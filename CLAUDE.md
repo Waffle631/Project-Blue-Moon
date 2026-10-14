@@ -14,6 +14,50 @@ to `gow3` (commits `3a0712a`, `a7cf186`) — the code is single-game, not a mult
 No game files are in the repo. A decrypted (fake-signed) dump folder with `eboot.bin`,
 `sce_module/` and `sce_sys/` is needed to run anything beyond unit tests.
 
+## Current goal: retarget to Tsukihime (branch `tsuki/main`)
+
+This branch is porting **TSUKIHIME -A piece of blue glass moon-** (PS4, CUSA47999, v01.00) on top
+of the GoW3 codebase. Everything below still describes the GoW3 code as it is; the
+"Game-specific surface" section is the checklist of what must be generalized or replaced.
+GoW3-only features (orb/damage hooks, actors, enemy health bar, GoW3 patches XML, `gbuffer_draw`
+heuristics, touchpad semantics, GoW3-only tests) must be **deleted** from the tree, not disabled,
+isolated or adapted: no dead code behind a switch. GoW3 stops being a supported title on this
+branch (history stays in git and the `gow3` branch). Generic code (loader, runtime, shadPS4 core,
+upscalers) stays. Order of work and acceptance criteria: Spec 1 in `.waffle/ROADMAP.md`.
+
+- Dump: `Tsukihime/CUSA47999/` (untracked, ~45 GB — never `git add` it). Run with
+  `GOW3_GAME_DIR=Tsukihime/CUSA47999`. Game data is in `image/` (`allpac*.hed/.mrg/.nam`,
+  `bgm.*`, `allscr.mrg`) plus `data/`; it is a visual novel, so 2D/video/audio paths matter more
+  than the 3D heuristics.
+- `prepare.py` parses the eboot cleanly: 34 MB image, entry `0xef390`, 337 imports, relocation
+  types 1/7/8 only (within the loader's limits).
+- Bundled modules: `libc.prx`, `libSceFios2.prx` and `libSceNpToolkit2.prx`. The eboot does not
+  import NpToolkit2 (not in its needed modules), so the default `link_modules.py` set is enough.
+- After linking, 359 imports go to the host runtime. A static inventory (2026-10-13, not yet
+  confirmed by `--check-imports`) found ~61 without implementation: 29 libkernel (notably
+  **kernel event flags**, process time counter, `pthread_rwlock_*`, thread dtors/atexit hooks),
+  libSceAudiodec (6) + libSceAudiodecCpu (3) — the game decodes audio through these, **not AJM** —
+  SaveData (Initialize3, Mount2, backup APIs), ScreenShot, SharePlay, GameLiveStreaming,
+  VideoRecording, Sysmodule, SystemService, UserService, MsgDialog, DiscMap, LibcInternalExt.
+  GnmDriver/VideoOut/AvPlayer NIDs all exist in the shadPS4 tables. Cutscenes are 134 `.mp4` in
+  `image/movie/` played through **`sceAvPlayer`** (not `sceVideodec`). libSceMouse is used and
+  already covered. Start bring-up with
+  `out/gow3-probe out/boot-linked.bin --app0 Tsukihime/CUSA47999 --check-imports`.
+- Target language: **English**. The game ships ja/en/zc/zt (`ft_*.mrg` fonts, `*_en.mp4` videos)
+  and picks it from the system language (`sceSystemServiceParamGetInt`); `runtime_services.c`
+  already reports 1 = English (US) unless `GOW3_LANGUAGE` overrides it. Japanese and the other
+  languages are not a goal.
+- Roadmap (Spanish): `.waffle/ROADMAP.md` — stages, specs and the full missing-API table.
+- Dev/test machine: Bazzite 44 (Fedora-based, immutable), KDE Plasma 6 on Wayland, Ryzen 5 7600,
+  16 GiB RAM, **AMD Radeon RX 6650 XT** (RADV). Linux is the primary platform; Windows comes later.
+- Build environment: everything is built and tested inside the Fedora 44 distrobox `ps4dev`
+  (the host is immutable; no `rpm-ostree`). Claude Code runs in the VS Code Flatpak, which cannot
+  see `distrobox`, so run commands as
+  `flatpak-spawn --host distrobox enter ps4dev -- sh -c 'cd /var/home/wafflepc/Documentos/ps4_port && bash build.sh'`.
+  `/tmp` of the Flatpak sandbox is not visible inside the container: write logs under `out/`.
+  Container setup, dependencies (Vulkan-Headers ≥ 1.4.344 in `/usr/local`, RPM Fusion full ffmpeg)
+  and command reference: `docs/ENTORNO.md`.
+
 ## Build and test
 
 Linux (deps via pkg-config: vulkan, sdl3, ffmpeg; `shell.nix` on NixOS, re-entered automatically):
@@ -109,7 +153,7 @@ TEB TLS slot on Windows, patched by `patch_tcb_loads`).
   upscalers, multisampling); `run.py` and `scripts/graphics_options.py` derive them from the
   launcher/`gow3.ini`. Temporal upscalers/motion vectors are experimental and off by default.
 
-## Game-specific surface (what to change to target another title)
+## Game-specific surface (GoW3 code to delete; what any other title would need)
 
 - Hooks (cheats, orb/damage multipliers, enemy health bar): `install_*` in `src/probe.c`,
   `src/*_hook.h`, `gpu/shim/gow3_orbs.cpp`, `gow3_actors.cpp`. Sites are found by byte signature
