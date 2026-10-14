@@ -1,27 +1,27 @@
 # Depth-Adaptive TAA Improvements
 
-**Дата:** 2026-10-01  
-**Статус:** Исторический эксперимент, заменён исправлением temporal reprojection.
+**Fecha:** 2026-10-01  
+**Estado:** Experimento histórico, reemplazado por la corrección de temporal reprojection.
 
-Описанные ниже пороги и веса больше не используются. Уменьшение веса истории вдали
-усиливало мерцание; сравнение device depth между разными камерами и хранение глубины
-в FP16 не позволяли корректно отличать дальние поверхности.
+Los umbrales y pesos descritos a continuación ya no se usan. Reducir el peso de la historia a distancia
+aumentaba el parpadeo; la comparación de device depth entre cámaras distintas y el almacenamiento de la profundidad
+en FP16 no permitían distinguir correctamente las superficies lejanas.
 
-## Проблема
+## Problema
 
-Текущая реализация TAA использует фиксированные пороги для:
-1. Определения disocclusion (раскрытие новых поверхностей): `0.0005`
-2. Временного веса накопления: `0.9` → `0.65` в зависимости от движения
+La implementación actual de TAA usa umbrales fijos para:
+1. Detectar disocclusion (descubrimiento de superficies nuevas): `0.0005`
+2. El peso temporal de acumulación: `0.9` → `0.65` según el movimiento
 
-Эти параметры не учитывают глубину пикселя, что приводит к проблемам:
-- **Далёкие объекты (depth → 1.0)**: временная нестабильность, мерцание
-- **Близкие объекты (depth → 0.0)**: чрезмерное размытие при быстром движении
+Estos parámetros no tienen en cuenta la profundidad del píxel, lo que provoca problemas:
+- **Objetos lejanos (depth → 1.0)**: inestabilidad temporal, parpadeo
+- **Objetos cercanos (depth → 0.0)**: desenfoque excesivo con movimiento rápido
 
-## Решение: Адаптивные пороги по глубине
+## Solución: umbrales adaptativos según la profundidad
 
 ### 1. Depth-Adaptive Disocclusion Threshold
 
-**Файл:** `gpu/shadps4/video_core/host_shaders/taa.comp`
+**Archivo:** `gpu/shadps4/video_core/host_shaders/taa.comp`
 
 ```glsl
 float depthThreshold(float depth) {
@@ -30,12 +30,12 @@ float depthThreshold(float depth) {
 }
 ```
 
-**Логика:**
-- Близкие поверхности (depth < 0.7): порог `0.001` — допускает небольшие расхождения
-- Дальние поверхности (depth > 0.95): порог `0.0002` — строже, меньше false positives
-- Плавный переход через `smoothstep(0.7, 0.95, depth)`
+**Lógica:**
+- Superficies cercanas (depth < 0.7): umbral `0.001` — admite pequeñas discrepancias
+- Superficies lejanas (depth > 0.95): umbral `0.0002` — más estricto, menos false positives
+- Transición suave mediante `smoothstep(0.7, 0.95, depth)`
 
-**Применение:**
+**Aplicación:**
 ```glsl
 float depthDiff = abs(history.a - depth);
 float threshold = depthThreshold(depth);
@@ -56,16 +56,16 @@ float temporalWeight(float depth, float motionLength) {
 }
 ```
 
-**Логика:**
-- **Базовый вес без движения:**
-  - Близко: `0.9` (агрессивное накопление истории)
-  - Далеко: `0.8` (консервативнее, меньше мерцания)
+**Lógica:**
+- **Peso base sin movimiento:**
+  - Cerca: `0.9` (acumulación agresiva de la historia)
+  - Lejos: `0.8` (más conservador, menos parpadeo)
   
-- **При быстром движении (motionLength > 16px):**
-  - Близко: снижается до `0.65`
-  - Далеко: снижается до `0.5` (ещё консервативнее)
+- **Con movimiento rápido (motionLength > 16px):**
+  - Cerca: baja hasta `0.65`
+  - Lejos: baja hasta `0.5` (aún más conservador)
 
-**Применение:**
+**Aplicación:**
 ```glsl
 float motionLength = length(motion);
 float weight = temporalWeight(depth, motionLength);
@@ -74,7 +74,7 @@ result = mix(current, clipped, weight);
 
 ### 3. Motion Vector Validation (camera_motion.comp)
 
-**Файл:** `gpu/shadps4/video_core/host_shaders/camera_motion.comp`
+**Archivo:** `gpu/shadps4/video_core/host_shaders/camera_motion.comp`
 
 ```glsl
 // Depth-adaptive validation: distant surfaces need tighter depth matching.
@@ -85,16 +85,16 @@ if (object_motion.b > 0.99 && abs(object_motion.a - depth) < depth_threshold &&
 }
 ```
 
-**Что изменено:**
-- Старый порог: фиксированный `0.001`
-- Новый порог: `0.001` → `0.0003` для далёких поверхностей
-- Предотвращает использование object motion vectors от неправильных пикселей
+**Qué cambió:**
+- Umbral antiguo: `0.001` fijo
+- Umbral nuevo: `0.001` → `0.0003` para superficies lejanas
+- Evita usar object motion vectors de píxeles incorrectos
 
-### 4. Улучшенная визуализация debug режимов
+### 4. Mejor visualización de los modos de depuración
 
-**Файл:** `gpu/shadps4/video_core/host_shaders/camera_motion.comp`
+**Archivo:** `gpu/shadps4/video_core/host_shaders/camera_motion.comp`
 
-Режимы `GOW3_DEBUG_MOTION=1` теперь структурированы:
+Los modos `GOW3_DEBUG_MOTION=1` ahora están estructurados así:
 ```glsl
 if (mode == 1) {
     // Raw depth visualization
@@ -106,82 +106,82 @@ if (mode == 1) {
 }
 ```
 
-## Ожидаемые улучшения
+## Mejoras esperadas
 
-### Дальние объекты
-- ✅ Меньше мерцания на далёких стенах и небе
-- ✅ Более стабильная история при небольших движениях камеры
-- ✅ Меньше ложных disocclusion от численных ошибок глубины
+### Objetos lejanos
+- ✅ Menos parpadeo en paredes lejanas y en el cielo
+- ✅ Historia más estable con pequeños movimientos de cámara
+- ✅ Menos disocclusion falsas por errores numéricos de profundidad
 
-### Близкие объекты
-- ✅ Меньше размытия при быстрых движениях (персонаж, оружие)
-- ✅ Более точные object motion vectors
-- ✅ Лучший баланс между накоплением и отзывчивостью
+### Objetos cercanos
+- ✅ Menos desenfoque en movimientos rápidos (personaje, arma)
+- ✅ Object motion vectors más precisos
+- ✅ Mejor equilibrio entre acumulación y capacidad de respuesta
 
-### Адаптивная зона (depth 0.7-0.95)
-- Плавный переход между режимами
-- Предотвращает резкие артефакты на границе
+### Zona adaptativa (depth 0.7-0.95)
+- Transición suave entre modos
+- Evita artefactos bruscos en el límite
 
-## Тестирование
+## Pruebas
 
-### Визуальная проверка
+### Verificación visual
 ```bash
-# TAA в нативном разрешении
+# TAA a resolución nativa
 GOW3_UPSCALER=taa bash run.sh
 
-# Проверить:
-# 1. Мерцание далёких стен (тестовая сцена, верхние этажи)
-# 2. Размытие оружия при быстром повороте
-# 3. Стабильность при медленном движении камеры
-# 4. Disocclusion при обходе углов
+# Comprobar:
+# 1. Parpadeo de paredes lejanas (escena de prueba, pisos superiores)
+# 2. Desenfoque del arma en un giro rápido
+# 3. Estabilidad con movimiento lento de la cámara
+# 4. Disocclusion al rodear esquinas
 ```
 
-### Debug режимы
+### Modos de depuración
 ```bash
-# Визуализация глубины
+# Visualización de la profundidad
 GOW3_DEBUG_MOTION=1 bash run.sh
 # Toggle: (1<<21) = raw depth, (1<<22) = view-space z
 
-# Проверка motion vectors
+# Comprobación de motion vectors
 # Toggle: (1<<20) = blended motion, (1<<23) = reprojection, (1<<24) = difference
 ```
 
-### A/B сравнение
+### Comparación A/B
 ```bash
-# Создать файл для runtime-переключения
+# Crear un archivo para el cambio en tiempo de ejecución
 echo "0" > /tmp/gow3_toggle
 
-# В игре переключать биты для сравнения
-# Потребуется временный механизм для старых/новых весов
+# En el juego, alternar los bits para comparar
+# Hará falta un mecanismo temporal para los pesos antiguos/nuevos
 ```
 
-## Потенциальные риски
+## Riesgos potenciales
 
-1. **Слишком консервативные веса на далёких объектах**
-   - Может увеличить смазывание при быстрых поворотах
-   - Решение: настроить `baseWeight` (0.8 → 0.85?)
+1. **Pesos demasiado conservadores en objetos lejanos**
+   - Pueden aumentar el emborronado en giros rápidos
+   - Solución: ajustar `baseWeight` (0.8 → 0.85?)
 
-2. **Слишком строгий порог глубины для object motion**
-   - Может отбрасывать валидные векторы
-   - Решение: `0.0003` → `0.0005` для depth > 0.95
+2. **Umbral de profundidad demasiado estricto para object motion**
+   - Puede descartar vectores válidos
+   - Solución: `0.0003` → `0.0005` para depth > 0.95
 
-3. **Smoothstep диапазон 0.7-0.95 может быть неоптимальным**
-   - Игра, на которой калибровали: near=0.05, far=3000
-   - Большинство геометрии в диапазоне 0.1-0.9
-   - Решение: профилирование распределения глубины в типичных сценах
+3. **El rango de smoothstep 0.7-0.95 puede no ser óptimo**
+   - Juego con el que se calibró: near=0.05, far=3000
+   - La mayor parte de la geometría está en el rango 0.1-0.9
+   - Solución: perfilar la distribución de profundidad en escenas típicas
 
-## Следующие шаги
+## Próximos pasos
 
-1. ✅ Реализовать depth-adaptive пороги
-2. ⏳ Собрать и протестировать в игре
-3. ⏳ Собрать статистику распределения глубины
-4. ⏳ Настроить пороги на основе реальных данных
-5. ⏳ Добавить runtime-переключение для A/B тестов
-6. ⏳ Документировать финальные параметры
+1. ✅ Implementar los umbrales depth-adaptive
+2. ⏳ Compilar y probar en el juego
+3. ⏳ Recoger estadísticas de la distribución de profundidad
+4. ⏳ Ajustar los umbrales con datos reales
+5. ⏳ Añadir cambio en tiempo de ejecución para pruebas A/B
+6. ⏳ Documentar los parámetros finales
 
-## Ссылки
+## Enlaces
 
-- [upscaler.md](upscaler.md) — общая архитектура апскейлера
-- [motion_vectors.md](motion_vectors.md) — векторы движения
+- [upscaler.md](upscaler.md) — arquitectura general del upscaler
+- [motion_vectors.md](motion_vectors.md) — vectores de movimiento
 - TAA shader: `gpu/shadps4/video_core/host_shaders/taa.comp`
 - Camera motion: `gpu/shadps4/video_core/host_shaders/camera_motion.comp`

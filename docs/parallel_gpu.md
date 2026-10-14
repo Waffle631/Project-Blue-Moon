@@ -1,578 +1,578 @@
-# Parallel GPU command processing — design notes
+# Procesamiento paralelo de comandos de GPU — notas de diseño
 
-Goal: remove the single-core bottleneck of the emulated GPU command processor
-(`shadPS4:GpuCommandProcessor`, ~100% of one core while the rest of the CPU idles).
+Objetivo: eliminar el cuello de botella de un solo núcleo del procesador de comandos de GPU emulado
+(`shadPS4:GpuCommandProcessor`, ~100 % de un núcleo mientras el resto de la CPU está ocioso).
 
-## Measurements (the base port's original game, test scene, ~70 FPS, `GOW3_DCB_STATS=1`)
+## Mediciones (el juego original del port base, escena de prueba, ~70 FPS, `GOW3_DCB_STATS=1`)
 
 | | |
 |---|---|
-| Graphics command buffers submitted | 4200–5800/s, **~65–80 per frame** |
-| Draws | ~110 000/s, ~1600 per frame |
-| Draws per command buffer | mostly 10–99, max ~200 |
-| Nested IndirectBuffer | none |
-| State before the first draw | ~118 context + ~31 SH register dwords written; only 8% start with ClearState |
+| Command buffers gráficos enviados | 4200–5800/s, **~65–80 por fotograma** |
+| Draws | ~110 000/s, ~1600 por fotograma |
+| Draws por command buffer | en su mayoría 10–99, máx. ~200 |
+| IndirectBuffer anidado | ninguno |
+| Estado antes del primer draw | ~118 dwords de registros de context + ~31 de SH escritos; solo el 8 % empieza con ClearState |
 
-GPU thread profile after the single-thread work (perf, `cpu-clock:u`):
-texture binding ~25%, pipeline selection ~19% (StageSpecialization build/compare,
-sharp fetches), buffer binding ~14%, render targets ~8%, PM4 decode ~3%.
+Perfil del hilo de GPU tras el trabajo de un solo hilo (perf, `cpu-clock:u`):
+binding de texturas ~25 %, selección de pipeline ~19 % (construcción/comparación de StageSpecialization,
+sharp fetches), binding de buffers ~14 %, render targets ~8 %, decodificación PM4 ~3 %.
 
-## Constraints
+## Restricciones
 
-- Command buffers are not self-contained: register state is inherited, so a worker needs
-  the register state at the start of its buffer (context + SH ranges are ~6–8 KiB; one
-  snapshot per buffer is ~40 MB/s at 70 FPS).
-- Draw preparation reads guest memory, not only registers: extended user data (EUD) and
-  shader code. Earlier packets in the stream (DMA, WriteData, constant-engine dumps) can
-  change that memory, so work done ahead of the GPU thread may see stale data.
-- The caches (buffer, texture, pipeline) and per-draw scratch state (flags in `Image`,
-  user data inside shared `Shader::Info`) are single-threaded by design.
-- Image layout and barrier tracking assume one ordered stream.
+- Los command buffers no son autocontenidos: el estado de los registros se hereda, así que un worker necesita
+  el estado de los registros al inicio de su buffer (los rangos de context + SH son ~6–8 KiB; un
+  snapshot por buffer son ~40 MB/s a 70 FPS).
+- La preparación de un draw lee memoria del guest, no solo registros: user data extendido (EUD) y
+  código de shaders. Los paquetes anteriores del stream (DMA, WriteData, volcados del constant engine) pueden
+  cambiar esa memoria, así que el trabajo hecho por adelantado respecto al hilo de GPU puede ver datos obsoletos.
+- Las cachés (buffer, textura, pipeline) y el estado scratch por draw (flags en `Image`,
+  user data dentro del `Shader::Info` compartido) son de un solo hilo por diseño.
+- El seguimiento de layouts de imagen y de barreras supone un único stream ordenado.
 
 ## Plan
 
-1. **Speculative draw preparation on workers, validated on the GPU thread.**
-   A cheap serial pass records the register state at the start of each command buffer.
-   Workers replay their buffer's register writes and, per draw, precompute the pure
-   parts: pipeline key and stage specialization inputs, sharp fetches, texture and
-   render-target descriptions, dynamic state values, vertex buffer ranges. Each result
-   carries the flattened user data it was computed from. The GPU thread still decodes
-   the stream and refreshes the flattened user data (cheap), compares it with the
-   worker's copy, and uses the prepared draw only on a match; otherwise it computes
-   as today. Correctness never depends on the workers.
-   Prerequisite refactor: sharp consumers read user data through a view instead of
-   the shared `Shader::Info` members, and per-draw scratch moves into a context struct.
-2. **Thread-safe cache lookups.** Finding existing buffers/images/views moves to the
-   workers; creation, uploads, barriers stay on the GPU thread.
-3. **Parallel Vulkan recording.** Each worker records its own command buffer; they are
-   executed in submission order with barriers at the seams.
+1. **Preparación especulativa de draws en workers, validada en el hilo de GPU.**
+   Un pase serie barato registra el estado de los registros al inicio de cada command buffer.
+   Los workers reproducen las escrituras de registros de su buffer y, por cada draw, precalculan las
+   partes puras: clave de pipeline y entradas de la especialización de stages, sharp fetches, descripciones de
+   texturas y render targets, valores del estado dinámico, rangos de vertex buffers. Cada resultado
+   lleva el user data aplanado a partir del cual se calculó. El hilo de GPU sigue decodificando
+   el stream y refrescando el user data aplanado (barato), lo compara con la copia
+   del worker y usa el draw preparado solo si coinciden; si no, calcula
+   como hoy. La corrección nunca depende de los workers.
+   Refactor previo: los consumidores de sharps leen el user data mediante una vista en lugar de
+   los miembros compartidos de `Shader::Info`, y el scratch por draw pasa a un struct de contexto.
+2. **Búsquedas en caché seguras entre hilos.** Encontrar buffers/imágenes/views existentes pasa a los
+   workers; la creación, las subidas y las barreras se quedan en el hilo de GPU.
+3. **Grabación Vulkan en paralelo.** Cada worker graba su propio command buffer; se
+   ejecutan en orden de envío con barreras en las uniones.
 
-Every step keeps a `GOW3_TOGGLE_FILE` bit so it can be switched off at run time and
-compared by screenshot and frame rate.
+Cada paso conserva un bit de `GOW3_TOGGLE_FILE` para poder desactivarlo en tiempo de ejecución y
+compararlo mediante capturas y tasa de fotogramas.
 
-## Portability
+## Portabilidad
 
-Must scale down to the Steam Deck (4 cores / 8 threads): worker count follows
-`hardware_concurrency()`, no busy waiting when cores are scarce, no AVX-512.
+Debe escalar hacia abajo hasta la Steam Deck (4 núcleos / 8 hilos): el número de workers sigue a
+`hardware_concurrency()`, sin espera activa cuando los núcleos escasean, sin AVX-512.
 
-## Results
+## Resultados
 
-Step 1 (draw preparation, 4 workers, toggle 8192), the test scene, same view:
-71.5 FPS with prepared draws vs 64.1 without (+11.5%), identical screenshots.
-97–98% of direct draws use the prepared pipeline; each `bb:DrawPrep` worker ~10% of a core.
-The GPU thread is still ~90% busy: texture/buffer binding is the next target (step 2).
+Paso 1 (preparación de draws, 4 workers, toggle 8192), escena de prueba, misma vista:
+71.5 FPS con draws preparados frente a 64.1 sin ellos (+11.5 %), capturas idénticas.
+El 97–98 % de los draws directos usan el pipeline preparado; cada worker `bb:DrawPrep` ~10 % de un núcleo.
+El hilo de GPU sigue ocupado ~90 %: el binding de texturas/buffers es el siguiente objetivo (paso 2).
 
-Guest write faults (same view, toggle 65536): the game fills its per-frame buffers
-sequentially and each 4 KiB page cost a protection fault — ~115k faults/s, ~20% of every
-GXWorker and of the main thread spent in the kernel. Unprotecting the aligned 64 KiB window
-around a fault: 16k faults/s, kernel time ~8%, **81.0 FPS vs 66.4** (+22%), identical frames.
-The GPU command thread is back at ~100%: it is the limit again.
+Faults de escritura del guest (misma vista, toggle 65536): el juego llena sus buffers por fotograma
+de forma secuencial y cada página de 4 KiB costaba un fault de protección — ~115k faults/s, ~20 % de cada
+GXWorker y del hilo principal gastado en el kernel. Desprotegiendo la ventana alineada de 64 KiB
+alrededor de un fault: 16k faults/s, tiempo de kernel ~8 %, **81.0 FPS frente a 66.4** (+22 %), fotogramas idénticos.
+El hilo de comandos de GPU vuelve a estar en ~100 %: es de nuevo el límite.
 
-Rejected: "hot pages" (never re-protect pages written repeatedly, upload them on every
-binding) — the set grew to ~14k pages, re-uploads dropped the frame rate to 33 FPS and a GPU
-ring timeout followed. Left opt-in behind GOW3_HOT_PAGES=1.
+Descartado: "hot pages" (no volver a proteger nunca las páginas escritas repetidamente, subirlas en cada
+binding) — el conjunto creció hasta ~14k páginas, las resubidas bajaron la tasa de fotogramas a 33 FPS y siguió un timeout
+del ring de la GPU. Queda opt-in tras GOW3_HOT_PAGES=1.
 
-Texture description cache 2-way/4096, same-target fast path, LRU touch skip, no per-texture
-meta lookup: other outdoor view, 93.9 FPS; with the texture memos off (mask 1056) 65.6 FPS.
-Close to the 100 Hz display cap (vblank-paced), so further gains need an uncapped test.
+Caché de descripciones de texturas 2-way/4096, ruta rápida de mismo objetivo, omisión del LRU touch, sin
+búsqueda de meta por textura: otra vista exterior, 93.9 FPS; con los memos de texturas apagados (máscara 1056) 65.6 FPS.
+Cerca del tope de 100 Hz de la pantalla (ritmo por vblank), por lo que más ganancias requieren una prueba sin límite.
 
-## Streaming stutter (GOW3_FRAME_STATS "Stall:" lines)
+## Stutter de streaming (líneas "Stall:" de GOW3_FRAME_STATS)
 
-Running through new areas gave 60–170 ms frames (also in shadPS4). The GPU thread was busy
-the whole frame, mostly in the kernel, uploading 50–400 MB of textures and buffers per frame.
-Findings, in the order they were fixed:
+Correr por áreas nuevas daba fotogramas de 60–170 ms (también en shadPS4). El hilo de GPU estaba ocupado
+todo el fotograma, sobre todo en el kernel, subiendo 50–400 MB de texturas y buffers por fotograma.
+Hallazgos, en el orden en que se corrigieron:
 
-1. Guest-to-staging copies ran on one thread (the recording thread, textures on the GPU
-   thread). They now start at once on copy threads (`Gow3Copy::Async`, `gow3_copy.cpp`);
-   small copies are batched per thread (one wakeup per ~512 KiB — one per copy cost 25% FPS).
-   Guest-visible fences and queue submission wait for them (`Scheduler::WaitHostCopies`),
-   which keeps the fix for UI flicker (the guest reused buffers before deferred copies ran).
-2. Copies then ran at 0.2–0.4 GB/s per thread, almost all in the kernel: the first CPU access
-   to a new staging block makes the kernel allocate and clear it (~2 ms per 16 MiB), and the
-   staging pool freed blocks after 3 s idle, between streaming bursts. It now keeps 512 MiB
-   (`GOW3_STAGING_KEEP_MB`), frees the rest after 30 s and populates 128 MiB at startup.
-3. Write faults: a 256 KiB unprotect window (`GOW3_FAULT_WINDOW`) halves them again.
-   `GOW3_UFFD=1` tracks writes with userfaultfd write-protection instead of mprotect (no
-   address-space write lock, no mapping splits); read protection for readbacks still uses
-   mprotect. It removes the mprotect time but did not change the stalls measurably; opt-in.
-4. File reads into write-protected guest pages failed with EFAULT (kernel copies do not reach
-   the fault handler); reads now touch each destination page first.
+1. Las copias guest-a-staging se ejecutaban en un solo hilo (el hilo de grabación; las texturas en el hilo de
+   GPU). Ahora empiezan de inmediato en hilos de copia (`Gow3Copy::Async`, `gow3_copy.cpp`);
+   las copias pequeñas se agrupan por hilo (un despertar por cada ~512 KiB — uno por copia costaba un 25 % de FPS).
+   Los fences visibles para el guest y el envío a la cola las esperan (`Scheduler::WaitHostCopies`),
+   lo que mantiene la corrección del parpadeo de la UI (el guest reutilizaba buffers antes de que se ejecutaran las copias diferidas).
+2. Entonces las copias iban a 0.2–0.4 GB/s por hilo, casi todo en el kernel: el primer acceso de CPU
+   a un nuevo bloque de staging hace que el kernel lo reserve y lo ponga a cero (~2 ms por 16 MiB), y el
+   pool de staging liberaba bloques tras 3 s de inactividad, entre ráfagas de streaming. Ahora conserva 512 MiB
+   (`GOW3_STAGING_KEEP_MB`), libera el resto tras 30 s y puebla 128 MiB al inicio.
+3. Faults de escritura: una ventana de desprotección de 256 KiB (`GOW3_FAULT_WINDOW`) los reduce a la mitad otra vez.
+   `GOW3_UFFD=1` rastrea escrituras con la protección de escritura de userfaultfd en lugar de mprotect (sin
+   write lock del espacio de direcciones, sin divisiones de mapeos); la protección de lectura para los readbacks sigue usando
+   mprotect. Elimina el tiempo de mprotect pero no cambió los stalls de forma medible; opt-in.
+4. Las lecturas de archivo hacia páginas del guest protegidas contra escritura fallaban con EFAULT (las copias del kernel no llegan
+   al manejador de faults); ahora las lecturas tocan primero cada página de destino.
 
-Result: stalls are mostly 40–50 ms (GPU thread ~30 ms of draw work plus ~12 ms of copies)
-instead of 60–170 ms; the area load frame 350 ms instead of 430–760 ms.
+Resultado: los stalls son sobre todo de 40–50 ms (hilo de GPU ~30 ms de trabajo de draws más ~12 ms de copias)
+en lugar de 60–170 ms; el fotograma de carga de área 350 ms en lugar de 430–760 ms.
 
-## Step 2, first slice: resource sharps on the workers (2026-09-30)
+## Paso 2, primera porción: sharps de recursos en los workers (2026-09-30)
 
-A prepared stage now also carries the sharps its worker read from the flattened user data:
-every T# with its texture-description hash, every S# and V# (`PrepareResources`,
-`PreparedStage::image_sharps` and siblings, in the arena of the submission). The GPU thread
-uses them when `PipelineCache::UsedPrepared()` reports that the draw's pipeline came from the
-prepared draw — the flattened data was then compared word for word, and sharps depend on
-nothing else. Resource list sizes are checked per stage. Toggle 4096 switches it off.
+Un stage preparado ahora también lleva los sharps que su worker leyó del user data aplanado:
+cada T# con el hash de su descripción de textura, cada S# y V# (`PrepareResources`,
+`PreparedStage::image_sharps` y similares, en el arena del envío). El hilo de GPU
+los usa cuando `PipelineCache::UsedPrepared()` indica que el pipeline del draw vino del
+draw preparado — los datos aplanados se compararon entonces palabra por palabra, y los sharps no dependen
+de nada más. Los tamaños de las listas de recursos se comprueban por stage. El toggle 4096 lo apaga.
 
-A/B in one run, standing still, `GOW3_FPS_LIMIT=0`, FSR 4, 20 s phases: 69–70 FPS with the
-prepared sharps, 66.5–67 without (+3%), same image.
+A/B en una misma ejecución, quieto, `GOW3_FPS_LIMIT=0`, FSR 4, fases de 20 s: 69–70 FPS con los
+sharps preparados, 66.5–67 sin ellos (+3 %), misma imagen.
 
-Upscaler costs removed from the GPU thread before this (perf, DWARF call graphs): per-draw
-driver format queries in `SceneTargets::Eligible` (~13%), direct recording forced by
-`CommandBuffer()` in object motion and the reactive mask, index-list scans for object motion
-(~10%, now `Motion::IndexRangeCache`).
+Costes del upscaler retirados del hilo de GPU antes de esto (perf, grafos de llamadas DWARF): consultas
+de formato al driver por draw en `SceneTargets::Eligible` (~13 %), grabación directa forzada por
+`CommandBuffer()` en object motion y la reactive mask, escaneos de listas de índices para object motion
+(~10 %, ahora `Motion::IndexRangeCache`).
 
-What remains on the GPU thread is mostly work on shared cache state: texture binding ~23%
-(FindView ~5.6%, UpdateImage/Track/Touch ~5%, barriers), buffer binding ~12% (ObtainBuffer
-~11%), render targets ~8%. The next step is a draw-level split: the GPU thread keeps decode,
-cache mutation and barriers; a second ordered stage builds descriptor writes and vertex
-input state from the resolved handles.
+Lo que queda en el hilo de GPU es sobre todo trabajo sobre el estado compartido de las cachés: binding de texturas ~23 %
+(FindView ~5.6 %, UpdateImage/Track/Touch ~5 %, barreras), binding de buffers ~12 % (ObtainBuffer
+~11 %), render targets ~8 %. El siguiente paso es una división a nivel de draw: el hilo de GPU conserva la decodificación,
+la mutación de cachés y las barreras; una segunda etapa ordenada construye las escrituras de descriptores y el estado
+de entrada de vértices a partir de los handles ya resueltos.
 
-## Scaling to the available threads (2026-09-30)
+## Escalado a los hilos disponibles (2026-09-30)
 
-Draw preparation used to replay the whole command stream in every worker and was switched
-off below 12 hardware threads (Steam Deck: no workers). Now:
+La preparación de draws antes reproducía todo el stream de comandos en cada worker y se desactivaba
+por debajo de 12 hilos de hardware (Steam Deck: sin workers). Ahora:
 
-- One scanner (`bb:DrawScan`) replays the register writes in order and stores, per buffer,
-  its starting checksum and a delta of the 32-word register blocks it wrote
-  (`AmdGpu::RegDirty/RegDelta`, recorded by `ApplyGraphicsRegisterPacket`).
-- Workers (`bb:DrawPrepN`, half the hardware threads in the affinity mask, 1..8) claim the
-  nearest scanned buffer ahead of the GPU thread, reach its starting state by applying the
-  deltas since their last buffer (or from the queue's tail state), and prepare its draws.
-  More workers now mean more buffers prepared in parallel, not more duplicated replay.
-- All helpers are SCHED_IDLE (`gow3_threads.h`): they only take idle cores. If the scanner
-  starves (busy CPU), the GPU thread rebases it from its own register state once the lag
-  passes 64 buffers instead of queueing without bound (`scanner rebases` in the stats).
-- Copy threads use the same affinity count (critical path, normal priority).
+- Un scanner (`bb:DrawScan`) reproduce en orden las escrituras de registros y guarda, por buffer,
+  su checksum inicial y un delta de los bloques de registros de 32 palabras que escribió
+  (`AmdGpu::RegDirty/RegDelta`, registrados por `ApplyGraphicsRegisterPacket`).
+- Los workers (`bb:DrawPrepN`, la mitad de los hilos de hardware de la máscara de afinidad, 1..8) reclaman el
+  buffer escaneado más cercano por delante del hilo de GPU, alcanzan su estado inicial aplicando los deltas
+  desde su último buffer (o desde el estado de cola de la cola), y preparan sus draws.
+  Más workers significan ahora más buffers preparados en paralelo, no más reproducción duplicada.
+- Todos los ayudantes son SCHED_IDLE (`gow3_threads.h`): solo toman núcleos ociosos. Si el scanner
+  se queda sin recursos (CPU ocupada), el hilo de GPU lo rebasa desde su propio estado de registros una vez que el retraso
+  supera 64 buffers, en lugar de encolar sin límite (`scanner rebases` en las estadísticas).
+- Los hilos de copia usan el mismo recuento de afinidad (camino crítico, prioridad normal).
 
-A/B in one run (toggle 8192, standing still, `GOW3_FPS_LIMIT=0`, FSR 4), ~98% of direct draws
-prepared, no rebases:
+A/B en una misma ejecución (toggle 8192, quieto, `GOW3_FPS_LIMIT=0`, FSR 4), ~98 % de los draws directos
+preparados, sin rebases:
 
-| CPU | with preparation | without |
+| CPU | con preparación | sin |
 |---|---|---|
-| 16 threads, 8 workers | ~74 FPS | ~57.7 FPS |
-| `taskset -c 0-3,8-11` (4 cores / 8 threads, Deck-like), 4 workers | ~68 FPS | ~53 FPS |
+| 16 hilos, 8 workers | ~74 FPS | ~57.7 FPS |
+| `taskset -c 0-3,8-11` (4 núcleos / 8 hilos, similar a la Deck), 4 workers | ~68 FPS | ~53 FPS |
 
-The previous design (4 replaying workers) gave ~69 FPS at the same spot on 16 threads, and
-none on 8.
+El diseño anterior (4 workers que reproducían) daba ~69 FPS en el mismo punto con 16 hilos, y
+ninguno con 8.
 
-## Vertex inputs on the workers (2026-09-30)
+## Vertex inputs en los workers (2026-09-30)
 
-`PreparedDraw::vertex` holds, for the dynamic vertex input path, the attribute and binding
-descriptions (`GetVertexInputs`), the V# of every stream, the stream memory merged into
-ranges with each stream's range index, and the XXH3 of the streams (object motion). The GPU
-thread only obtains the buffers of the merged ranges and records the bindings. Used when the
-prepared draw's pipeline was taken, the attribute count matches the pipeline's fetch shader
-and no frame capture runs; toggle 4096 switches it off together with the sharps.
+`PreparedDraw::vertex` contiene, para la ruta de vertex input dinámico, las descripciones de atributos y bindings
+(`GetVertexInputs`), el V# de cada stream, la memoria de los streams fusionada en
+rangos con el índice de rango de cada stream, y el XXH3 de los streams (object motion). El hilo
+de GPU solo obtiene los buffers de los rangos fusionados y graba los bindings. Se usa cuando se tomó el
+pipeline del draw preparado, el número de atributos coincide con el fetch shader del pipeline
+y no hay una captura de fotograma en curso; el toggle 4096 lo apaga junto con los sharps.
 
-A/B (standing still, `GOW3_FPS_LIMIT=0`, FSR 4, 16 threads): ~69.3 FPS on, ~65.7 off (+5.5%;
-the sharps alone gave +3%). Screenshots identical.
+A/B (quieto, `GOW3_FPS_LIMIT=0`, FSR 4, 16 hilos): ~69.3 FPS activado, ~65.7 desactivado (+5.5 %;
+los sharps solos daban +3 %). Capturas idénticas.
 
-Render targets were looked at and left on the GPU thread: their descriptions are already
-memoized per slot (key copy + compare), the size hint (`last_cb_extent`) is GPU-thread state
-rather than register state, and the rest of `BeginRendering` is view lookup, barriers and the
-reduced-resolution proxies — all on shared mutable state.
+Se examinaron los render targets y se dejaron en el hilo de GPU: sus descripciones ya están
+memoizadas por slot (copia de clave + comparación), la pista de tamaño (`last_cb_extent`) es estado del hilo de GPU
+y no estado de registros, y el resto de `BeginRendering` es búsqueda de views, barreras y los
+proxies de resolución reducida — todo sobre estado mutable compartido.
 
-## Engine short paths: investigation (2026-09-30, in progress)
+## Rutas cortas del motor: investigación (2026-09-30, en curso)
 
-- The measured eboot has no symbols but links Sony's Gnmx (`sdk\target\src\gnmx\gfxcontext.cpp`,
-  `lwgfxcontext.cpp`); the game's own engine sits on top, with middleware for the
-  post-processing.
-- `GOW3_BUFFER_STATS=1` (buffer_cache.cpp) prints buffer bindings per guest region every 5 s.
-  Almost all traffic comes from the engine's frame ring, ~0x1043400000–0x1049xxxxxx inside the
-  2.4 GB direct allocation at 0x1042c00000: ~400k small constant copies/s (~190 MB/s) and
-  ~850 MB/s of arena re-uploads after CPU writes (~13 MB per frame).
-- Candidate short path: import that ring into Vulkan (VK_EXT_external_memory_host) so the GPU
-  reads it in place — no copies, no page tracking, far fewer GPU-thread operations.
-  Blocker to resolve first: EOP fences are signalled when the GPU thread records the packet,
-  not when the GPU executes it, so the guest may rewrite ring data still unread by the GPU.
-  With ~100 MB of ring and ~13 MB per frame the wrap is ~7–8 frames; the GPU's lag is bounded
-  by the presenter's frame pool (`present_frames`, swapchain image count). Next: measure the
-  ring's wrap period per frame and the real GPU lag, then prototype the import behind a toggle.
+- El eboot medido no tiene símbolos pero enlaza el Gnmx de Sony (`sdk\target\src\gnmx\gfxcontext.cpp`,
+  `lwgfxcontext.cpp`); el motor propio del juego se apoya encima, con middleware para el
+  postprocesado.
+- `GOW3_BUFFER_STATS=1` (buffer_cache.cpp) imprime los bindings de buffers por región del guest cada 5 s.
+  Casi todo el tráfico viene del frame ring del motor, ~0x1043400000–0x1049xxxxxx dentro de la
+  reserva directa de 2.4 GB en 0x1042c00000: ~400k copias pequeñas de constantes/s (~190 MB/s) y
+  ~850 MB/s de resubidas de arena tras escrituras de la CPU (~13 MB por fotograma).
+- Ruta corta candidata: importar ese ring a Vulkan (VK_EXT_external_memory_host) para que la GPU
+  lo lea en el sitio — sin copias, sin seguimiento de páginas, muchas menos operaciones del hilo de GPU.
+  Bloqueo a resolver primero: los fences EOP se señalizan cuando el hilo de GPU graba el paquete,
+  no cuando la GPU lo ejecuta, así que el guest puede reescribir datos del ring que la GPU aún no ha leído.
+  Con ~100 MB de ring y ~13 MB por fotograma, la vuelta completa es de ~7–8 fotogramas; el retraso de la GPU está acotado
+  por el pool de fotogramas del presenter (`present_frames`, número de imágenes del swapchain). Siguiente: medir
+  el periodo de vuelta del ring por fotograma y el retraso real de la GPU, luego prototipar la importación tras un toggle.
 
-### Measurements for the frame-data window (GOW3_BUFFER_STATS=1)
+### Mediciones para la ventana de datos de fotograma (GOW3_BUFFER_STATS=1)
 
-- Reuse distance of 64 KiB blocks in 0x104xxxxxxx: overwhelmingly 1 frame (then 2). The engine
-  rewrites the same memory every frame; there is no long ring.
-- GPU lag when the GPU thread starts a frame (`GPU lag at frame start`): almost always 0 —
-  the GPU has finished the previous frame. But the engine writes the next frame's data while
-  the GPU still executes the current one, and EOP fences are signalled at record time.
-  **Reading this memory in place (VK_EXT_external_memory_host) is therefore unsafe** unless
-  fences wait for real GPU completion, which costs the guest (it waits on them). Dropped.
-- Per second in the hot window: ~370k small constant copies (~179 MB, ~480 B each) and ~3.6k
-  arena bindings covering ~13.8 GB (≈3.8 MB per binding) of which only ~516 MB are re-uploaded.
-  Copying bound ranges instead of tracking pages would multiply the traffic by ~27 (why the
-  "hot pages" attempt fell to 33 FPS); page tracking is the right mechanism there.
-- Remaining candidates: per-submission snapshots of the constant area (fewer, larger copies
-  instead of ~6000 per frame) and trimming vertex-buffer bindings to the index range a draw
-  uses (the V#s cover whole vertex pools, so each binding walks ~950 tracked pages).
+- Distancia de reutilización de bloques de 64 KiB en 0x104xxxxxxx: abrumadoramente 1 fotograma (luego 2). El motor
+  reescribe la misma memoria en cada fotograma; no hay un ring largo.
+- Retraso de la GPU cuando el hilo de GPU inicia un fotograma (`GPU lag at frame start`): casi siempre 0 —
+  la GPU ha terminado el fotograma anterior. Pero el motor escribe los datos del siguiente fotograma mientras
+  la GPU aún ejecuta el actual, y los fences EOP se señalizan en el momento de grabar.
+  **Leer esta memoria en el sitio (VK_EXT_external_memory_host) es por tanto inseguro** a menos que
+  los fences esperen a la finalización real de la GPU, lo cual le cuesta al guest (que los espera). Descartado.
+- Por segundo en la ventana caliente: ~370k copias pequeñas de constantes (~179 MB, ~480 B cada una) y ~3.6k
+  bindings de arena que cubren ~13.8 GB (≈3.8 MB por binding) de los cuales solo ~516 MB se resuben.
+  Copiar los rangos enlazados en lugar de rastrear páginas multiplicaría el tráfico por ~27 (por eso el
+  intento de "hot pages" cayó a 33 FPS); el seguimiento de páginas es el mecanismo correcto ahí.
+- Candidatos restantes: snapshots por envío del área de constantes (menos copias, más grandes,
+  en lugar de ~6000 por fotograma) y recortar los bindings de vertex buffers al rango de índices que usa un draw
+  (los V# cubren pools de vértices enteros, así que cada binding recorre ~950 páginas rastreadas).
 
-### Tried and reverted: per-epoch constant chunks
+### Probado y revertido: chunks de constantes por época
 
-Small read-only constants served from one snapshot per chunk and queue-task epoch (the epoch
-changed at every task entry and resume, so a chunk only served data written before its copy).
-A/B in one run, standing still: 32 KiB chunks 82/82/79 FPS vs 85/84/84 without (slower: the
-extra copied bytes cost more than the saved operations); 8 KiB chunks 85/85/85 vs 85/83/85
-(no difference). The per-binding constant copies are not what limits the frame; the change
-was removed. `GOW3_BUFFER_STATS=1` (bindings per region, reuse distance, GPU lag) stays.
+Constantes pequeñas de solo lectura servidas desde un snapshot por chunk y época de tarea de la cola (la época
+cambiaba en cada entrada y reanudación de tarea, de modo que un chunk solo servía datos escritos antes de su copia).
+A/B en una misma ejecución, quieto: chunks de 32 KiB 82/82/79 FPS frente a 85/84/84 sin ellos (más lento: los
+bytes extra copiados cuestan más que las operaciones ahorradas); chunks de 8 KiB 85/85/85 frente a 85/83/85
+(sin diferencia). Las copias de constantes por binding no son lo que limita el fotograma; el cambio
+se eliminó. `GOW3_BUFFER_STATS=1` (bindings por región, distancia de reutilización, retraso de GPU) se mantiene.
 
-State after this work, standing still, `GOW3_FPS_LIMIT=0`, FSR 4: 82–85 FPS; GPU command thread
-~90% of a core, recording thread ~92% (mostly its spin), GPU ~70% busy.
+Estado tras este trabajo, quieto, `GOW3_FPS_LIMIT=0`, FSR 4: 82–85 FPS; hilo de comandos de GPU
+~90 % de un núcleo, hilo de grabación ~92 % (sobre todo su spin), GPU ~70 % ocupada.
 
-### Texture binding: repeated sets and the UpdateImage fast path
+### Binding de texturas: sets repetidos y la ruta rápida de UpdateImage
 
-- Measured and dropped: only ~13% of draws bind exactly the textures and samplers of the
-  previous draw in every stage (running through the test level), so skipping whole texture sets
-  would save at most ~3% of the GPU thread.
-- `TextureCache::UpdateImage` runs for every texture binding; for a clean, registered image
-  already tracked and touched in this GC period it only took the texture-cache mutex (shared
-  with the guest threads' fault handlers). It now returns without the lock in that case,
-  reading the flags atomically (toggle 1073741824 = 1 << 30 restores the locked path).
-  A/B, 8 phases of 20 s: 81.8 vs 80.2 FPS mean (+2%), 3 of 4 pairs ahead; the game window
-  was partly covered by other applications during the run, so treat it as indicative.
-- The A/B script now records the log line at each phase switch and prints per-phase means.
+- Medido y descartado: solo ~13 % de los draws enlazan exactamente las texturas y samplers del
+  draw anterior en cada stage (recorriendo el nivel de prueba), por lo que omitir sets de texturas completos
+  ahorraría como mucho ~3 % del hilo de GPU.
+- `TextureCache::UpdateImage` se ejecuta para cada binding de textura; para una imagen limpia y registrada
+  ya rastreada y tocada en este periodo de GC solo tomaba el mutex de la caché de texturas (compartido
+  con los manejadores de faults de los hilos del guest). Ahora retorna sin el lock en ese caso,
+  leyendo los flags de forma atómica (el toggle 1073741824 = 1 << 30 restaura la ruta con lock).
+  A/B, 8 fases de 20 s: media de 81.8 frente a 80.2 FPS (+2 %), 3 de 4 pares por delante; la ventana del juego
+  estaba parcialmente cubierta por otras aplicaciones durante la ejecución, así que tómalo como orientativo.
+- El script A/B ahora registra la línea del log en cada cambio de fase e imprime las medias por fase.
 
-## LTO and PGO (2026-09-30)
+## LTO y PGO (2026-09-30)
 
-`build.sh` builds `libgow3gpu` with LTO (`-flto=auto`, also for sirit and FSR-Vulkan linked
-into it) and, when `pgo/` holds a profile, with `-fprofile-use` (`-fprofile-partial-training
--fprofile-correction`; functions changed since the profile compile without it). No `-march`:
-the same build runs on the Steam Deck.
+`build.sh` compila `libgow3gpu` con LTO (`-flto=auto`, también para sirit y FSR-Vulkan enlazados
+en ella) y, cuando `pgo/` contiene un perfil, con `-fprofile-use` (`-fprofile-partial-training
+-fprofile-correction`; las funciones modificadas desde el perfil se compilan sin él). Sin `-march`:
+la misma build funciona en la Steam Deck.
 
-Collecting a profile: `GOW3_PGO=generate bash run.sh` builds an instrumented library
-(`-fprofile-generate -fprofile-update=atomic`) that writes `pgo/` every 30 s (`bb:pgo` thread:
-`__gcov_dump` + `__gcov_reset`, since the game often ends through `_exit`); play a few minutes
-of ordinary gameplay. The next plain build uses it. `GOW3_PGO=off` / `GOW3_LTO=OFF` disable them.
-Regenerate the profile after larger code changes.
+Recoger un perfil: `GOW3_PGO=generate bash run.sh` compila una biblioteca instrumentada
+(`-fprofile-generate -fprofile-update=atomic`) que escribe `pgo/` cada 30 s (hilo `bb:pgo`:
+`__gcov_dump` + `__gcov_reset`, ya que el juego suele terminar mediante `_exit`); juega unos minutos
+de gameplay normal. La siguiente build normal lo usa. `GOW3_PGO=off` / `GOW3_LTO=OFF` los desactivan.
+Regenera el perfil tras cambios de código mayores.
 
-Comparison, three runs in game (median of in-game 5 s windows, >800 draws/frame), with the new
-`Frame stats` field "GPU thread us/draw" (CPU time of the GPU command thread per draw, which
-tolerates small scene differences better than FPS):
+Comparación, tres ejecuciones en el juego (mediana de ventanas de 5 s dentro del juego, >800 draws/fotograma), con el nuevo
+campo de `Frame stats` "GPU thread us/draw" (tiempo de CPU del hilo de comandos de GPU por draw, que
+tolera mejor las pequeñas diferencias de escena que los FPS):
 
 | build | FPS | GPU thread µs/draw |
 |---|---|---|
-| no LTO, no PGO | 73.2 | 7.72 |
-| LTO | 74.4 | 7.58 (−1.8%) |
-| LTO + PGO | 76.3 | 7.35 (−4.8%) |
+| sin LTO, sin PGO | 73.2 | 7.72 |
+| LTO | 74.4 | 7.58 (−1.8 %) |
+| LTO + PGO | 76.3 | 7.35 (−4.8 %) |
 
-## Second pass: where the GPU thread's time goes, and a texture helper (2026-09-30)
+## Segundo pase: adónde va el tiempo del hilo de GPU, y un helper de texturas (2026-09-30)
 
-Standing in the test scene, FSR 4, `GOW3_FPS_LIMIT=0`, ~85 FPS, ~1610 draws/frame.
+De pie en la escena de prueba, FSR 4, `GOW3_FPS_LIMIT=0`, ~85 FPS, ~1610 draws/fotograma.
 
-**On-CPU profile** (perf, direct children): `Draw` 74% — `BindResources` 32% (textures 16%,
-buffers 13%), `BeginRendering` 8%, `GetGraphicsPipeline` 5%, `BindVertexBuffers` 4.5%,
-`ResetBindings` 4%, dynamic state 2%; `DispatchDirect` 6%; PM4 decode and register hashing ~9%.
-No function above ~5% self time: the cost is cache misses spread over the texture, buffer and
-barrier structures (`slot_images[id]`, image descriptions, backing state, set writes).
+**Perfil on-CPU** (perf, hijos directos): `Draw` 74 % — `BindResources` 32 % (texturas 16 %,
+buffers 13 %), `BeginRendering` 8 %, `GetGraphicsPipeline` 5 %, `BindVertexBuffers` 4.5 %,
+`ResetBindings` 4 %, estado dinámico 2 %; `DispatchDirect` 6 %; decodificación PM4 y hash de registros ~9 %.
+Ninguna función por encima de ~5 % de tiempo propio: el coste son fallos de caché repartidos por las estructuras de
+texturas, buffers y barreras (`slot_images[id]`, descripciones de imagen, estado de backing, escrituras de sets).
 
-**Wall time** (new `Frame stats` fields): the GPU thread is on the CPU 91% of the time and
-waits for guest submissions 0.5%. About 9% is blocked in `Scheduler::WaitHostCopies`: ~130
-times per frame (EOP/EOS events, `WriteData`, submissions) it waits for the small guest
-copies queued in the recording stream, i.e. until the recording thread has recorded every
-command before them, plus ~4% for the copy threads (`Gow3Copy::WaitAsync`). The recording thread
-itself works ~40% (the rest is its spin); it is not the limit.
+**Tiempo de reloj** (nuevos campos de `Frame stats`): el hilo de GPU está en la CPU el 91 % del tiempo y
+espera envíos del guest el 0.5 %. Alrededor del 9 % está bloqueado en `Scheduler::WaitHostCopies`: ~130
+veces por fotograma (eventos EOP/EOS, `WriteData`, envíos) espera las pequeñas copias del guest
+encoladas en el stream de grabación, es decir, hasta que el hilo de grabación ha grabado todos los
+comandos anteriores, más ~4 % por los hilos de copia (`Gow3Copy::WaitAsync`). El propio hilo de grabación
+trabaja ~40 % (el resto es su spin); no es el límite.
 
-### Texture binding on a helper thread (opt-in: `GOW3_TEXTURE_HELPER=1`, toggle 1 << 22)
+### Binding de texturas en un hilo auxiliar (opt-in: `GOW3_TEXTURE_HELPER=1`, toggle 1 << 22)
 
-`bb:TexBind` binds a draw's textures while the GPU thread binds its buffers and resolves its
-vertex/index buffers (split into Resolve/Emit, toggle 1 << 23); the GPU thread joins before
-`BeginRendering`. The helper takes only the memoized path (FindImage memo valid, image clean,
-no scene-target proxy, no upscaler redirect, no storage images, no mip arrays, no storage
-buffers in the pipeline); anything else is bound after the join. The GPU thread joins before
-it changes image state (`Runtime::BeforeImageAccess` in `Transit`, `FlushBarriers`,
-`SetBackingSamples`, and in `SynchronizeMemoryFromImage` once a texel buffer aliases an image).
-68% of draws were bound in parallel, the image was unchanged — and the frame rate too:
-85.9 FPS with the helper vs 85.8 without (A/B, 6 × 16 s).
+`bb:TexBind` enlaza las texturas de un draw mientras el hilo de GPU enlaza sus buffers y resuelve sus
+vertex/index buffers (dividido en Resolve/Emit, toggle 1 << 23); el hilo de GPU hace join antes de
+`BeginRendering`. El helper toma solo la ruta memoizada (memo de FindImage válido, imagen limpia,
+sin proxy de scene target, sin redirección de upscaler, sin storage images, sin arrays de mips, sin storage
+buffers en el pipeline); todo lo demás se enlaza tras el join. El hilo de GPU hace join antes de
+cambiar el estado de las imágenes (`Runtime::BeforeImageAccess` en `Transit`, `FlushBarriers`,
+`SetBackingSamples`, y en `SynchronizeMemoryFromImage` una vez que un texel buffer es alias de una imagen).
+El 68 % de los draws se enlazaron en paralelo, la imagen no cambió — ni la tasa de fotogramas:
+85.9 FPS con el helper frente a 85.8 sin él (A/B, 6 × 16 s).
 
-Instrumented with `rdtsc`: the helper's task took ~6200 cycles per fork where the same work
-cost ~4600 on the GPU thread, and the GPU thread still waited ~2500 cycles per fork in the
-join. The descriptor infos, image states and binding flags the helper writes are read by the
-GPU thread right after, so each draw moves them between cores; the GPU thread's own work got
-slower by about what it handed over. Per-draw fork/join over ~7 µs of cache-bound work does
-not pay on this CPU; the helper stays opt-in for other CPUs.
+Instrumentado con `rdtsc`: la tarea del helper tomó ~6200 ciclos por fork cuando el mismo trabajo
+costaba ~4600 en el hilo de GPU, y el hilo de GPU aún esperaba ~2500 ciclos por fork en el
+join. Las infos de descriptores, los estados de imagen y los flags de binding que escribe el helper los lee
+el hilo de GPU justo después, así que cada draw los mueve entre núcleos; el trabajo propio del hilo de GPU se volvió
+más lento aproximadamente lo que cedió. Un fork/join por draw sobre ~7 µs de trabajo limitado por caché
+no compensa en esta CPU; el helper queda opt-in para otras CPUs.
 
-### Other attempts
+### Otros intentos
 
-| change | A/B | kept |
+| cambio | A/B | conservado |
 |---|---|---|
-| FindView memo in the image description cache (1 << 21) + write prefetch in record chunks (1 << 20) | 81.5 vs 80.8 FPS | yes |
-| format check by table instead of `magic_enum::enum_contains` (a linear scan per texture per draw); hot `Image` fields (flags, binding, tracking range, backing, ticks) moved in front of `ImageInfo` | within noise | yes (no downside) |
-| host copy queue: small copies in a lock-free MPMC queue, run by the idle recording thread, the rest by the GPU thread at the wait | blocked 9.5% → 4.8%, but 86.5 vs 87.2 FPS: the copying moved onto the GPU thread | no |
-| no barrier tracking for read-only stream buffer ranges | 85.9 vs 87.4 FPS, both phase orders (cause not found) | no |
-| small host copies batched, one recorded command per 32 | 86.4 vs 86.2 FPS | no |
+| memo de FindView en la caché de descripciones de imagen (1 << 21) + prefetch de escritura en chunks de grabación (1 << 20) | 81.5 frente a 80.8 FPS | sí |
+| comprobación de formato por tabla en lugar de `magic_enum::enum_contains` (un escaneo lineal por textura por draw); campos `Image` calientes (flags, binding, rango de seguimiento, backing, ticks) movidos delante de `ImageInfo` | dentro del ruido | sí (sin desventajas) |
+| cola de copias del host: copias pequeñas en una cola MPMC lock-free, ejecutadas por el hilo de grabación ocioso, el resto por el hilo de GPU en la espera | bloqueado 9.5 % → 4.8 %, pero 86.5 frente a 87.2 FPS: la copia pasó al hilo de GPU | no |
+| sin seguimiento de barreras para rangos de buffers de stream de solo lectura | 85.9 frente a 87.4 FPS, en ambos órdenes de fase (causa no encontrada) | no |
+| copias pequeñas del host agrupadas, un comando grabado por cada 32 | 86.4 frente a 86.2 FPS | no |
 
-Fixed on the way: a draw-preparation worker could stop the process with
-`SurfaceFormat: Unknown data_format=15` — it read a V# the guest was still writing and
-`SurfaceFormat` asserts. Workers now use `TrySurfaceFormat` and leave such draws to the GPU
-thread. It showed up with the slower PGO-instrumented build.
+Corregido de paso: un worker de preparación de draws podía detener el proceso con
+`SurfaceFormat: Unknown data_format=15` — leía un V# que el guest aún estaba escribiendo y
+`SurfaceFormat` hace assert. Ahora los workers usan `TrySurfaceFormat` y dejan esos draws al hilo de
+GPU. Apareció con la build instrumentada para PGO, que es más lenta.
 
-PGO profile regenerated for the changed code (camera rotation only, merged with the old one).
-Before/after, as a user builds them (37c8eac with its profile vs this state with the new one),
-three alternating restarts × 50 s: 86.9 vs 86.4 FPS, 6.47 vs 6.51 µs/draw — no change beyond
-the run-to-run spread (±1.5 FPS).
+Perfil PGO regenerado para el código modificado (solo rotación de cámara, fusionado con el antiguo).
+Antes/después, tal como las compila un usuario (37c8eac con su perfil frente a este estado con el nuevo),
+tres reinicios alternados × 50 s: 86.9 frente a 86.4 FPS, 6.47 frente a 6.51 µs/draw — sin cambio más allá de
+la dispersión entre ejecuciones (±1.5 FPS).
 
-### What would scale
+### Qué escalaría
 
-Moving work to another core per draw costs about what it saves, because the data is shared.
-Scaling needs splits where each thread owns its data for long stretches:
+Mover trabajo a otro núcleo por draw cuesta aproximadamente lo que ahorra, porque los datos son compartidos.
+Escalar requiere divisiones donde cada hilo sea dueño de sus datos durante largos periodos:
 
-1. **Two-stage pipeline.** A second thread owns the texture cache and image state
-   (`PrepareRenderState`, `BindTextures`, `BeginRendering`, barriers, descriptor writes, dynamic
-   state, draw recording) and runs a draw behind the GPU thread, which keeps decode, pipelines
-   and the buffer cache. The second thread cannot read `liverpool->regs` (the GPU thread is
-   already on later packets): it keeps its own register copy from the per-buffer deltas the
-   draw scanner already records (`AmdGpu::RegDelta`). Packets that touch memory or images
-   outside draws (DMA, `WriteData`, EOP/EOS, dispatches, fast clears) drain the pipeline.
-   Estimate: the second stage takes ~30% of today's GPU thread work, less the drains. Large,
-   delicate refactor.
-2. **Less work per draw.** A frame-to-frame memo of a stage's resolved textures (image ids,
-   views, samplers) keyed by the prepared T#/S# hashes and validated by the registry
-   generation, image cleanliness and layouts, instead of per-texture lookups.
-3. **The copies before fences** (~9% blocked): keep them off the GPU thread's critical path,
-   e.g. by letting the idle draw-preparation workers drain a copy queue.
+1. **Pipeline de dos etapas.** Un segundo hilo es dueño de la caché de texturas y del estado de imágenes
+   (`PrepareRenderState`, `BindTextures`, `BeginRendering`, barreras, escrituras de descriptores, estado
+   dinámico, grabación de draws) y ejecuta un draw por detrás del hilo de GPU, que conserva la decodificación, los pipelines
+   y la caché de buffers. El segundo hilo no puede leer `liverpool->regs` (el hilo de GPU ya
+   está en paquetes posteriores): mantiene su propia copia de registros a partir de los deltas por buffer
+   que el scanner de draws ya registra (`AmdGpu::RegDelta`). Los paquetes que tocan memoria o imágenes
+   fuera de los draws (DMA, `WriteData`, EOP/EOS, dispatches, fast clears) vacían el pipeline.
+   Estimación: la segunda etapa toma ~30 % del trabajo actual del hilo de GPU, menos los vaciados. Un
+   refactor grande y delicado.
+2. **Menos trabajo por draw.** Un memo entre fotogramas de las texturas resueltas de un stage (ids de imagen,
+   views, samplers) con clave en los hashes T#/S# preparados y validado por la generación del registro,
+   la limpieza de las imágenes y los layouts, en lugar de búsquedas por textura.
+3. **Las copias antes de los fences** (~9 % bloqueado): mantenerlas fuera del camino crítico del hilo de GPU,
+   p. ej. dejando que los workers ociosos de preparación de draws vacíen una cola de copias.
 
-## Two-stage draw pipeline (2026-09-30)
+## Pipeline de draws en dos etapas (2026-09-30)
 
-`vk_draw_pipe.h`. The GPU command thread (stage A) keeps PM4 decoding, the register file, the
-constant engine and pipeline selection. A direct draw or dispatch becomes a packet in a 16 MiB
-ring: the 32-word register blocks written since the previous packet (`Liverpool::pipe_dirty`,
-marked by `ApplyGraphicsRegisterPacket`), the CB/DB size hints, each stage's user data, flattened
-user data and program base, and the draw parameters (for a dispatch the `ComputeProgram`).
-The draw recording thread `bb:DrawRec` (stage B) applies the blocks to its own register copy and
-runs the rest of the draw (`DrawRecord`, `DispatchRecord`): textures, buffers, render targets,
-barriers, descriptors, dynamic state, recording. While packets are in flight stage B owns the
-texture/buffer caches, the runtime, the scheduler, the scene targets, the upscaler and the motion
-state.
+`vk_draw_pipe.h`. El hilo de comandos de GPU (etapa A) conserva la decodificación PM4, el archivo de registros, el
+constant engine y la selección de pipeline. Un draw o dispatch directo se convierte en un paquete en un ring
+de 16 MiB: los bloques de registros de 32 palabras escritos desde el paquete anterior (`Liverpool::pipe_dirty`,
+marcados por `ApplyGraphicsRegisterPacket`), las pistas de tamaño CB/DB, el user data de cada stage, el user data
+aplanado y la base del programa, y los parámetros del draw (para un dispatch el `ComputeProgram`).
+El hilo de grabación de draws `bb:DrawRec` (etapa B) aplica los bloques a su propia copia de registros y
+ejecuta el resto del draw (`DrawRecord`, `DispatchRecord`): texturas, buffers, render targets,
+barreras, descriptores, estado dinámico, grabación. Mientras hay paquetes en vuelo, la etapa B es dueña de las
+cachés de texturas/buffers, el runtime, el scheduler, los scene targets, el upscaler y el estado
+de movimiento.
 
-- Stage B reads registers through `Rasterizer::Regs()/CbExtent()/CsRegs()` (its copy there,
-  Liverpool's elsewhere) and shader user data through `Shader::Info::UserData()/FlatUserData()/
-  ProgramBase()`, which return the snapshot stage B installed for the stages of the current
-  draw (`Info::ud_snapshots`, thread-local).
-- Everything else stage A does on stage B's state first waits for it to run dry
-  (`Rasterizer::DrainDrawPipe`): every public rasterizer entry point on the GPU thread, PM4
-  packets other than register writes/draws/dispatches/fences (`PipelinedOpcode`), pending
-  commands (`ProcessCommands`), compute queue packets, `DumpConstRam`.
-- End-of-pipe/-shader events run in order on stage B (`Rasterizer::RunInOrder`). A
-  `WaitRegMem` on a fence value handed to stage B counts as met (`Liverpool::pending_fences`):
-  stage B runs everything in stream order anyway. Unmet waits drain stage B, then yield.
-- The EOP fence is signalled by the Vulkan recording thread after the guest memory copies queued
-  before it (`Scheduler::SignalAfterHostCopies`), so stage B does not wait for them.
-- A submission's prepared draws stay alive until stage B has passed them
-  (`RetireSubmission`) instead of a drain at its end.
-- Faults: stage B handles its own inline, like the GPU thread (`IsGpuSideThread`); the GPU
-  thread drains stage B before handling one inline. With userfaultfd, faults of the GPU thread
-  take the locked path of guest threads.
-- `DmaData` to 0x3022C (skipped by the handler; ~70k/s) does not drain.
-- `GOW3_PIPE_VERIFY=N`: every Nth packet also carries the full register file and stage B reports
-  words where its copy differs (none seen in game, menus included).
-- `GOW3_DRAW_PIPE=0/1` overrides the default (on with 8+ hardware threads). The toggle mask is 64
-  bits now (bits 20-29 are raw debug toggles of the motion vectors and the upscaler, which the
-  first measurements below also flipped): 1 << 37 whole pipeline, 1 << 38 fences on stage B,
-  1 << 39 WaitRegMem on pending fences, 1 << 40 dispatches, 1 << 41 fences signalled by the
-  recording thread, 1 << 42 WriteData/DmaData/special draws/flip IRQ on stage B, 1 << 36 constant
-  ring. `Frame stats` add a `Draw pipe` line: draws, drains that waited and why, stage A waiting,
-  stage B busy.
+- La etapa B lee los registros mediante `Rasterizer::Regs()/CbExtent()/CsRegs()` (su copia allí, la de
+  Liverpool en el resto) y el user data de shaders mediante `Shader::Info::UserData()/FlatUserData()/
+  ProgramBase()`, que devuelven el snapshot que la etapa B instaló para los stages del draw actual
+  (`Info::ud_snapshots`, thread-local).
+- Todo lo demás que la etapa A hace sobre el estado de la etapa B primero espera a que se vacíe
+  (`Rasterizer::DrainDrawPipe`): cada punto de entrada público del rasterizer en el hilo de GPU, los paquetes PM4
+  distintos de escrituras de registros/draws/dispatches/fences (`PipelinedOpcode`), los comandos pendientes
+  (`ProcessCommands`), los paquetes de la cola compute, `DumpConstRam`.
+- Los eventos end-of-pipe/-shader se ejecutan en orden en la etapa B (`Rasterizer::RunInOrder`). Un
+  `WaitRegMem` sobre un valor de fence entregado a la etapa B se cuenta como cumplido (`Liverpool::pending_fences`):
+  la etapa B ejecuta todo en el orden del stream de todos modos. Las esperas no cumplidas vacían la etapa B y luego ceden.
+- El fence EOP lo señaliza el hilo de grabación Vulkan después de las copias de memoria del guest encoladas
+  antes (`Scheduler::SignalAfterHostCopies`), de modo que la etapa B no las espera.
+- Los draws preparados de un envío siguen vivos hasta que la etapa B los ha superado
+  (`RetireSubmission`) en lugar de un vaciado al final.
+- Faults: la etapa B maneja los suyos en línea, como el hilo de GPU (`IsGpuSideThread`); el hilo
+  de GPU vacía la etapa B antes de manejar uno en línea. Con userfaultfd, los faults del hilo de GPU
+  toman la ruta con lock de los hilos del guest.
+- `DmaData` a 0x3022C (omitido por el manejador; ~70k/s) no vacía.
+- `GOW3_PIPE_VERIFY=N`: cada N-ésimo paquete lleva también el archivo de registros completo y la etapa B informa de
+  las palabras en que su copia difiere (ninguna vista en el juego, menús incluidos).
+- `GOW3_DRAW_PIPE=0/1` anula el valor predeterminado (activado con 8+ hilos de hardware). La máscara de toggles es ahora de 64
+  bits (los bits 20-29 son toggles de depuración sin procesar de los vectores de movimiento y el upscaler, que las
+  primeras mediciones de abajo también alternaron): 1 << 37 todo el pipeline, 1 << 38 fences en la etapa B,
+  1 << 39 WaitRegMem sobre fences pendientes, 1 << 40 dispatches, 1 << 41 fences señalizados por el hilo de
+  grabación, 1 << 42 WriteData/DmaData/draws especiales/flip IRQ en la etapa B, 1 << 36 constant
+  ring. `Frame stats` añade una línea `Draw pipe`: draws, vaciados que esperaron y por qué, etapa A esperando,
+  etapa B ocupada.
 
-Results (the test scene, standing, FSR 4, `GOW3_FPS_LIMIT=0`, A/B in one run):
+Resultados (escena de prueba, quieto, FSR 4, `GOW3_FPS_LIMIT=0`, A/B en una misma ejecución):
 
-| | pipeline on | off |
+| | pipeline activado | desactivado |
 |---|---|---|
-| 16 threads | 96.1 FPS | 80.6 FPS (+19%) |
-| 4 cores / 8 threads (`taskset -c 0-3,8-11`) | 83.8 FPS | 71.0 FPS (+18%) |
+| 16 hilos | 96.1 FPS | 80.6 FPS (+19 %) |
+| 4 núcleos / 8 hilos (`taskset -c 0-3,8-11`) | 83.8 FPS | 71.0 FPS (+18 %) |
 
-Steps on the way (FPS in the same scene): first version, drains at every non-draw packet —
-79.8 (drained ~80k/s, almost all no-op `DmaData`); skipping those — 89; fences on stage B and
-lazy `WaitRegMem` — 92; dispatches handed over — 93; fences signalled by the recording thread —
-103.5 (A/B of that step alone: 103.5 vs 94.9).
+Pasos intermedios (FPS en la misma escena): primera versión, vaciados en cada paquete que no es draw —
+79.8 (vaciaba ~80k/s, casi todos `DmaData` sin efecto); omitiéndolos — 89; fences en la etapa B y
+`WaitRegMem` perezoso — 92; dispatches entregados — 93; fences señalizados por el hilo de grabación —
+103.5 (A/B de ese paso solo: 103.5 frente a 94.9).
 
-Now stage B is the limit (~85-90% busy, the draw path as profiled above), stage A waits most of
-the time, and the GPU is ~80% busy with FSR 4. Remaining drains: `WriteData` (~30/frame: 192
-zero bytes to a frame buffer and a 4-byte label, whose readers are unknown), non-trivial
-`DmaData`, indirect draws. Next: move work from stage B to stage A — the buffer side of a draw
-(ObtainBuffer, uploads) needs stage A to own the buffer cache and hand its commands to stage B.
+Ahora la etapa B es el límite (~85-90 % ocupada, el camino del draw como se perfiló arriba), la etapa A espera la mayor parte del
+tiempo, y la GPU está ~80 % ocupada con FSR 4. Vaciados restantes: `WriteData` (~30/fotograma: 192
+bytes a cero a un buffer de fotograma y una etiqueta de 4 bytes, cuyos lectores se desconocen), `DmaData` no
+trivial, draws indirectos. Siguiente: mover trabajo de la etapa B a la A — el lado de buffers de un draw
+(ObtainBuffer, subidas) requiere que la etapa A sea dueña de la caché de buffers y entregue sus comandos a la etapa B.
 
-### Second round (2026-09-30)
+### Segunda ronda (2026-09-30)
 
-- `WriteData`, `DmaData`, the flip IRQ after them (the buffer label is a `WriteData`) and draws
-  `FilterDraw` handles itself (fast clear elimination, resolve, depth copy) run in order on
-  stage B. Drains: ~7 per frame (DumpConstRam, indirect draws/dispatches).
-- **Constant ring** (`vk_constant_ring.h`): stage A copies small read-only guest buffers (the
-  stream path of `ObtainBuffer`, and the flattened user data) into a 32 MiB ring of its own;
-  stage B only binds them. A region is reused once the submission stage B recorded its last
-  draw in has completed (stage B stamps packets with the submission tick). Buffers overlapping
-  guest memory that queued work will write (storage buffers, DMA, WriteData, fences:
-  `NotePendingGpuWrite`) or GPU-modified memory stay with stage B.
-- `GOW3_PIPE_VERIFY` also re-walks each stage's resource tables on stage B and compares them with
-  stage A's snapshot (guarded against faults: pointers may be stale by then). Pixel shaders whose
-  `Info` the pipeline selection does not refresh (no user data) are skipped.
+- `WriteData`, `DmaData`, el flip IRQ posterior (la etiqueta del buffer es un `WriteData`) y los draws que
+  `FilterDraw` maneja por sí mismo (eliminación de fast clear, resolve, copia de depth) se ejecutan en orden en
+  la etapa B. Vaciados: ~7 por fotograma (DumpConstRam, draws/dispatches indirectos).
+- **Constant ring** (`vk_constant_ring.h`): la etapa A copia los buffers del guest pequeños de solo lectura (la
+  ruta stream de `ObtainBuffer`, y el user data aplanado) a un ring propio de 32 MiB;
+  la etapa B solo los enlaza. Una región se reutiliza cuando el envío en el que la etapa B grabó su último
+  draw ha terminado (la etapa B sella los paquetes con el tick del envío). Los buffers que se solapan con
+  memoria del guest que el trabajo encolado escribirá (storage buffers, DMA, WriteData, fences:
+  `NotePendingGpuWrite`) o con memoria modificada por la GPU se quedan en la etapa B.
+- `GOW3_PIPE_VERIFY` también recorre de nuevo las tablas de recursos de cada stage en la etapa B y las compara con
+  el snapshot de la etapa A (protegido contra faults: los punteros pueden estar obsoletos para entonces). Se omiten los pixel shaders
+  cuyo `Info` la selección de pipeline no refresca (sin user data).
 
-A/B in one run (16 threads, FSR 4 Ultra Performance, clean toggle bits): whole pipeline
-110.9 vs 83.9 FPS (+32%); constant ring 114.2 vs 102.5 FPS (+11%).
+A/B en una misma ejecución (16 hilos, FSR 4 Ultra Performance, bits de toggle limpios): todo el pipeline
+110.9 frente a 83.9 FPS (+32 %); constant ring 114.2 frente a 102.5 FPS (+11 %).
 
-### GPU time per frame vs upscaler preset
+### Tiempo de GPU por fotograma frente al preset del upscaler
 
-The GPU (RX 7800 XT) now limits more than the CPU. Presets change it little:
+La GPU (RX 7800 XT) ahora limita más que la CPU. Los presets lo cambian poco:
 
-| mode | FPS | GPU busy | GPU ms/frame |
+| modo | FPS | GPU ocupada | GPU ms/fotograma |
 |---|---|---|---|
-| upscaler off | 132 | 76% | 5.8 |
-| FSR 3 Native AA | 116 | 76% | 6.6 |
-| FSR 3 Ultra Performance (scene 640x360) | 114 | 71% | 6.3 |
-| FSR 4 Quality | 115 | 88% | 7.7 |
-| FSR 4 Ultra Performance | 114 | 84% | 7.4 |
+| upscaler apagado | 132 | 76 % | 5.8 |
+| FSR 3 Native AA | 116 | 76 % | 6.6 |
+| FSR 3 Ultra Performance (escena 640x360) | 114 | 71 % | 6.3 |
+| FSR 4 Quality | 115 | 88 % | 7.7 |
+| FSR 4 Ultra Performance | 114 | 84 % | 7.4 |
 
-The reduced scene targets are used (1160 of ~1530 scene draws per frame), but rasterizing the
-scene costs little on this GPU: a ninth of the pixels saves ~0.3 ms. The rest does not depend on
-the preset (shadow maps, full-resolution post-processing and UI, FSR itself — FSR 4 costs
-~1.1-1.4 ms more than FSR 3 —, and emulation overhead: barriers, copies, resampling). FSR 4 at
-Native AA fails to start ("no free provider frame").
+Se usan los scene targets reducidos (1160 de ~1530 draws de escena por fotograma), pero rasterizar la
+escena cuesta poco en esta GPU: una novena parte de los píxeles ahorra ~0.3 ms. El resto no depende del
+preset (shadow maps, postprocesado y UI a resolución completa, el propio FSR — FSR 4 cuesta
+~1.1-1.4 ms más que FSR 3 — y la sobrecarga de emulación: barreras, copias, remuestreo). FSR 4 en
+Native AA no arranca ("no free provider frame").
 
-### GPU profile (`GOW3_GPU_PROFILE=1`, `vk_gpu_profiler.h`)
+### Perfil de GPU (`GOW3_GPU_PROFILE=1`, `vk_gpu_profiler.h`)
 
-Timestamps where each render pass, dispatch, upscaler run and submission end starts; the time to
-the next one is charged to it (barriers and copies in between included; "between submissions"
-is mostly the GPU waiting for the CPU). Printed every 5 s, GPU ms per frame by label. Timestamps
-are written outside render passes (`radv_CmdWriteTimestamp2` crashed inside some) and only into
-the rasterizer's scheduler (the presenter has its own).
+Timestamps donde empieza cada render pass, dispatch, ejecución del upscaler y fin de envío; el tiempo hasta
+el siguiente se le carga a él (incluidas las barreras y copias intermedias; "between submissions"
+es sobre todo la GPU esperando a la CPU). Se imprime cada 5 s, ms de GPU por fotograma por etiqueta. Los timestamps
+se escriben fuera de los render passes (`radv_CmdWriteTimestamp2` fallaba dentro de algunos) y solo en el
+scheduler del rasterizer (el presenter tiene el suyo).
 
-the test scene, FSR 4 Ultra Performance, ~110 FPS (8.8 ms/frame):
+escena de prueba, FSR 4 Ultra Performance, ~110 FPS (8.8 ms/fotograma):
 
-| label | ms/frame |
+| etiqueta | ms/fotograma |
 |---|---|
-| GPU idle between submissions | 2.1 |
-| guest copy shader `fefebf9f`, 57 dispatches (HLE) | 2.1 |
+| GPU ociosa entre envíos | 2.1 |
+| copy shader del guest `fefebf9f`, 57 dispatches (HLE) | 2.1 |
 | FSR 4 | 1.5 |
-| guest compute `3d5ebf4e`, 8 dispatches | 0.5 |
-| G-buffer passes at 640x360 | ~0.8 |
-| the rest (post-processing, UI, smaller passes) | ~1.8 |
+| compute del guest `3d5ebf4e`, 8 dispatches | 0.5 |
+| pases del G-buffer a 640x360 | ~0.8 |
+| el resto (postprocesado, UI, pases menores) | ~1.8 |
 
-This is why presets barely change the GPU load: only the scene passes scale.
+Por eso los presets apenas cambian la carga de GPU: solo escalan los pases de escena.
 
-The copy shader is HLE'd (`vk_shader_hle.cpp`) as `vkCmdCopyBuffer` with ~1024 small regions
-per dispatch. `buffer_multi_copy.comp` now does a batch in one dispatch (toggle 1 << 43):
-the copies themselves 0.4 ms/frame; with the buffer preparation before them the label fell from
-2.1 to 1.6 ms/frame. Most of the rest is `ObtainBuffer` over the merged ranges (copies of a few
-KiB spread over up to 57 MiB of destination): synchronizing only the copied parts saved another
-~0.75 ms of GPU time but cost more on the CPU (page protection per part, no stream path for
-small sources: 108.7 vs 114.3 FPS, sources only 105.7 vs 111.9), so it was dropped. Frame rate
-unchanged with the multi-copy shader (CPU-bound here); it helps where the GPU limits.
+El copy shader tiene HLE (`vk_shader_hle.cpp`) como `vkCmdCopyBuffer` con ~1024 regiones pequeñas
+por dispatch. `buffer_multi_copy.comp` ahora hace un lote en un dispatch (toggle 1 << 43):
+las copias en sí 0.4 ms/fotograma; con la preparación de buffers previa la etiqueta bajó
+de 2.1 a 1.6 ms/fotograma. La mayor parte del resto es `ObtainBuffer` sobre los rangos fusionados (copias de unos pocos
+KiB repartidas por hasta 57 MiB de destino): sincronizar solo las partes copiadas ahorró otros
+~0.75 ms de GPU pero costó más en la CPU (protección de páginas por parte, sin ruta stream para
+fuentes pequeñas: 108.7 frente a 114.3 FPS, solo fuentes 105.7 frente a 111.9), así que se descartó. La tasa de
+fotogramas no cambió con el multi-copy shader (aquí limitada por CPU); ayuda donde limita la GPU.
 
-### Render state memo (toggle 1 << 44)
+### Memo del estado de render (toggle 1 << 44)
 
-~90% of draws continue the render pass the previous draw opened, yet `BeginRendering` redid
-the target lookups, transitions, scene-target proxies and upscaler redirects for each. Now a
-draw reuses the previous render state when the scheduler still has that exact pass open (nothing
-broke it: barriers, copies and dispatches end passes), the inputs match (target ids and views,
-pipeline attachment key, scene/raster scaling and upscaler redirect state, image registry
-generation, depth control), no clear is requested, and no target is also sampled by the draw.
-States with clears are not remembered (the next draw's differs). 90% hits; 122.1 vs 111.8 FPS
-(+9%); screenshots on/off differ no more than two taken in the same mode (animated scene).
+~90 % de los draws continúan el render pass que abrió el draw anterior, y aun así `BeginRendering` rehacía
+las búsquedas de targets, transiciones, proxies de scene targets y redirecciones del upscaler en cada uno. Ahora un
+draw reutiliza el estado de render anterior cuando el scheduler todavía tiene abierto ese mismo pass (nada
+lo rompió: las barreras, copias y dispatches terminan los passes), las entradas coinciden (ids y views de targets,
+clave de attachments del pipeline, estado de escalado de escena/raster y redirección del upscaler, generación del
+registro de imágenes, control de profundidad), no se pide ningún clear y ningún target es también muestreado por el draw.
+Los estados con clears no se recuerdan (el del siguiente draw difiere). 90 % de aciertos; 122.1 frente a 111.8 FPS
+(+9 %); las capturas con/sin difieren como mucho lo que dos tomadas en el mismo modo (escena animada).
 
-### Texture set memo (toggle 1 << 45)
+### Memo de sets de texturas (toggle 1 << 45)
 
-A stage's resolved textures (image after the depth redirect, view, backing, subresource range)
-remembered by the prepared T# hashes, 8192 slots, sets of up to 16 sampled images. A hit
-requires the same image registry generation, the same backings, no rebind, images up to date,
-no render-target feedback and no upscaler redirect; it then only redoes the per-draw effects
-(found tick, binding flags, bound list, layout transition, usage) and writes the descriptors.
-84% hits; 128.6 vs 121.8 FPS (+5.6%); screenshots on/off within the scene's own noise.
+Las texturas resueltas de un stage (imagen tras la redirección de depth, view, backing, rango de subrecursos)
+recordadas por los hashes T# preparados, 8192 slots, sets de hasta 16 imágenes muestreadas. Un acierto
+requiere la misma generación del registro de imágenes, los mismos backings, ningún rebind, imágenes al día,
+sin retroalimentación de render targets y sin redirección del upscaler; entonces solo rehace los efectos por draw
+(tick de encontrado, flags de binding, lista de enlazados, transición de layout, uso) y escribe los descriptores.
+84 % de aciertos; 128.6 frente a 121.8 FPS (+5.6 %); capturas con/sin dentro del ruido propio de la escena.
 
-### Copy shader merge distance
+### Distancia de fusión del copy shader
 
-The HLE merged copies whose ranges fit in 64 MiB, and each merged batch synchronizes its whole
-source and destination range. With 64 KiB (`GOW3_COPY_MERGE_KB`): the copy shader's GPU time
-1.5 -> 0.6 ms/frame (profiler), GPU busy 85% -> ~77%, frame rate not lower (restarts vary
-125-142 FPS; 16 KiB and 256 KiB similar).
+El HLE fusionaba copias cuyos rangos cabían en 64 MiB, y cada lote fusionado sincroniza todo su rango de
+origen y destino. Con 64 KiB (`GOW3_COPY_MERGE_KB`): el tiempo de GPU del copy shader
+1.5 -> 0.6 ms/fotograma (profiler), GPU ocupada 85 % -> ~77 %, tasa de fotogramas no inferior
+(los reinicios varían 125-142 FPS; 16 KiB y 256 KiB similares).
 
-## Third round (2026-09-30, afternoon)
+## Tercera ronda (2026-09-30, tarde)
 
-Frame rate at the level entrance, 16 threads, FSR 4 Ultra Performance: ~134 -> ~145-150 FPS
-(restarts vary by a few FPS; the A/B numbers below are from one run each).
+Tasa de fotogramas en la entrada del nivel, 16 hilos, FSR 4 Ultra Performance: ~134 -> ~145-150 FPS
+(los reinicios varían unos pocos FPS; los números A/B de abajo son de una ejecución cada uno).
 
-### Where stage A waits
+### Dónde espera la etapa A
 
-`Frame stats` now prints, next to the drain counts, the share of stage A's time each drain
-reason and each call site (`function:line`, `DrainDrawPipe` records `__builtin_LINE`) waited.
-Stage A waits ~25% of its time, almost all at one drain per frame: whichever drain comes first
-after a long stretch of draws waits for stage B to finish them. It was `DrawIndirect` (21%),
-then `DispatchIndirect`, then a `DumpConstRam` once those were pipelined. So stage A is faster
-than stage B, and removing drains helps only where it breaks the lockstep; stage B (85% busy,
-~2.8 µs per packet, flat profile) is the limit.
+`Frame stats` ahora imprime, junto a los recuentos de vaciados, la parte del tiempo de la etapa A que esperó cada motivo
+de vaciado y cada punto de llamada (`function:line`, `DrainDrawPipe` registra `__builtin_LINE`).
+La etapa A espera ~25 % de su tiempo, casi todo en un vaciado por fotograma: el primero que llega
+tras un largo tramo de draws espera a que la etapa B los termine. Era `DrawIndirect` (21 %),
+luego `DispatchIndirect`, luego un `DumpConstRam` una vez que aquellos se encadenaron en pipeline. Así que la etapa A es más rápida
+que la B, y quitar vaciados ayuda solo donde rompe el paso sincronizado; la etapa B (85 % ocupada,
+~2.8 µs por paquete, perfil plano) es el límite.
 
-- Indirect draws and dispatches are pipelined like direct ones (toggle 1 << 46): the pipeline is
-  selected on stage A, the argument buffer lookup and the indirect command are recorded on B.
-  +1.4%.
-- Pending GPU writes (the constant ring's guard) merge overlapping ranges and are pruned every
-  64th check instead of on every buffer: `PendingWriteOverlaps` 7.5% -> 3.6% of stage A; together
-  ~+4%.
-- Texture set memo: 32768 slots; a quarter of the misses were slot collisions (37k -> 11k per
-  5 s): +1.3%.
-- Motion history per-frame tables: open addressing instead of `std::unordered_map` (four node
-  allocations per stored draw, freed every frame). Neutral on FPS.
-- Tried: a release store instead of the sequentially consistent one in `DrawPipe::Commit` with a
-  timed futex sleep (+0.4%, not worth a possible missed wake-up; reverted).
+- Los draws y dispatches indirectos se encadenan en pipeline como los directos (toggle 1 << 46): el pipeline se
+  selecciona en la etapa A, la búsqueda del buffer de argumentos y el comando indirecto se graban en B.
+  +1.4 %.
+- Las escrituras pendientes de la GPU (la protección del constant ring) fusionan rangos solapados y se podan cada
+  64.ª comprobación en lugar de en cada buffer: `PendingWriteOverlaps` 7.5 % -> 3.6 % de la etapa A; en conjunto
+  ~+4 %.
+- Memo de sets de texturas: 32768 slots; una cuarta parte de los fallos eran colisiones de slots (37k -> 11k por
+  5 s): +1.3 %.
+- Tablas por fotograma de la historia de movimiento: direccionamiento abierto en lugar de `std::unordered_map` (cuatro
+  reservas de nodos por draw almacenado, liberadas en cada fotograma). Neutral en FPS.
+- Probado: un release store en lugar del secuencialmente consistente en `DrawPipe::Commit` con un
+  sleep de futex temporizado (+0.4 %, no compensa un posible despertar perdido; revertido).
 
-Object motion vectors cost ~10% FPS (155 vs 141 FPS with `object_motion=0`): stage B spends
-~0.28 µs more per packet, spread over DrawRecord (bone palette hashes, index range cache, motion
-pipeline variants).
+Los object motion vectors cuestan ~10 % de FPS (155 frente a 141 FPS con `object_motion=0`): la etapa B gasta
+~0.28 µs más por paquete, repartidos en DrawRecord (hashes de paletas de huesos, caché de rangos de índices, variantes
+de pipeline de movimiento).
 
-### Scene resolution and the preset/GPU load question
+### Resolución de escena y la cuestión preset/carga de GPU
 
-GPU busy time per frame (profile total minus the idle time between submissions):
+Tiempo de GPU ocupada por fotograma (total del perfil menos el tiempo ocioso entre envíos):
 
-| mode | GPU busy |
+| modo | GPU ocupada |
 |---|---|
-| upscaler off (native 1080p) | 3.67 ms |
+| upscaler apagado (1080p nativo) | 3.67 ms |
 | FSR 4 Quality | 5.64 -> 5.50 ms |
 | FSR 4 Ultra Performance | 5.11 -> 4.98 -> 4.86 ms |
 
-Rasterizing the scene costs little on this GPU, so a lower preset saves ~0.5 ms, while FSR 4
-itself costs ~1.4 ms at 1080p output; FSR 4 Ultra Performance takes more GPU time than native
-rendering without an upscaler. Found on the way:
+Rasterizar la escena cuesta poco en esta GPU, así que un preset más bajo ahorra ~0.5 ms, mientras que el propio FSR 4
+cuesta ~1.4 ms con salida 1080p; FSR 4 Ultra Performance toma más tiempo de GPU que el
+render nativo sin upscaler. Hallado de paso:
 
-- The reduced-size decision looked at all eight color slots, but slots past the mask width keep
-  earlier passes' targets — in the lighting passes the G-buffer images they sample. The light
-  accumulation passes stayed at 1920x1080 at every preset. Fixed (toggle 1 << 47 restores it).
-- Every pass that sampled a reduced target made the proxy be resampled to the native size first
-  (~25 resolves per frame, 0.4 ms; `GOW3_GPU_PROFILE` now labels resolves, fills, image uploads and
-  downloads). The recompiler marks images read by anything but normalized sampling without
-  offsets (`ImageResource::needs_native`); other sampled bindings read the proxy directly
-  (toggle 1 << 48): GPU busy 5.02 -> 4.86 ms, identical screenshots. Changes the `Info` layout:
-  shader meta version 7, pipeline key version 5 (caches rebuilt once).
-- `GOW3_SCENE_DEBUG=<file>`: touching the file prints the next frame's scene passes with the reason
-  each keeps the native size. What remains native before the upscaler: half-resolution
-  (960x540) passes, which `SceneTargets::Eligible` does not handle.
+- La decisión de tamaño reducido miraba los ocho slots de color, pero los slots más allá del ancho de la máscara conservan
+  los targets de pases anteriores — en los pases de iluminación las imágenes del G-buffer que muestrean. Los pases de acumulación de
+  luz se quedaban a 1920x1080 en cualquier preset. Corregido (el toggle 1 << 47 lo restaura).
+- Cada pase que muestreaba un target reducido hacía que el proxy se remuestreara primero al tamaño nativo
+  (~25 resolves por fotograma, 0.4 ms; `GOW3_GPU_PROFILE` ahora etiqueta resolves, fills, subidas y
+  descargas de imágenes). El recompiler marca las imágenes leídas por cualquier cosa distinta del muestreo normalizado
+  sin offsets (`ImageResource::needs_native`); los demás bindings muestreados leen el proxy directamente
+  (toggle 1 << 48): GPU ocupada 5.02 -> 4.86 ms, capturas idénticas. Cambia el layout de `Info`:
+  versión de meta de shader 7, versión de clave de pipeline 5 (las cachés se reconstruyen una vez).
+- `GOW3_SCENE_DEBUG=<archivo>`: al tocar el archivo se imprimen los pases de escena del siguiente fotograma con el motivo por el que
+  cada uno conserva el tamaño nativo. Lo que queda nativo antes del upscaler: los pases a media resolución
+  (960x540), que `SceneTargets::Eligible` no maneja.
 
-Next GPU item (matters most on the Steam Deck): guest compute `3d5ebf4e` is a dword memcpy that
-copies render target memory (the 1080p depth buffer, 12 MB, sampled afterwards as R32F; a
-G-buffer target; two 960x540 targets): 8 dispatches, and each needs the image downloaded into
-the buffer, the proxy resolved and the destination image uploaded again. Recognizing copies
-whose source is an image and turning them into image copies (or a proxy-sized copy) would remove
-most of that. Skipping the dispatches blacks out the scene, so the copies are needed.
+Siguiente punto de GPU (importa sobre todo en la Steam Deck): el compute del guest `3d5ebf4e` es un memcpy de dwords que
+copia memoria de render targets (el buffer de profundidad 1080p, 12 MB, muestreado después como R32F; un
+target del G-buffer; dos targets de 960x540): 8 dispatches, y cada uno requiere descargar la imagen al
+buffer, resolver el proxy y volver a subir la imagen de destino. Reconocer las copias
+cuya fuente es una imagen y convertirlas en copias de imagen (o una copia del tamaño del proxy) eliminaría
+la mayor parte. Omitir los dispatches deja la escena en negro, así que las copias son necesarias.
 
-### Fixed: guest heap corruption with the draw pipeline (2026-10-01)
+### Corregido: corrupción del heap del guest con el pipeline de draws (2026-10-01)
 
-Cause: GPU idle (`IrqC GpuIdle`, which releases `sceGnmSubmitDone`) was signalled once stage A had
-decoded every submission, while end-of-pipe fences deferred to the Vulkan recording thread
-(RecorderFences) were still pending; the guest freed the objects holding those labels while
-another of its threads still updated them. Stage A now drains the pipe and waits for the
-deferred signals before GPU idle (and before compute-queue WriteData/ReleaseMem). Found with
-`GOW3_WRITE_LOG=2` (fence targets logged at decode time, off the racing path). The notes below
-are the investigation.
+Causa: el GPU idle (`IrqC GpuIdle`, que libera `sceGnmSubmitDone`) se señalizaba una vez que la etapa A había
+decodificado todos los envíos, mientras los fences end-of-pipe diferidos al hilo de grabación Vulkan
+(RecorderFences) seguían pendientes; el guest liberaba los objetos que contenían esas etiquetas mientras
+otro de sus hilos aún las actualizaba. Ahora la etapa A vacía el pipe y espera las señales
+diferidas antes del GPU idle (y antes de WriteData/ReleaseMem de la cola compute). Encontrado con
+`GOW3_WRITE_LOG=2` (objetivos de fences registrados en el momento de la decodificación, fuera de la ruta de la carrera). Las notas de abajo
+son la investigación.
 
-#### Investigation notes
+#### Notas de investigación
 
-After ~2-15 min at the level (camera turning, nobody moving) the guest faults at guest offset
-`0x263b8e7`: a free-list pop in a guest allocator reads the next pointer `0x0000005300000000`
-from a freed block, so something wrote into memory the game had already freed. Soak runs of
-15-20 min: with the draw pipeline 3 of 4 crashed (at 863, 844 s and one earlier), with
-`GOW3_DRAW_PIPE=0` 0 of 2. With `GOW3_WRITE_LOG=1` (slower downloads) one run survived 20 min.
+Tras ~2-15 min en el nivel (cámara girando, nadie moviéndose) el guest falla en el offset del guest
+`0x263b8e7`: un pop de la free-list en un allocator del guest lee el siguiente puntero `0x0000005300000000`
+de un bloque liberado, así que algo escribió en memoria que el juego ya había liberado. Ejecuciones de resistencia de
+15-20 min: con el pipeline de draws 3 de 4 se cayeron (a los 863, 844 s y una antes), con
+`GOW3_DRAW_PIPE=0` 0 de 2. Con `GOW3_WRITE_LOG=1` (descargas más lentas) una ejecución sobrevivió 20 min.
 
-Ruled out / done so far:
-- guest-visible writes overtaking deferred fences (now ordered: `WaitDeferredSignals`, toggle
-  1 << 49) — the crash remains;
-- the scene-proxy and texture-set changes: the crash also happened before them.
+Descartado / hecho hasta ahora:
+- escrituras visibles para el guest que adelantan a los fences diferidos (ahora ordenadas: `WaitDeferredSignals`, toggle
+  1 << 49) — el fallo persiste;
+- los cambios de proxies de escena y de sets de texturas: el fallo ocurrió también antes de ellos.
 
-Candidates: late writes into guest memory that the pipeline delays further — asynchronous image
-downloads (`TextureCache::DownloadImageMemory`, deferred until the GPU finishes, whole image),
-buffer downloads on page faults, and fault handling when the GPU command thread (stage A), which
-now reads guest memory for the constant ring, is not treated as a GPU-side thread
-(`IsGpuSideThreadId` accepts only stage B). Next: a run with `GOW3_WRITE_LOG=1` that crashes
-prints which logged write landed near the corrupted block; bisect the pipeline toggles
-(38 tasks, 39 pending fence waits, 41 recorder fences, 42 memory writes, 36 constant ring).
+Candidatos: escrituras tardías en memoria del guest que el pipeline retrasa aún más — descargas asíncronas
+de imágenes (`TextureCache::DownloadImageMemory`, diferidas hasta que la GPU termina, imagen completa),
+descargas de buffers en page faults, y el manejo de faults cuando el hilo de comandos de GPU (etapa A), que
+ahora lee memoria del guest para el constant ring, no se trata como un hilo del lado de la GPU
+(`IsGpuSideThreadId` acepta solo la etapa B). Siguiente: una ejecución con `GOW3_WRITE_LOG=1` que falle
+imprime qué escritura registrada cayó cerca del bloque corrupto; bisecar los toggles del pipeline
+(38 tareas, 39 esperas de fences pendientes, 41 fences del recorder, 42 escrituras de memoria, 36 constant ring).

@@ -1,298 +1,300 @@
-# Temporal upscaling and frame generation — frame analysis and plan
+# Temporal upscaling y frame generation — análisis de fotogramas y plan
 
-## Native TAA and missing FSR 4 assets (2026-10-01)
+## TAA nativo y assets de FSR 4 ausentes (2026-10-01)
 
-`upscaler=taa` / `GOW3_UPSCALER=taa` is a separate native-resolution temporal AA
-mode, available live in the launcher and overlay. It uses the existing jitter and
-camera/object motion vectors, reprojection, depth rejection and 3×3 neighborhood
-clipping in one compute pass with two ping-pong RGBA16F histories. History stores
-depth in alpha; the scene's original alpha is preserved by the HDR merge. HUD is
-composed afterwards and never enters history. Output changes and AA/provider
-changes reset history. TAA uses Native AA dimensions while preserving the saved
-FSR preset, and does not allocate an FSR context or execute an FSR model/RCAS.
-It still adds GPU work compared with disabling temporal AA; native 4K raster cost
-also remains. The explicit `GOW3_RENDER_RES` compatibility path must be unset.
+`upscaler=taa` / `GOW3_UPSCALER=taa` es un modo de AA temporal independiente a resolución
+nativa, disponible en vivo en el launcher y en el overlay. Usa el jitter y los vectores de
+movimiento de cámara/objeto existentes, la reproyección, el rechazo por profundidad y el
+clipping de vecindad 3×3 en un único pase compute con dos historias RGBA16F en ping-pong.
+La historia guarda la profundidad en alfa; el alfa original de la escena se conserva con el
+HDR merge. El HUD se compone después y nunca entra en la historia. Los cambios de salida y
+los cambios de AA/proveedor reinician la historia. TAA usa las dimensiones de Native AA
+conservando el preset de FSR guardado, y no reserva un FSR context ni ejecuta un modelo
+FSR/RCAS. Aun así añade trabajo de GPU respecto a desactivar el AA temporal; además se
+mantiene el coste de raster nativo en 4K. La ruta de compatibilidad explícita
+`GOW3_RENDER_RES` debe estar sin definir.
 
-FSR Native AA is not a fast pass-through: it renders at the output resolution and
-also executes the temporal reconstruction (including the model for FSR 4) and
-optional sharpening. It can therefore be slower than no AA at the same output.
+FSR Native AA no es un pass-through rápido: renderiza a la resolución de salida y además
+ejecuta la reconstrucción temporal (incluido el modelo en FSR 4) y el sharpening opcional.
+Por eso puede ser más lento que no usar AA con la misma salida.
 
-FSR 4.1.1 assets have separate 1080p/2160p tiers and standard/Ultra models:
-`t1080_m0`, `t1080_m1`, `t2160_m0`, `t2160_m1`. Outputs above 1080p need the 2160
-tier, irrespective of the preset. A missing `t2160_m0/spd.spv` means missing
-assets, not a GPU feature failure. These assets are not bundled: build the full
-set with `tools/fsr4cap/build_assets.sh` and put it in `GOW3_FSR411_DIR` or the
-packaged data directory's `fsr4_411`. Fatal asset failures now select FSR 3.1 in
-the live settings, so the menu shows the active provider, retains the error, and
-allows retrying FSR 4 after changing the output/installing assets.
+Los assets de FSR 4.1.1 tienen niveles 1080p/2160p separados y modelos estándar/Ultra:
+`t1080_m0`, `t1080_m1`, `t2160_m0`, `t2160_m1`. Las salidas por encima de 1080p necesitan el
+nivel 2160, sea cual sea el preset. La falta de `t2160_m0/spd.spv` significa que faltan
+assets, no un fallo de una característica de la GPU. Estos assets no vienen incluidos:
+construye el conjunto completo con `tools/fsr4cap/build_assets.sh` y colócalo en
+`GOW3_FSR411_DIR` o en `fsr4_411` del directorio de datos empaquetado. Los fallos fatales de
+assets ahora seleccionan FSR 3.1 en los ajustes en vivo, de modo que el menú muestra el
+proveedor activo, conserva el error y permite reintentar FSR 4 tras cambiar la salida o
+instalar los assets.
 
-`taa-shader-test` checks real SPIR-V output for accumulation, clipping, depth
-disocclusion, invalid history and out-of-frame motion on Vulkan (Lavapipe works).
-`out/taa-appimage-build.log` records these checks, settings round trips and 64
-Python tests. `out/taa-live-validation.log` and `out/taa-appimage-validation.log`
-check TAA at 1080p/720p/1440p/4K, TAA ↔ FSR 3, and a missing 2160-tier FSR 4.1.1
-model in one gameplay process, including output captures and camera movement.
-`out/taa-launcher-validation.log` checks actual GTK controls and saved settings.
-TAA has not yet been tested on the tester's GTX 1060.
+`taa-shader-test` comprueba la salida SPIR-V real para acumulación, clipping, disocclusion
+por profundidad, historia no válida y movimiento fuera del fotograma en Vulkan (Lavapipe
+funciona). `out/taa-appimage-build.log` registra estas comprobaciones, los round trips de
+ajustes y 64 tests de Python. `out/taa-live-validation.log` y
+`out/taa-appimage-validation.log` comprueban TAA a 1080p/720p/1440p/4K, TAA ↔ FSR 3 y un
+modelo FSR 4.1.1 del nivel 2160 ausente en un único proceso de juego, incluidas capturas de
+salida y movimiento de cámara. `out/taa-launcher-validation.log` comprueba los controles GTK
+reales y los ajustes guardados. TAA todavía no se ha probado en la GTX 1060 del tester.
 
-## Startup patch is the default again for outputs other than 1080p (2026-10-02)
+## El parche de inicio vuelve a ser el predeterminado para salidas distintas de 1080p (2026-10-02)
 
-The live path below made the Steam Deck and a GTX 1060 + 4-core Haswell drop to 7–8 FPS
-(release 0.1 AppImage: 40–50 FPS on the Deck). With guest allocations at 1920×1080 the game's
-post-processing stays at 1080p even for 720p output, guest compute passes resolve scene proxies
-back to 1080p every frame (RX 7800 XT, 720p FSR 3 Performance on 4 cores: 826 vs 576
-draws/frame, 185 vs 210 FPS), and on GPUs without shader stencil export every depth/stencil
-copy took nine draws.
+La ruta en vivo descrita abajo hizo que la Steam Deck y una GTX 1060 + Haswell de 4 núcleos cayeran a 7–8 FPS
+(AppImage de la release 0.1: 40–50 FPS en la Deck). Con las reservas del guest a 1920×1080, el
+postprocesado del juego se queda en 1080p incluso con salida 720p, los pases compute del guest resuelven los proxies de escena
+de vuelta a 1080p en cada fotograma (RX 7800 XT, 720p FSR 3 Performance con 4 núcleos: 826 frente a 576
+draws/fotograma, 185 frente a 210 FPS), y en las GPUs sin shader stencil export cada copia de
+depth/stencil requería nueve draws.
 
-- `run.sh` again patches the game's render size for outputs other than 1080p (as in 0.1) and
-  marks it with `GOW3_AUTO_RENDER_RES=1`, so an in-game restart recomputes it. Preset and output
-  changes then need a restart (the menu offers it). `GOW3_LIVE_RES=1` selects the live path.
-  1080p output and TAA keep the live path.
-- Depth/stencil scene proxies need `VK_EXT_shader_stencil_export` again; without it these
-  targets stay native (as in 0.1). `GOW3_SCENE_STENCIL_BITS=1` still forces the portable
-  resampler for tests.
+- `run.sh` vuelve a parchear el tamaño de render del juego para salidas distintas de 1080p (como en 0.1) y
+  lo marca con `GOW3_AUTO_RENDER_RES=1`, de modo que un reinicio dentro del juego lo recalcula. Los cambios de preset y de
+  salida requieren entonces un reinicio (el menú lo ofrece). `GOW3_LIVE_RES=1` selecciona la ruta en vivo.
+  La salida 1080p y TAA conservan la ruta en vivo.
+- Los proxies de escena de depth/stencil vuelven a necesitar `VK_EXT_shader_stencil_export`; sin ella estos
+  objetivos se quedan nativos (como en 0.1). `GOW3_SCENE_STENCIL_BITS=1` sigue forzando el
+  resampler portable para los tests.
 
-## Live resolution changes (2026-10-01)
+## Cambios de resolución en vivo (2026-10-01)
 
-The in-game output selector now resizes 720p/1080p/1440p/2160p host targets at a
-display-pass boundary. Presets use `output / scale`, including raster sizes above
-1080p (4K Quality: 2560×1440; Native AA: 3840×2160). Guest allocations stay at
-1920×1080; `run.sh` no longer inserts a resolution patch for normal output choices.
-The explicit `GOW3_RENDER_RES` compatibility override is retained.
+El selector de salida dentro del juego ahora redimensiona los objetivos del host de 720p/1080p/1440p/2160p en el
+límite de un display pass. Los presets usan `output / scale`, incluidos tamaños de raster por encima de
+1080p (4K Quality: 2560×1440; Native AA: 3840×2160). Las reservas del guest se mantienen en
+1920×1080; `run.sh` ya no inserta un parche de resolución para las elecciones normales de salida.
+Se conserva el override de compatibilidad explícito `GOW3_RENDER_RES`.
 
-`SceneTargets` resolves and retires old proxies before changing size. FSR resources
-and history are rebuilt for the new input/output, with completion waits for both
-FSR 3 and FSR 4. The 1080p path keeps HDR reconstruction before game post;
-other outputs reconstruct tonemapped scene proxies at the first Scaleform pass,
-then draw HUD/menu geometry into the output-size target. The display buffer is
-resized too. Movie shader identification prevents a native-size fullscreen post
-pass from being mistaken for UI.
+`SceneTargets` resuelve y retira los proxies antiguos antes de cambiar de tamaño. Los recursos y la
+historia de FSR se reconstruyen para la nueva entrada/salida, con esperas de finalización tanto para
+FSR 3 como para FSR 4. La ruta de 1080p mantiene la reconstrucción HDR antes del post del juego;
+las demás salidas reconstruyen los proxies de escena con tonemapping en el primer pase de Scaleform,
+y luego dibujan la geometría de HUD/menú en el objetivo del tamaño de salida. El display buffer también se
+redimensiona. La identificación del shader de movie evita que un pase de post a pantalla completa
+de tamaño nativo se confunda con UI.
 
-Guest compute passes retain their native dispatch sizes and can resolve proxies
-back to 1080p. This change does not scale every post-processing pass; performance
-and intermediate detail can differ from the old startup-patched render sizes.
+Los pases compute del guest conservan sus tamaños de dispatch nativos y pueden resolver los proxies
+de vuelta a 1080p. Este cambio no escala todos los pases de postprocesado; el rendimiento
+y el detalle intermedio pueden diferir de los antiguos tamaños de render con parche de inicio.
 
-Verification: `out/dev/live-resolution-summary.log` switches output, preset and FSR
-off/on in one PID. `GOW3_PRESENT_DUMP_TRIGGER` captures the completed host display
-buffer (including HUD) into `GOW3_DUMP_DIR`. Captures confirm actual 720p/1440p/2160p
-buffers. `scene-resolution-test` covers color/depth/stencil round trips through
-proxies both smaller and larger than the guest allocation. `GOW3_PRESET_FILE` accepts
-`preset [output-index [upscaler-index]]` for scripted menu-equivalent changes.
+Verificación: `out/dev/live-resolution-summary.log` cambia salida, preset y FSR
+apagado/encendido en un mismo PID. `GOW3_PRESENT_DUMP_TRIGGER` captura el display
+buffer del host ya completado (incluido el HUD) en `GOW3_DUMP_DIR`. Las capturas confirman buffers
+reales de 720p/1440p/2160p. `scene-resolution-test` cubre los round trips de color/depth/stencil a través de
+proxies tanto menores como mayores que la reserva del guest. `GOW3_PRESET_FILE` acepta
+`preset [output-index [upscaler-index]]` para cambios con script equivalentes a los del menú.
 
-Frame analyzer: `GOW3_CAPTURE_TRIGGER=<file> GOW3_CAPTURE_DIR=<dir>`; creating the file records
-the next frame (boundary: the pass writing a display buffer) — passes, targets, shaders,
-sampled textures, and the first 1 KiB of bound constants for small passes and first draws.
+Analizador de fotogramas: `GOW3_CAPTURE_TRIGGER=<archivo> GOW3_CAPTURE_DIR=<dir>`; al crear el archivo se graba
+el siguiente fotograma (límite: el pase que escribe un display buffer) — pases, objetivos, shaders,
+texturas muestreadas y el primer 1 KiB de las constantes enlazadas para los pases pequeños y los primeros draws.
 
-## God of War III's frame (mapped 2026-10-10, 2560x1440 render)
+## El fotograma de God of War III (mapeado el 2026-10-10, render 2560x1440)
 
-Captured with the in-game menu (Insert > Diagnostics > Capture frame, files in
-`user/captures/`). `tools/gow3_frame_map.py <capture>` finds every piece below by structure,
-not by address (addresses change with the render resolution patch), and exits 1 when one is
-missing. There is no velocity buffer: motion vectors have to be computed.
+Capturado con el menú del juego (Insert > Diagnostics > Capture frame, archivos en
+`user/captures/`). `tools/gow3_frame_map.py <captura>` encuentra cada pieza de abajo por estructura,
+no por dirección (las direcciones cambian con el parche de resolución de render), y sale con 1 cuando falta
+alguna. No hay buffer de velocidad: los vectores de movimiento hay que calcularlos.
 
-| Stage | What |
+| Etapa | Qué |
 |---|---|
-| first pass of a frame | 2 draws copying the previous frame's final image into the display buffer |
-| depth pre-pass | depth only, all opaque geometry (500–900 draws): **scene depth**, D32S8 at render size |
-| linear depth | full-screen pass into R32F at render size |
-| shadows + light pre-pass | 2048x2048 D32 cascades, lights accumulated into an RGBA8 sRGB target |
-| material pass | the pre-pass geometry again (same draw count), sampling the light buffer |
-| transparencies/effects | two RGBA8 sRGB targets with a second depth buffer |
-| post | bloom pyramid 1280x720 down to 160x90, luminance in R16G16F, **1x1 R16G16F exposure** (read by the CPU every frame) |
-| composite | full-size pass sampling the half-size bloom: **scene color before the HUD**, RGBA8 sRGB at render size |
-| HUD | later passes drawing into that same image (some with the second depth); the game hides the HUD out of combat |
+| primer pase de un fotograma | 2 draws que copian la imagen final del fotograma anterior al display buffer |
+| depth pre-pass | solo profundidad, toda la geometría opaca (500–900 draws): **profundidad de escena**, D32S8 al tamaño de render |
+| profundidad lineal | pase a pantalla completa en R32F al tamaño de render |
+| sombras + light pre-pass | cascadas D32 de 2048x2048, luces acumuladas en un objetivo RGBA8 sRGB |
+| pase de material | la geometría del pre-pass otra vez (mismo número de draws), muestreando el buffer de luz |
+| transparencias/efectos | dos objetivos RGBA8 sRGB con un segundo buffer de profundidad |
+| post | pirámide de bloom de 1280x720 a 160x90, luminancia en R16G16F, **exposición 1x1 R16G16F** (la lee la CPU en cada fotograma) |
+| composite | pase a tamaño completo que muestrea el bloom a mitad de tamaño: **color de escena antes del HUD**, RGBA8 sRGB al tamaño de render |
+| HUD | pases posteriores que dibujan sobre esa misma imagen (algunos con el segundo depth); el juego oculta el HUD fuera de combate |
 
-## Camera constants
+## Constantes de cámara
 
-| Where | What |
+| Dónde | Qué |
 |---|---|
-| depth pre-pass vertex shader (`aed40011eb5259f3`), slot 1, 144 bytes, floats 0–15 | **view-projection**, column-major; the same for every draw of a frame, changes with the camera and its field of view |
-| same buffer, floats 16–31 | the object's world matrix (identity for static scenery) |
-| 64-byte buffers (`*bbe4f109`, slot 0) | projection alone: x 1.96855, y 3.49965 at 16:9 (cinematic shots narrow it, e.g. 1.5073), near 0.5, very far plane, D3D depth |
+| vertex shader del depth pre-pass (`aed40011eb5259f3`), slot 1, 144 bytes, floats 0–15 | **view-projection**, column-major; igual para todos los draws de un fotograma, cambia con la cámara y su campo de visión |
+| mismo buffer, floats 16–31 | la matriz de mundo del objeto (identidad para el escenario estático) |
+| buffers de 64 bytes (`*bbe4f109`, slot 0) | solo la proyección: x 1.96855, y 3.49965 en 16:9 (los planos cinemáticos la estrechan, p. ej. 1.5073), near 0.5, plano far muy lejano, profundidad D3D |
 
-The previous frame's matrices are not in the frame; the port has to keep them.
+Las matrices del fotograma anterior no están en el fotograma; el port debe conservarlas.
 
 ## Plan
 
-1. Find the camera constants every frame (depth pre-pass, above), keep the previous view-projection.
-2. Camera motion vectors: compute pass from depth and current/previous matrices into an
-   RG16F target; debug view to check them. Object motion later (vertex shader replay with the
-   previous frame's constants through the recompiler).
-3. Jitter: sub-pixel offset of clip-space positions in the scene passes (recompiler).
-4. Upscaler at the scene color stage (before post and UI): FSR 3.1 first (open, native Vulkan,
-   also frame generation), then DLSS (native on Linux), XeSS/XeFG and OptiScaler through a
-   loader for their Windows DLLs.
+1. Encontrar las constantes de cámara en cada fotograma (depth pre-pass, arriba), conservar la view-projection anterior.
+2. Vectores de movimiento de cámara: pase compute a partir de la profundidad y las matrices actual/anterior hacia un
+   objetivo RG16F; vista de depuración para comprobarlos. Movimiento de objetos más adelante (repetición del vertex shader con las
+   constantes del fotograma anterior mediante el recompiler).
+3. Jitter: desplazamiento subpíxel de las posiciones clip-space en los pases de escena (recompiler).
+4. Upscaler en la etapa de color de escena (antes del post y la UI): primero FSR 3.1 (abierto, Vulkan nativo,
+   también frame generation), luego DLSS (nativo en Linux), XeSS/XeFG y OptiScaler mediante un
+   loader para sus DLL de Windows.
 
-## Status
+## Estado
 
-- Camera motion vectors: verified by reprojecting the previous frame (`GOW3_DEBUG_MOTION=1`,
-  toggles 1<<22 reprojected frame, 1<<23 error map): static geometry matches.
-- FSR 3.1 (`GOW3_UPSCALER=fsr3`, FireBurn/FSR-Vulkan submodule): scene color before the
-  post-processing combine (compute shader 9a9cf8a9), 1:1, RGB written back (the game keeps data
-  in the alpha). Toggle 1<<24 switches it off at run time.
-- Jitter: viewport offset of scene geometry (drawn with the scene depth, not full-screen
-  quads), Halton(2,3) 8 phases; sign checked by sharpness (correct 255, flipped 208, off 271 —
-  1:1 jitter trades high-frequency aliasing for a slightly softer image). Toggle 1<<25 off.
-- Frame-to-frame difference while standing still: ~33% lower with FSR.
-- Missing: motion of animated objects (characters, cloth, foliage), reactive/transparency
-  masks for particles and fog, render-resolution scaling, frame generation.
+- Vectores de movimiento de cámara: verificados reproyectando el fotograma anterior (`GOW3_DEBUG_MOTION=1`,
+  toggles 1<<22 fotograma reproyectado, 1<<23 mapa de error): la geometría estática coincide.
+- FSR 3.1 (`GOW3_UPSCALER=fsr3`, submódulo FireBurn/FSR-Vulkan): color de escena antes de la
+  combinación de postprocesado (compute shader 9a9cf8a9), 1:1, RGB escrito de vuelta (el juego guarda datos
+  en el alfa). El toggle 1<<24 lo apaga en tiempo de ejecución.
+- Jitter: desplazamiento del viewport de la geometría de escena (dibujada con la profundidad de escena, no con quads
+  a pantalla completa), Halton(2,3) 8 fases; el signo se comprobó por nitidez (correcto 255, invertido 208, apagado 271 —
+  el jitter 1:1 cambia aliasing de alta frecuencia por una imagen algo más suave). Toggle 1<<25 lo apaga.
+- Diferencia entre fotogramas con la cámara quieta: ~33 % menor con FSR.
+- Pendiente: movimiento de objetos animados (personajes, tela, vegetación), máscaras de
+  reactividad/transparencia para partículas y niebla, escalado de resolución de render, frame generation.
 
-## 2026-10-01: FSR 4 при выводе 1440p/2160p не работал (мерцание и дрожание)
+## 2026-10-01: FSR 4 no funcionaba con salida 1440p/2160p (parpadeo y temblor)
 
-Видео `video_2026-10-01_03-58-59.mp4` (вывод 3840x2160, FSR 4 Performance): мерцание и дрожание
-всех объектов. Причина — апскейлер в этом режиме вообще не выполнялся, а jitter оставался
-включённым: на экран шёл растянутый кадр сцены, каждый кадр сдвинутый на свою фазу Halton.
+Vídeo `video_2026-10-01_03-58-59.mp4` (salida 3840x2160, FSR 4 Performance): parpadeo y temblor
+de todos los objetos. La causa: el upscaler en este modo no se ejecutaba en absoluto y el jitter seguía
+activado: a la pantalla llegaba un fotograma de escena estirado, desplazado en cada fotograma a su fase Halton.
 
-1. Проход UI опознавался по точному размеру цели `GOW3_RENDER_RES` (1916x1078), а игра выделяет
-   цели с выровненной высотой (1916x1080; в константах сцены тоже 1916x1080). `RunScaled` не
-   вызывался ни разу (в логе не было `UI: native composition`). Теперь допускается выравнивание
-   до 8 пикселей (`RenderTarget`), а размер сцены для FSR берётся из констант сцены
+1. El pase de UI se identificaba por el tamaño exacto del objetivo `GOW3_RENDER_RES` (1916x1078), pero el juego reserva
+   objetivos con la altura alineada (1916x1080; en las constantes de escena también 1916x1080). `RunScaled` no
+   se llamó ni una vez (en el log no había `UI: native composition`). Ahora se admite alineación
+   de hasta 8 píxeles (`RenderTarget`), y el tamaño de escena para FSR se toma de las constantes de escena
    (`CameraMotion::RenderSize`, `SceneSize`).
-2. После этого FSR 4 падал с `external image registration failed (-1000069000)`: `RunScaled`
-   создавал новые image view каждый кадр, а реестр FSR 4 вмещает восемь. Теперь те же
-   `CachedView`, что и в пути Native AA.
+2. Después de eso FSR 4 caía con `external image registration failed (-1000069000)`: `RunScaled`
+   creaba nuevos image views en cada fotograma, y el registro de FSR 4 admite ocho. Ahora se usan las mismas
+   `CachedView` que en la ruta Native AA.
 
-Проверка дампом (`GOW3_DUMP_TRIGGER=<файл> GOW3_DUMP_DIR=<каталог>`, `GOW3_DUMP_FRAMES`, по умолчанию 8:
-вход FSR, векторы движения и выход, raw): при неподвижной камере PSNR соседних кадров выхода
-~45 дБ против ~28 дБ у входа с jitter; при повороте камеры и ходьбе шлейфов нет. FPS в этом
-режиме ~107 вместо ~220 — раньше FSR 4 просто не выполнялся.
+Comprobación con volcado (`GOW3_DUMP_TRIGGER=<archivo> GOW3_DUMP_DIR=<directorio>`, `GOW3_DUMP_FRAMES`, por defecto 8:
+entrada de FSR, vectores de movimiento y salida, raw): con la cámara quieta el PSNR entre fotogramas vecinos de la salida es
+~45 dB frente a ~28 dB en la entrada con jitter; al girar la cámara y caminar no hay estelas. Los FPS en este
+modo son ~107 en lugar de ~220 — antes FSR 4 simplemente no se ejecutaba.
 
-Осталось: спрайты (по 4 индекса) в цвет сцены со сценической глубиной — свечения, огоньки —
-по-прежнему не сдвигаются jitter (правило «≤ 6 индексов = полноэкранный проход»).
+Pendiente: los sprites (de 4 índices) en el color de escena con profundidad de escena — destellos, lucecitas —
+siguen sin desplazarse con el jitter (regla «≤ 6 índices = pase a pantalla completa»).
 
-## 2026-10-01: FSR 4 быстрее — проход post (2.9 → 0.8 мс в 4K)
+## 2026-10-01: FSR 4 más rápido — pase post (2.9 → 0.8 ms en 4K)
 
-Замеры: `GOW3_FSR4_PROFILE=1` (время каждого прохода FSR 4, патч провайдера в субмодуле,
-см. `gpu/patches/fsr-vulkan`), бенчмарк вне игры `out/gpu/fsr4-bench` (`ninja -C out/gpu
-fsr4-bench`; `--stats` — регистры и инструкции от RADV). 4K Balanced (2260x1272 → 3840x2160),
-RX 7800 XT: весь FSR 4 — 5.8 мс, из них **post 2.5–2.9 мс** (не нейросеть: последние слои,
-pixel shuffle 2x2 и смешивание с историей), 12 проходов модели — 2.4 мс, pre 0.55.
+Mediciones: `GOW3_FSR4_PROFILE=1` (tiempo de cada pase de FSR 4, parche del proveedor en el submódulo,
+ver `gpu/patches/fsr-vulkan`), benchmark fuera del juego `out/gpu/fsr4-bench` (`ninja -C out/gpu
+fsr4-bench`; `--stats` — registros e instrucciones de RADV). 4K Balanced (2260x1272 → 3840x2160),
+RX 7800 XT: todo FSR 4 — 5.8 ms, de los cuales **post 2.5–2.9 ms** (no la red neuronal: las últimas capas,
+pixel shuffle 2x2 y mezcla con la historia), 12 pases del modelo — 2.4 ms, pre 0.55.
 
-Причина: каждый поток считает блок 2x2 выходных пикселей и пишет их по одному в три образа
-(рекуррентное состояние, история, выход) — каждая инструкция записи волны пишет пиксели через
-один. Убрав любую из трёх записей, проход ускорялся в 1.3–4 раза при том же коде.
+Causa: cada hilo calcula un bloque 2x2 de píxeles de salida y los escribe uno a uno en tres imágenes
+(estado recurrente, historia, salida) — cada instrucción de escritura de la wave escribe píxeles
+alternos. Quitando cualquiera de las tres escrituras, el pase se aceleraba entre 1.3 y 4 veces con el mismo código.
 
-Решение: `tools/fsr4_optimize.sh` декомпилирует post (spirv-cross), `tools/fsr4_post_lds.pl`
-собирает блок 16x16 рабочей группы в shared memory и пишет сплошными строками, glslang
-компилирует обратно в `fsr4_shaders/opt/`; `vk_fsr4.cpp` берёт его оттуда (`GOW3_FSR4_OPT=0` —
-оригинал). Две тонкости, найденные сравнением выходов:
-- spirv-cross переводит знаковую распаковку int8 (`OpBitcast` в `i8vec4`) как `unpack8(uint)`
-  (беззнаковую) — без исправления результат совсем другой (PSNR 17 дБ);
-- значения в shared memory должны оставаться float: half из shared memory компилятор
-  превращает в 16-битную запись, а она иначе округляет в unorm8.
+Solución: `tools/fsr4_optimize.sh` decompila el post (spirv-cross), `tools/fsr4_post_lds.pl`
+reúne el bloque 16x16 del workgroup en shared memory y escribe en líneas contiguas, glslang
+lo compila de vuelta en `fsr4_shaders/opt/`; `vk_fsr4.cpp` lo toma de allí (`GOW3_FSR4_OPT=0` —
+el original). Dos sutilezas, encontradas comparando salidas:
+- spirv-cross traduce el desempaquetado int8 con signo (`OpBitcast` a `i8vec4`) como `unpack8(uint)`
+  (sin signo) — sin corregirlo el resultado es totalmente distinto (PSNR 17 dB);
+- los valores en shared memory deben seguir siendo float: el compilador convierte un half de shared memory
+  en una escritura de 16 bits, y esta redondea de otra forma a unorm8.
 
-`tools/fsr4_verify.sh` сравнивает оригинал и оптимизированный post для всех пресетов при выводе
-1080p/1440p/4K на псевдослучайных входах: 1440p и 4K — побитово одинаково; post 4K 2.1–3.5 →
-0.81–0.87 мс, 1440p 1.2–1.5 → 0.36–0.38 мс, 1080p 0.37–0.69 → 0.20–0.22 мс. В игре (4K
-Balanced): FSR 4 5.8 → 4.0 мс, кадр GPU 13.1 → ~11.6 мс; дальше FPS упирается в CPU (поток
-GPU-команд ждёт копии гостевой памяти, «host copies» ~20%).
+`tools/fsr4_verify.sh` compara el post original y el optimizado para todos los presets con salida
+1080p/1440p/4K sobre entradas pseudoaleatorias: 1440p y 4K — idénticos bit a bit; post 4K 2.1–3.5 →
+0.81–0.87 ms, 1440p 1.2–1.5 → 0.36–0.38 ms, 1080p 0.37–0.69 → 0.20–0.22 ms. En el juego (4K
+Balanced): FSR 4 5.8 → 4.0 ms, fotograma de GPU 13.1 → ~11.6 ms; a partir de ahí los FPS dependen de la CPU (el hilo de
+comandos de GPU espera las copias de memoria del guest, «host copies» ~20 %).
 
-Найдено попутно: **оригинальный FSR 4 на уровне 1080 (вывод 1920x1080) недетерминирован** — от
-запуска к запуску на одинаковых входах меняется полоса у левого края (столбцы 0–132), то есть
-где-то гонка или чтение неинициализированной памяти в модели/провайдере. При выводе 1080p это
-может давать мерцание у левого края кадра. Не исследовано.
+Hallado de paso: **el FSR 4 original en el nivel 1080 (salida 1920x1080) no es determinista** — de
+una ejecución a otra con entradas idénticas cambia una franja en el borde izquierdo (columnas 0–132), es decir,
+en algún lugar hay una carrera o lectura de memoria sin inicializar en el modelo/proveedor. Con salida 1080p
+puede provocar parpadeo en el borde izquierdo del fotograma. Sin investigar.
 
-Маска реактивности при FSR 4 больше не считается (FSR 4 её не принимает).
+La máscara de reactividad con FSR 4 ya no se calcula (FSR 4 no la acepta).
 
-### Что ещё проверено (там же, 4K Balanced)
+### Qué más se comprobó (en lo mismo, 4K Balanced)
 
-- **A/B в одном процессе** (`ab.sh`, бит 24 — FSR выключен, UI-копия без апскейла): 86.5 FPS с
-  FSR 4 против 87.7 без него. После оптимизации post кадр упирается в CPU (поток GPU-команд,
-  ожидание копий гостевой памяти), а не в GPU. Async compute для FSR (перекрыть его с началом
-  следующего кадра) дал бы не больше этого ~1% — отложено до ускорения CPU-части; к тому же он
-  требует переставлять команды UI и вывода кадра N после работы кадра N+1.
-- **WMMA (`VK_KHR_cooperative_matrix`, RADV на RDNA3 поддерживает)**: прототип прохода 1
-  модели (остаточный блок 16 каналов: 3x3 16→16, 1x1 16→32 ReLU, 1x1 32→16) — 0.85 мс в первом
-  варианте, 0.49 мс со словной раскладкой в shared memory, против 0.30 мс у исходного dot4.
-  Арифметика на WMMA заняла бы ~0.1 мс, но при 16 каналах выкладка тайлов, эпилоги через shared
-  memory и занятость (6 волн/SIMD, предел по LDS) съедают выигрыш. Потолок — около 1 мс на
-  все 12 проходов при тонкой ручной переработке каждого; не начато.
-- `RADV_PERFTEST=cswave32` (wave32 для compute): FSR 4 медленнее, 4.2 → 5.4 мс.
-- Проход pre (0.54 мс) запись не ограничивает (0.50 мс без записи).
+- **A/B en un mismo proceso** (`ab.sh`, bit 24 — FSR apagado, copia de UI sin upscaling): 86.5 FPS con
+  FSR 4 frente a 87.7 sin él. Tras optimizar el post, el fotograma depende de la CPU (hilo de comandos de GPU,
+  espera de copias de memoria del guest), no de la GPU. El async compute para FSR (solaparlo con el inicio
+  del siguiente fotograma) no daría más que ese ~1 % — aplazado hasta acelerar la parte de CPU; además
+  exige reordenar los comandos de UI y de salida del fotograma N tras el trabajo del fotograma N+1.
+- **WMMA (`VK_KHR_cooperative_matrix`, RADV en RDNA3 lo admite)**: prototipo del pase 1 del
+  modelo (bloque residual de 16 canales: 3x3 16→16, 1x1 16→32 ReLU, 1x1 32→16) — 0.85 ms en la primera
+  variante, 0.49 ms con disposición por palabras en shared memory, frente a 0.30 ms del dot4 original.
+  La aritmética en WMMA ocuparía ~0.1 ms, pero con 16 canales la disposición de tiles, los epílogos vía shared
+  memory y la ocupación (6 waves/SIMD, límite por LDS) se comen la ganancia. El techo es de aproximadamente 1 ms en
+  los 12 pases con un trabajo manual fino en cada uno; no iniciado.
+- `RADV_PERFTEST=cswave32` (wave32 para compute): FSR 4 más lento, 4.2 → 5.4 ms.
+- El pase pre (0.54 ms) no está limitado por la escritura (0.50 ms sin escritura).
 
-## 2026-10-01: мерцание FSR 4 у левого края при выводе 1080p — гонка в проходе 11 модели
+## 2026-10-01: parpadeo de FSR 4 en el borde izquierdo con salida 1080p — carrera en el pase 11 del modelo
 
-Недетерминизм уровня 1080 (см. выше) — ошибка в шейдере модели v07, проход 11 (декодер,
-1/4 → 1/2 разрешения). Каждый поток — пиксель входа 1/4 разрешения и пишет блок 2x2 выхода
-1/2 разрешения. Диспатч округляет ширину до 64 потоков, а потоки за шириной входа не
-останавливаются: на уровне 1080 (вход 480 в ширину) потоки 480..511 пишут пиксели выхода
-960..1023, то есть первые пиксели следующей строки (строка любого тензора — 15360 байт), и
-гоняются с их настоящими авторами. При выводе 4K ширина 960 делится на 64, ошибки нет.
+El no determinismo del nivel 1080 (ver arriba) es un error en el shader del modelo v07, pase 11 (decodificador,
+1/4 → 1/2 de resolución). Cada hilo es un píxel de la entrada a 1/4 de resolución y escribe un bloque 2x2 de la salida
+a 1/2 de resolución. El dispatch redondea el ancho a 64 hilos, y los hilos fuera del ancho de entrada no
+se detienen: en el nivel 1080 (entrada de 480 de ancho) los hilos 480..511 escriben píxeles de salida
+960..1023, es decir, los primeros píxeles de la fila siguiente (la fila de cualquier tensor — 15360 bytes), y
+compiten con sus autores legítimos. Con salida 4K el ancho 960 es divisible entre 64, no hay error.
 
-`tools/fsr4_pass11_guard.pl` добавляет ранний выход для потоков за границей (размер берётся из
-проверки соседей самого прохода); `tools/fsr4_optimize.sh` собирает его в `fsr4_shaders/opt`
-для всех пресетов вместе с post; `vk_fsr4.cpp` и бенчмарк берут из `opt/` любой проход.
-`tools/fsr4_verify.sh`: 1440p/4K — побитово как оригинал (защита там не срабатывает); 1080p —
-одинаковый результат от запуска к запуску, отличия от оригинала после первого кадра только в
-бывшей полосе у левого края.
+`tools/fsr4_pass11_guard.pl` añade una salida temprana para los hilos fuera del límite (el tamaño se toma de
+la comprobación de vecinos del propio pase); `tools/fsr4_optimize.sh` lo compila en `fsr4_shaders/opt`
+para todos los presets junto con el post; `vk_fsr4.cpp` y el benchmark toman de `opt/` cualquier pase.
+`tools/fsr4_verify.sh`: 1440p/4K — idénticos bit a bit al original (la protección allí no se activa); 1080p —
+mismo resultado de una ejecución a otra, con diferencias respecto al original tras el primer fotograma solo en la
+antigua franja del borde izquierdo.
 
-Найдено при этом: spirv-cross переводит все знаковые распаковки int8 (`OpBitcast` в `v4char`)
-как беззнаковый `unpack8(uint)`; в pass 11 их девять разных форм. Исправление общее для
-скриптов — `tools/Fsr4SpirvCrossFixes.pm` (все `unpack8` через знаковый помощник).
+Hallado en el proceso: spirv-cross traduce todos los desempaquetados int8 con signo (`OpBitcast` a `v4char`)
+como `unpack8(uint)` sin signo; en el pase 11 hay nueve formas distintas. La corrección común para los
+scripts es `tools/Fsr4SpirvCrossFixes.pm` (todos los `unpack8` mediante un helper con signo).
 
-## 2026-10-01: FSR 4.1.1 — что внутри и как его запустить в Vulkan (разведка)
+## 2026-10-01: FSR 4.1.1 — qué hay dentro y cómo ejecutarlo en Vulkan (reconocimiento)
 
-Источник: `amd_fidelityfx_upscaler_dx12.dll` 4.1.1.2740 из OptiScaler (`FSR4_LATEST`).
-- В DLL есть провайдер `ffxProvider_FSR4_Int8` / `Fsr4Int8UpscalerModel` (версия «FSR4-i8 4.1.1»).
-  1028 DXIL-контейнеров (25.7 МБ): проходы модели `fsr4_model_v07_fp8_no_scale_pass1..12` (+ `_post`),
-  270 вариантов `prepass`, 144 `postpass`, `fsr_rcas_pass` и запасной FSR 3.1/2. Сжатых данных нет.
-- Несмотря на «fp8» в имени, проходы модели — обычный DXIL с `dot4AddPacked` (int8 dot4), без
-  расширений AMD (WMMA). Архитектура та же v07 (12 проходов), но веса и смещения не зашиты в
-  шейдер, а читаются из `InitializerBuffer` (t18, typed buffer), размеры тензоров — из cbuffer
-  `CsTensorSizes`, scratch — `u11`. У каждого прохода 9 вариантов: сетка зашита (уровни 1080 / 4K /
-  8K: 480x270, 960x540, 1920x1080 для прохода 5) и, видимо, пресеты.
-- `amdxcffx64.dll` (загрузчик 2.3.0.2913, его подгружает Proton) — те же FP8-проходы FSR 4 и ML-
-  генерация кадров (`mlfi_*`), отдельной INT8-модели нет. `FSR4_INT8` 4.0.2 — это `v07_i8`, то есть
-  то, что порт уже использует.
-- dxil-spirv (HansKristian-Work/dxil-spirv, собирается из исходников) переводит проходы в
-  корректный SPIR-V: `dxil-spirv <pass> --enable-shader-i8-dot --ssbo-uav --use-reflection-names`.
+Fuente: `amd_fidelityfx_upscaler_dx12.dll` 4.1.1.2740 de OptiScaler (`FSR4_LATEST`).
+- La DLL contiene el proveedor `ffxProvider_FSR4_Int8` / `Fsr4Int8UpscalerModel` (versión «FSR4-i8 4.1.1»).
+  1028 contenedores DXIL (25.7 MB): pases del modelo `fsr4_model_v07_fp8_no_scale_pass1..12` (+ `_post`),
+  270 variantes de `prepass`, 144 de `postpass`, `fsr_rcas_pass` y un FSR 3.1/2 de reserva. No hay datos comprimidos.
+- A pesar del «fp8» en el nombre, los pases del modelo son DXIL normal con `dot4AddPacked` (int8 dot4), sin
+  extensiones de AMD (WMMA). La arquitectura es la misma v07 (12 pases), pero los pesos y sesgos no están incrustados en
+  el shader sino que se leen de `InitializerBuffer` (t18, typed buffer), los tamaños de los tensores vienen del cbuffer
+  `CsTensorSizes`, y el scratch es `u11`. Cada pase tiene 9 variantes: la malla está incrustada (niveles 1080 / 4K /
+  8K: 480x270, 960x540, 1920x1080 para el pase 5) y, al parecer, los presets.
+- `amdxcffx64.dll` (loader 2.3.0.2913, lo carga Proton) — los mismos pases FP8 de FSR 4 y la generación de
+  fotogramas por ML (`mlfi_*`); no hay un modelo INT8 aparte. `FSR4_INT8` 4.0.2 es `v07_i8`, es decir,
+  lo que el port ya usa.
+- dxil-spirv (HansKristian-Work/dxil-spirv, se compila desde el código fuente) traduce los pases a
+  SPIR-V correcto: `dxil-spirv <pass> --enable-shader-i8-dot --ssbo-uav --use-reflection-names`.
 
-Чего не хватает для своего провайдера 4.1.1: соответствие контейнеров (пресет, уровень, проход),
-содержимое `InitializerBuffer`, значения `CsTensorSizes`, перестановки prepass/postpass, константы и
-размеры диспатчей. Самый надёжный путь — не разбирать x86-код провайдера, а записать один кадр:
-маленькая тестовая программа на FFX API (DX12, MinGW) под Wine/Proton с vkd3d-proton, явный выбор
-провайдера «FSR4-i8» через override версии, и Vulkan-слой, который пишет пайплайны (SPIR-V от
-dxil-spirv), содержимое буферов и размеры диспатчей. Затем — воспроизведение своим провайдером
-через тот же бенчмарк (`fsr4-bench`), с проверкой против записанного выхода.
+Lo que falta para un proveedor 4.1.1 propio: la correspondencia de los contenedores (preset, nivel, pase), el
+contenido de `InitializerBuffer`, los valores de `CsTensorSizes`, las permutaciones de prepass/postpass, las constantes y
+los tamaños de dispatch. La vía más fiable no es desmontar el código x86 del proveedor, sino grabar un fotograma:
+un pequeño programa de prueba con la FFX API (DX12, MinGW) bajo Wine/Proton con vkd3d-proton, selección explícita
+del proveedor «FSR4-i8» mediante un override de versión, y una capa Vulkan que registre los pipelines (SPIR-V de
+dxil-spirv), el contenido de los buffers y los tamaños de dispatch. Después, la reproducción con un proveedor propio
+a través del mismo benchmark (`fsr4-bench`), con comprobación contra la salida grabada.
 
-## 2026-10-01: FSR 4.1.1 в порту (upscaler=fsr411)
+## 2026-10-01: FSR 4.1.1 en el port (upscaler=fsr411)
 
-Модель AMD 4.1.1 (INT8) работает нативно в Vulkan и совпадает с DLL до бита.
+El modelo 4.1.1 (INT8) de AMD funciona de forma nativa en Vulkan y coincide con la DLL bit a bit.
 
-**Как получено.** `tools/fsr4cap/fsr4cap.exe` (C, MinGW) вызывает FidelityFX API 2.3 из
-`amd_fidelityfx_loader_dx12.dll` с явной версией 4.1.1 и через подмену таблиц методов D3D12
-записывает всё, что делает DLL под vkd3d-proton: пайплайны (DXIL), корневые сигнатуры,
-дескрипторы, загрузки, константы, диспатчи. Кадр — 29 диспатчей: SPD авто-экспозиции, prepass,
-pass0_post, проходы модели 1..12 (за каждым `_post`, обнуление рамки тензора), postpass, RCAS.
-- Моделей две: m0 (Native..Performance) и m1 (Ultra Performance, соотношение 3.0), веса — 128 КБ
-  (`InitializerBuffer`). Уровни: t1080 (вывод до 1920x1080), t2160 (больше, вкл. 2560x1080).
-- Тензоры считаются от вывода, выровненного до 8; таблица `CsTensorSizes` (17 размеров), число
-  групп и константы (MLSR как у v07, но width/height не выровнены и `inv_scale = 1 / scale`;
-  SPD; RCAS) проверяются `extract.py` на 20 записях.
-- dxil-spirv переводит DXIL так же, как vkd3d-proton: `--mixed-float-dot-product`
-  (`VK_VALVE_shader_mixed_float_dot_product`, dot2 по half с накоплением во float) — без него
-  PSNR 40 дБ вместо точного совпадения. `--class-bindings` (патч) раскладывает регистры SRV/UAV/
-  CBV/сэмплеров по биндингам +0/+32/+64/+96, рантайм привязывает ресурсы по именам.
-- `fsr411/fsr411.cpp` — независимое ядро на Vulkan (игра и `fsr4-bench --fsr411`).
-- `verify.sh`: DLL и воспроизведение на одинаковых входах, 8 кадров — побитово одинаково для
-  1080p (обе модели), 1440p, 2560x1080, 4K (обе модели). 1600x900 расходится только у правого
-  края, где сама DLL недетерминирована (гонка в её шейдерах при ширине тензора не кратной 64).
+**Cómo se obtuvo.** `tools/fsr4cap/fsr4cap.exe` (C, MinGW) llama a la FidelityFX API 2.3 de
+`amd_fidelityfx_loader_dx12.dll` con la versión 4.1.1 explícita y, sustituyendo las tablas de métodos de D3D12,
+graba todo lo que hace la DLL bajo vkd3d-proton: pipelines (DXIL), firmas raíz,
+descriptores, cargas, constantes, dispatches. El fotograma son 29 dispatches: SPD de autoexposición, prepass,
+pass0_post, pases del modelo 1..12 (tras cada uno `_post`, puesta a cero del marco del tensor), postpass, RCAS.
+- Hay dos modelos: m0 (Native..Performance) y m1 (Ultra Performance, relación 3.0), pesos de 128 KB
+  (`InitializerBuffer`). Niveles: t1080 (salida hasta 1920x1080), t2160 (mayor, incl. 2560x1080).
+- Los tensores se calculan a partir de la salida alineada a 8; la tabla `CsTensorSizes` (17 tamaños), el número
+  de grupos y las constantes (MLSR como en v07, pero width/height sin alinear y `inv_scale = 1 / scale`;
+  SPD; RCAS) las comprueba `extract.py` sobre 20 grabaciones.
+- dxil-spirv traduce el DXIL igual que vkd3d-proton: `--mixed-float-dot-product`
+  (`VK_VALVE_shader_mixed_float_dot_product`, dot2 sobre half con acumulación en float) — sin ello
+  PSNR 40 dB en lugar de coincidencia exacta. `--class-bindings` (parche) distribuye los registros SRV/UAV/
+  CBV/samplers en los bindings +0/+32/+64/+96, y el runtime enlaza los recursos por nombre.
+- `fsr411/fsr411.cpp` — núcleo independiente en Vulkan (el juego y `fsr4-bench --fsr411`).
+- `verify.sh`: la DLL y la reproducción con entradas idénticas, 8 fotogramas — idénticos bit a bit en
+  1080p (ambos modelos), 1440p, 2560x1080, 4K (ambos modelos). 1600x900 diverge solo en el borde
+  derecho, donde la propia DLL no es determinista (carrera en sus shaders cuando el ancho del tensor no es múltiplo de 64).
 
-**Ускорение.** postpass переписан через workgroup memory на уровне SPIR-V-ассемблера
-(`postpass_lds.py`; перевод через GLSL неточен: теряются `DenormPreserve` и точная расстановка
-`RelaxedPrecision`, и ещё что-то меняет результат): 2.18 → 0.95 мс в 4K, побитово как DLL.
-Весь FSR 4.1.1: 1.09 мс при 1080p (1280x720), 4.2 мс при 4K Balanced. В игре (4K Balanced)
-апскейлер 4.12 мс против 4.32 мс у ускоренного v07.
+**Aceleración.** El postpass se reescribió con workgroup memory a nivel del ensamblador SPIR-V
+(`postpass_lds.py`; pasar por GLSL es impreciso: se pierden `DenormPreserve` y la colocación exacta de
+`RelaxedPrecision`, y algo más cambia el resultado): 2.18 → 0.95 ms en 4K, idéntico bit a bit a la DLL.
+Todo FSR 4.1.1: 1.09 ms en 1080p (1280x720), 4.2 ms en 4K Balanced. En el juego (4K Balanced)
+el upscaler 4.12 ms frente a 4.32 ms del v07 acelerado.
 
-**Сборка ассетов** (пользователем, из своих DLL; в репозитории ничего от AMD нет):
+**Construcción de assets** (por el usuario, a partir de sus DLL; en el repositorio no hay nada de AMD):
 
     bash tools/fsr4cap/build_assets.sh <amd_fidelityfx_upscaler_dx12.dll 4.1.x> <amd_fidelityfx_loader_dx12.dll 2.3.x>
 
-Нужны nix-shell (или MinGW, cmake, ninja, python3, SPIRV-Tools, umu-run), сеть для dxil-spirv и
-заголовков FidelityFX SDK и Proton (GE-Proton). DLL есть, например, у OptiScaler
-(`FSR4_LATEST/`) и в играх с FSR 3.1/4. Сборка с нуля даёт те же файлы; `VERIFY=1` в конце
-сравнивает с DLL.
+Hacen falta nix-shell (o MinGW, cmake, ninja, python3, SPIRV-Tools, umu-run), red para dxil-spirv y para las
+cabeceras del FidelityFX SDK y Proton (GE-Proton). Las DLL las tiene, por ejemplo, OptiScaler
+(`FSR4_LATEST/`) y los juegos con FSR 3.1/4. Construir desde cero da los mismos archivos; `VERIFY=1` al final
+compara con la DLL.
 
-**Поправка к A/B выше («кадр упирается в CPU»).** Те замеры шли, пока 12 зависших процессов
-shadPS4 занимали по ядру. На свободной системе: «host copies» 1.6%, ожидание GPU ~41% — кадр
-упирается в GPU, так что async compute для FSR снова имеет смысл.
+**Corrección al A/B anterior («el fotograma depende de la CPU»).** Aquellas mediciones se hicieron mientras 12 procesos colgados
+de shadPS4 ocupaban un núcleo cada uno. En un sistema libre: «host copies» 1.6 %, espera de GPU ~41 % — el fotograma
+depende de la GPU, así que el async compute para FSR vuelve a tener sentido.
