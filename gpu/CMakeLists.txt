@@ -77,7 +77,12 @@ if (NOT miniz_FOUND)
     unset(CMAKE_POLICY_VERSION_MINIMUM)
     add_library(miniz::miniz ALIAS miniz)
 endif()
-find_package(Zydis REQUIRED)
+find_package(Zydis QUIET)
+if (NOT Zydis_FOUND)
+    # Fedora's zydis-devel ships only zydis.pc, without a CMake package.
+    pkg_check_modules(ZYDIS REQUIRED IMPORTED_TARGET zydis)
+    add_library(Zydis::Zydis ALIAS PkgConfig::ZYDIS)
+endif()
 find_program(GLSLANG_COMPILER NAMES glslang glslangValidator REQUIRED)
 
 set(SIRIT_USE_SYSTEM_SPIRV_HEADERS OFF CACHE BOOL "" FORCE)
