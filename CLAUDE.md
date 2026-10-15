@@ -191,4 +191,4 @@ bound to a GOT slot. Frame capture: `GOW3_FRAME_CAPTURE_KEY` (F11). The full log
   file that depends on a contract.
 - User-facing docs: `README.md` (English) and `README.pt-BR.md` must stay in sync;
   progress lives in `docs/gow3/ROADMAP.md` (Portuguese).
-- never do a commit
+- Repo is only local, so u can do commits or create a branch to test something
