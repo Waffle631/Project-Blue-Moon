@@ -23,7 +23,9 @@ GoW3-only features (orb/damage hooks, actors, enemy health bar, GoW3 patches XML
 heuristics, touchpad semantics, GoW3-only tests) must be **deleted** from the tree, not disabled,
 isolated or adapted: no dead code behind a switch. GoW3 stops being a supported title on this
 branch (history stays in git and the `gow3` branch). Generic code (loader, runtime, shadPS4 core,
-upscalers) stays. Order of work and acceptance criteria: Spec 1 in `.waffle/ROADMAP.md`.
+upscalers) stays. Order of work and acceptance criteria: `.waffle/ROADMAP.md` (kernel Spec 2 first; Spec 1a deletes
+hooks/patches early; a "first frame" milestone gates Spec 1b, which deletes the renderer heuristics
+with before/after captures; the `gow3` → `tsuki` rename is Spec 7, done last).
 
 - Dump: `Tsukihime/CUSA47999/` (untracked, ~45 GB — never `git add` it). Run with
   `GOW3_GAME_DIR=Tsukihime/CUSA47999`. Game data is in `image/` (`allpac*.hed/.mrg/.nam`,

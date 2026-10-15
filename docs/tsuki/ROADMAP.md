@@ -1,0 +1,831 @@
+# tsuki_pc — Roadmap hasta la versión Alpha
+
+Port nativo de **TSUKIHIME -A piece of blue glass moon-** (PS4) a PC, construido sobre el código de
+gow3_pc (God of War III Remastered), que a su vez viene de
+[bbport / bloodborne_pc](https://github.com/Supermedo/bloodborne_pc).
+
+| | |
+|---|---|
+| Rama | `tsuki/main` (sobre el código de gow3_pc) |
+| Juego objetivo | TSUKIHIME -A piece of blue glass moon-, **CUSA47999**, versión **01.00** (`HP3279-CUSA47999_00-GAME000TSUKIHIME`) |
+| Idioma objetivo | **Inglés** (el runtime ya reporta inglés al juego: `GOW3_LANGUAGE`, valor 1 por defecto) |
+| Plataforma | Linux primero (máquina de desarrollo), Windows 10/11 después; Vulkan 1.3 |
+| Máquina de pruebas | Bazzite 44 (KDE Plasma 6.7, Wayland), AMD Ryzen 5 7600, 16 GB, **AMD Radeon RX 6650 XT** |
+| Dump | `Tsukihime/CUSA47999/` (sin versionar, ~45 GB) |
+| Última actualización | 2026-10-14. Revisión del orden tras un análisis adversarial: el kernel va primero, hay un hito de "primer fotograma", el borrado se parte en dos y el renombrado pasa al final. Lo específico de GoW3 se elimina, no se desactiva |
+
+---
+
+## Índice
+
+1. [Cómo funciona el proyecto (versión simple)](#1-cómo-funciona-el-proyecto-versión-simple)
+2. [Qué cambia respecto a God of War III](#2-qué-cambia-respecto-a-god-of-war-iii)
+3. [Definición de la Alpha](#3-definición-de-la-alpha)
+4. [Visión general de las etapas](#4-visión-general-de-las-etapas)
+5. [Etapas en detalle](#5-etapas-en-detalle)
+6. [Riesgos](#6-riesgos)
+7. [Pendientes del usuario](#7-pendientes-del-usuario)
+8. [Después de la Alpha](#8-después-de-la-alpha)
+9. [Glosario](#9-glosario)
+10. [Referencias](#10-referencias)
+
+---
+
+## 1. Cómo funciona el proyecto (versión simple)
+
+**No es descompilación ni emulación completa.** El ejecutable original del juego (`eboot.bin`) se ejecuta
+sin modificaciones, directamente en el procesador del PC (la PS4 usa x86-64 AMD, igual que un PC).
+
+El proyecto **imita el sistema de la PS4** alrededor del juego:
+
+| Analogía web | En el proyecto | Dónde está |
+|---|---|---|
+| App compilada sin código fuente | Ejecutable del juego | `Tsukihime/CUSA47999/eboot.bin` |
+| Script de build/deploy | Preparación: lee el ejecutable y genera una imagen lista para cargar | `scripts/prepare.py`, `scripts/link_modules.py` |
+| Servidor que levanta la app | Loader: carga la imagen en memoria e inicia el juego | `src/probe.c` |
+| Implementación falsa de las APIs del servidor | Runtime: reimplementa las APIs de la PS4 | `src/runtime_*.c` |
+| Adaptador de base de datos | Traductor de gráficos: comandos de la GPU de la PS4 → Vulkan | `gpu/` (núcleo de shadPS4) |
+| Error 404 con el nombre de la ruta | API inexistente → `STOP: first unsupported PS4 import: <nombre>` | `src/probe.c` |
+
+El trabajo del port es: **implementar cada API que usa Tsukihime y que gow3_pc no implementa,
+eliminar todo lo específico de God of War III y validar el camino 2D, de vídeo y de audio.**
+
+---
+
+## 2. Qué cambia respecto a God of War III
+
+Tsukihime es una **novela visual**: casi todo es 2D (fondos, sprites, texto), vídeo (openings,
+títulos de capítulo, créditos) y audio (BGM, voces, efectos). El trabajo de rendimiento 3D de gow3
+(readbacks, G-buffer, upscalers) importa poco; importan el texto, las transiciones, el vídeo y el
+audio.
+
+| Aspecto | God of War III | Tsukihime |
+|---|---|---|
+| ID / versión | CUSA01623 v01.02 | CUSA47999 v01.00 |
+| SDK | — | 11.008 (`sdk_ver=11008000`, publicado el 2025-09-19) |
+| Imagen del eboot | — | 34 MB, entrada `0xef390`, relocaciones tipo 1/7/8 (dentro de los límites del loader) |
+| Imports | 387 | 337 (359 quedan al runtime tras enlazar `libc.prx` y `libSceFios2.prx`) |
+| Audio | AJM (ATRAC9 + MP3) | **libSceAudiodec + libSceAudiodecCpu** (no usa AJM) |
+| Vídeo | `sceVideodec` (H.264 de bajo nivel) | **`sceAvPlayer`** (134 `.mp4` en `image/movie/`, 4,5 GB) |
+| Entrada | Mando, teclado | Mando, teclado **y ratón** (`libSceMouse`) |
+| Datos | WAD | `image/*.hed/.mrg/.nam` (`allpac*`, `bgm`, `voice*`, `vag`, `se_nam`, `script_text`, fuentes `ft_*.mrg`) |
+| Idiomas | — | ja, en, zc (chino simplificado), zt (chino tradicional), ko (fuentes); **el port solo apunta al inglés** |
+| Módulos incluidos | `libc`, `libSceFios2` | `libc`, `libSceFios2`, `libSceNpToolkit2` (**el eboot no lo importa**: no hace falta enlazarlo) |
+| Patches de la comunidad | Resolución, 120 FPS | Ninguno conocido |
+
+### Qué se elimina (no se desactiva ni se adapta)
+
+Todo lo que solo sirve a God of War III se **borra del árbol**; no se deja código muerto detrás de
+un interruptor. GoW3 deja de ser un título soportado en esta rama (la historia sigue en git y en
+la rama `gow3`).
+
+- Hooks de orbes, daño, cheats y barra de vida del enemigo: los `install_*` de `src/probe.c`,
+  `src/*_hook.h`, `gpu/shim/gow3_orbs.cpp`, `gpu/shim/gow3_actors.cpp`, y sus llamadas desde el
+  overlay. *(Spec 1a)* Las del launcher se quitan al final (ver "Después de la Alpha").
+- `tools/gow3_frame_map.py` (herramienta específica de GoW3). *(Spec 1a)*
+- `patches/God_of_War_III_Remastered.xml`, el perfil `GAMES` y `REFERENCE_SHA256` de
+  `scripts/patches.py`, y `tools/make_signatures.py` si solo genera firmas de GoW3. *(Spec 1a)*
+- Semántica del touchpad (modo foto / pausa) en `runtime_pad.c`. *(Spec 1a)*
+- Tests que solo inspeccionan código de GoW3: `stat-multipliers-test`, `cheat-hooks-test`,
+  `signatures-test` y los de Python que dependen del perfil de GoW3. *(Spec 1a)*
+- Identidad de GoW3: título y serial por defecto en `probe.c` y en `run.py`/`scripts/patches.py`.
+  *(Spec 1a)* El acceso de Steam, los textos del launcher, el empaquetado y los README se dejan para
+  el final (ver "Después de la Alpha").
+- Heurísticas de GPU de GoW3: `gbuffer_draw` y la constante de cámara de 864 bytes en
+  `vk_rasterizer.cpp`; decisión de MSAA por vendor; `GOW3_READBACK_LINEAR=1` por defecto en `run.py`.
+  *(Spec 1b, después del hito de primer fotograma)* El escalado a 1920×1080 **se conserva**: el
+  proyecto trabaja de base a 1080p.
+
+Lo que no es de GoW3 sino genérico (loader, runtime, núcleo de shadPS4, upscalers) se conserva.
+
+**Por qué el borrado va en dos tandas:** los hooks, patches y tests no tocan el renderizador y quitan
+ruido del log, así que se borran pronto. Las heurísticas están dentro del núcleo de GPU
+(`vk_rasterizer.cpp`, `liverpool.cpp`, `vk_pipeline_cache.cpp`): borrarlas sin ver un fotograma no
+tiene forma de comprobarse. Se borran cuando el hito de primer fotograma deja una captura con la que
+comparar antes y después.
+
+---
+
+## 3. Definición de la Alpha
+
+### Objetivo
+
+Tsukihime abre con el loader nativo, muestra los logos, reproduce el opening, llega al menú
+principal, inicia una partida nueva y se puede leer **el prólogo hasta el primer título de
+capítulo** (`phasetitle_01_00`), con texto, música, voces y control, y guardar y cargar la partida.
+
+### Criterios de aceptación
+
+Se separan según quién los comprueba. Los primeros se verifican con el log o con un test; los
+segundos los juzga el usuario jugando.
+
+**Se comprueban con log o test**
+
+- [ ] El log (`user/last_run.log`) no contiene `STOP:` ni `Fault:` en el recorrido.
+- [ ] El prólogo se recorre hasta `phasetitle_01_00` sin colgarse ni cerrarse. El recorrido se graba
+  una vez con `GOW3_PAD_RECORD` y se repite con `GOW3_PAD_REPLAY`, para poder repetirlo tras cada cambio.
+- [ ] El juego arranca en inglés: el log de archivos abiertos muestra recursos `_en` y la fuente
+  `ft_en`, y ninguno de otro idioma.
+- [ ] El save se graba y se carga tras reiniciar el juego (archivo de save presente y estado restaurado).
+- [ ] La decodificación de audio produce el mismo PCM que FFmpeg/LibAtrac9 en un clip de referencia (test C).
+
+**Los juzga el usuario**
+
+- [ ] El juego muestra los logos y el opening en inglés (`op1_arc_en.mp4`) con vídeo y sonido.
+- [ ] Llega al menú principal e inicia una partida nueva.
+- [ ] El texto se ve correctamente y fondos, sprites y transiciones no tienen corrupción ni pantalla
+  negra/blanca, según las capturas de línea base que el usuario ha aprobado (ver Spec 6).
+- [ ] BGM, voces y efectos suenan sin chirridos ni cortes.
+- [ ] Se avanza el texto con mando, teclado y ratón.
+
+### Fuera de la Alpha
+
+- Japonés, chino y coreano (si funcionan, mejor, pero no se prueban).
+- Upscalers, motion vectors, patches de resolución o FPS.
+- Launcher completo con identidad de Tsukihime.
+- Trofeos reales, funciones de PSN, capturas/grabación/streaming del sistema.
+- Windows y Steam Deck (solo si no salen gratis del build actual).
+- Rutas completas y finales (eso es la Beta).
+
+---
+
+## 4. Visión general de las etapas
+
+El orden sigue una regla: **primero lo que acerca el juego a pintar algo, luego lo que se puede
+comprobar con eso, y lo que solo es limpieza, al final.**
+
+La columna de esfuerzo es una **propuesta gruesa del autor, sin medir**, para tener un punto de
+partida. Se corrige después del hito de primer fotograma, que es el primer momento con datos reales.
+
+| # | Etapa | Tipo | Depende de | Esfuerzo (propuesta) | Estado |
+|---|---|---|---|---|---|
+| 0 | Preparar el entorno (Linux) | Setup | — | — | ✅ Concluida |
+| 1 | Inventario de APIs faltantes | Diagnóstico | 0 | — | ✅ Concluida |
+| 2 | Kernel: event flags, tiempo, hilos (y lo mínimo de servicios para arrancar) | **Spec 2** | 1 | 3–5 días | ⬜ Pendiente |
+| 3 | Borrar hooks, patches, touchpad, tests e identidad de GoW3 | **Spec 1a** | 1 (en paralelo con la Spec 2) | 1–2 días | ⬜ Pendiente |
+| 4 | **Hito: primer fotograma** | Hito | Spec 2 | 1 día | ⬜ Pendiente |
+| 5 | Borrar las heurísticas de GPU de GoW3 | **Spec 1b** | Spec 1a, hito | 2–3 días | ⬜ Pendiente |
+| 6 | Servicios del sistema que faltan | **Spec 3** | Spec 2 | 2–3 días | ⬜ Pendiente |
+| 7 | Audio (Audiodec / AudiodecCpu), con investigación previa | **Spec 4** | Spec 2 | 1–2 semanas, sin tope | ⬜ Pendiente |
+| 8 | Vídeo (AvPlayer) | **Spec 5** | Specs 2 y 3 | 2–4 días | ⬜ Pendiente |
+| 9 | 2D correcto, ratón y saves | **Spec 6** | Hito (empieza), Specs 1b, 3, 4 y 5 (cierra) | 1–3 semanas | ⬜ Pendiente |
+| 10 | Renombrar `gow3` → `tsuki` | **Spec 7** | Spec 6 | 2–3 días | ⬜ Pendiente |
+
+**Total: 8 specs y 1 hito** (pueden crecer según lo que aparezca al ejecutar el juego).
+
+Leyenda de estado: ⬜ Pendiente · 🟨 En curso · ✅ Concluida · ⛔ Bloqueada
+
+```mermaid
+flowchart LR
+    E0[0. Entorno] --> E1[1. Inventario]
+    E1 --> S2[Spec 2<br/>Kernel]
+    E1 --> S1A[Spec 1a<br/>Borrar hooks y patches]
+    S2 --> H{{Hito<br/>Primer fotograma}}
+    S1A --> S1B[Spec 1b<br/>Borrar heurísticas GPU]
+    H --> S1B
+    S2 --> S3[Spec 3<br/>Servicios]
+    S2 --> S4[Spec 4<br/>Audio]
+    S2 --> S5[Spec 5<br/>Vídeo]
+    S3 --> S5
+    H --> S6[Spec 6<br/>2D + ratón + saves]
+    S1B --> S6
+    S3 --> S6
+    S4 --> S6
+    S5 --> S6
+    S6 --> S7[Spec 7<br/>Renombrar a tsuki]
+    S7 --> A((Alpha))
+```
+
+### Lo que ya se hizo
+
+| # | Entregado | Commit |
+|---|---|---|
+| — | Dump CUSA47999 v01.00 extraído (ShadPS4Plus `pkg_extractor`) en `Tsukihime/CUSA47999/`, ignorado en `.gitignore`. | — |
+| — | `prepare.py` y `link_modules.py` procesan el eboot sin errores: 104 enlaces nativos a `libc`/`Fios2`, 359 imports para el runtime, 0 parches `fs→gs`. | — |
+| 1 | Inventario estático (sección de la etapa 1): ~61 APIs sin implementación, 57 con nombre. | — |
+
+### Flujo de cada spec
+
+1. Spec escrita (objetivo, contrato, casos de error, archivos, criterios de aceptación).
+2. **Aprobación del usuario** (único punto de parada obligatorio).
+3. Tests escritos antes del código, cuando la lógica no es trivial.
+4. Implementación.
+5. Validación: tests automáticos y ejecución real del juego. Si la spec toca el renderizador, se
+   captura el mismo fotograma antes y después con la herramienta de captura de píxeles del hito y se
+   comparan con `tools/compare_captures.sh`.
+6. El usuario hace el commit (Claude no hace commits) y se actualiza el estado en esta página.
+
+---
+
+## 5. Etapas en detalle
+
+> Hasta que se ejecute la Spec 7 (renombrado), el resto de este documento usa los nombres **actuales**
+> (`GOW3_*`, `gow3-probe`, `libgow3gpu.so`). La última capa del renombrado los actualiza aquí también.
+
+### Etapa 0 — Preparar el entorno (Linux)
+
+**Qué es:** confirmar que el proyecto, todavía sin cambios, compila en la máquina de desarrollo.
+
+**Pasos**
+
+1. ✅ Dependencias por pkg-config (vulkan, sdl3, ffmpeg). Bazzite es inmutable: compilar dentro de
+   un contenedor (distrobox/toolbox de Fedora) con los `-devel` instalados, no con `rpm-ostree`.
+2. ✅ `bash build.sh` y confirmar que existen `out/gpu/libgow3gpu.so` y `out/gow3-probe`.
+3. ✅ `bash build.sh --test` y `python3 -m unittest discover -s tests`; anotar la línea base.
+
+**Listo cuando:** el build termina sin errores y la línea base de los tests está registrada.
+
+**Resultado (2026-10-14):** distrobox `ps4dev` (Fedora 44, GCC del sistema, LTO activado, sin PGO).
+Comandos y recreación del contenedor en `docs/ENTORNO.md`. Ajustes del entorno, dentro del
+contenedor:
+
+- Fedora 44 trae Vulkan-Headers 1.4.341 y shadPS4 usa `VK_VALVE_shader_mixed_float_dot_product`
+  (1.4.344): se instala Vulkan-Headers v1.4.344 en `/usr/local`.
+- ffmpeg completo de RPM Fusion en vez de `ffmpeg-free` (que no decodifica H.264 sin openh264;
+  `videodec-test` fallaba). Hará falta igualmente para los `.mp4` de AvPlayer.
+
+Cambios en el repo para compilar en Fedora:
+
+- `gpu/CMakeLists.txt`: si no hay paquete CMake de Zydis (Fedora solo trae `zydis.pc`), se usa
+  pkg-config.
+- `build.sh --test`: `runtime-test` y `sema-test` compilaban `src/runtime*.c` sin
+  `"${includes[@]}"`; en Fedora las cabeceras de ffmpeg están en `/usr/include/ffmpeg`.
+
+**Línea base de tests:**
+
+| Suite | Resultado |
+|---|---|
+| `bash build.sh --test` (C) | 10/10 PASS: pad, runtime, file-mods, sema, content, mp3, videodec, services, isa-emulate, isa-stub |
+| `python3 -m unittest discover -s tests` | 238 ejecutados, OK, 37 saltados: 17 sin `iced-x86` (pip), 16 solo Windows/Tk, 2 sin dump de GoW3 (`GOW3_GAME`), 2 registro de fuentes GDI (Windows) |
+| `out/gow3-probe --cpu-features` | `CPU: complete` (MOVBE/BMI1/LZCNT nativos, sin `isa_rewrite`) |
+| `out/gow3-probe --vulkan-only` | RX 6650 XT (RADV NAVI23): envío de comandos + readback de 4096 bytes PASS |
+
+---
+
+### Etapa 1 — Inventario de APIs faltantes
+
+**Qué es:** primer contacto con el juego. No cambia código.
+
+**Pasos**
+
+1. ✅ `prepare.py` + `link_modules.py` sobre el dump.
+2. ✅ Inventario estático: cruzar los imports con `src/import_names.inc`, el código del runtime y
+   las tablas de shadPS4 en `gpu/`; nombres recuperados calculando el NID de nombres candidatos.
+3. ✅ Confirmarlo con `out/gow3-probe out/boot-linked.bin --app0 Tsukihime/CUSA47999 --check-imports`:
+   61 imports sin implementación (2026-10-14), el mismo reparto por biblioteca que el inventario estático.
+4. ✅ Intentar iniciar el juego (`GOW3_GAME_DIR=Tsukihime/CUSA47999 python3 run.py`) y anotar el
+   primer `STOP:`.
+5. ✅ Ajustar las specs 2 a 5 con la lista real (Spec 2 reordenada; ver "Resultado del primer arranque").
+
+**Resultado estático (2026-10-13):** 359 imports para el runtime; los 121 de GnmDriver, VideoOut y
+AvPlayer existen en las tablas de shadPS4; **~61 sin implementación**.
+
+| Biblioteca | Faltan | Funciones | Spec |
+|---|---|---|---|
+| libkernel | 29 | Event flags (Create, Delete, Wait, Set, Cancel); GetProcessTimeCounter(+Frequency); ConvertUtcToLocaltime / LocaltimeToUtc; IsNeoMode; `_sceKernelSetThreadDtors`, `SetThreadAtexitCount`, `SetThreadAtexitReport`; GetSanitizerMalloc/NewReplaceExternal, IsAddressSanitizerEnabled; InternalMemoryGetModuleSegmentInfo, GetModuleInfoForUnwind; Getdents, Utimes, Chmod; `scePthreadCancel`, `scePthreadGetname`; `pthread_rwlock_rdlock/wrlock/unlock`; 3 sin nombre (`NhpspxdjEKU`, `Tz4RNUCBbGI`, `8OnWXlgQlvo`) | 2 |
+| libSceAudiodec | 6 | InitLibrary, TermLibrary, CreateDecoder, DeleteDecoder, Decode, ClearContext | 4 |
+| libSceAudiodecCpu | 3 | QueryMemSize, InitDecoder, Decode | 4 |
+| libSceSaveData | 5 | Initialize3, Mount2, UmountWithBackup, CheckBackupData, RestoreBackupData | 3 |
+| libSceScreenShot | 3 | Enable, Disable, SetOverlayImageWithOrigin | 3 |
+| libSceSharePlay | 3 | Initialize, Terminate, SetProhibition | 3 |
+| libSceGameLiveStreaming | 3 | Initialize, Terminate, EnableLiveStreaming | 3 |
+| libSceVideoRecording | 1 | SetInfo | 3 |
+| libSceSysmodule | 2 | GetModuleInfoForUnwind, LoadModuleInternalWithArg | 3 |
+| libSceSystemService | 2 | ParamGetString, ReenableMusicPlayer | 3 |
+| libSceUserService | 1 | GetUserColor | 3 |
+| libSceMsgDialog | 1 | GetResult | 3 |
+| libSceDiscMap | 1 | `fJgP+wqifno` (sin nombre) | 3 |
+| libSceLibcInternalExt | 1 | `sceLibcHeapGetTraceInfo` | 3 |
+
+**Qué significa "cubierta".** El inventario estático solo dice que una API *existe* en el runtime
+(su NID tiene entrada en `import_names.inc` y su nombre o NID aparece en el código). No dice que
+funcione. Desde esta revisión, una API se considera **cubierta** solo si tiene un test o si el juego
+la llamó en un recorrido real; hasta entonces es "existe".
+
+Bibliotecas que el runtime ya implementa (existen, sin verificar contra el juego): AudioOut, Pad,
+PlayGo, NpTrophy, NpManager, SaveDataDialog, CommonDialog, Rtc, UserService (el resto),
+SystemService (el resto).
+
+**Mouse no está entre ellas.** `libSceMouse` es hoy un stub: `mouse_open` devuelve un identificador y
+`mouse_read` nunca informa de un dispositivo conectado (`src/runtime_services.c`); los eventos de
+ratón de SDL solo llegan al overlay de ImGui, y `gpu/shim/window.cpp` dice que el juego no tiene
+ratón. Es trabajo nuevo y está en la Spec 6.
+
+> Además, que la lista llegue a cero no garantiza que el juego abra: los cuelgues de sincronización
+> y los defectos gráficos aparecen en el hito de primer fotograma y en las specs 5 y 6.
+
+**Resultado del primer arranque (2026-10-14):** el loader mapea los 9 segmentos (37 MB, 42 319
+relocaciones) y arranca el módulo `libc.prx`, pero se detiene **antes de ejecutar el juego**:
+
+```
+STOP: first unsupported PS4 import: rNhWz+lvOMU#libkernel (index 337)
+Caller in linked module 0 (libc.prx): +0x790
+Native libc initialization is incomplete; game entry has not run.
+```
+
+- `rNhWz+lvOMU` = **`_sceKernelSetThreadDtors`** (NID verificado con `nid()`), llamado desde la
+  inicialización de `libc.prx`. Es el primer ítem de la Spec 2 y desbloquea el arranque; después
+  aparecerán los siguientes `STOP:` uno por uno (el inventario estático sigue siendo la lista guía).
+- `--check-imports` repite los 61 (2026-10-14), mismo reparto por biblioteca. Dos NIDs más
+  resueltos: `fgxnMeTNUtY` = `sceKernelGetProcessTimeCounter`, `BNowx2l588E` =
+  `sceKernelGetProcessTimeCounterFrequency`.
+- Dos NIDs más resueltos al escribir las specs (2026-10-14, 166 nombres candidatos probados):
+  `Tz4RNUCBbGI` = `_sceKernelRtldThreadAtexitIncrement` y `8OnWXlgQlvo` =
+  `_sceKernelRtldThreadAtexitDecrement`. Siguen sin nombre `NhpspxdjEKU` (libkernel) y
+  `fJgP+wqifno` (DiscMap). Se resuelven desde el sitio de llamada cuando aparezcan como `STOP:`
+  (el log da "Caller return offset" y el primer argumento).
+- **Cinco de los 61 ya tienen código** y solo les falta su línea en `src/import_names.inc`
+  (`runtime_lookup` no los encuentra sin ella): `sceKernelGetProcessTimeCounter`,
+  `sceKernelGetProcessTimeCounterFrequency`, `sceSaveDataInitialize3`, `sceSaveDataMount2` y
+  `sceMsgDialogGetResult`. El trabajo real baja a 56 APIs.
+- Un import sin implementar solo detiene el juego **cuando se llama**, así que los 61 son un límite
+  superior: el trabajo de la Spec 2 se guía por los `STOP:` y se cierra la lista al final.
+- No hizo falta cambiar código. El perfil de parches responde "no patch profile for CUSA47999" y
+  los hooks de GoW3 informan "code not found" (ruido que borra la Spec 1a). Sin `profile.bin` en
+  la caché de pipelines (aviso inocuo en el primer arranque).
+- Logs: `out/check-imports.log`, `out/first-run.log`.
+
+**Listo cuando:** `--check-imports` confirma la lista y se conoce el primer `STOP:` real. ✅
+
+---
+
+### Spec 2 — Kernel: event flags, tiempo e hilos
+
+> Spec detallada: [docs/specs/2026-10-14-spec-2-kernel.md](../docs/specs/2026-10-14-spec-2-kernel.md)
+
+**Problema:** faltan 29 APIs de `libkernel`. Las más importantes son los **event flags**, que el
+runtime no implementa (están en la lista de "no implementado" del proyecto) y que el juego usa para
+sincronizar hilos. Es la primera spec porque el juego no pasa de la inicialización de `libc.prx`
+hasta que está hecha, y nada más (renderizado, audio, vídeo) se puede observar antes.
+
+**Solución** (orden: lo primero que corta el arranque es `_sceKernelSetThreadDtors`, desde `libc.prx`)
+
+0. `_sceKernelSetThreadDtors`, `SetThreadAtexitCount` y `SetThreadAtexitReport`, que bloquean la
+   inicialización de `libc.prx`.
+1. Event flags completos (Create, Delete, Wait con modos AND/OR y CLEAR, Set, Cancel, timeout).
+   La semántica se toma del shadPS4 upstream; esa parte **no está vendorizada** en `gpu/shadps4/`
+   (solo `equeue`), así que hay que consultarla en su repositorio.
+2. Tiempo: `GetProcessTimeCounter(+Frequency)`, conversiones UTC ↔ hora local.
+3. Hilos: variantes POSIX de `pthread_rwlock_*` (reutilizar `src/runtime_rwlock.c`, que ya existe),
+   `scePthreadCancel`, `scePthreadGetname`, `_sceKernelSetThreadDtors/AtexitCount/AtexitReport`.
+4. Respuestas explícitas: `IsNeoMode` (0 o 1, decidir), sanitizer desactivado, info de módulo para
+   unwind, `Getdents`/`Utimes`/`Chmod` sobre los montajes del runtime.
+5. Identificar los 3 NIDs sin nombre (desensamblar el sitio de llamada o buscar en aerolib).
+6. **Servicios mínimos para arrancar:** si el siguiente `STOP:` es de una API de la Spec 3
+   (por ejemplo `Sysmodule` o `SystemService`), se adelanta aquí lo imprescindible para seguir. El
+   resto de esa spec espera.
+
+**Archivos afectados:** `src/runtime_thread.c`, `src/runtime_rwlock.c`, `src/runtime_mutex.c`, nuevo
+módulo o sección para event flags, `src/runtime_file.c`, `src/import_names.inc`, `tests/test_sema.c`
+u otro test C.
+
+**Requisitos**
+
+- Cuando un hilo espere un event flag, el sistema debe despertarlo exactamente cuando se cumpla la
+  condición o expire el timeout, con los códigos de error de la PS4.
+- Nunca se debe fingir éxito en una API cuyo resultado el juego use.
+
+**Criterios de aceptación**
+
+- [ ] Test C de event flags: AND, OR, CLEAR_ALL, CLEAR_PAT, timeout, cancel, varios hilos.
+- [ ] El juego pasa del arranque a los logos sin `STOP:` de libkernel.
+- [ ] Se llega al hito de primer fotograma (ver abajo).
+
+---
+
+### Spec 1a — Eliminar hooks, patches, touchpad, tests e identidad de GoW3
+
+> Spec detallada: [docs/specs/2026-10-14-spec-1a-borrar-hooks-y-patches.md](../docs/specs/2026-10-14-spec-1a-borrar-hooks-y-patches.md)
+
+**Problema:** el código asume God of War III en el título, el serial, los patches, los hooks y los
+tests. Dejarlo desactivado confunde el diagnóstico (el log de arranque ya muestra diez líneas de
+"code not found") y obliga a mantenerlo compilando. Esta parte no toca el renderizador, así que se
+puede hacer en paralelo con la Spec 2 y sin ver el juego.
+
+**Solución:** borrar lo marcado *(Spec 1a)* en la sección 2, dejar un único título soportado
+(CUSA47999) y leer el título y el serial del `param.sfo`. **No se renombra nada todavía.**
+
+**Orden de trabajo** (un paso por vez, compilando y pasando tests entre pasos)
+
+1. Hooks y backends: `install_*` en `src/probe.c`, `src/*_hook.h`, `gow3_orbs.cpp`,
+   `gow3_actors.cpp`, y lo que los referencie en el overlay y la configuración.
+2. Patches: XML, perfil `GAMES`, `REFERENCE_SHA256`; el cargador de patches queda genérico (sin
+   perfil, no aplica ninguno).
+3. Entrada: touchpad de `runtime_pad.c`.
+4. Tests: borrar los de GoW3 y ajustar los genéricos (`test_patches.py`, etc.).
+5. Identidad: título y serial por defecto. El launcher, el acceso de Steam y el empaquetado no se
+   tocan (quedan para el final).
+
+**Archivos afectados:** los listados arriba, más `CMakeLists.txt` (`gpu/`) y `build.sh` para quitar
+los tests y fuentes eliminados.
+
+**Requisitos**
+
+- El árbol no debe contener hooks, patches ni firmas de God of War III.
+- Cuando el juego no sea CUSA47999, el sistema debe rechazarlo con un mensaje claro en el log.
+- Lo genérico (loader, runtime, núcleo de shadPS4, upscalers) no debe cambiar de comportamiento.
+
+**Criterios de aceptación**
+
+- [ ] `bash build.sh --test` y `python3 -m unittest discover -s tests` pasan, con la línea base de
+  la etapa 0 como referencia (menos los tests borrados, que se listan).
+- [ ] Comprobación de símbolos con una **lista cerrada y coincidencia de palabra completa**
+  (`git grep -nw`), por ejemplo `CUSA01623`, `CUSA01715`, `God_of_War_III_Remastered`,
+  `REFERENCE_SHA256` y los nombres de los `install_*` borrados. La lista exacta se fija al escribir
+  la spec. No se usan términos sueltos como `orb` o `damage`, que coinciden con `LICENSE`, las
+  cabeceras de FSR y cualquier "absorb".
+- [ ] El log de arranque de Tsukihime no menciona hooks ni patches y, por lo demás, es igual al de
+  antes del cambio (se comparan `out/first-run.log` antes y después: mismo punto de parada).
+- [ ] Un juego que no sea CUSA47999 se rechaza con mensaje claro (test).
+
+---
+
+### Hito — Primer fotograma
+
+> Spec detallada: [docs/specs/2026-10-14-hito-primer-fotograma.md](../docs/specs/2026-10-14-hito-primer-fotograma.md)
+
+**Qué es:** el momento en que el juego, tras la Spec 2, llega a emitir comandos de dibujo. No es una
+spec: es un punto de control para decidir el resto con datos reales. Hoy no hay ninguna señal sobre
+cómo dibuja este juego en el traductor de GPU, y es la mayor incógnita del proyecto.
+
+**Pasos**
+
+1. Ejecutar el juego tras la Spec 2 hasta que aparezca algo en pantalla (logo, fondo negro con
+   draws) o hasta el siguiente `STOP:`.
+2. Capturar los primeros fotogramas y guardarlos en `out/baseline/` (**no se versionan**: son imágenes
+   del juego). `GOW3_FRAME_CAPTURE_KEY=1` + F11 **no sirve para esto**: escribe una lista de pasos en
+   texto, no una imagen, y el proyecto no tiene captura de píxeles (se quitó al vendorizar el
+   presentador). Hacer esa herramienta, **en proceso** (decidido el 2026-10-14), es un entregable del
+   hito (ver su spec).
+3. Anotar los avisos de GPU del log (`Unimplemented ...`, formatos no soportados, etc.).
+4. Decidir según el resultado:
+
+| Resultado | Qué se hace |
+|---|---|
+| Se ve bien (logo legible, colores correctos) | Seguir con el orden previsto |
+| Se ve mal o negro, pero hay draws | Abrir una spec de renderizado **antes** de las specs 4 y 5 |
+| No llega a pintar | Es el siguiente `STOP:` o `Fault:`: volver a las specs 2 y 3 |
+
+5. **Revisar este roadmap:** re-estimar el esfuerzo de las specs restantes con lo que se haya visto.
+
+**Listo cuando:** hay al menos una captura del juego en `out/baseline/` y una decisión anotada.
+
+---
+
+### Spec 1b — Eliminar las heurísticas de GPU de GoW3
+
+> Spec detallada: [docs/specs/2026-10-14-spec-1b-heuristicas-gpu.md](../docs/specs/2026-10-14-spec-1b-heuristicas-gpu.md)
+
+**Problema:** el traductor de GPU conserva ajustes pensados para God of War III: `gbuffer_draw`, la
+constante de cámara de 864 bytes, la decisión de MSAA por vendor y `GOW3_READBACK_LINEAR=1` por
+defecto (el escalado a 1920×1080 se conserva: 1080p es la resolución base del proyecto). Están
+dentro del núcleo (`vk_rasterizer.cpp`,
+`liverpool.cpp`, `vk_pipeline_cache.cpp`, `videoout/driver.cpp`) y borrarlos sin ver un fotograma no
+tiene forma de comprobarse. Por eso esta spec va después del hito.
+
+**Solución:** borrarlas una a una, con el mismo fotograma capturado antes y después de cada borrado.
+
+**Orden de trabajo**
+
+1. Con las heurísticas aún presentes, capturar los fotogramas del hito (ya están en `out/baseline/`).
+2. Borrar una heurística, compilar, pasar tests y recapturar.
+3. Comparar las capturas (diferencia de píxeles). Si cambian, entender por qué antes de seguir; si el
+   cambio es el esperado (la heurística actuaba sobre algo de GoW3), anotarlo y actualizar la línea base.
+4. Repetir con la siguiente. Valores por defecto de `run.py` y `scripts/graphics_options.py` al final.
+
+**Requisitos**
+
+- Lo genérico (loader, runtime, núcleo de shadPS4, upscalers) no debe cambiar de comportamiento
+  salvo lo explicado en el paso 3.
+- La heurística de MSAA por vendor se borra aquí. La documentación del defecto RDNA2
+  (`docs/plans/2026-10-12-gpu-corruption-rdna2.md`) se conserva como historia.
+
+**Criterios de aceptación**
+
+- [ ] `bash build.sh --test` y `python3 -m unittest discover -s tests` pasan.
+- [ ] `out/gow3-probe --vulkan-only` sigue en PASS en la RX 6650 XT.
+- [ ] Las capturas antes y después de cada borrado son idénticas o la diferencia está explicada por escrito.
+- [ ] La comprobación de símbolos (lista cerrada, `git grep -nw`) no encuentra `gbuffer_draw` ni la
+  constante de 864 bytes.
+
+---
+
+### Spec 3 — Servicios del sistema que faltan
+
+> Spec detallada: [docs/specs/2026-10-14-spec-3-servicios.md](../docs/specs/2026-10-14-spec-3-servicios.md)
+
+**Problema:** APIs de plataforma que un juego offline no necesita de verdad, pero que el juego
+llama: capturas, Share Play, streaming, grabación, saves con copia de seguridad, etc.
+
+**Solución:** implementar cada una con un comportamiento explícito y documentado:
+
+| Área | Comportamiento |
+|---|---|
+| ScreenShot, VideoRecording, GameLiveStreaming, SharePlay | Aceptan la llamada y no hacen nada (consola sin esas funciones); streaming "no activo" |
+| SaveData `Initialize3`, `Mount2` | Igual que las variantes ya implementadas |
+| SaveData con backup | `UmountWithBackup` = desmontar; `CheckBackupData` = "no hay backup"; `RestoreBackupData` = error de no existe |
+| SystemService `ParamGetString` | Nombre de usuario / valores del sistema; `ReenableMusicPlayer` sin efecto |
+| UserService `GetUserColor` | Color fijo del usuario 1 |
+| MsgDialog `GetResult` | Resultado del diálogo del overlay |
+| Sysmodule | `LoadModuleInternalWithArg` como la carga interna existente; info para unwind |
+| DiscMap, LibcInternalExt | Comportamiento de shadPS4 |
+
+Cada API de comportamiento "sin efecto" escribe una línea en el log la primera vez que el juego la
+llama (`Service: <nombre> accepted, no effect`). Así no son stubs silenciosos y se ve cuáles usa el
+juego de verdad. El runtime ya tiene 39 entradas de ese tipo (`ok_void`); esta spec no añade más sin
+esa línea de log.
+
+**Archivos afectados:** `src/runtime_services.c`, `src/runtime_savedata.c`,
+`src/import_names.inc`, `tests/test_services.c`.
+
+**Requisitos**
+
+- El sistema nunca debe fingir que PSN está conectada.
+- Cuando el juego abra un diálogo del sistema, el sistema debe concluirlo con el resultado
+  documentado y registrarlo en el log.
+- Si el juego usa el valor devuelto por una API "sin efecto" para decidir algo, deja de ser "sin
+  efecto" y se implementa de verdad.
+
+**Criterios de aceptación**
+
+- [ ] `--check-imports` termina con 0 faltantes (junto con las specs 2 y 4).
+- [ ] `services-test` cubre las APIs nuevas.
+
+---
+
+### Spec 4 — Audio (Audiodec / AudiodecCpu)
+
+> Spec detallada: [docs/specs/2026-10-14-spec-4-audiodec.md](../docs/specs/2026-10-14-spec-4-audiodec.md)
+
+**Problema:** Tsukihime no usa AJM sino `libSceAudiodec` y `libSceAudiodecCpu`, que el runtime no
+tiene. **No hay una implementación HLE de referencia:** el shadPS4 upstream carga el firmware real
+(`libSceAudiodec.sprx` en `sys_modules`), no lo reimplementa. La ABI, las estructuras, el modelo de
+buffers y los códigos de error hay que deducirlos del propio juego. Por eso esta spec empieza como
+investigación, sin tope de tiempo (es un experimento y un hobby). Hay que averiguar además qué códec piden (ATRAC9, MP3,
+AAC o M4AAC) para BGM, voces y efectos (`bgm.mrg`, `voice*.mrg`, `vag.mrg`, `se_nam.mrg`).
+
+**Solución**
+
+*Fase A — Investigación (primero):*
+
+1. Registrar en el log, en la primera ejecución, el `codecType` de cada `CreateDecoder`/`InitDecoder`,
+   los argumentos de cada llamada y su orden.
+2. Desensamblar los sitios de llamada del juego para fijar el layout de las estructuras y qué campos
+   lee después. Si existen cabeceras o documentación pública de la comunidad, usarlas como contraste.
+3. Escribir lo averiguado en `docs/audiodec.md` (estructuras, secuencia de llamadas, códigos de error
+   observados). Esto es el entregable de la fase.
+
+*Fase B — Implementación:*
+
+4. Implementar el front-end de Audiodec sobre los decodificadores que ya existen: LibAtrac9
+   (`third_party/LibAtrac9`) para ATRAC9 y FFmpeg (`src/runtime_mp3.c`) para MP3/AAC.
+5. Códec no soportado → `STOP:` con el número del códec, nunca silencio.
+
+**Tope de tiempo (propuesta: 2 semanas entre las dos fases).** Si se agota sin que BGM y voces suenen,
+se para y se decide con el usuario qué hacer antes de seguir. No se alarga en silencio.
+
+**Archivos afectados:** nuevo `src/runtime_audiodec.c`, `src/runtime.c` (registro),
+`src/import_names.inc`, `docs/audiodec.md`, build y un test C con un clip de referencia.
+
+**Requisitos**
+
+- Cuando el juego envíe un bloque válido, el sistema debe devolver el PCM en el formato y tamaño
+  que el juego pidió, con los bytes consumidos correctos.
+- Si el stream no es válido, el sistema debe devolver el código de error de la PS4 sin cerrar el
+  juego.
+
+**Criterios de aceptación**
+
+- [ ] `docs/audiodec.md` describe el `codecType` observado y las estructuras usadas.
+- [ ] Un test decodifica un clip de referencia y compara con FFmpeg/LibAtrac9.
+- [ ] En el juego, BGM, voces y efectos suenan sin chirridos ni cortes (lo juzga el usuario).
+
+---
+
+### Spec 5 — Vídeo (AvPlayer)
+
+> Spec detallada: [docs/specs/2026-10-14-spec-5-avplayer.md](../docs/specs/2026-10-14-spec-5-avplayer.md)
+
+**Problema:** los 134 vídeos (`image/movie/*.mp4`: openings, títulos de capítulo, finales, créditos)
+pasan por `sceAvPlayer`, que viene de shadPS4 y en gow3 apenas se usó. Hay versiones por idioma
+(`_en`, `_zc`, `_zt`).
+
+**Solución:** validar el AvPlayer de shadPS4 con los vídeos del juego y corregir lo que falle:
+sincronía vídeo/audio, fin de stream, salto del vídeo con un botón, rutas `/app0/image/movie/...`
+a través de `runtime_file.c`.
+
+**Archivos afectados:** `gpu/shadps4/core/libraries/avplayer/` (cambios marcados con `gow3:`),
+`src/runtime_file.c` si hay problemas de rutas.
+
+**Requisitos**
+
+- Cuando el juego abra un vídeo, el sistema debe mostrarlo completo y sincronizado con su sonido.
+- Cuando el vídeo termine o se salte, el juego debe recibir el evento correspondiente y continuar.
+
+**Criterios de aceptación**
+
+- [ ] El opening en inglés (`op1_arc_en.mp4`) se reproduce completo, sincronizado.
+- [ ] El título del capítulo 1 en inglés (`phasetitle_01_00_en.mp4`) se reproduce y el juego continúa después.
+- [ ] Saltar un vídeo no cuelga el juego.
+
+---
+
+### Spec 6 — 2D correcto, ratón y saves
+
+> Spec detallada: [docs/specs/2026-10-14-spec-6-2d-raton-saves.md](../docs/specs/2026-10-14-spec-6-2d-raton-saves.md)
+
+**Problema:** el traductor de gráficos se ajustó para un juego 3D. En una novela visual los
+defectos típicos son otros: texto ilegible o con bordes rotos, transiciones (fundidos, máscaras)
+incorrectas, alfa premultiplicado mal, pantalla negra entre escenas. Además el juego usa ratón y
+saves con su propia interfaz. **Empieza en cuanto existe el hito de primer fotograma**, sin esperar
+a audio y vídeo: los logos ya son 2D. Se cierra cuando están hechas las specs 3, 4 y 5.
+
+**Solución, en orden**
+
+1. **Línea base de capturas.** Las capturas del hito se amplían con las escenas del recorrido (logos,
+   menú, fondo, sprite, texto, fundido). El usuario revisa y aprueba cada una; las aprobadas pasan a
+   ser la referencia (`out/baseline/`, sin versionar). No hay otra fuente de referencia: el juego
+   corre solo aquí.
+2. Ejecutar en el modo más seguro: sin upscaler y sin optimizaciones opcionales
+   (`GOW3_TOGGLE_FILE`).
+3. Revisar texto, sprites, fundidos y vídeos sobre la escena contra la línea base.
+4. **Ratón (trabajo nuevo, no una comprobación).** Hoy `libSceMouse` no informa de ningún dispositivo.
+   Hay que: hacer que `mouse_open`/`mouse_read` informen de un ratón conectado, crear el puente
+   SDL → runtime para movimiento, botones y rueda, y quitar la restricción de `window.cpp` que dice
+   que el juego no tiene ratón. Se decide si vive en `runtime_services.c` o en un `src/runtime_mouse.c`
+   nuevo (hoy no existe).
+5. Saves: grabar en el menú del juego, reiniciar y cargar.
+6. Idioma: confirmar que el juego arranca en inglés con el valor que ya devuelve
+   `sceSystemServiceParamGetInt` (1 = inglés US) y que carga los recursos `_en`.
+7. Grabar el recorrido del prólogo con `GOW3_PAD_RECORD` para repetirlo con `GOW3_PAD_REPLAY` tras
+   cada cambio.
+
+**Archivos afectados:** `gpu/shadps4/video_core/...` (a definir durante la investigación),
+`src/runtime_services.c` (o `src/runtime_mouse.c`), `gpu/shim/window.cpp`, `src/runtime_pad.c`,
+`src/runtime_savedata.c`.
+
+**Requisitos**
+
+- Cuando una optimización heredada cause un error visual en Tsukihime, se debe **eliminar** del
+  código, no dejarla desactivada.
+- Cada corrección de render se valida con captura antes y después.
+
+**Criterios de aceptación**
+
+- [ ] Las capturas del recorrido coinciden con la línea base aprobada por el usuario.
+- [ ] Texto en inglés legible, sin glifos rotos ni cortes de línea incorrectos (lo juzga el usuario).
+- [ ] Un test o un registro del log muestra que `mouse_read` entrega movimiento y clics de SDL.
+- [ ] Mando, teclado y ratón avanzan el texto y manejan los menús.
+- [ ] Save y load funcionan tras reiniciar el juego.
+- [ ] El recorrido grabado se repite entero con `GOW3_PAD_REPLAY`, sin `STOP:` ni `Fault:`.
+
+> Esta es la spec más incierta. Puede dividirse en render 2D, ratón y saves cuando aparezcan los defectos.
+
+---
+
+### Spec 7 — Renombrar `gow3` a `tsuki`
+
+> Spec detallada: [docs/specs/2026-10-14-spec-7-renombrado.md](../docs/specs/2026-10-14-spec-7-renombrado.md)
+
+**Problema:** todos los nombres estáticos del proyecto dicen `gow3`. Es un cambio mecánico pero grande
+(2551 líneas en 290 archivos, 194 variables de entorno distintas, 40 archivos con `gow3` en el nombre).
+No reduce ningún riesgo técnico, y hacerlo antes de que el juego arranque mezclaría sus errores con
+los de las specs nuevas. Va al final, cuando existe un recorrido que comprueba que nada cambió.
+
+**Solución:** pasar **todos los nombres estáticos** `gow3` al prefijo `tsuki`, por capas, sin alias.
+
+**Tabla de renombrado** (primera propuesta, se revisa antes de ejecutar)
+
+| Hoy | Pasa a |
+|---|---|
+| Variables de entorno `GOW3_*` (194 distintas: `GOW3_GAME_DIR`, `GOW3_DATA_DIR`, `GOW3_CONFIG`, `GOW3_FRAME_STATS`, `GOW3_NO_MSAA`, …) | `TSUKI_*` |
+| Binarios `gow3-probe`, `gow3-gpu-capabilities` (y `.exe`), pruebas `gow3-*` | `tsuki-probe`, `tsuki-gpu-capabilities`, … |
+| `libgow3gpu.so`, `gow3gpu.h`, `gow3gpu_resolve`, `gow3gpu_register_*` | `libtsukigpu.so`, `tsukigpu.h`, `tsukigpu_*` |
+| Archivos `gpu/shim/gow3_*.cpp/.h`, `gpu/dlss_bridge/gow3_dlss_bridge.*`, `gpu/shadps4/video_core/amdgpu/gow3_msaa*.h` | `tsuki_*` |
+| Clases y símbolos `Gow3Settings`, `Gow3Overlay`, `Gow3Graphics`, `Gow3Png`, `gow3_longjmp`, … | `TsukiSettings`, `TsukiOverlay`, … / `tsuki_*` |
+| `gow3.ini`, `%APPDATA%\gow3-launcher`, `launcher/gow3.png/.ico`, `God of War III.exe` | `tsuki.ini`, `%APPDATA%\tsuki-launcher`, … |
+| Marca `gow3:` en los cambios del código de shadPS4 | `tsuki:` |
+| Nombres del proyecto: `gow3_pc`, `gow3-windows`, `gow3_launcher_win`, `.gitignore`, `shell.nix`, empaquetado | `tsuki_pc`, … |
+
+Las configuraciones y saves antiguos no se migran (no hay usuarios de los nombres viejos).
+
+**Orden de trabajo** (por capas; compilar y pasar tests tras cada una)
+
+1. Inventario: `git grep -ohiE '[a-z0-9_.-]*gow3[a-z0-9_.-]*'` y `git ls-files | grep -i gow3`,
+   más los nombres en strings, scripts, `CMakeLists.txt`, `build.sh`, `run.py`, `shell.nix`,
+   empaquetado y documentación. Los submódulos `gpu/third_party/*` no se tocan; sí los parches
+   de `gpu/patches/fsr-vulkan/*.patch` (nombre de archivo y variables `GOW3_*` de dentro).
+   Un análisis previo no encontró nombres construidos dinámicamente (`GOW3_%s` o concatenaciones);
+   se vuelve a comprobar al empezar.
+2. Variables de entorno `GOW3_*` → `TSUKI_*` en C, C++, Python y documentos a la vez, sin
+   dejar alias ni lectura de los nombres viejos.
+3. Archivos y directorios con `git mv` (conserva la historia), luego `#include`, CMake y
+   listas de fuentes.
+4. Símbolos, clases, binarios, biblioteca de la GPU, `.ini`, rutas de usuario y marca `gow3:`.
+5. Documentación (`CLAUDE.md`, `README*.md`, este roadmap) y la memoria del proyecto.
+
+**Archivos afectados:** prácticamente todo el árbol.
+
+**Requisitos**
+
+- Ninguna variable `GOW3_*` debe seguir leyéndose.
+- El comportamiento no cambia: el recorrido grabado y las capturas de la línea base dan el mismo resultado.
+
+**Criterios de aceptación**
+
+- [ ] `bash build.sh --test` y `python3 -m unittest discover -s tests` pasan.
+- [ ] Un script único de comprobación (`tools/check_rename.sh`, nuevo) busca `gow3` sin distinguir
+  mayúsculas con `git grep -i` y devuelve error si encuentra algo fuera de estas **excepciones
+  explícitas**: `docs/gow3/`, `docs/plans/` (documentos históricos, o se borran), los submódulos y la
+  mención de la rama `gow3` por su nombre en `CLAUDE.md` y en este roadmap.
+- [ ] `bash build.sh` produce `out/tsuki-probe` y `out/gpu/libtsukigpu.so`, y
+  `TSUKI_GAME_DIR=Tsukihime/CUSA47999 python3 run.py` repite el recorrido grabado igual que antes
+  del renombrado (mismo log, sin `STOP:` ni `Fault:`).
+- [ ] Las capturas de la línea base coinciden antes y después.
+- [ ] La ventana y el menú Insert muestran el título leído del `param.sfo`.
+
+---
+
+## 6. Riesgos
+
+| Riesgo | Impacto | Mitigación |
+|---|---|---|
+| Event flags mal sincronizados → cuelgues aleatorios | Alto | Test C con varios hilos; watchdog `--timeout` para volcar las pilas |
+| Los 61 imports se resuelven y el juego igual se cuelga, por la semántica de sincronización y no por APIs que faltan | Alto | Hito de primer fotograma y recorrido grabado; `--timeout` con volcado de pilas; no dar por buena una spec solo porque `--check-imports` llegue a cero |
+| Audiodec no tiene implementación HLE de referencia: ABI, estructuras y errores se deducen del juego | Alto | Spec 4 con fase de investigación y `docs/audiodec.md` antes de implementar; sin tope de tiempo |
+| Audiodec pide un códec que no tenemos | Medio | Registrar el códec antes de implementar; FFmpeg cubre MP3/AAC |
+| El traductor de GPU no dibuja bien una novela visual (nunca se ha visto un draw de este juego) | Alto | Hito de primer fotograma antes que audio y vídeo; Spec 6 empieza en cuanto hay hito; revisar el roadmap tras el hito |
+| "Cubierta" se confunde con "funciona" (Mouse parecía cubierta y es un stub) | Medio | Cubierta solo si tiene test o el juego la llamó en un recorrido real; ratón pasa a la Spec 6 como trabajo nuevo |
+| SDK 11.008, mucho más nuevo que el de GoW3: comportamientos del kernel no vistos | Medio | Seguir la semántica de shadPS4; registrar todo lo nuevo en el log |
+| AvPlayer de shadPS4 inmaduro (sincronía, eventos) | Medio | Probar opening y títulos de capítulo pronto; seguir upstream |
+| Defectos 2D (alfa, fundidos, texto) en el traductor | Medio | Línea base de capturas aprobadas por el usuario; captura antes y después de cada corrección |
+| Borrar heurísticas del renderizador (Spec 1b) rompe el dibujo sin que se sepa qué cambió | Medio | Se hace después del hito, una heurística por vez, con captura antes y después |
+| Borrar por error código compartido con lo genérico | Medio | Borrar por pasos, compilar y pasar los tests tras cada uno; la historia queda en git y en la rama `gow3` |
+| El renombrado masivo rompe el build o una variable queda a medias (el juego ignora la opción sin avisar) | Medio | Va al final (Spec 7), con recorrido grabado y capturas como oráculo; renombrar por capas con `git mv`; sin alias; script de comprobación con excepciones explícitas |
+| Defecto de render RDNA2 (franjas oscuras) documentado en `docs/plans/2026-10-12-gpu-corruption-rdna2.md`; la máquina de pruebas es una Navi 23 | Bajo | Visto solo en Windows y en la ruta de MSAA de GoW3, que borra la Spec 1b; `--vulkan-only` pasa en RADV. Se revisa si aparece algo parecido en el hito |
+| El juego no elige inglés o mezcla recursos de otro idioma | Bajo | El runtime ya reporta inglés; verificar `_en` en el log de archivos abiertos |
+| Sin estimaciones fiables de esfuerzo | Bajo | Las de la sección 4 son una propuesta; se corrigen tras el hito |
+| Licencia | Bajo | Mantener GPL-2.0 y los créditos; no distribuir nunca archivos del juego (tampoco capturas: `out/baseline/` no se versiona) |
+
+---
+
+## 7. Pendientes del usuario
+
+| Pendiente | Necesario a partir de |
+|---|---|
+| Compilar en la máquina de desarrollo y registrar la línea base de tests | Etapa 0 |
+| Aprobar cada spec antes de la implementación | Specs 1a, 1b, 2 a 7 |
+| Mirar el resultado del hito de primer fotograma y decidir con el autor cómo seguir | Hito |
+| Aprobar las capturas de línea base (una por una) | Hito, Spec 1b, Spec 6 |
+| Probar el recorrido en el juego e informar de lo que vio y oyó | Specs 4 a 6 |
+| Hacer los commits (Claude no los hace) | Todas |
+
+---
+
+## 8. Después de la Alpha
+
+Ideas para versiones siguientes, sin compromiso:
+
+- **Beta:** todas las rutas (Arcueid y Ciel) hasta los finales y créditos.
+- **Launcher, empaquetado y documentación de usuario** (se hacen al final, por decisión del
+  2026-10-14): identidad de Tsukihime, acceso de Steam, README, `.github`, y quitar del launcher las
+  opciones de funciones ya borradas (orbes, cheats) y sus tests de Python.
+- Launcher con idioma, resolución de ventana y remapeo pensados para una novela visual.
+- Escalado limpio para 1440p/4K (FSR 1 o escalado entero) de fondos y texto.
+- Windows y Steam Deck.
+
+---
+
+## 9. Glosario
+
+| Término | Significado simple |
+|---|---|
+| **eboot.bin** | El ejecutable del juego de PS4 |
+| **Dump** | Copia de los archivos del juego extraída de una PS4 propia |
+| **CUSA47999** | Código de esta versión de Tsukihime en PS4 |
+| **Novela visual** | Juego de lectura: texto, imágenes fijas, música y voces |
+| **HLE / runtime** | Reimplementación de las APIs de la PS4 en el PC |
+| **LLE** | Cargar el módulo original del sistema (firmware) en vez de reimplementarlo; es lo que hace shadPS4 con Audiodec |
+| **Import / NID** | Una API del sistema que el juego llama; el NID es su ID (hash del nombre) |
+| **Loader** | Programa que carga el juego en memoria y lo inicia |
+| **shadPS4** | Emulador de PS4 de código abierto; el proyecto usa su parte de gráficos y vídeo |
+| **Vulkan** | API gráfica moderna usada para dibujar en la tarjeta de vídeo del PC |
+| **Audiodec** | Decodificador de audio de la PS4 (alternativa a AJM) |
+| **AvPlayer** | Reproductor de vídeo de alto nivel de la PS4 (mp4) |
+| **Event flag** | Primitiva del kernel de la PS4 para que hilos esperen una combinación de bits |
+| **Hito** | Punto de control que no es una spec: sirve para decidir el siguiente paso con datos reales |
+| **Línea base de capturas** | Fotogramas del juego que el usuario ha aprobado como correctos; sirven para comparar tras cada cambio de render |
+| **`.hed/.mrg/.nam`** | Formato de archivos empaquetados del juego (índice, datos, nombres) |
+
+---
+
+## 10. Referencias
+
+- [bloodborne_pc (Supermedo)](https://github.com/Supermedo/bloodborne_pc), base del fork.
+- [bbport (deadinside28)](https://github.com/deadinside28/bloodborne_pc), port original para Linux.
+- [shadPS4](https://github.com/shadps4-emu/shadPS4), origen del traductor de gráficos y del AvPlayer;
+  referencia para la semántica de event flags y de los servicios. **No sirve de referencia para
+  Audiodec:** upstream carga el firmware real en vez de reimplementarlo.
+- Roadmap de God of War III: [docs/gow3/ROADMAP.md](../docs/gow3/ROADMAP.md) (histórico; se puede borrar junto con el resto de GoW3).
+- Documentos internos: [CLAUDE.md](../CLAUDE.md), [mods](../docs/MODS.md),
+  [Windows](../packaging/windows/README.md).
