@@ -141,7 +141,8 @@ dispositivos y `MESA_VK_DEVICE_SELECT=<vendor:device>` fuerza uno.
 - `user/last_run.log` — log completo de la última ejecución desde el launcher.
 - `STOP: first unsupported PS4 import: <nombre>` — la siguiente API que falta implementar.
 - Los fallos del juego se reportan como offsets relativos a la imagen con backtrace por `rbp`;
-  `python3 tools/got_import.py <offset>` dice qué import está enlazado a un slot de la GOT.
+  `python3 tools/got_import.py [--linked] <offset>` dice qué import está enlazado a un slot de la GOT
+  (`--linked`: lee `out/boot-linked.bin`, que incluye `libc.prx`).
 - `--timeout N` arma el watchdog; `kill -USR2 <tid>` vuelca la pila de un hilo.
 - `GOW3_FRAME_CAPTURE_KEY` (F11 por defecto) — captura de un frame.
 - `GOW3_PAD_FILE`, `GOW3_PAD_RECORD` / `GOW3_PAD_REPLAY` — entrada de mando por guion.

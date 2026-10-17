@@ -177,8 +177,8 @@ kernel event flags, AIO, `sceKernelLoadStartModule`.
 
 The loader reports guest faults as image-relative offsets with an rbp backtrace; `--timeout N`
 arms a watchdog that dumps all thread stacks (Linux; SIGUSR2 dumps one thread). Scripted input:
-`GOW3_PAD_FILE`, `GOW3_PAD_RECORD`/`GOW3_PAD_REPLAY`. `tools/got_import.py <offset>` names the import
-bound to a GOT slot. Frame capture: `GOW3_FRAME_CAPTURE_KEY` (F11). The full log of a launcher run is
+`GOW3_PAD_FILE`, `GOW3_PAD_RECORD`/`GOW3_PAD_REPLAY`. `tools/got_import.py [--linked] <offset>` names the import
+bound to a GOT slot (`--linked`: `out/boot-linked.bin`, which includes `libc.prx`). Frame capture: `GOW3_FRAME_CAPTURE_KEY` (F11). The full log of a launcher run is
 `user/last_run.log`.
 
 ## Conventions
