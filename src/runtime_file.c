@@ -17,6 +17,7 @@
 #include <sys/stat.h>
 #ifdef _WIN32
 #include <windows.h>
+#include <sys/utime.h>
 /* 64-bit sizes and times; directories are never opened as CRT descriptors. */
 typedef struct _stat64 HostStat;
 #define host_stat(path,s) _stat64(path,s)
@@ -438,6 +439,37 @@ static int64_t do_truncate(const char *guest,int64_t length) {
     return truncate(path,length) ? -errno : 0;
 #endif
 }
+/* libc's <filesystem> sets times and permissions (libc.prx +0x959c8, +0x95cb6; spec 2, block F). */
+typedef struct { int64_t sec, usec; } GuestTimeval;
+static int64_t do_utimes(const char *guest,const GuestTimeval *times) {
+    if (game_path(guest)) return -EROFS;
+    char path[1024];
+    int e=translate(guest,path,sizeof(path));
+    if (e) return -e;
+    if (times) for (int i=0;i<2;++i) if (times[i].usec<0 || times[i].usec>=1000000) return -EINVAL;
+#ifdef _WIN32
+    /* The CRT keeps whole seconds. */
+    struct __utimbuf64 t={0};
+    if (times) { t.actime=times[0].sec; t.modtime=times[1].sec; }
+    return _utime64(path,times ? &t : NULL) ? -errno : 0;
+#else
+    struct timespec t[2]={{0}};
+    if (times) for (int i=0;i<2;++i) t[i]=(struct timespec){.tv_sec=(time_t)times[i].sec,.tv_nsec=(long)times[i].usec*1000};
+    return utimensat(AT_FDCWD,path,times ? t : NULL,0) ? -errno : 0;
+#endif
+}
+static int64_t do_chmod(const char *guest,uint16_t mode) {
+    if (game_path(guest)) return -EROFS;
+    char path[1024];
+    int e=translate(guest,path,sizeof(path));
+    if (e) return -e;
+#ifdef _WIN32
+    /* Only the owner write bit exists there (the read-only attribute). */
+    return _chmod(path,(mode&0200) ? _S_IREAD|_S_IWRITE : _S_IREAD) ? -errno : 0;
+#else
+    return chmod(path,mode&07777) ? -errno : 0;
+#endif
+}
 static int64_t do_fsync(int fd) { int h=host_fd(fd); if (h<0) return -EBADF; return fsync(h) ? -errno : 0; }
 static int64_t do_access(const char *guest,int mode) {
     char path[1024];
@@ -480,6 +512,10 @@ static ABI int64_t posix_unlink(const char *p) { return posix(path_op(p,2,0)); }
 static ABI int32_t sce_check_reachability(const char *p) {
     GuestStat s; return (int32_t)sce(do_stat(p,&s));
 }
+/* getdirentries without the base pointer (libc's directory iterator, libc.prx +0x95141). */
+static ABI int64_t sce_getdents_only(int fd,char *b,uint64_t n) { return sce(do_getdents(fd,b,n,NULL)); }
+static ABI int64_t sce_utimes(const char *p,const GuestTimeval *t) { return sce(do_utimes(p,t)); }
+static ABI int64_t sce_chmod(const char *p,uint16_t m) { return sce(do_chmod(p,m)); }
 
 static const RuntimeExport exports[]={
     {"sceKernelOpen",sce_open}, {"open",posix_open}, {"_open",posix_open},
@@ -492,6 +528,7 @@ static const RuntimeExport exports[]={
     {"sceKernelFstat",sce_fstat}, {"fstat",posix_fstat},
     {"sceKernelStat",sce_stat}, {"stat",posix_stat},
     {"sceKernelGetdirentries",sce_getdents}, {"getdirentries",posix_getdents},
+    {"sceKernelGetdents",sce_getdents_only}, {"sceKernelUtimes",sce_utimes}, {"sceKernelChmod",sce_chmod},
     {"sceKernelRename",sce_rename}, {"rename",posix_rename},
     {"sceKernelFtruncate",sce_ftruncate}, {"ftruncate",posix_ftruncate},
     {"sceKernelTruncate",sce_truncate}, {"truncate",posix_truncate},

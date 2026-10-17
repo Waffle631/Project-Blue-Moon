@@ -114,16 +114,44 @@ static ABI int32_t posix_nanosleep(const GuestTimespec *rq,GuestTimespec *rem) {
 static ABI int32_t kernel_nanosleep(const GuestTimespec *rq,GuestTimespec *rem) {
     return posix_nanosleep(rq,rem) ? ERR(*runtime_errno()) : 0;
 }
+/* Seconds east of UTC of the host zone at t, daylight saving included: the guest sees a zone whose
+ * DST is folded into its offset (dsttime and dst are always 0). */
+static long utc_offset(time_t t) {
+#ifdef _WIN32
+    return compat_utc_offset(t);
+#else
+    struct tm local;
+    return localtime_r(&t,&local) ? local.tm_gmtoff : 0;
+#endif
+}
 typedef struct { int32_t minuteswest, dsttime; } GuestTimezone;
 static ABI int32_t kernel_gettimezone(GuestTimezone *tz) {
     if (!tz) return ERR(22);
-    time_t now=time(NULL);
-#ifdef _WIN32
-    tz->minuteswest=(int32_t)(-compat_utc_offset(now)/60); tz->dsttime=0;
-#else
-    struct tm local; localtime_r(&now,&local);
-    tz->minuteswest=(int32_t)(-local.tm_gmtoff/60); tz->dsttime=0;
-#endif
+    tz->minuteswest=(int32_t)(-utc_offset(time(NULL))/60); tz->dsttime=0;
+    return 0;
+}
+/* libc's localtime_r, mktime and strftime %z (libc.prx +0x1740, +0xc0a0, +0x1fb00; spec 2, block C)
+ * read local = utc + west + dst from this record. */
+typedef struct { int64_t t; int32_t west, dst; } GuestTimesec;
+static ABI int32_t convert_utc_to_local(int64_t utc,int64_t *local,GuestTimesec *ts,uint64_t *dst) {
+    if (!local) return ERR(22);
+    long offset=utc_offset((time_t)utc);
+    *local=utc+offset;
+    if (ts) *ts=(GuestTimesec){utc,(int32_t)offset,0};
+    if (dst) *dst=0;
+    return 0;
+}
+/* isdst is mktime's tm_isdst; with DST folded into the offset there is nothing left to choose. The
+ * offset is the one at the result, found from the offset at local read as UTC (two steps cover a
+ * change of offset in between). Ambiguous local times get one valid answer; skipped ones, the offset
+ * after the change, which libc's mktime then sees as a mismatch and keeps the time as given. */
+static ABI int32_t convert_local_to_utc(int64_t local,int32_t isdst,int64_t *utc,GuestTimesec *ts,int32_t *dst) {
+    (void)isdst;
+    if (!utc) return ERR(22);
+    long offset=utc_offset((time_t)(local-utc_offset((time_t)local)));
+    *utc=local-offset;
+    if (ts) *ts=(GuestTimesec){*utc,(int32_t)offset,0};
+    if (dst) *dst=0;
     return 0;
 }
 static ABI int32_t posix_gettimeofday(GuestTimeval *tv,GuestTimezone *tz) {
@@ -339,6 +367,7 @@ static const RuntimeExport exports[]={
     {"sceKernelUsleep",kernel_usleep}, {"usleep",posix_usleep}, {"sleep",posix_sleep},
     {"nanosleep",posix_nanosleep}, {"_nanosleep",posix_nanosleep}, {"sceKernelNanosleep",kernel_nanosleep},
     {"sceKernelGettimezone",kernel_gettimezone}, {"gettimeofday",posix_gettimeofday},
+    {"sceKernelConvertUtcToLocaltime",convert_utc_to_local}, {"sceKernelConvertLocaltimeToUtc",convert_local_to_utc},
     {"sceKernelGettimeofday",kernel_gettimeofday},
     {"time",posix_time},
     {"getpagesize",get_pagesize}, {"getpid",get_pid}, {"sched_yield",yield},

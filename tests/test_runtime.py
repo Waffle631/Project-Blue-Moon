@@ -48,6 +48,35 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(r.returncode,0,r.stdout+r.stderr)
         self.assertIn('PASS: thread dtors',r.stdout)
 
+    def test_posix_rwlock_names_share_objects(self):
+        r=self.run_case('--posix-rwlocks')
+        self.assertEqual(r.returncode,0,r.stdout+r.stderr)
+
+    def test_thread_name_fits_sdk_buffer(self):
+        r=self.run_case('--thread-name')
+        self.assertEqual(r.returncode,0,r.stdout+r.stderr)
+
+    def test_time_conversion_uses_host_zone(self):
+        r=self.run_case('--time-conversion')
+        self.assertEqual(r.returncode,0,r.stdout+r.stderr)
+
+    def test_file_metadata_respects_readonly_game(self):
+        r=self.run_case('--file-metadata')
+        self.assertEqual(r.returncode,0,r.stdout+r.stderr)
+
+    def test_decided_traps_are_named_and_unresolved(self):
+        r=self.run_case('--decided-traps')
+        self.assertEqual(r.returncode,0,r.stdout+r.stderr)
+
+    def test_explicit_answers_log_first_call_once(self):
+        # Spec 2, block E: a defined answer, not simulated success, written once to the log.
+        r=self.run_case()
+        self.assertEqual(r.returncode,0,r.stdout+r.stderr)
+        for line in ('sceKernelGetSanitizerMallocReplaceExternal: no replacement',
+                     'sceKernelGetSanitizerNewReplaceExternal: no replacement',
+                     'sceKernelIsAddressSanitizerEnabled: 0', 'sceKernelIsNeoMode: 0 (base PS4)'):
+            self.assertEqual(r.stdout.count('Runtime: '+line+'\n'),1,line)
+
     def test_rtld_atexit_underflow_fails_explicitly(self):
         r=self.run_case('--rtld-underflow')
         self.assertEqual(r.returncode,21)

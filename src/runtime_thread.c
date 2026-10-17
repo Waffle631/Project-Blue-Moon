@@ -362,6 +362,14 @@ static ABI int32_t thread_rename(GuestThread *t,const char *name) {
     if (t==current) set_host_name(t->name);
     return 0;
 }
+/* The API takes no size: SDK buffers are 32 bytes like name (libc's atexit report, +0xb63a0). */
+static ABI int32_t thread_get_name(GuestThread *t,char *name) {
+    if (!find_thread(t)) return ERR(3);
+    if (!name) return ERR(22);
+    size_t n=strnlen(t->name,sizeof(t->name)-1);
+    memcpy(name,t->name,n); name[n]=0;
+    return 0;
+}
 static ABI int32_t thread_equal(GuestThread *a,GuestThread *b) { return a==b; }
 static ABI int32_t set_thread_dtors(ThreadDtors callback) {
     pthread_mutex_lock(&lock); thread_dtors=callback; pthread_mutex_unlock(&lock);
@@ -417,7 +425,8 @@ uintptr_t runtime_thread_resolve(const char *name) {
         {"4qGrR6eoP9Y#libkernel",thread_detach}, {"3kg7rT0NQIs#libkernel",thread_exit},
         {"T72hz6ffq08#libkernel",thread_yield}, {"1tKyG7RlMJo#libkernel",thread_get_prio},
         {"W0Hpm2X0uPE#libkernel",thread_set_prio}, {"bt3CTBKmGyI#libkernel",thread_set_affinity}, {"rcrVFJsQWRY#libkernel",thread_get_affinity},
-        {"GBUY7ywdULE#libkernel",thread_rename}, {"3PtV6p3QNX4#libkernel",thread_equal},
+        {"GBUY7ywdULE#libkernel",thread_rename}, {"How7B8Oet6k#libkernel",thread_get_name},
+        {"3PtV6p3QNX4#libkernel",thread_equal},
         {"wtkt-teR1so#libkernel",posix_attr_init}, {"zHchY8ft5pk#libkernel",posix_attr_destroy},
         {"E+tyo3lp5Lw#libkernel",posix_attr_set_detach}, {"2Q0z6rnBrTE#libkernel",posix_attr_set_stack},
         {"euKRgm0Vn2M#libkernel",posix_attr_set_param}, {"OxhIB8LB-PQ#libkernel",posix_create},

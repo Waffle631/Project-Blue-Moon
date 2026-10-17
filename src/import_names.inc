@@ -819,3 +819,19 @@
 {"JTvBflhYazQ#libkernel","sceKernelWaitEventFlag"},
 {"IOnSvHzqu6A#libkernel","sceKernelSetEventFlag"},
 {"PZku4ZrXJqg#libkernel","sceKernelCancelEventFlag"},
+/* POSIX rwlock names (runtime_rwlock.c) and thread names (runtime_thread.c); spec 2, block D. */
+{"iGjsr1WAtI0#libkernel","pthread_rwlock_rdlock"},
+{"sIlRvQqsN2Y#libkernel","pthread_rwlock_wrlock"},
+{"EgmLo6EWgso#libkernel","pthread_rwlock_unlock"},
+{"How7B8Oet6k#libkernel","scePthreadGetname"},
+/* Time zone conversions of libc.prx's localtime/mktime/strftime (runtime_kernel.c; spec 2, block C). */
+{"-o5uEDpN+oY#libkernel","sceKernelConvertUtcToLocaltime"},
+{"0NTHN1NKONI#libkernel","sceKernelConvertLocaltimeToUtc"},
+/* libc.prx <filesystem>: directory reads, times and permissions (runtime_file.c; spec 2, block F). */
+{"j2AIqSqJP0w#libkernel","sceKernelGetdents"},
+{"0Cq8ipKr9n0#libkernel","sceKernelUtimes"},
+{"fgIsQ10xYVA#libkernel","sceKernelChmod"},
+/* Names only: traps until the game calls them, so the STOP line names the API (spec 2, section 9). */
+{"qBDmpCyGssE#libkernel","scePthreadCancel"},
+{"RpQJJVKTiFM#libkernel","sceKernelGetModuleInfoForUnwind"},
+{"-YTW+qXc3CQ#libkernel","sceKernelInternalMemoryGetModuleSegmentInfo"},

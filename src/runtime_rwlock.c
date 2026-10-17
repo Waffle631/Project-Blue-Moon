@@ -142,6 +142,12 @@ static ABI int32_t rw_destroy(Rwlock **handle) {
     }
     pthread_mutex_unlock(&registry_lock); return error(e);
 }
+/* POSIX names return positive errno values, the low half of the Orbis code. libc.prx locks its
+ * module table (+0x128f60, static initializer: NULL handle) with them. */
+static int32_t posix(int32_t r) { return r ? (int32_t)((uint32_t)r&0xffff) : 0; }
+static ABI int32_t posix_read(Rwlock **r) { return posix(rw_read(r)); }
+static ABI int32_t posix_write(Rwlock **r) { return posix(rw_write(r)); }
+static ABI int32_t posix_unlock(Rwlock **r) { return posix(rw_unlock(r)); }
 uintptr_t runtime_rwlock_resolve(const char *name) {
     if (!strcmp(name,"6ULAa0fq4jA#libkernel")) return (uintptr_t)rw_init;
     if (!strcmp(name,"BB+kb08Tl9A#libkernel")) return (uintptr_t)rw_destroy;
@@ -152,6 +158,9 @@ uintptr_t runtime_rwlock_resolve(const char *name) {
     if (!strcmp(name,"+L98PIbGttk#libkernel")) return (uintptr_t)rw_unlock;
     if (!strcmp(name,"iPtZRWICjrM#libkernel")) return (uintptr_t)rw_timedread;
     if (!strcmp(name,"adh--6nIqTk#libkernel")) return (uintptr_t)rw_timedwrite;
+    if (!strcmp(name,"iGjsr1WAtI0#libkernel")) return (uintptr_t)posix_read;
+    if (!strcmp(name,"sIlRvQqsN2Y#libkernel")) return (uintptr_t)posix_write;
+    if (!strcmp(name,"EgmLo6EWgso#libkernel")) return (uintptr_t)posix_unlock;
     return 0;
 }
 void runtime_rwlock_report(void) {

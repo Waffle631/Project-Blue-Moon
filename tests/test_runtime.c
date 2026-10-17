@@ -11,6 +11,8 @@ void runtime_restart(void) { abort(); }
 #include <pthread.h>
 #include <stdatomic.h>
 #include <time.h>
+#include <unistd.h>
+#include <sys/stat.h>
 
 typedef int (ABI *Register)(GuestCallback);
 typedef int (ABI *RegisterCxa)(void (ABI *)(void *), void *, void *);
@@ -462,6 +464,118 @@ static void thread_dtors_contract(void) {
     static int dso;
     assert(increment(&dso)==0 && increment(&dso)==0 && decrement(&dso)==0 && decrement(&dso)==0);
 }
+/* Spec 2 (block D): libc's module table lock (libc +0x128f60, a static initializer, so NULL) goes
+   through the POSIX names; same objects as scePthreadRwlock*, positive errno values. */
+static void posix_rwlocks(void) {
+    rw_setup();
+    HandleOp rd=GET(HandleOp,"iGjsr1WAtI0#libkernel"),wr=GET(HandleOp,"sIlRvQqsN2Y#libkernel"),un=GET(HandleOp,"EgmLo6EWgso#libkernel");
+    assert(rd && wr && un);
+    void *lock=NULL;
+    assert(rd(&lock)==0 && lock && rd(&lock)==0);
+    assert(wr(&lock)==11 && (uint32_t)rw_trywrite(&lock)==0x80020010); /* EDEADLK: this thread reads */
+    assert(un(&lock)==0 && un(&lock)==0 && un(&lock)==1);                /* EPERM: nothing held */
+    assert(wr(&lock)==0 && rd(&lock)==11 && un(&lock)==0);
+    assert(rd(NULL)==22 && wr(NULL)==22 && un(NULL)==22);
+    assert(rw_destroy(&lock)==0 && wr(&lock)==22);
+}
+/* Spec 2 (block D): scePthreadGetname is only called by libc's per-thread atexit report (+0xb63a0,
+   module unloading only) with a 32-byte stack buffer; the API takes no size. */
+static void thread_get_name(void) {
+    typedef int32_t (ABI *Rename)(void *,const char *);
+    typedef int32_t (ABI *GetName)(void *,char *);
+    Rename rename_thread=GET(Rename,"GBUY7ywdULE#libkernel");
+    GetName get_name=GET(GetName,"How7B8Oet6k#libkernel");
+    assert(rename_thread && get_name);
+    void *self=GET(ThreadSelf,"aI+OeCz8xrQ#libkernel")();
+    struct { char name[32]; uint64_t canary; } b;
+    memset(&b,0x55,sizeof(b)); b.canary=0xfeedface;
+    assert(rename_thread(self,"task_game")==0 && get_name(self,b.name)==0 && !strcmp(b.name,"task_game"));
+    assert(rename_thread(self,"a-thread-name-longer-than-thirty-one-characters")==0 && get_name(self,b.name)==0);
+    assert(strlen(b.name)==31 && !strncmp(b.name,"a-thread-name-longer-than-thirt",31) && b.canary==0xfeedface);
+    assert((uint32_t)get_name(self,NULL)==0x80020016 && (uint32_t)get_name(&b,b.name)==0x80020003);
+    assert(rename_thread(self,"host")==0);
+}
+/* Spec 2 (block C): libc's localtime_r (+0x1740), mktime (+0xc0a0) and strftime %z (+0x1fb00) convert
+   through the kernel with a 16-byte {t, west, dst} record: local = utc + west + dst. The offset is the
+   host zone's at that instant with daylight saving folded in, like sceKernelGettimezone. */
+static void time_conversion(void) {
+    typedef struct { int64_t t; int32_t west, dst; } Timesec;
+    typedef int32_t (ABI *ToLocal)(int64_t,int64_t *,Timesec *,uint64_t *);
+    typedef int32_t (ABI *ToUtc)(int64_t,int32_t,int64_t *,Timesec *,int32_t *);
+    ToLocal to_local=GET(ToLocal,"-o5uEDpN+oY#libkernel");
+    ToUtc to_utc=GET(ToUtc,"0NTHN1NKONI#libkernel");
+    assert(to_local && to_utc);
+    assert(!setenv("TZ","EST5EDT,M3.2.0,M11.1.0",1)); tzset();
+    const int64_t winter=1700000000, summer=1690000000, twice=1699147800; /* twice: 2023-11-05 01:30 */
+    int64_t local=0,utc=0; Timesec ts={0,7,7}; uint64_t dst=7; int32_t dst_seconds=7;
+    assert(to_local(winter,&local,&ts,&dst)==0 && local==winter-5*3600);
+    assert(ts.t==winter && ts.west==-5*3600 && ts.dst==0 && dst==0);
+    assert(to_local(summer,&local,&ts,NULL)==0 && local==summer-4*3600 && ts.t==summer && ts.west==-4*3600 && ts.dst==0);
+    assert(to_local(summer,&local,NULL,NULL)==0 && local==summer-4*3600);
+    assert((uint32_t)to_local(winter,NULL,&ts,NULL)==0x80020016);
+    for (int32_t hint=-1;hint<=1;++hint) { /* tm_isdst from mktime: the folded offset already decides */
+        ts=(Timesec){0,7,7}; dst_seconds=7;
+        assert(to_utc(winter-5*3600,hint,&utc,&ts,&dst_seconds)==0 && utc==winter);
+        assert(ts.t==winter && ts.west==-5*3600 && ts.dst==0 && dst_seconds==0);
+        assert(to_utc(summer-4*3600,hint,&utc,NULL,NULL)==0 && utc==summer);
+    }
+    assert(to_utc(twice,0,&utc,&ts,NULL)==0 && utc+ts.west==twice && to_local(utc,&local,NULL,NULL)==0 && local==twice);
+    /* 03:00 that day is EST, but read as UTC it is still EDT: one step would be an hour off. */
+    assert(to_utc(twice+5400,0,&utc,&ts,NULL)==0 && utc==twice+5400+5*3600 && ts.west==-5*3600);
+    /* 2023-03-12 02:30 does not exist: the offset after the change. */
+    assert(to_utc(1678588200,1,&utc,&ts,NULL)==0 && utc==1678588200+4*3600 && ts.west==-4*3600);
+    assert((uint32_t)to_utc(winter,0,NULL,&ts,NULL)==0x80020016);
+}
+/* Spec 2 (block F): libc's <filesystem> reads directories with sceKernelGetdents (libc +0x95141) and
+   sets times and permissions with sceKernelUtimes (+0x959c8, timeval[2]) and sceKernelChmod (+0x95cb6).
+   Game files stay read-only; writable mounts change the host file. */
+static void file_metadata(void) {
+    typedef int32_t (ABI *Getdents)(int,char *,uint64_t);
+    typedef int32_t (ABI *Utimes)(const char *,const int64_t *);
+    typedef int32_t (ABI *Chmod)(const char *,uint16_t);
+    Getdents getdents=GET(Getdents,"j2AIqSqJP0w#libkernel");
+    Utimes set_times=GET(Utimes,"0Cq8ipKr9n0#libkernel");
+    Chmod set_mode=GET(Chmod,"fgIsQ10xYVA#libkernel");
+    assert(getdents && set_times && set_mode);
+    char root[]="out/file-metadata-XXXXXX",game[64],user[64],host[96],cmd[96];
+    assert(mkdtemp(root));
+    snprintf(game,sizeof game,"%s/game",root); snprintf(user,sizeof user,"%s/user",root);
+    assert(!mkdir(game,0755));
+    snprintf(host,sizeof host,"%s/asset.bin",game); FILE *f=fopen(host,"w"); assert(f && !fclose(f));
+    runtime_file_configure(game,user);
+    snprintf(host,sizeof host,"%s/data/meta.txt",user); f=fopen(host,"w"); assert(f && !fclose(f));
+    int dir=(int)runtime_file_open("/app0",0x20000,0); assert(dir>=3);
+    char entries[1024]; int32_t n=getdents(dir,entries,sizeof entries),found=0;
+    assert(n>0);
+    for (int32_t p=0;p<n;) {
+        uint16_t length; memcpy(&length,entries+p+4,2); assert(length);
+        found|=(!strcmp(entries+p+8,"asset.bin") && entries[p+6]==8); p+=length;
+    }
+    assert(found && getdents(dir,entries,sizeof entries)==0); /* end of the directory */
+    assert((uint32_t)getdents(dir,NULL,sizeof entries)==0x8002000e && (uint32_t)getdents(dir,entries,256)==0x80020016);
+    assert(runtime_file_close(dir)==0 && (uint32_t)getdents(dir,entries,sizeof entries)==0x80020009);
+    const int64_t times[4]={1000000000,250000,1100000000,500000},bad[4]={0,1000000,0,0};
+    struct stat s;
+    assert(set_times("/data/meta.txt",times)==0 && !stat(host,&s));
+    assert(s.st_atim.tv_sec==1000000000 && s.st_atim.tv_nsec==250000000 && s.st_mtim.tv_sec==1100000000 && s.st_mtim.tv_nsec==500000000);
+    time_t before=time(NULL);
+    assert(set_times("/data/meta.txt",NULL)==0 && !stat(host,&s) && s.st_mtim.tv_sec>=before); /* NULL: now */
+    assert((uint32_t)set_times("/data/meta.txt",bad)==0x80020016);
+    assert((uint32_t)set_times("/app0/asset.bin",times)==0x8002001e && (uint32_t)set_times("/data/missing",times)==0x80020002);
+    assert(set_mode("/data/meta.txt",0600)==0 && !stat(host,&s) && (s.st_mode&0777)==0600);
+    assert(set_mode("/data/meta.txt",0644)==0 && !stat(host,&s) && (s.st_mode&0777)==0644);
+    assert((uint32_t)set_mode("/app0/asset.bin",0644)==0x8002001e && (uint32_t)set_mode("/data/missing",0644)==0x80020002);
+    snprintf(cmd,sizeof cmd,"rm -rf %s",root); assert(system(cmd)==0);
+}
+/* Spec 2, section 9: these stay traps until the game calls them (scePthreadCancel: destructors of the
+   eboot's thread class, +0x12af2e; the other two: libc's unwinder and a heap path never taken). Named
+   so the STOP line says which API it is, never resolved. */
+static void decided_traps(void) {
+    static const char *const traps[][2]={{"qBDmpCyGssE#libkernel","scePthreadCancel"},
+        {"RpQJJVKTiFM#libkernel","sceKernelGetModuleInfoForUnwind"},
+        {"-YTW+qXc3CQ#libkernel","sceKernelInternalMemoryGetModuleSegmentInfo"}};
+    for (int i=0;i<3;++i) assert(!strcmp(runtime_import_name(traps[i][0]),traps[i][1]) && !runtime_resolve(traps[i][0],0));
+}
 int main(int argc,char **argv) {
     runtime_start(0); assert(runtime_resolve("bzQExy189ZI#libc",0)==0);
     runtime_start(1);
@@ -493,11 +607,18 @@ int main(int argc,char **argv) {
     if (argc>1 && !strcmp(argv[1],"--rwlock-concurrency")) { rw_concurrency(); return 0; }
     if (argc>1 && !strcmp(argv[1],"--rwlock-timeouts")) { rw_timeouts(); return 0; }
     if (argc>1 && !strcmp(argv[1],"--thread-dtors")) { thread_dtors_contract(); puts("PASS: thread dtors"); return 0; }
+    if (argc>1 && !strcmp(argv[1],"--posix-rwlocks")) { posix_rwlocks(); return 0; }
+    if (argc>1 && !strcmp(argv[1],"--thread-name")) { thread_get_name(); return 0; }
+    if (argc>1 && !strcmp(argv[1],"--time-conversion")) { time_conversion(); return 0; }
+    if (argc>1 && !strcmp(argv[1],"--file-metadata")) { file_metadata(); return 0; }
+    if (argc>1 && !strcmp(argv[1],"--decided-traps")) { decided_traps(); return 0; }
     if (argc>1 && !strcmp(argv[1],"--rtld-underflow")) {
         static int dso; GET(DsoCount,"8OnWXlgQlvo#libkernel")(&dso); return 99;
     }
     libc_support(); posix_mutexes(); wall_time(); kernel_time_names(); sanitizer_and_neo(); heap_trace_info(); audiodec_provisional(); savedata_initialize3(); savedata_mount2(); savedata_umount_with_backup(); discmap_location(); exit_handlers(); guards(); mutexes(); direct_memory(); memory_primitives();
-    rw_lifecycle(); rw_concurrency(); rw_timeouts();
-    puts("PASS: callback lifecycle, guard ABI, mutex errors, shared direct memory, memory primitives, resolver scope");
+    rw_lifecycle(); rw_concurrency(); rw_timeouts(); posix_rwlocks(); thread_get_name(); file_metadata(); decided_traps();
+    time_conversion(); /* last: changes TZ */
+    puts("PASS: callback lifecycle, guard ABI, mutex errors, shared direct memory, memory primitives, resolver scope, "
+         "POSIX rwlocks, thread names, file metadata, time conversion");
     return 0;
 }
