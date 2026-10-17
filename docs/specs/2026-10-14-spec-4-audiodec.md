@@ -35,13 +35,30 @@ son módulos del sistema, que el juego carga con `sceSysmoduleLoadModule` (`src/
 |---|---|---|---|
 | `VjhsmxpcezI` | `sceAudiodecInitLibrary` | 4a | provisional (error explícito, fase 2A, `18ad4dc`) |
 | `h5jSB2QIDV0` | `sceAudiodecTermLibrary` | 4a | falta |
-| `O3f1sLMWRvs` | `sceAudiodecCreateDecoder` | 4a | falta |
+| `O3f1sLMWRvs` | `sceAudiodecCreateDecoder` | 4a | falta; es el `STOP:` que llega al final del prólogo (2.5) |
 | `Tp+ZEy69mLk` | `sceAudiodecDeleteDecoder` | 4a | falta |
 | `KHXHMDLkILw` | `sceAudiodecDecode` | 4a | falta |
 | `6Vf9WTLDoss` | `sceAudiodecClearContext` | 4a | falta |
 | `ktD2w3D4G2U` | `sceAudiodecCpuQueryMemSize` | 4b | falta |
 | `hdFsxo3MFu8` | `sceAudiodecCpuInitDecoder` | 4b | falta |
 | `lSVTiWV5wLc` | `sceAudiodecCpuDecode` | 4b | falta |
+
+**[V]** Sitios de llamada en el eboot (2026-10-17, desensamblado de `out/boot-linked.bin`, todas las
+llamadas directas a cada PLT):
+
+- `libSceAudiodec`:
+  - `InitLibrary` en `+0x10e20c`;
+  - `TermLibrary` en `+0x10df70`;
+  - `CreateDecoder` en `+0x113172`;
+  - `Decode` en `+0x113398`;
+  - `ClearContext` en `+0x11353f`;
+  - `DeleteDecoder` en `+0x112d28` y `+0x1136ff`.
+- `libSceAudiodecCpu`:
+  - `QueryMemSize` en `+0x115788`;
+  - `InitDecoder` en `+0x115811`;
+  - `Decode` en `+0x11590c`.
+
+Todo el ATRAC9 pasa por una sola rutina de preparación (2.5) y una sola de decodificación.
 
 ### 2.2 El audio del juego (dump, 2026-10-17)
 
@@ -123,6 +140,68 @@ Que `vse` sean efectos es **[H]**: se deduce del nombre.
 - **[V]** `GOW3_AUDIO_TRACE` solo traza aperturas bajo `sound/` (`src/runtime_file.c`), una ruta de
   GoW3: no sirve para Tsukihime. La Spec 6 lo generaliza.
 
+### 2.5 Primer `CreateDecoder`: al final del prólogo (2026-10-17, `out/run-prologo.log`)
+
+Ejecución sin watchdog, con la partida de la iteración 9 de la Spec 2. El juego reproduce el vídeo del
+prólogo y, según el usuario, el `STOP:` llega después del vídeo:
+
+```
+STOP: first unsupported PS4 import: O3f1sLMWRvs#libSceAudiodec (index 123)
+Caller return offset: 0x113177; first argument: 0x1006eb2048
+```
+
+No se implementó (decisión del usuario, 2026-10-17: solo documentar). Todo lo que sigue sale del
+desensamblado del sitio de llamada; el trazador de la fase A tiene que confirmarlo.
+
+- **[V] Rutina de preparación** (`+0x1130b0`), llamada desde `+0x11276b` y `+0x1128ac`, dos objetos
+  de flujo distintos:
+  - Recibe la cabecera RIFF ATRAC9 de la pista (2.2).
+  - Solo acepta 12000, 24000 y 48000 Hz (RIFF `+0x18`), con 64, 128 y 256 muestras por trama. Con
+    otra frecuencia devuelve "falso" sin llamar a Audiodec.
+  - También lee los canales (`+0x16`), el tamaño de bloque (`+0x20`), las muestras por bloque (`+0x26`)
+    y la configuración (`+0x40`).
+- **[V] Bloque de control**, que reserva el juego (puntero en el objeto de flujo `+0x70`). `ctrl`, el
+  puntero que reciben `CreateDecoder` y `Decode`, es el bloque `+0x08` (el primer argumento del log,
+  `0x1006eb2048`, es bloque + 8):
+
+  | Desplazamiento | Contenido | Lo que escribe el juego |
+  |---|---|---|
+  | `+0x08` | `ctrl`: puntero a los parámetros | → `+0x58` |
+  | `+0x10` | puntero a la info del flujo (bsi) | → `+0x64` |
+  | `+0x18` | puntero a la entrada (AU) | → `+0x28` |
+  | `+0x20` | puntero a la salida (PCM) | → `+0x40` |
+  | `+0x28` | AU, 0x18 bytes: `{u32 tamaño; u32; void *datos /*+0x8*/; u32 bytes /*+0x10*/; u32}` | tamaño `0x18` |
+  | `+0x40` | PCM, la misma forma | tamaño `0x18` |
+  | `+0x58` | parámetros ATRAC9: `{u32 tamaño; u32; u32 config}` | `0xC`, `1` y los 4 bytes del RIFF `+0x40` (`0xFE…`) |
+  | `+0x64` | info del flujo | tamaño `0x24`; el resto lo rellena la biblioteca **[H]** |
+
+  Es la misma forma que las estructuras de `AudiodecCpu` del PR #5289 (2.4): descriptor de 0x18 bytes
+  con los datos en `+0x8` y el tamaño en `+0x10`, y un `ctrl` con parámetros, bsi, AU y PCM. Para
+  `libSceAudiodec` ya no es una hipótesis: lo construye el propio juego.
+- **[V] La llamada** es `sceAudiodecCreateDecoder(ctrl, 1)`, con códec 1 = ATRAC9, el mismo valor que
+  en `InitLibrary`. El valor devuelto se guarda como identificador en el objeto de flujo `+0x0`. La
+  rutina **no lo comprueba** y devuelve "verdadero" de todas formas.
+- **[V] La rutina de decodificación** (`+0x1132b0`) hace lo siguiente:
+  - **Si el identificador es negativo, devuelve "falso" sin llamar a `sceAudiodecDecode`.**
+  - Si no, prepara la entrada y la salida:
+    - AU: el resto de la supertrama, con el puntero en base + tamaño de bloque − bytes pendientes y el
+      tamaño en los bytes pendientes;
+    - PCM: un búfer de `canales × 512` bytes.
+  - Llama a `sceAudiodecDecode(id, ctrl)`. Con un resultado ≠ 0 devuelve "falso"; con 0 resta de los
+    pendientes el campo `bytes` del AU. Es decir, **la biblioteca sobrescribe el tamaño del AU con los
+    bytes consumidos**.
+  - Una función auxiliar (`+0x1132a0`) devuelve el `u32` de bsi `+0x4`.
+- **[H]** Quedan para el trazador:
+  - El `1` del segundo campo de los parámetros podría ser el formato del PCM; el juego abre sus
+    puertos de `AudioOut` en float.
+  - `canales × 512` bytes caben en una trama de 256 muestras en 16 bits o en una de 128 en float.
+  - El contenido de la info del flujo.
+  - Qué hace el nivel superior cuando la rutina de decodificación devuelve "falso": silencio,
+    reintento o espera.
+- **Consecuencia para la respuesta provisional.** Si `CreateDecoder` devuelve un error, el juego no
+  llama a `Decode` para ese flujo. Con la regla "función no llamada = sin resolver", la siguiente
+  ejecución no pararía en `Decode` sino en lo que haga el juego con un flujo que no produce nada.
+
 ## 3. Reglas comunes a 4a y 4b
 
 - **Nunca éxito simulado.** Hasta que una función esté implementada de verdad, responde con un error
@@ -165,6 +244,13 @@ Entregable: `docs/audiodec.md`, apartado ATRAC9. Sin él no se pasa a la fase B.
    - Los códigos de error que el juego distingue (fin de flujo, trama corrupta).
    - Qué hace el juego si `CreateDecoder` falla, para saber si la respuesta provisional deja pasar el
      arranque (sección 6).
+
+   *Avance (2026-10-17, solo desensamblado, 2.5):*
+   - el layout del control y de los parámetros, el paso de la configuración y los bytes consumidos ya
+     están vistos;
+   - que el juego no llama a `Decode` si `CreateDecoder` falla también está visto;
+   - falta todo lo que solo da el trazador: el formato del PCM, la info del flujo, los errores y la
+     secuencia completa por pista.
 3. **Orden de observación:** la música primero (lo primero que suene en la pantalla de título o en el
    prólogo), luego las voces y luego `vse`.
 4. **Fuentes:** el código de llamada del propio juego (desensamblado de `eboot.bin`) y el volcado del
@@ -218,6 +304,15 @@ Audiodec se llama **antes del primer draw** (2.3). Mientras el juego ignore lo q
 respuestas provisionales, el hito no depende de esta spec, y la fase 2A de la Spec 2 sigue con ellas.
 Si un `CreateDecoder` (o `InitDecoder`) fallido cuelga el arranque o lo desvía, la fase A de 4a (o de
 4b) pasa a formar parte del camino hacia el hito, y se avisa al usuario.
+
+**Resultado (2026-10-17).** `InitLibrary` llega antes del primer draw, pero `CreateDecoder` no llega
+hasta el final del vídeo del prólogo (2.5), cuando el H1 del hito ya está cumplido. Por tanto:
+
+- Audiodec **no bloquea el hito**.
+- Audiodec **sí bloquea pasar del prólogo**: lo que viene después (**[H]** la música de la pantalla
+  siguiente) necesita al menos la respuesta de la fase A para `CreateDecoder`.
+- Cada prueba cuesta los 6 min 29 s del vídeo, porque el prólogo no se ha podido saltar (Spec 2,
+  sección 4.1).
 
 ## 7. Requisitos
 
@@ -287,3 +382,6 @@ aceptar módulos de sistema nuevos, `src/runtime_content.c`.
   (respuesta provisional en `18ad4dc`). El inventario del dump (2.2) y el PR #5289 muestran que todo
   es ATRAC9 salvo 19 efectos HEVAG. El usuario fija la prioridad (música, voces, efectos) y aprueba
   dividir la spec en 4a y 4b.
+- 2026-10-17 (después): sin watchdog, el juego reproduce el prólogo y para en
+  `sceAudiodecCreateDecoder`. El sitio de llamada da el bloque de control y la secuencia
+  `CreateDecoder` → `Decode` (2.5, sección 6). No se implementa nada (decisión del usuario).

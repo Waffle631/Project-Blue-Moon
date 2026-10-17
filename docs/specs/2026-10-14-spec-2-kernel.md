@@ -291,6 +291,33 @@ Conclusiones de las iteraciones 6 a 10 (2026-10-17):
   - La iteración 9 resuelve seis APIs de una vez: van seguidas en la misma función, sin ramas entre
     ellas, y el juego ignora todos los resultados.
 
+**Después del punto de parada (2026-10-17, `out/run-prologo.log`, sin watchdog, con partida).** El
+juego reproduce el vídeo del prólogo (`prologue_en.mp4`, 6 min 29 s) y, según el usuario, después se
+para:
+
+```
+STOP: first unsupported PS4 import: O3f1sLMWRvs#libSceAudiodec (index 123)
+Caller return offset: 0x113177; first argument: 0x1006eb2048
+```
+
+- Es `sceAudiodecCreateDecoder(ctrl, 1)` desde eboot `+0x113172`, el primer decodificador ATRAC9. No
+  es de libkernel: la fase 2A tampoco encuentra ninguno aquí.
+- **No se implementó** (decisión del usuario: solo documentar). El sitio de llamada y la estructura
+  de control están en la Spec 4, sección 2.5.
+- Contadores al final (6 min 16 s de proceso):
+  - 45 hilos guest, de los que salieron 3;
+  - 80 event flags (42 borrados), con 90021 esperas y ningún timeout;
+  - 44990 adquisiciones de semáforo;
+  - 4 puertos de audio y 174036 búferes enviados;
+  - 22495 lecturas del mando.
+
+  No hubo `Fault:` ni cuelgue.
+- **El prólogo no se pudo saltar** (`out/run-skip-1.log`, con partida). Se pulsaron Options, Cruz y
+  Círculo durante 0,3 s por `GOW3_PAD_FILE`, entre los 20 y los 60 s de ejecución. El juego lee el mando
+  todo el tiempo, pero el vídeo siguió. **[H]** Es obligatorio la primera vez, o hace falta otro
+  botón o una pulsación más larga. Hasta saberlo, cada prueba de lo que va después del prólogo cuesta
+  6 min 29 s.
+
 ## 5. Pasos de verificación (antes de escribir código de cada bloque)
 
 Método común: `objdump -D -b binary -mi386:x86-64 -M intel` sobre `out/boot-linked.bin` (la

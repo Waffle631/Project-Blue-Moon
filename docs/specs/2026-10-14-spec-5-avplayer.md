@@ -39,6 +39,31 @@ espera, y que el juego continúe después.
   vídeo (1). El juego activa las dos y AvPlayer emite `StateReady` y `StatePlay`. El juego crea su hilo
   `av audio` (prioridad 714) y abre el puerto de audio 3 (2 canales, float, 256 muestras). Sin
   errores en 60 s. Falta ver si la imagen y el sonido son correctos (hito y paso 2).
+- **[V]** Imagen y sonido del prólogo (2026-10-17, después de la fase 2A):
+  - las capturas del escritorio (hito, H1) muestran el vídeo bien, con sus subtítulos en inglés, que
+    vienen dentro del MP4;
+  - el usuario confirma que el sonido se oye bien;
+  - sin watchdog (`out/run-prologo.log`), el vídeo se ve entero y, según el usuario, después llega el
+    `STOP:` de `sceAudiodecCreateDecoder` (Spec 4, 2.5). No hay error de AvPlayer.
+- **[V]** El prólogo no se salta con Options, Cruz ni Círculo (pulsaciones de 0,3 s, Spec 2, sección
+  4.1). Es un dato para el caso 3 del paso 2, que todavía no se puede valorar.
+- **[H] El vídeo podría ir más rápido que el tiempo real.** Datos de `out/run-prologo.log`:
+
+  | Dato | Valor |
+  |---|---|
+  | Lanzamiento (copia de partidas, justo antes de arrancar) | 13:20:50 |
+  | Última línea del log (el `STOP:`) | 13:27:06, es decir, 6 min 16 s de proceso |
+  | Inicio del vídeo tras el lanzamiento, en otra ejecución | ~12 s (captura de los 15 s ≈ segundo 3 del MP4) |
+  | Tiempo de pared para el vídeo | ~6 min 4 s |
+  | Duración del archivo | 6 min 29 s (`ffprobe`), ~25 s más |
+
+  - Si el vídeo terminó antes del `STOP:`, se reprodujo ~6 % más rápido o se saltó algún trozo. Los
+    últimos ~25 s del archivo son créditos sobre negro y la luna que se apaga.
+  - Tampoco hay `StateStop` en el log, y AvPlayer lo registra a nivel `info` cuando lo emite
+    (`avplayer_state.cpp:375`).
+  - O el juego dejó el vídeo antes de su final, o decide el final por su cuenta. Hay que medirlo
+    en el paso 2: tiempo de pared contra la marca de tiempo de los fotogramas y del audio entregados.
+    Es la fila "Se corta o se desincroniza" del paso 3.
 
 ## 3. Diseño: validar antes de corregir
 

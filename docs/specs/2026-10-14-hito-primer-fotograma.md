@@ -50,6 +50,20 @@ No hay `STOP:` ni `Fault:` en 60 s. Los únicos avisos de GPU son los de formato
 soporta (sección 2); ningún `Unimplemented`. A nivel `info` los flips no salen: se registran a nivel
 `debug`. Por eso hace falta el H2. Falta saber si hay draws y qué se ve (H2 y H3).
 
+**Comprobación visual (2026-10-17, después de la fase 2A).**
+
+- Capturas de pantalla del escritorio (Spectacle, recortadas al monitor del juego,
+  `out/game-{15,30,45,60,80,100,125}.png`, sin versionar). Muestran el vídeo del prólogo: imagen
+  correcta y subtítulos en inglés, que vienen dentro del propio MP4. Incluso el texto con serifa del
+  principio ("I awake suddenly.") es del vídeo.
+- El usuario confirma que el sonido se oye bien. En otra ejecución (`out/run-prologo.log`, Spec 2,
+  sección 4.1) el vídeo se ve entero hasta el `STOP:` de Audiodec.
+- **Hay draws:** AvPlayer deja cada fotograma en memoria del guest, y solo llega a la pantalla a
+  través de los comandos de GPU del propio juego (textura + dibujo + flip).
+- **No sustituye a H2 ni a H3:** no hay contadores, las capturas son externas (no del fotograma
+  presentado) y lo que se ha visto es el vídeo, no el 2D propio del juego (fondos, sprites, texto del
+  motor).
+
 ### H2 — Contadores de GPU en el log
 Si el log no permite saber cuántos draws, flips y envíos hizo el juego, añadir una línea de resumen al
 final de la ejecución (en `runtime_report` o en `gow3gpu.cpp`). Entregable: una línea con
