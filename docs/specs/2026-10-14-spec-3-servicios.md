@@ -36,7 +36,7 @@ offline no tiene (PSN, capturas, Share Play, streaming).
 
 | NID | Nombre | Biblioteca | Estado | Comportamiento |
 |---|---|---|---|---|
-| `TywrFKCoLGY` | `sceSaveDataInitialize3` | SaveData | código existe | solo `import_names.inc` |
+| `TywrFKCoLGY` | `sceSaveDataInitialize3` | SaveData | **hecha** (`2a43953`) | solo `import_names.inc`; el juego la llama con `NULL` (eboot `+0xed2eb`) |
 | `0z45PIH+SNI` | `sceSaveDataMount2` | SaveData | código existe | solo `import_names.inc` |
 | `VwadwBBBJ80` | `sceSaveDataUmountWithBackup` | SaveData | falta | igual que `sceSaveDataUmount` (`save_umount`); no crea copia |
 | `RQOqDbk3bSU` | `sceSaveDataCheckBackupData` | SaveData | falta | `NOT_FOUND` (0x809F0008): no hay copia de seguridad |
@@ -44,16 +44,16 @@ offline no tiene (PSN, capturas, Share Play, streaming).
 | `2xxUtuC-RzE` | `sceScreenShotEnable` | ScreenShot | falta | 0, sin efecto |
 | `tIYf0W5VTi8` | `sceScreenShotDisable` | ScreenShot | falta | 0, sin efecto |
 | `73WQ4Jj0nJI` | `sceScreenShotSetOverlayImageWithOrigin` | ScreenShot | falta | 0, sin efecto |
-| `isruqthpYcw` | `sceSharePlayInitialize` | SharePlay | falta | 0, sin efecto |
+| `isruqthpYcw` | `sceSharePlayInitialize` | SharePlay | **hecha** (`1f701d3`) | 0, sin efecto; `(NULL, 0x1800)` en eboot `+0xed32e`, resultado ignorado |
 | `UaLjloJinow` | `sceSharePlayTerminate` | SharePlay | falta | 0, sin efecto |
 | `co2NCj--pnc` | `sceSharePlaySetProhibition` | SharePlay | falta | 0, sin efecto |
-| `kvYEw2lBndk` | `sceGameLiveStreamingInitialize` | GameLiveStreaming | falta | 0, sin efecto |
+| `kvYEw2lBndk` | `sceGameLiveStreamingInitialize` | GameLiveStreaming | falta (**siguiente `STOP:`**) | 0, sin efecto; `(0x4000)` en eboot `+0xed338` |
 | `9yK6Fk8mKOQ` | `sceGameLiveStreamingTerminate` | GameLiveStreaming | falta | 0, sin efecto |
 | `dWM80AX39o4` | `sceGameLiveStreamingEnableLiveStreaming` | GameLiveStreaming | falta | 0 y retransmisión "no activa" **[H]** |
 | `Fc8qxlKINYQ` | `sceVideoRecordingSetInfo` | VideoRecording | falta | 0, sin efecto |
-| `hHrGoGoNf+s` | `sceSysmoduleLoadModuleInternalWithArg` | Sysmodule | falta | como `module_load` (acepta el mismo identificador interno; los argumentos extra se registran) **[H]** |
+| `hHrGoGoNf+s` | `sceSysmoduleLoadModuleInternalWithArg` | Sysmodule | **hecha** (`673559f`) | como `module_load`; los argumentos se registran (**[V]**, ver 4.3) |
 | `4fU5yvOkVG4` | `sceSysmoduleGetModuleInfoForUnwind` | Sysmodule | falta | error explícito (ver 4.2) |
-| `SsC-m-S9JTA` | `sceSystemServiceParamGetString` | SystemService | falta | ver 4.1 |
+| `SsC-m-S9JTA` | `sceSystemServiceParamGetString` | SystemService | **hecha** (`6e40c0e`) | ver 4.1 |
 | `9kPCz7Or+1Y` | `sceSystemServiceReenableMusicPlayer` | SystemService | falta | 0, sin efecto (`sceSystemServiceDisableMusicPlayer` ya existe) |
 | `lUoqwTQu4Go` | `sceUserServiceGetUserColor` | UserService | falta | ver 4.1 |
 | `Lr8ovHH9l6A` | `sceMsgDialogGetResult` | MsgDialog | código existe | solo `import_names.inc` |
@@ -75,10 +75,18 @@ ninguna sin esa línea. Si el juego usa el valor devuelto para decidir algo (por
 `EnableLiveStreaming` consulta un estado), la API deja de ser "sin efecto" y se implementa de
 verdad.
 
-- `sceSystemServiceParamGetString(id, buf, size)` **[H]**: se registran el `id` y el tamaño; para ids
-  desconocidos devuelve `SYSTEM_PARAMETER` (0x80A10003), igual que `ParamGetInt`. Cuando el sitio de
-  llamada muestre qué id pide, se añade ese valor (por ejemplo, nombre del sistema) con un texto
-  fijo.
+- `sceSystemServiceParamGetString(id, buf, size)` **[V]** (2026-10-17, fase 2A, iteración 1): el
+  juego la llama una vez al arrancar (eboot `+0x129991`), justo después de `ParamGetInt(1)` (idioma),
+  con `(6, obj+4, 0x41)`: el id 6 es el nombre del sistema, en un buffer de 65 bytes, y el valor
+  devuelto se ignora. Se devuelve el texto fijo `"PS4"`. Cada llamada registra el `id` y el tamaño;
+  un id desconocido, un buffer nulo o uno demasiado corto devuelven `SYSTEM_PARAMETER` (0x80A10003).
+  Ojo: `ParamGetInt` no hace lo mismo con un id desconocido (da `STOP:`, `runtime_services.c`); aquí
+  se sigue esta spec.
+- Mecanismo común (`runtime_services.c`, desde la iteración 5): una tabla de nombres y contadores y
+  `no_effect(api)`, que devuelve 0 y escribe `Service: <nombre> accepted, no effect` solo en la
+  primera llamada; `runtime_services_report()` saca los contadores en `runtime_report`. Añadir otra
+  API "sin efecto" es una entrada en el `enum`, su nombre y su función. Por ahora solo está
+  `sceSharePlayInitialize`.
 - `sceUserServiceGetUserColor(user, *color)` **[H]**: color fijo del usuario 1. Solo para el usuario
   que el runtime ya reporta (`user_initial`); cualquier otro id devuelve el error de usuario.
 
@@ -90,6 +98,14 @@ Se devuelve un error y se registra; si el juego lanza excepciones, aparecerá co
 implementará con los datos reales de `probe.c`.
 
 ### 4.3 Las que se resuelven con el sitio de llamada
+
+- `sceSysmoduleLoadModuleInternalWithArg` **[V]** (2026-10-17, fase 2A, iteración 2): la llama
+  `libSceFios2.prx` (`+0x394a5`) con `(0xd7, argc=0, argv=NULL, 0, &res)`. Si devuelve `0x80020064`,
+  Fios2 toma el error de `res`; si su init posterior falla, descarga el módulo con la
+  `sceSysmoduleUnloadModule` **pública**, así que usa los mismos ids y el mismo contador. 0xd7 es
+  DiscMap: después Fios2 llama a `sceDiscMapIsRequestOnHDD`. Implementada en `runtime_content.c` sobre
+  `module_load`, con `*res = 0` (un módulo del host no tiene función de inicio). Un id de más de 16
+  bits (internos `0x8000xxxx`) da `STOP:`, porque aún no se ha visto ninguno.
 
 - `fJgP+wqifno` (DiscMap): no coincide con ningún nombre probado. El dump trae `sce_discmap.plt`, lo
   que indica uso real de DiscMap. Mismo método que la Spec 2 (paso 5.7): sitio de llamada, primer

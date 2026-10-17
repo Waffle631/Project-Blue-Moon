@@ -222,6 +222,36 @@ primera vez que se llaman.
 - **Fase 2B — cierre.** Con el juego ya arrancando, implementar el resto de la lista hasta que
   `--check-imports` no liste nada de `libkernel`.
 
+### 4.1 Fase 2A: registro de iteraciones
+
+Antes de la fase 2A, la ejecución real ya pasaba la init de `libc.prx` y de `libSceFios2.prx` y entraba
+en el código del juego (`0xef390`, pasos 2.5 y 2.7 del plan). Las iteraciones del bucle, cada una con
+su `STOP:`, su sitio de llamada, la respuesta, un test y un commit (logs `out/run-2a-N.log`):
+
+| # | `STOP:` | Sitio de llamada **[V]** | Respuesta | Spec | Commit |
+|---|---|---|---|---|---|
+| 1 | `SsC-m-S9JTA` `sceSystemServiceParamGetString` | eboot `+0x129991`: `(6, obj+4, 0x41)` tras `ParamGetInt(1)`; ignora el resultado | `"PS4"` para el id 6 (nombre del sistema); `0x80A10003` para otro id o buffer corto | 3 (4.1) | `6e40c0e` |
+| 2 | `hHrGoGoNf+s` `sceSysmoduleLoadModuleInternalWithArg` | Fios2 `+0x394a5`: `(0xd7, 0, NULL, 0, &res)`; si falla después, `sceSysmoduleUnloadModule(0xd7)` | igual que `sceSysmoduleLoadModule`, `*res = 0`; ids de más de 16 bits → `STOP:` | 3 | `673559f` |
+| 3 | `VjhsmxpcezI` `sceAudiodecInitLibrary` | eboot `+0x10e20c`: `(1)` (ATRAC9); ignora el resultado | error provisional `0x807F0001` (fase A de la Spec 4) | **4** | `18ad4dc` |
+| 4 | `TywrFKCoLGY` `sceSaveDataInitialize3` | eboot `+0xed2eb`: `(NULL)` | ya existía; faltaba la línea de `import_names.inc` | 3 | `2a43953` |
+| 5 | `isruqthpYcw` `sceSharePlayInitialize` | eboot `+0xed32e`: `(NULL, 0x1800)`; ignora el resultado | "sin efecto": 0, una línea de log y un contador | 3 (4.1) | `1f701d3` |
+
+Siguiente `STOP:` (sin hacer): `kvYEw2lBndk#libSceGameLiveStreaming` `sceGameLiveStreamingInitialize(0x4000)`,
+eboot `+0xed338`. Después, en el mismo bloque de init (`+0xed2e9`…), el juego sigue con más servicios.
+
+Conclusiones de las cinco iteraciones (2026-10-17):
+
+- **Ningún `STOP:` de `libkernel`** desde que el juego entró en su código: todo lo que bloquea es de la
+  Spec 3 y, una vez, de la Spec 4. Hasta aquí, el kernel que hay basta para el arranque.
+- **El audio va antes que el primer fotograma.** La iteración 3 para en Audiodec antes de cualquier
+  draw. El roadmap suponía que el hito de primer fotograma solo dependía de esta spec. Mientras el
+  juego ignore lo que devuelve Audiodec, basta la respuesta provisional de la fase A de la Spec 4. El
+  hito tampoco ha llegado aún: el log no muestra ningún envío a la GPU ni un `VideoOut` abierto por el
+  juego (solo las líneas de arranque del propio runtime).
+- Hilos y sincronización hasta el `STOP:` de la iteración 5: 39 hilos guest (ninguno ha salido),
+  61 mutex, 8 variables de condición, 3 rwlocks, 0 semáforos. Sin cuelgues: con `GOW3_TIMEOUT=60`,
+  las cinco ejecuciones terminan en su `STOP:` sin que salte el watchdog.
+
 ## 5. Pasos de verificación (antes de escribir código de cada bloque)
 
 Método común: `objdump -D -b binary -mi386:x86-64 -M intel` sobre `out/boot-linked.bin` (la
@@ -245,6 +275,12 @@ nombrar el import de una ranura de GOT.
 2. **Event flags. ✅ (2026-10-17)** Tabla de la sección 3.2 corregida con shadPS4 upstream.
 3. **Uso real.** Con `GOW3_TRACE_EVENTFLAG` ver con qué argumentos llama el juego (atributos,
    patrones, timeouts) y cuántos hilos esperan a la vez.
+   Primeros datos, sin traza (2026-10-17, `out/run-2a-5.log`): 69 flags, **todos con `attr = 0x22`
+   (PRIO + MULTI) y patrón inicial 0**: `scheduler event` (1), `waveout thread` (2), `at9 event` y
+   `at9 thread` (32 de cada), `hevag decode thread` y `hevag waveout thread` (1 de cada). Hay 36
+   borrados, 36 esperas, 36 `Set`, ningún timeout y ningún `Cancel`. Como son PRIO, se atienden en
+   FIFO (sección 3.2). Faltan los argumentos de `Wait` (modos y timeouts): hay que repetirlo con
+   `GOW3_TRACE_EVENTFLAG`.
 4. **`scePthreadCancel`.** Averiguar quién la llama y a qué hilo. Decidir entonces la estrategia.
 5. **Conversión de hora y sanitizer.** Mirar el sitio de llamada para fijar firma y valor devuelto.
 6. **Bloque F.** Mirar quién llama `Utimes` y `Chmod` y sobre qué rutas.
@@ -287,8 +323,11 @@ nuevo). Windows: comprobar si `gpu/CMakeLists.txt` enumera `runtime_*.c` explíc
 - [x] `out/eventflag-test` pasa con los 9 casos; el estrés no se cuelga ni pierde señales
   (2026-10-17: 4 pares de hilos, 100 000 idas y vueltas en ~0,4 s; prueba de mutación del orden de
   limpieza, el resultado antes de limpiar, SINGLE, Cancel y Delete: todas detectadas).
-- [ ] `bash build.sh --test` y `python3 -m unittest discover -s tests` siguen en la línea base.
-- [ ] El juego pasa de `libc` a ejecutar su propio código (el log muestra su primera llamada).
+- [x] `bash build.sh --test` y `python3 -m unittest discover -s tests` siguen en la línea base
+  (2026-10-17, tras la iteración 5 de la fase 2A: todos los tests C pasan; Python 244 OK, 37 omitidos).
+- [x] El juego pasa de `libc` a ejecutar su propio código (el log muestra su primera llamada)
+  (2026-10-17: `Entering original x86-64 code at guest offset 0xef390` y, después, sus llamadas a
+  SystemService, Sysmodule, UserService, AudioOut…; ver 4.1).
 - [ ] Se llega al hito de primer fotograma sin `STOP:` de `libkernel`.
 - [ ] Fase 2B: `out/gow3-probe out/boot-linked.bin --app0 Tsukihime/CUSA47999 --check-imports` no lista
   nada de `libkernel`, salvo lo que esta spec deje explícitamente como trampa (por ejemplo
