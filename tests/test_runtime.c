@@ -217,6 +217,13 @@ static void audiodec_provisional(void) {
     Init init=GET(Init,"VjhsmxpcezI#libSceAudiodec");
     assert(init && (uint32_t)init(1)==0x807F0001 && (uint32_t)init(1)==0x807F0001);
 }
+/* Spec 3: sceSaveDataInitialize3 had code but no name, so it could not be reached. The game calls
+   it with NULL (eboot +0xed2eb). */
+static void savedata_initialize3(void) {
+    typedef int32_t (ABI *Init)(const void *);
+    Init init=GET(Init,"TywrFKCoLGY#libSceSaveData");
+    assert(init && init(NULL)==0);
+}
 static void direct_memory(void) {
     Allocate alloc=GET(Allocate,"rTXw65xmLIA#libkernel");
     Map map=GET(Map,"L-Q3LEjIbgA#libkernel");
@@ -452,7 +459,7 @@ int main(int argc,char **argv) {
     if (argc>1 && !strcmp(argv[1],"--rtld-underflow")) {
         static int dso; GET(DsoCount,"8OnWXlgQlvo#libkernel")(&dso); return 99;
     }
-    libc_support(); posix_mutexes(); wall_time(); kernel_time_names(); sanitizer_and_neo(); heap_trace_info(); audiodec_provisional(); exit_handlers(); guards(); mutexes(); direct_memory(); memory_primitives();
+    libc_support(); posix_mutexes(); wall_time(); kernel_time_names(); sanitizer_and_neo(); heap_trace_info(); audiodec_provisional(); savedata_initialize3(); exit_handlers(); guards(); mutexes(); direct_memory(); memory_primitives();
     rw_lifecycle(); rw_concurrency(); rw_timeouts();
     puts("PASS: callback lifecycle, guard ABI, mutex errors, shared direct memory, memory primitives, resolver scope");
     return 0;

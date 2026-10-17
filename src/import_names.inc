@@ -438,6 +438,7 @@
 {"1Pk0qZQGeWo#libc","sscanf"},
 {"8u8lPzUEq+U#libc","memchr"},
 {"ZkZhskCPXFw#libSceSaveData","sceSaveDataInitialize"},
+{"TywrFKCoLGY#libSceSaveData","sceSaveDataInitialize3"},
 {"yKDy8S5yLA0#libSceSaveData","sceSaveDataTerminate"},
 {"dyIhnXq-0SM#libSceSaveData","sceSaveDataDirNameSearch"},
 {"S1GkePI17zQ#libSceSaveData","sceSaveDataDelete"},
