@@ -109,6 +109,26 @@ static ABI int32_t safe_area(float *info) { if (!info) return SYSTEM_PARAMETER; 
 static ABI int32_t disable_music_player(void) { return 0; }
 static ABI int32_t launch_browser(void) { note("SystemService: web browser request ignored (offline)"); return 0; }
 
+/* ---- Accepted with no effect (Spec 3, 4.1): features an offline console does not offer. Each
+ * returns 0, logs its first call and counts all of them; one whose result the game uses to decide
+ * something needs a real implementation instead. ---- */
+enum { SHAREPLAY_INITIALIZE, NO_EFFECT_COUNT };
+static const char *const no_effect_names[NO_EFFECT_COUNT]={"sceSharePlayInitialize"};
+static unsigned no_effect_calls[NO_EFFECT_COUNT];
+static int32_t no_effect(int api) {
+    pthread_mutex_lock(&lock); unsigned calls=++no_effect_calls[api]; pthread_mutex_unlock(&lock);
+    if (calls==1) printf("Service: %s accepted, no effect\n",no_effect_names[api]);
+    return 0;
+}
+/* (NULL, 0x1800) at eboot +0xed32e; the result is ignored. */
+static ABI int32_t shareplay_initialize(void *heap,uint64_t size) { (void)heap; (void)size; return no_effect(SHAREPLAY_INITIALIZE); }
+void runtime_services_report(void) {
+    pthread_mutex_lock(&lock);
+    printf("Runtime: no-effect services:");
+    for (int i=0;i<NO_EFFECT_COUNT;++i) printf(" %s=%u",no_effect_names[i],no_effect_calls[i]);
+    putchar('\n'); pthread_mutex_unlock(&lock);
+}
+
 /* ---- NetCtl / Net / Http / Ssl: no network ---- */
 static int32_t net_errno;
 static ABI int32_t net_init(void) { return 0; }
@@ -558,7 +578,7 @@ static const RuntimeExport exports[]={
     {"sceUserServiceGetInitialUser",user_initial}, {"sceUserServiceGetLoginUserIdList",user_list},
     {"sceUserServiceGetUserName",user_name}, {"sceUserServiceGetEvent",user_event},
     {"sceSystemServiceParamGetInt",system_param}, {"sceSystemServiceParamGetString",system_param_string},
-    {"sceSystemServiceGetStatus",system_status},
+    {"sceSystemServiceGetStatus",system_status}, {"sceSharePlayInitialize",shareplay_initialize},
     {"sceSystemServiceReceiveEvent",system_event}, {"sceSystemServiceHideSplashScreen",hide_splash},
     {"sceSystemServiceLaunchWebBrowser",launch_browser},
     {"sceSystemServiceGetDisplaySafeAreaInfo",safe_area}, {"sceSystemServiceDisableMusicPlayer",disable_music_player},

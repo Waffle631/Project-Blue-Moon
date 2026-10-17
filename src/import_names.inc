@@ -762,6 +762,7 @@
 {"U0kpGF1cl90#libSceVideodec","sceVideodecDeleteDecoder"},
 {"1n37q1Bvc5Y#libSceSystemService","sceSystemServiceGetDisplaySafeAreaInfo"},
 {"x1UB9bwDSOw#libSceSystemService","sceSystemServiceDisableMusicPlayer"},
+{"isruqthpYcw#libSceSharePlay","sceSharePlayInitialize"},
 {"HTrcDKlFKuM#libSceMsgDialog","sceMsgDialogClose"},
 {"wTpfglkmv34#libSceMsgDialog","sceMsgDialogProgressBarSetValue"},
 {"ERKzksauAJA#libSceSaveDataDialog","sceSaveDataDialogGetStatus"},

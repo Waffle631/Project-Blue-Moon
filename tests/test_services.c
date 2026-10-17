@@ -2,6 +2,7 @@
 #undef NDEBUG /* the checks are asserts; release builds define NDEBUG */
 #include "../src/runtime_services.c"
 #include <assert.h>
+#include <unistd.h>
 
 uintptr_t runtime_lookup(const RuntimeExport *table, size_t count, const char *nid) { (void)table; (void)count; (void)nid; return 0; }
 int gow3gpu_text_input_begin(const char *text, const char *prompt) { (void)text; (void)prompt; return 0; }
@@ -14,6 +15,16 @@ int gow3gpu_choice_begin(const char *title, const char *const *items, const char
 int gow3gpu_choice_poll(void) { return choice_next; }
 int runtime_savedata_param(int32_t user, const char *dir, void *param) { (void)user; (void)dir; (void)param; return -1; }
 int runtime_savedata_icon(int32_t user, const char *dir, char *out, size_t size) { (void)user; (void)dir; (void)out; (void)size; return -1; }
+
+/* Runs f with stdout sent to a temporary file and returns the number of lines it printed. */
+static int printed_lines(void (*f)(void)) {
+    fflush(stdout); FILE *tmp=tmpfile(); assert(tmp);
+    int saved=dup(1); assert(saved>=0 && dup2(fileno(tmp),1)>=0);
+    f(); fflush(stdout); dup2(saved,1); close(saved);
+    rewind(tmp); int lines=0,c; while ((c=fgetc(tmp))!=EOF) lines+=c=='\n';
+    fclose(tmp); return lines;
+}
+static void shareplay_twice(void) { assert(shareplay_initialize(NULL,0x1800)==0 && shareplay_initialize(NULL,0x1800)==0); }
 
 int main(void) {
     unsigned char param[128]={0}, result[64]={0}; /* the game zeroes the pointers it does not want */
@@ -88,6 +99,9 @@ int main(void) {
     assert(system_param_string(6,system_name,sizeof system_name)==0 && !strcmp(system_name,"PS4"));
     assert(system_param_string(6,system_name,3)==SYSTEM_PARAMETER && system_param_string(6,NULL,65)==SYSTEM_PARAMETER);
     assert(system_param_string(99,system_name,sizeof system_name)==SYSTEM_PARAMETER);
+    /* "No effect" services (Spec 3, 4.1): 0, a log line on the first call only, every call counted. */
+    assert(printed_lines(shareplay_twice)==1 && no_effect_calls[SHAREPLAY_INITIALIZE]==2);
+    assert(printed_lines(shareplay_twice)==0 && no_effect_calls[SHAREPLAY_INITIALIZE]==4);
     puts("services test: ok");
     return 0;
 }
