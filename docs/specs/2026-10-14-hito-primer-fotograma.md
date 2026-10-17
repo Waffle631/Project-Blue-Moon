@@ -1,6 +1,6 @@
 # Hito — Primer fotograma (y herramienta de captura de píxeles)
 
-Fecha: 2026-10-14. Estado: **borrador para aprobación**. Roadmap: `.waffle/ROADMAP.md`, sección "Hito".
+Fecha: 2026-10-14. Estado: **borrador para aprobación**. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Hito".
 
 Marcas: **[V]** comprobado en el repo; **[D]** decisión del usuario.
 

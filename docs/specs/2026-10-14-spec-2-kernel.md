@@ -1,6 +1,6 @@
 # Spec 2 — Kernel: arranque de libc, event flags, tiempo, hilos y archivos
 
-Fecha: 2026-10-14. Estado: **borrador para aprobación**. Roadmap: `.waffle/ROADMAP.md`, sección "Spec 2".
+Fecha: 2026-10-14. Estado: **borrador para aprobación**. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 2".
 
 Marcas usadas en este documento: **[V]** hecho comprobado en el repo o en los logs (con el comando o
 la ruta); **[H]** hipótesis que hay que confirmar antes de implementar (cada una tiene su paso de
@@ -187,8 +187,8 @@ Diagnóstico: `GOW3_TRACE_EVENTFLAG` imprime las esperas bloqueantes (igual que 
 | `sceKernelIsNeoMode` | 0 | El runtime representa una PS4 base. Neo hace que algunos juegos pidan más resolución y memoria |
 | `sceKernelIsAddressSanitizerEnabled` | 0 | No hay sanitizer |
 | `sceKernelGetSanitizerMallocReplaceExternal` / `...NewReplaceExternal` **[H]** | devuelven "no hay reemplazo" | libc consulta si el malloc está reemplazado; la forma exacta (valor devuelto o parámetro de salida) sale del sitio de llamada |
-| `sceKernelGetModuleInfoForUnwind` **[H]** | error explícito (`ESRCH`) hasta que el juego lo necesite de verdad | Lo usa el desenrollado de excepciones de C++. Devolver datos falsos corrompería el desenrollado. Si el juego lanza excepciones, aparecerá como fallo claro y se implementa con los datos reales de `probe.c` |
-| `sceKernelInternalMemoryGetModuleSegmentInfo` **[H]** | igual: error explícito hasta ver el sitio de llamada | |
+| `sceKernelGetModuleInfoForUnwind` | trampa (`STOP:`) hasta que el juego la llame (decidido, sección 9) | Lo usa el desenrollado de excepciones de C++. Devolver datos falsos corrompería el desenrollado. Si el juego lanza excepciones, aparecerá como `STOP:` y se implementa con los datos reales de `probe.c` |
+| `sceKernelInternalMemoryGetModuleSegmentInfo` | igual: trampa hasta ver el sitio de llamada | |
 
 Estas respuestas no son éxito simulado: devuelven un valor definido y se registran en el log la
 primera vez que se llaman.
@@ -277,8 +277,8 @@ nuevo). Windows: comprobar si `gpu/CMakeLists.txt` enumera `runtime_*.c` explíc
   roadmap. Mitigación: el paso 5.2 antes de escribir código, el test 5 (orden de limpieza) y el de estrés.
 - Los callbacks de hilo se ejecutan código del juego en el camino de salida de un hilo del host: hay
   que cuidar que el TCB y el TLS sigan vivos en ese momento.
-- ¿Se acepta que `sceKernelIsNeoMode` devuelva 0? Se propone 0 (PS4 base). Si el juego tuviera un camino
-  mejor para Neo no importa para la Alpha.
-- Pregunta para el usuario: ¿se acepta dejar `scePthreadCancel`, `GetModuleInfoForUnwind` y
-  `InternalMemoryGetModuleSegmentInfo` como trampa hasta que el juego las llame, en vez de
-  implementarlas "por si acaso"? Es la opción que respeta la regla de no fingir éxito.
+- **Decidido (2026-10-17, usuario):** `sceKernelIsNeoMode` devuelve 0 (PS4 base). Si el juego tuviera
+  un camino mejor para Neo, no importa para la Alpha.
+- **Decidido (2026-10-17, usuario):** `scePthreadCancel`, `GetModuleInfoForUnwind` y
+  `InternalMemoryGetModuleSegmentInfo` quedan como trampa (`STOP:`) hasta que el juego las llame, en vez
+  de implementarlas "por si acaso". Es la opción que respeta la regla de no fingir éxito.

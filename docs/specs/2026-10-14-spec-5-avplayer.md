@@ -1,6 +1,6 @@
 # Spec 5 — Vídeo: AvPlayer
 
-Fecha: 2026-10-14. Estado: **borrador para aprobación**. Roadmap: `.waffle/ROADMAP.md`, sección "Spec 5".
+Fecha: 2026-10-14. Estado: **borrador para aprobación**. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 5".
 Depende de: Specs 2 y 3 (el juego tiene que llegar a pedir un vídeo).
 
 Marcas: **[V]** comprobado; **[H]** hipótesis a confirmar con el primer vídeo.

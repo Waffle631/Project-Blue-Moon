@@ -1,6 +1,6 @@
 # Spec 1a — Eliminar hooks, patches, touchpad, tests e identidad de GoW3
 
-Fecha: 2026-10-14. Estado: **borrador para aprobación**. Roadmap: `.waffle/ROADMAP.md`, sección "Spec 1a".
+Fecha: 2026-10-14. Estado: **borrador para aprobación**. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 1a".
 
 Marcas: **[V]** comprobado en el repo (comando indicado); **[D]** decisión que debe tomar el usuario.
 

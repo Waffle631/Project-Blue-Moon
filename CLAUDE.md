@@ -23,7 +23,7 @@ GoW3-only features (orb/damage hooks, actors, enemy health bar, GoW3 patches XML
 heuristics, touchpad semantics, GoW3-only tests) must be **deleted** from the tree, not disabled,
 isolated or adapted: no dead code behind a switch. GoW3 stops being a supported title on this
 branch (history stays in git and the `gow3` branch). Generic code (loader, runtime, shadPS4 core,
-upscalers) stays. Order of work and acceptance criteria: `.waffle/ROADMAP.md` (kernel Spec 2 first; Spec 1a deletes
+upscalers) stays. Order of work and acceptance criteria: `docs/tsuki/ROADMAP.md` (kernel Spec 2 first; Spec 1a deletes
 hooks/patches early; a "first frame" milestone gates Spec 1b, which deletes the renderer heuristics
 with before/after captures; the `gow3` → `tsuki` rename is Spec 7, done last).
 
@@ -49,7 +49,7 @@ with before/after captures; the `gow3` → `tsuki` rename is Spec 7, done last).
   and picks it from the system language (`sceSystemServiceParamGetInt`); `runtime_services.c`
   already reports 1 = English (US) unless `GOW3_LANGUAGE` overrides it. Japanese and the other
   languages are not a goal.
-- Roadmap (Spanish): `.waffle/ROADMAP.md` — stages, specs and the full missing-API table.
+- Roadmap (Spanish): `docs/tsuki/ROADMAP.md` — stages, specs and the full missing-API table.
 - Dev/test machine: Bazzite 44 (Fedora-based, immutable), KDE Plasma 6 on Wayland, Ryzen 5 7600,
   16 GiB RAM, **AMD Radeon RX 6650 XT** (RADV). Linux is the primary platform; Windows comes later.
 - Build environment: everything is built and tested inside the Fedora 44 distrobox `ps4dev`
@@ -190,5 +190,5 @@ bound to a GOT slot. Frame capture: `GOW3_FRAME_CAPTURE_KEY` (F11). The full log
   `;`, few braces) — match the surrounding file. Comments explain why, often referencing the
   file that depends on a contract.
 - User-facing docs: `README.md` (English) and `README.pt-BR.md` must stay in sync;
-  progress lives in `docs/gow3/ROADMAP.md` (Portuguese).
+  progress lives in `docs/tsuki/ROADMAP.md` (Spanish; `docs/gow3/ROADMAP.md` is the historical GoW3 one, in Portuguese).
 - Repo is only local, so u can do commits or create a branch to test something

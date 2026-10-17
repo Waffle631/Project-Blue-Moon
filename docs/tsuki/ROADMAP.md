@@ -351,7 +351,7 @@ Native libc initialization is incomplete; game entry has not run.
 
 ### Spec 2 — Kernel: event flags, tiempo e hilos
 
-> Spec detallada: [docs/specs/2026-10-14-spec-2-kernel.md](../docs/specs/2026-10-14-spec-2-kernel.md)
+> Spec detallada: [docs/specs/2026-10-14-spec-2-kernel.md](../specs/2026-10-14-spec-2-kernel.md)
 
 **Problema:** faltan 29 APIs de `libkernel`. Las más importantes son los **event flags**, que el
 runtime no implementa (están en la lista de "no implementado" del proyecto) y que el juego usa para
@@ -368,8 +368,9 @@ hasta que está hecha, y nada más (renderizado, audio, vídeo) se puede observa
 2. Tiempo: `GetProcessTimeCounter(+Frequency)`, conversiones UTC ↔ hora local.
 3. Hilos: variantes POSIX de `pthread_rwlock_*` (reutilizar `src/runtime_rwlock.c`, que ya existe),
    `scePthreadCancel`, `scePthreadGetname`, `_sceKernelSetThreadDtors/AtexitCount/AtexitReport`.
-4. Respuestas explícitas: `IsNeoMode` (0 o 1, decidir), sanitizer desactivado, info de módulo para
-   unwind, `Getdents`/`Utimes`/`Chmod` sobre los montajes del runtime.
+4. Respuestas explícitas: `IsNeoMode` = 0 (PS4 base, decidido el 2026-10-17), sanitizer desactivado,
+   `Getdents`/`Utimes`/`Chmod` sobre los montajes del runtime. `scePthreadCancel` y la info de módulo
+   para unwind quedan como trampa hasta que el juego las llame (decidido el 2026-10-17).
 5. Identificar los 3 NIDs sin nombre (desensamblar el sitio de llamada o buscar en aerolib).
 6. **Servicios mínimos para arrancar:** si el siguiente `STOP:` es de una API de la Spec 3
    (por ejemplo `Sysmodule` o `SystemService`), se adelanta aquí lo imprescindible para seguir. El
@@ -395,7 +396,7 @@ u otro test C.
 
 ### Spec 1a — Eliminar hooks, patches, touchpad, tests e identidad de GoW3
 
-> Spec detallada: [docs/specs/2026-10-14-spec-1a-borrar-hooks-y-patches.md](../docs/specs/2026-10-14-spec-1a-borrar-hooks-y-patches.md)
+> Spec detallada: [docs/specs/2026-10-14-spec-1a-borrar-hooks-y-patches.md](../specs/2026-10-14-spec-1a-borrar-hooks-y-patches.md)
 
 **Problema:** el código asume God of War III en el título, el serial, los patches, los hooks y los
 tests. Dejarlo desactivado confunde el diagnóstico (el log de arranque ya muestra diez líneas de
@@ -442,7 +443,7 @@ los tests y fuentes eliminados.
 
 ### Hito — Primer fotograma
 
-> Spec detallada: [docs/specs/2026-10-14-hito-primer-fotograma.md](../docs/specs/2026-10-14-hito-primer-fotograma.md)
+> Spec detallada: [docs/specs/2026-10-14-hito-primer-fotograma.md](../specs/2026-10-14-hito-primer-fotograma.md)
 
 **Qué es:** el momento en que el juego, tras la Spec 2, llega a emitir comandos de dibujo. No es una
 spec: es un punto de control para decidir el resto con datos reales. Hoy no hay ninguna señal sobre
@@ -474,7 +475,7 @@ cómo dibuja este juego en el traductor de GPU, y es la mayor incógnita del pro
 
 ### Spec 1b — Eliminar las heurísticas de GPU de GoW3
 
-> Spec detallada: [docs/specs/2026-10-14-spec-1b-heuristicas-gpu.md](../docs/specs/2026-10-14-spec-1b-heuristicas-gpu.md)
+> Spec detallada: [docs/specs/2026-10-14-spec-1b-heuristicas-gpu.md](../specs/2026-10-14-spec-1b-heuristicas-gpu.md)
 
 **Problema:** el traductor de GPU conserva ajustes pensados para God of War III: `gbuffer_draw`, la
 constante de cámara de 864 bytes, la decisión de MSAA por vendor y `GOW3_READBACK_LINEAR=1` por
@@ -512,7 +513,7 @@ tiene forma de comprobarse. Por eso esta spec va después del hito.
 
 ### Spec 3 — Servicios del sistema que faltan
 
-> Spec detallada: [docs/specs/2026-10-14-spec-3-servicios.md](../docs/specs/2026-10-14-spec-3-servicios.md)
+> Spec detallada: [docs/specs/2026-10-14-spec-3-servicios.md](../specs/2026-10-14-spec-3-servicios.md)
 
 **Problema:** APIs de plataforma que un juego offline no necesita de verdad, pero que el juego
 llama: capturas, Share Play, streaming, grabación, saves con copia de seguridad, etc.
@@ -555,7 +556,7 @@ esa línea de log.
 
 ### Spec 4 — Audio (Audiodec / AudiodecCpu)
 
-> Spec detallada: [docs/specs/2026-10-14-spec-4-audiodec.md](../docs/specs/2026-10-14-spec-4-audiodec.md)
+> Spec detallada: [docs/specs/2026-10-14-spec-4-audiodec.md](../specs/2026-10-14-spec-4-audiodec.md)
 
 **Problema:** Tsukihime no usa AJM sino `libSceAudiodec` y `libSceAudiodecCpu`, que el runtime no
 tiene. **No hay una implementación HLE de referencia:** el shadPS4 upstream carga el firmware real
@@ -604,7 +605,7 @@ se para y se decide con el usuario qué hacer antes de seguir. No se alarga en s
 
 ### Spec 5 — Vídeo (AvPlayer)
 
-> Spec detallada: [docs/specs/2026-10-14-spec-5-avplayer.md](../docs/specs/2026-10-14-spec-5-avplayer.md)
+> Spec detallada: [docs/specs/2026-10-14-spec-5-avplayer.md](../specs/2026-10-14-spec-5-avplayer.md)
 
 **Problema:** los 134 vídeos (`image/movie/*.mp4`: openings, títulos de capítulo, finales, créditos)
 pasan por `sceAvPlayer`, que viene de shadPS4 y en gow3 apenas se usó. Hay versiones por idioma
@@ -632,7 +633,7 @@ a través de `runtime_file.c`.
 
 ### Spec 6 — 2D correcto, ratón y saves
 
-> Spec detallada: [docs/specs/2026-10-14-spec-6-2d-raton-saves.md](../docs/specs/2026-10-14-spec-6-2d-raton-saves.md)
+> Spec detallada: [docs/specs/2026-10-14-spec-6-2d-raton-saves.md](../specs/2026-10-14-spec-6-2d-raton-saves.md)
 
 **Problema:** el traductor de gráficos se ajustó para un juego 3D. En una novela visual los
 defectos típicos son otros: texto ilegible o con bordes rotos, transiciones (fundidos, máscaras)
@@ -685,7 +686,7 @@ a audio y vídeo: los logos ya son 2D. Se cierra cuando están hechas las specs 
 
 ### Spec 7 — Renombrar `gow3` a `tsuki`
 
-> Spec detallada: [docs/specs/2026-10-14-spec-7-renombrado.md](../docs/specs/2026-10-14-spec-7-renombrado.md)
+> Spec detallada: [docs/specs/2026-10-14-spec-7-renombrado.md](../specs/2026-10-14-spec-7-renombrado.md)
 
 **Problema:** todos los nombres estáticos del proyecto dicen `gow3`. Es un cambio mecánico pero grande
 (2551 líneas en 290 archivos, 194 variables de entorno distintas, 40 archivos con `gow3` en el nombre).
@@ -826,6 +827,6 @@ Ideas para versiones siguientes, sin compromiso:
 - [shadPS4](https://github.com/shadps4-emu/shadPS4), origen del traductor de gráficos y del AvPlayer;
   referencia para la semántica de event flags y de los servicios. **No sirve de referencia para
   Audiodec:** upstream carga el firmware real en vez de reimplementarlo.
-- Roadmap de God of War III: [docs/gow3/ROADMAP.md](../docs/gow3/ROADMAP.md) (histórico; se puede borrar junto con el resto de GoW3).
-- Documentos internos: [CLAUDE.md](../CLAUDE.md), [mods](../docs/MODS.md),
-  [Windows](../packaging/windows/README.md).
+- Roadmap de God of War III: [docs/gow3/ROADMAP.md](../gow3/ROADMAP.md) (histórico; se puede borrar junto con el resto de GoW3).
+- Documentos internos: [CLAUDE.md](../../CLAUDE.md), [mods](../MODS.md),
+  [Windows](../../packaging/windows/README.md).

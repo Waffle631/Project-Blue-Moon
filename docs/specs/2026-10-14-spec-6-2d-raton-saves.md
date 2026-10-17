@@ -1,6 +1,6 @@
 # Spec 6 — 2D correcto, ratón, saves e idioma
 
-Fecha: 2026-10-14. Estado: **borrador para aprobación**. Roadmap: `.waffle/ROADMAP.md`, sección "Spec 6".
+Fecha: 2026-10-14. Estado: **borrador para aprobación**. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 6".
 Empieza tras el hito de primer fotograma; se cierra cuando están hechas las Specs 1b, 3, 4 y 5.
 
 Marcas: **[V]** comprobado en el repo; **[H]** hipótesis a confirmar; **[D]** decisión del usuario.

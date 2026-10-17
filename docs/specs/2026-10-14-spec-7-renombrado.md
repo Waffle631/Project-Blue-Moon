@@ -1,6 +1,6 @@
 # Spec 7 — Renombrar `gow3` a `tsuki`
 
-Fecha: 2026-10-14. Estado: **borrador para aprobación**. Roadmap: `.waffle/ROADMAP.md`, sección "Spec 7".
+Fecha: 2026-10-14. Estado: **borrador para aprobación**. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 7".
 Depende de: Spec 6 (el recorrido grabado y las capturas son el oráculo del renombrado).
 
 Marcas: **[V]** comprobado el 2026-10-14; **[D]** decisión del usuario.

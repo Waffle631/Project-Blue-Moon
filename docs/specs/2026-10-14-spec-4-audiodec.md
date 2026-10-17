@@ -1,6 +1,6 @@
 # Spec 4 — Audio: Audiodec y AudiodecCpu
 
-Fecha: 2026-10-14. Estado: **borrador para aprobación**. Roadmap: `.waffle/ROADMAP.md`, sección "Spec 4".
+Fecha: 2026-10-14. Estado: **borrador para aprobación**. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 4".
 
 Marcas: **[V]** comprobado; **[H]** hipótesis a confirmar en la Fase A; **[D]** decisión del usuario.
 
