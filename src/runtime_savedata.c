@@ -68,7 +68,7 @@ static char title_id[16]="UNKNOWN";
 static struct { int used; char host[700], meta[700]; } slots[SLOTS];
 static char memory_path[720];
 static uint64_t memory_size;
-static size_t mounts_done, memory_writes;
+static size_t mounts_done, memory_writes, umounts_with_backup;
 
 void runtime_savedata_configure(const char *title) {
     if (title && *title) snprintf(title_id,sizeof(title_id),"%s",title);
@@ -190,6 +190,14 @@ static ABI int32_t save_umount(const MountPoint *point) {
     if (slot>=0) { runtime_file_unmount(point->data); slots[slot].used=0; }
     pthread_mutex_unlock(&lock);
     return slot>=0 ? 0 : ERR_NOT_FOUND;
+}
+/* Spec 3 (4.4): unmounts like sceSaveDataUmount but keeps no backup copy, so CheckBackupData and
+ * RestoreBackupData have nothing to find. The game ignores the result (eboot +0x1214e2). */
+static ABI int32_t save_umount_backup(const MountPoint *point) {
+    int32_t result=save_umount(point);
+    pthread_mutex_lock(&lock); size_t calls=++umounts_with_backup; pthread_mutex_unlock(&lock);
+    if (calls==1) puts("Runtime: sceSaveDataUmountWithBackup unmounts without keeping a backup copy");
+    return result;
 }
 static ABI int32_t save_set_param(const MountPoint *point, uint32_t type, const void *buffer, uint64_t size) {
     if (!initialized) return ERR_NOT_INITIALIZED;
@@ -335,11 +343,14 @@ static const RuntimeExport exports[]={
     {"sceSaveDataInitialize",save_initialize}, {"sceSaveDataInitialize2",save_initialize},
     {"sceSaveDataInitialize3",save_initialize}, {"sceSaveDataTerminate",save_terminate},
     {"sceSaveDataMount",save_mount}, {"sceSaveDataMount2",save_mount2}, {"sceSaveDataUmount",save_umount},
+    {"sceSaveDataUmountWithBackup",save_umount_backup},
     {"sceSaveDataSetParam",save_set_param}, {"sceSaveDataSaveIcon",save_icon}, {"sceSaveDataDelete",save_delete},
     {"sceSaveDataDirNameSearch",save_search},
     {"sceSaveDataSetupSaveDataMemory",memory_setup}, {"sceSaveDataGetSaveDataMemory",memory_get},
     {"sceSaveDataSetSaveDataMemory",memory_set},
 };
 uintptr_t runtime_savedata_resolve(const char *name) { return RUNTIME_LOOKUP(exports,name); }
-void runtime_savedata_report(void) { printf("Runtime: save data mounts=%zu, memory writes=%zu\n",mounts_done,memory_writes); }
+void runtime_savedata_report(void) {
+    printf("Runtime: save data mounts=%zu, memory writes=%zu, unmounts without backup=%zu\n",mounts_done,memory_writes,umounts_with_backup);
+}
 

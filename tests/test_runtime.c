@@ -234,6 +234,21 @@ static void savedata_mount2(void) {
     Mount2 m={1,0,dir,0x60,1,{0}};
     assert(mount && (uint32_t)mount(&m,result)==0x809F0008 && (uint32_t)mount(NULL,result)==0x809F0000);
 }
+/* Spec 3 (4.4): sceSaveDataUmountWithBackup unmounts like sceSaveDataUmount and keeps no backup. The
+   game calls it on the mount point it just created (eboot +0x1214e2) and ignores the result. */
+static void savedata_umount_with_backup(void) {
+    typedef struct { int32_t user,pad; const char *dir; uint64_t blocks; uint32_t mode; uint8_t reserved[36]; } Mount2;
+    typedef int32_t (ABI *Mount)(const Mount2 *,void *);
+    typedef int32_t (ABI *Umount)(const void *);
+    Mount mount=GET(Mount,"0z45PIH+SNI#libSceSaveData");
+    Umount backup=GET(Umount,"VwadwBBBJ80#libSceSaveData"),umount=GET(Umount,"BMR4F-Uek3E#libSceSaveData");
+    char user[]="out/savedata-test-XXXXXX",dir[32]="savedata000",result[64],cmd[64];
+    assert(mkdtemp(user)); runtime_file_configure("out",user);
+    Mount2 m={1,0,dir,0x60,4,{0}}; /* CREATE */
+    assert(mount && backup && umount && mount(&m,result)==0 && !strncmp(result,"/savedata",9));
+    assert(backup(result)==0 && (uint32_t)backup(result)==0x809F0008 && (uint32_t)umount(result)==0x809F0008);
+    snprintf(cmd,sizeof cmd,"rm -rf %s",user); assert(system(cmd)==0);
+}
 /* Spec 3: fJgP+wqifno is DiscMap 0x7C980FFB0AA27E7A (the NID's bytes). libSceFios2.prx asks it for a
    file's LBA package location (call at +0x3411a) and takes its fallback path on any nonzero result.
    Like its twin ioKMruft1ek, it reports that no disc bitmap exists and leaves the outputs alone. */
@@ -481,7 +496,7 @@ int main(int argc,char **argv) {
     if (argc>1 && !strcmp(argv[1],"--rtld-underflow")) {
         static int dso; GET(DsoCount,"8OnWXlgQlvo#libkernel")(&dso); return 99;
     }
-    libc_support(); posix_mutexes(); wall_time(); kernel_time_names(); sanitizer_and_neo(); heap_trace_info(); audiodec_provisional(); savedata_initialize3(); savedata_mount2(); discmap_location(); exit_handlers(); guards(); mutexes(); direct_memory(); memory_primitives();
+    libc_support(); posix_mutexes(); wall_time(); kernel_time_names(); sanitizer_and_neo(); heap_trace_info(); audiodec_provisional(); savedata_initialize3(); savedata_mount2(); savedata_umount_with_backup(); discmap_location(); exit_handlers(); guards(); mutexes(); direct_memory(); memory_primitives();
     rw_lifecycle(); rw_concurrency(); rw_timeouts();
     puts("PASS: callback lifecycle, guard ABI, mutex errors, shared direct memory, memory primitives, resolver scope");
     return 0;

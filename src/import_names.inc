@@ -445,6 +445,7 @@
 {"S1GkePI17zQ#libSceSaveData","sceSaveDataDelete"},
 {"32HQAQdwM2o#libSceSaveData","sceSaveDataMount"},
 {"BMR4F-Uek3E#libSceSaveData","sceSaveDataUmount"},
+{"VwadwBBBJ80#libSceSaveData","sceSaveDataUmountWithBackup"},
 {"7Bt5pBC-Aco#libSceSaveData","sceSaveDataGetSaveDataMemory"},
 {"h3YURzXGSVQ#libSceSaveData","sceSaveDataSetSaveDataMemory"},
 {"s9e3+YpRnzw#libSceSaveDataDialog","sceSaveDataDialogInitialize"},
