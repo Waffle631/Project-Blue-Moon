@@ -12,7 +12,7 @@ gow3_pc (God of War III Remastered), que a su vez viene de
 | Plataforma | Linux primero (máquina de desarrollo), Windows 10/11 después; Vulkan 1.3 |
 | Máquina de pruebas | Bazzite 44 (KDE Plasma 6.7, Wayland), AMD Ryzen 5 7600, 16 GB, **AMD Radeon RX 6650 XT** |
 | Dump | `Tsukihime/CUSA47999/` (sin versionar, ~45 GB) |
-| Última actualización | 2026-10-14. Revisión del orden tras un análisis adversarial: el kernel va primero, hay un hito de "primer fotograma", el borrado se parte en dos y el renombrado pasa al final. Lo específico de GoW3 se elimina, no se desactiva |
+| Última actualización | 2026-10-17. La Spec 2 está en su fase 2A, guiada por los `STOP:` (5 iteraciones; el juego ya ejecuta su propio código). La Spec 4 se replantea en dos partes: **4a ATRAC9** (música, voces y efectos `vse`) y **4b HEVAG** (19 efectos de `vag.mrg`). 2026-10-14: revisión del orden tras un análisis adversarial (el kernel va primero, hay un hito de "primer fotograma", el borrado se parte en dos y el renombrado pasa al final; lo específico de GoW3 se elimina, no se desactiva) |
 
 ---
 
@@ -65,7 +65,7 @@ audio.
 | SDK | — | 11.008 (`sdk_ver=11008000`, publicado el 2025-09-19) |
 | Imagen del eboot | — | 34 MB, entrada `0xef390`, relocaciones tipo 1/7/8 (dentro de los límites del loader) |
 | Imports | 387 | 337 (359 quedan al runtime tras enlazar `libc.prx` y `libSceFios2.prx`) |
-| Audio | AJM (ATRAC9 + MP3) | **libSceAudiodec + libSceAudiodecCpu** (no usa AJM) |
+| Audio | AJM (ATRAC9 + MP3) | **libSceAudiodec + libSceAudiodecCpu** (no usa AJM): ATRAC9 en música, voces y efectos `vse`; **HEVAG** en los 19 efectos de `vag.mrg` |
 | Vídeo | `sceVideodec` (H.264 de bajo nivel) | **`sceAvPlayer`** (134 `.mp4` en `image/movie/`, 4,5 GB) |
 | Entrada | Mando, teclado | Mando, teclado **y ratón** (`libSceMouse`) |
 | Datos | WAD | `image/*.hed/.mrg/.nam` (`allpac*`, `bgm`, `voice*`, `vag`, `se_nam`, `script_text`, fuentes `ft_*.mrg`) |
@@ -127,7 +127,7 @@ segundos los juzga el usuario jugando.
 - [ ] El juego arranca en inglés: el log de archivos abiertos muestra recursos `_en` y la fuente
   `ft_en`, y ninguno de otro idioma.
 - [ ] El save se graba y se carga tras reiniciar el juego (archivo de save presente y estado restaurado).
-- [ ] La decodificación de audio produce el mismo PCM que FFmpeg/LibAtrac9 en un clip de referencia (test C).
+- [ ] La decodificación de audio produce el mismo PCM que LibAtrac9 en un clip ATRAC9 de referencia, y el decodificador HEVAG pasa su test (tests C).
 
 **Los juzga el usuario**
 
@@ -161,17 +161,18 @@ partida. Se corrige después del hito de primer fotograma, que es el primer mome
 |---|---|---|---|---|---|
 | 0 | Preparar el entorno (Linux) | Setup | — | — | ✅ Concluida |
 | 1 | Inventario de APIs faltantes | Diagnóstico | 0 | — | ✅ Concluida |
-| 2 | Kernel: event flags, tiempo, hilos (y lo mínimo de servicios para arrancar) | **Spec 2** | 1 | 3–5 días | ⬜ Pendiente |
+| 2 | Kernel: event flags, tiempo, hilos (y lo mínimo de servicios para arrancar) | **Spec 2** | 1 | 3–5 días | 🟨 En curso (fase 2A) |
 | 3 | Borrar hooks, patches, touchpad, tests e identidad de GoW3 | **Spec 1a** | 1 (en paralelo con la Spec 2) | 1–2 días | ⬜ Pendiente |
 | 4 | **Hito: primer fotograma** | Hito | Spec 2 | 1 día | ⬜ Pendiente |
 | 5 | Borrar las heurísticas de GPU de GoW3 | **Spec 1b** | Spec 1a, hito | 2–3 días | ⬜ Pendiente |
-| 6 | Servicios del sistema que faltan | **Spec 3** | Spec 2 | 2–3 días | ⬜ Pendiente |
-| 7 | Audio (Audiodec / AudiodecCpu), con investigación previa | **Spec 4** | Spec 2 | 1–2 semanas, sin tope | ⬜ Pendiente |
+| 6 | Servicios del sistema que faltan | **Spec 3** | Spec 2 | 2–3 días | 🟨 En curso (5 APIs adelantadas en la Spec 2) |
+| 7a | Audio ATRAC9 (`libSceAudiodec`): música → voces → efectos `vse`, con investigación previa | **Spec 4a** | Spec 2 | 1–2 semanas, sin tope | ⬜ Pendiente (respuesta provisional de `InitLibrary` hecha en la Spec 2) |
+| 7b | Audio HEVAG (`libSceAudiodecCpu`): efectos de `vag.mrg`, con investigación previa | **Spec 4b** | Spec 4a (música y voces) | sin estimar, sin tope | ⬜ Pendiente |
 | 8 | Vídeo (AvPlayer) | **Spec 5** | Specs 2 y 3 | 2–4 días | ⬜ Pendiente |
 | 9 | 2D correcto, ratón y saves | **Spec 6** | Hito (empieza), Specs 1b, 3, 4 y 5 (cierra) | 1–3 semanas | ⬜ Pendiente |
 | 10 | Renombrar `gow3` → `tsuki` | **Spec 7** | Spec 6 | 2–3 días | ⬜ Pendiente |
 
-**Total: 8 specs y 1 hito** (pueden crecer según lo que aparezca al ejecutar el juego).
+**Total: 8 specs (la 4 en dos partes) y 1 hito** (pueden crecer según lo que aparezca al ejecutar el juego).
 
 Leyenda de estado: ⬜ Pendiente · 🟨 En curso · ✅ Concluida · ⛔ Bloqueada
 
@@ -184,13 +185,15 @@ flowchart LR
     S1A --> S1B[Spec 1b<br/>Borrar heurísticas GPU]
     H --> S1B
     S2 --> S3[Spec 3<br/>Servicios]
-    S2 --> S4[Spec 4<br/>Audio]
+    S2 --> S4A[Spec 4a<br/>Audio ATRAC9]
+    S4A --> S4B[Spec 4b<br/>Audio HEVAG]
     S2 --> S5[Spec 5<br/>Vídeo]
     S3 --> S5
     H --> S6[Spec 6<br/>2D + ratón + saves]
     S1B --> S6
     S3 --> S6
-    S4 --> S6
+    S4A --> S6
+    S4B --> S6
     S5 --> S6
     S6 --> S7[Spec 7<br/>Renombrar a tsuki]
     S7 --> A((Alpha))
@@ -283,8 +286,8 @@ AvPlayer existen en las tablas de shadPS4; **~61 sin implementación**.
 | Biblioteca | Faltan | Funciones | Spec |
 |---|---|---|---|
 | libkernel | 29 | Event flags (Create, Delete, Wait, Set, Cancel); GetProcessTimeCounter(+Frequency); ConvertUtcToLocaltime / LocaltimeToUtc; IsNeoMode; `_sceKernelSetThreadDtors`, `SetThreadAtexitCount`, `SetThreadAtexitReport`; GetSanitizerMalloc/NewReplaceExternal, IsAddressSanitizerEnabled; InternalMemoryGetModuleSegmentInfo, GetModuleInfoForUnwind; Getdents, Utimes, Chmod; `scePthreadCancel`, `scePthreadGetname`; `pthread_rwlock_rdlock/wrlock/unlock`; 3 sin nombre (`NhpspxdjEKU`, `Tz4RNUCBbGI`, `8OnWXlgQlvo`) | 2 |
-| libSceAudiodec | 6 | InitLibrary, TermLibrary, CreateDecoder, DeleteDecoder, Decode, ClearContext | 4 |
-| libSceAudiodecCpu | 3 | QueryMemSize, InitDecoder, Decode | 4 |
+| libSceAudiodec | 6 | InitLibrary, TermLibrary, CreateDecoder, DeleteDecoder, Decode, ClearContext | 4a |
+| libSceAudiodecCpu | 3 | QueryMemSize, InitDecoder, Decode | 4b |
 | libSceSaveData | 5 | Initialize3, Mount2, UmountWithBackup, CheckBackupData, RestoreBackupData | 3 |
 | libSceScreenShot | 3 | Enable, Disable, SetOverlayImageWithOrigin | 3 |
 | libSceSharePlay | 3 | Initialize, Terminate, SetProhibition | 3 |
@@ -386,9 +389,17 @@ u otro test C.
   condición o expire el timeout, con los códigos de error de la PS4.
 - Nunca se debe fingir éxito en una API cuyo resultado el juego use.
 
+**Estado (2026-10-17):** hechos los callbacks de hilo de libc, las respuestas del sanitizer y de Neo,
+`_nanosleep`, los nombres de ProcessTimeCounter y los event flags. Además se adelantaron de la Spec 3
+`sceLibcHeapGetTraceInfo`, `ParamGetString`, `LoadModuleInternalWithArg`, `SaveDataInitialize3` y
+`SharePlayInitialize`. El juego pasa la init de `libc` y de Fios2, entra en su código y no ha vuelto a
+pararse en libkernel. La fase 2A va por la iteración 5: el siguiente `STOP:` es
+`sceGameLiveStreamingInitialize` (registro en la spec, sección 4.1). Por el camino, el juego llama a
+Audiodec **antes del primer draw**; se responde con un error provisional, que el juego ignora.
+
 **Criterios de aceptación**
 
-- [ ] Test C de event flags: AND, OR, CLEAR_ALL, CLEAR_PAT, timeout, cancel, varios hilos.
+- [x] Test C de event flags: AND, OR, CLEAR_ALL, CLEAR_PAT, timeout, cancel, varios hilos.
 - [ ] El juego pasa del arranque a los logos sin `STOP:` de libkernel.
 - [ ] Se llega al hito de primer fotograma (ver abajo).
 
@@ -465,7 +476,7 @@ cómo dibuja este juego en el traductor de GPU, y es la mayor incógnita del pro
 |---|---|
 | Se ve bien (logo legible, colores correctos) | Seguir con el orden previsto |
 | Se ve mal o negro, pero hay draws | Abrir una spec de renderizado **antes** de las specs 4 y 5 |
-| No llega a pintar | Es el siguiente `STOP:` o `Fault:`: volver a las specs 2 y 3 |
+| No llega a pintar | Es el siguiente `STOP:` o `Fault:`: volver a las specs 2 y 3 (o a la fase A de la Spec 4a si lo que bloquea es Audiodec, que se llama antes del primer draw) |
 
 5. **Revisar este roadmap:** re-estimar el esfuerzo de las specs restantes con lo que se haya visto.
 
@@ -554,39 +565,50 @@ esa línea de log.
 
 ---
 
-### Spec 4 — Audio (Audiodec / AudiodecCpu)
+### Spec 4 — Audio: ATRAC9 (4a) y HEVAG (4b)
 
 > Spec detallada: [docs/specs/2026-10-14-spec-4-audiodec.md](../specs/2026-10-14-spec-4-audiodec.md)
+> (replanteada el 2026-10-17)
 
 **Problema:** Tsukihime no usa AJM sino `libSceAudiodec` y `libSceAudiodecCpu`, que el runtime no
-tiene. **No hay una implementación HLE de referencia:** el shadPS4 upstream carga el firmware real
-(`libSceAudiodec.sprx` en `sys_modules`), no lo reimplementa. La ABI, las estructuras, el modelo de
-buffers y los códigos de error hay que deducirlos del propio juego. Por eso esta spec empieza como
-investigación, sin tope de tiempo (es un experimento y un hobby). Hay que averiguar además qué códec piden (ATRAC9, MP3,
-AAC o M4AAC) para BGM, voces y efectos (`bgm.mrg`, `voice*.mrg`, `vag.mrg`, `se_nam.mrg`).
+tiene. El inventario del dump (2026-10-17) muestra que **casi todo es ATRAC9**: la música (`bgm.mrg`,
+132 pistas estéreo), las voces (`voice.mrg`, mono, comprimidas con MZX) y los efectos de `vse.mrg`
+(1327). Solo **19 efectos de `vag.mrg` son HEVAG**. No hay MP3 ni AAC. El juego llama a
+`sceAudiodecInitLibrary(1)` al arrancar, antes del primer draw; hoy recibe un error provisional, que
+ignora.
+
+- **4a, ATRAC9 por `libSceAudiodec`:** el decodificador existe (LibAtrac9), pero las estructuras de
+  esta biblioteca **no tienen referencia**: hay que deducirlas del juego.
+- **4b, HEVAG por `libSceAudiodecCpu`:** el PR #5289 de shadPS4 (abierto, probado con este juego) trae
+  estructuras, ids de códec (`Hevag 0x1008`) y errores. El decodificador se adapta de vgmstream
+  (`decode_hevag`, licencia tipo ISC).
+
+**Orden [decidido por el usuario, 2026-10-17]:** música → voces → efectos. Primero 4a y después 4b.
+**Sin tope de tiempo** (decidido el 2026-10-14; es un experimento y un hobby).
 
 **Solución**
 
-*Fase A — Investigación (primero):*
+*Spec 4a:*
 
-1. Registrar en el log, en la primera ejecución, el `codecType` de cada `CreateDecoder`/`InitDecoder`,
-   los argumentos de cada llamada y su orden.
-2. Desensamblar los sitios de llamada del juego para fijar el layout de las estructuras y qué campos
-   lee después. Si existen cabeceras o documentación pública de la comunidad, usarlas como contraste.
-3. Escribir lo averiguado en `docs/audiodec.md` (estructuras, secuencia de llamadas, códigos de error
-   observados). Esto es el entregable de la fase.
+1. Fase A: trazador `GOW3_TRACE_AUDIODEC` (argumentos y volcado de las estructuras) con respuestas
+   provisionales de error; desensamblar los sitios de llamada; escribir `docs/audiodec.md` (apartado
+   ATRAC9) con las estructuras, la secuencia y los errores.
+2. Fase B: `CreateDecoder`, `Decode`, `ClearContext`, `DeleteDecoder` y `TermLibrary` sobre LibAtrac9
+   (`third_party/LibAtrac9`, con `src/runtime_ajm.c` como plantilla). Primero la música, después las
+   voces y luego `vse`.
 
-*Fase B — Implementación:*
+*Spec 4b (cuando ya suenan la música y las voces):*
 
-4. Implementar el front-end de Audiodec sobre los decodificadores que ya existen: LibAtrac9
-   (`third_party/LibAtrac9`) para ATRAC9 y FFmpeg (`src/runtime_mp3.c`) para MP3/AAC.
-5. Códec no soportado → `STOP:` con el número del códec, nunca silencio.
+3. Fase A: el mismo trazador sobre `QueryMemSize`, `InitDecoder` y `Decode`, contrastado con el PR
+   #5289; apartado HEVAG de `docs/audiodec.md`.
+4. Fase B: decodificador HEVAG adaptado de vgmstream, conservando su aviso de licencia.
 
-**Tope de tiempo (propuesta: 2 semanas entre las dos fases).** Si se agota sin que BGM y voces suenen,
-se para y se decide con el usuario qué hacer antes de seguir. No se alarga en silencio.
+En las dos: códec no soportado → `STOP:` con el número, nunca silencio.
 
-**Archivos afectados:** nuevo `src/runtime_audiodec.c`, `src/runtime.c` (registro),
-`src/import_names.inc`, `docs/audiodec.md`, build y un test C con un clip de referencia.
+**Archivos afectados:** `src/runtime_audiodec.c` (ya existe, con la respuesta provisional), nuevo
+`src/runtime_audiodec_cpu.c`, el decodificador HEVAG, `src/runtime.c` (registro),
+`src/import_names.inc`, `docs/audiodec.md`, build y tests C con clips de referencia extraídos en local
+(sin versionar).
 
 **Requisitos**
 
@@ -597,9 +619,11 @@ se para y se decide con el usuario qué hacer antes de seguir. No se alarga en s
 
 **Criterios de aceptación**
 
-- [ ] `docs/audiodec.md` describe el `codecType` observado y las estructuras usadas.
-- [ ] Un test decodifica un clip de referencia y compara con FFmpeg/LibAtrac9.
-- [ ] En el juego, BGM, voces y efectos suenan sin chirridos ni cortes (lo juzga el usuario).
+- [ ] `docs/audiodec.md` describe el ATRAC9 (4a) y el HEVAG (4b) observados, con estructuras y errores.
+- [ ] Un test decodifica un clip ATRAC9 igual que LibAtrac9, y otro prueba el decodificador HEVAG.
+- [ ] En el juego suenan, por este orden, la música, las voces y los efectos, sin chirridos ni cortes
+  (lo juzga el usuario).
+- [ ] `--check-imports` no lista ninguna función de Audiodec ni de AudiodecCpu.
 
 ---
 
@@ -753,9 +777,10 @@ Las configuraciones y saves antiguos no se migran (no hay usuarios de los nombre
 |---|---|---|
 | Event flags mal sincronizados → cuelgues aleatorios | Alto | Test C con varios hilos; watchdog `--timeout` para volcar las pilas |
 | Los 61 imports se resuelven y el juego igual se cuelga, por la semántica de sincronización y no por APIs que faltan | Alto | Hito de primer fotograma y recorrido grabado; `--timeout` con volcado de pilas; no dar por buena una spec solo porque `--check-imports` llegue a cero |
-| Audiodec no tiene implementación HLE de referencia: ABI, estructuras y errores se deducen del juego | Alto | Spec 4 con fase de investigación y `docs/audiodec.md` antes de implementar; sin tope de tiempo |
-| Audiodec pide un códec que no tenemos | Medio | Registrar el códec antes de implementar; FFmpeg cubre MP3/AAC |
-| El traductor de GPU no dibuja bien una novela visual (nunca se ha visto un draw de este juego) | Alto | Hito de primer fotograma antes que audio y vídeo; Spec 6 empieza en cuanto hay hito; revisar el roadmap tras el hito |
+| `libSceAudiodec` no tiene implementación HLE de referencia: ABI, estructuras y errores se deducen del juego | Alto | Spec 4a con fase de investigación y `docs/audiodec.md` antes de implementar; sin tope de tiempo. Para `libSceAudiodecCpu` hay estructuras en el PR #5289 de shadPS4 (sin fusionar) |
+| HEVAG no lo decodifica ni LibAtrac9 ni FFmpeg | Bajo (solo 19 efectos) | Adaptar `decode_hevag` de vgmstream (licencia tipo ISC, compatible con la GPL-2.0), Spec 4b |
+| Audiodec se llama antes del primer draw y podría bloquear el hito | Medio | Respuesta provisional con error explícito, que hoy el juego ignora; si deja de bastar, la fase A de 4a entra en el camino del hito |
+| El traductor de GPU no dibuja bien una novela visual (nunca se ha visto un draw de este juego) | Alto | Hito de primer fotograma antes que la implementación del audio y del vídeo; Spec 6 empieza en cuanto hay hito; revisar el roadmap tras el hito |
 | "Cubierta" se confunde con "funciona" (Mouse parecía cubierta y es un stub) | Medio | Cubierta solo si tiene test o el juego la llamó en un recorrido real; ratón pasa a la Spec 6 como trabajo nuevo |
 | SDK 11.008, mucho más nuevo que el de GoW3: comportamientos del kernel no vistos | Medio | Seguir la semántica de shadPS4; registrar todo lo nuevo en el log |
 | AvPlayer de shadPS4 inmaduro (sincronía, eventos) | Medio | Probar opening y títulos de capítulo pronto; seguir upstream |
@@ -812,6 +837,9 @@ Ideas para versiones siguientes, sin compromiso:
 | **shadPS4** | Emulador de PS4 de código abierto; el proyecto usa su parte de gráficos y vídeo |
 | **Vulkan** | API gráfica moderna usada para dibujar en la tarjeta de vídeo del PC |
 | **Audiodec** | Decodificador de audio de la PS4 (alternativa a AJM) |
+| **ATRAC9** | Códec de audio de Sony; lo usan la música, las voces y la mayoría de los efectos del juego (LibAtrac9 lo decodifica) |
+| **HEVAG** | "High Efficiency VAG": ADPCM de Sony para Vita y PS4, evolución del VAG de PS1; lo usan 19 efectos de `vag.mrg` |
+| **MZX** | Compresión propia de los archivos del juego; las voces de `voice.mrg` van comprimidas con ella |
 | **AvPlayer** | Reproductor de vídeo de alto nivel de la PS4 (mp4) |
 | **Event flag** | Primitiva del kernel de la PS4 para que hilos esperen una combinación de bits |
 | **Hito** | Punto de control que no es una spec: sirve para decidir el siguiente paso con datos reales |
@@ -826,7 +854,11 @@ Ideas para versiones siguientes, sin compromiso:
 - [bbport (deadinside28)](https://github.com/deadinside28/bloodborne_pc), port original para Linux.
 - [shadPS4](https://github.com/shadps4-emu/shadPS4), origen del traductor de gráficos y del AvPlayer;
   referencia para la semántica de event flags y de los servicios. **No sirve de referencia para
-  Audiodec:** upstream carga el firmware real en vez de reimplementarlo.
+  `libSceAudiodec`:** upstream carga el firmware real en vez de reimplementarlo. Para
+  `libSceAudiodecCpu`, el [PR #5289](https://github.com/shadps4-emu/shadPS4/pull/5289) (abierto,
+  probado con CUSA47999) trae estructuras, ids de códec y errores.
+- [vgmstream](https://github.com/vgmstream/vgmstream), decodificador HEVAG (`src/coding/psv_decoder.c`)
+  y detección de `VAGp` (`src/meta/vag.c`); licencia tipo ISC.
 - Roadmap de God of War III: [docs/gow3/ROADMAP.md](../gow3/ROADMAP.md) (histórico; se puede borrar junto con el resto de GoW3).
 - Documentos internos: [CLAUDE.md](../../CLAUDE.md), [mods](../MODS.md),
   [Windows](../../packaging/windows/README.md).
