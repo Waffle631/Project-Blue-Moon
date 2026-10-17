@@ -112,8 +112,11 @@ static ABI int32_t launch_browser(void) { note("SystemService: web browser reque
 /* ---- Accepted with no effect (Spec 3, 4.1): features an offline console does not offer. Each
  * returns 0, logs its first call and counts all of them; one whose result the game uses to decide
  * something needs a real implementation instead. ---- */
-enum { SHAREPLAY_INITIALIZE, LIVE_STREAMING_INITIALIZE, NO_EFFECT_COUNT };
-static const char *const no_effect_names[NO_EFFECT_COUNT]={"sceSharePlayInitialize","sceGameLiveStreamingInitialize"};
+enum { SHAREPLAY_INITIALIZE, LIVE_STREAMING_INITIALIZE, SCREENSHOT_DISABLE, SCREENSHOT_OVERLAY, SCREENSHOT_ENABLE,
+       LIVE_STREAMING_ENABLE, SHAREPLAY_PROHIBITION, VIDEO_RECORDING_INFO, NO_EFFECT_COUNT };
+static const char *const no_effect_names[NO_EFFECT_COUNT]={"sceSharePlayInitialize","sceGameLiveStreamingInitialize",
+    "sceScreenShotDisable","sceScreenShotSetOverlayImageWithOrigin","sceScreenShotEnable",
+    "sceGameLiveStreamingEnableLiveStreaming","sceSharePlaySetProhibition","sceVideoRecordingSetInfo"};
 static unsigned no_effect_calls[NO_EFFECT_COUNT];
 static int32_t no_effect(int api) {
     pthread_mutex_lock(&lock); unsigned calls=++no_effect_calls[api]; pthread_mutex_unlock(&lock);
@@ -124,6 +127,15 @@ static int32_t no_effect(int api) {
 static ABI int32_t shareplay_initialize(void *heap,uint64_t size) { (void)heap; (void)size; return no_effect(SHAREPLAY_INITIALIZE); }
 /* (0x4000) at eboot +0xed338, right after Share Play; the result is ignored. */
 static ABI int32_t live_streaming_initialize(uint64_t heap_size) { (void)heap_size; return no_effect(LIVE_STREAMING_INITIALIZE); }
+/* The game's capture policy (eboot +0xee550): mode 0 = Disable, overlay "/app0/image/corp.png" (0, 0, origin 3)
+ * and Enable; otherwise Disable. Then, in every mode, EnableLiveStreaming(mode==0), SetProhibition(0 or 2) and
+ * VideoRecordingSetInfo(0xd, &prohibited, 4). It ignores every result. */
+static ABI int32_t screenshot_disable(void) { return no_effect(SCREENSHOT_DISABLE); }
+static ABI int32_t screenshot_enable(void) { return no_effect(SCREENSHOT_ENABLE); }
+static ABI int32_t screenshot_overlay(const char *path,int32_t x,int32_t y,int32_t origin) { (void)path; (void)x; (void)y; (void)origin; return no_effect(SCREENSHOT_OVERLAY); }
+static ABI int32_t live_streaming_enable(int32_t enabled) { (void)enabled; return no_effect(LIVE_STREAMING_ENABLE); }
+static ABI int32_t shareplay_prohibition(int32_t mode) { (void)mode; return no_effect(SHAREPLAY_PROHIBITION); }
+static ABI int32_t video_recording_info(int32_t info,const void *value,uint64_t size) { (void)info; (void)value; (void)size; return no_effect(VIDEO_RECORDING_INFO); }
 void runtime_services_report(void) {
     pthread_mutex_lock(&lock);
     printf("Runtime: no-effect services:");
@@ -585,6 +597,10 @@ static const RuntimeExport exports[]={
     {"sceSystemServiceParamGetInt",system_param}, {"sceSystemServiceParamGetString",system_param_string},
     {"sceSystemServiceGetStatus",system_status}, {"sceSharePlayInitialize",shareplay_initialize},
     {"sceGameLiveStreamingInitialize",live_streaming_initialize},
+    {"sceScreenShotDisable",screenshot_disable}, {"sceScreenShotEnable",screenshot_enable},
+    {"sceScreenShotSetOverlayImageWithOrigin",screenshot_overlay},
+    {"sceGameLiveStreamingEnableLiveStreaming",live_streaming_enable}, {"sceSharePlaySetProhibition",shareplay_prohibition},
+    {"sceVideoRecordingSetInfo",video_recording_info},
     {"sceSystemServiceReceiveEvent",system_event}, {"sceSystemServiceHideSplashScreen",hide_splash},
     {"sceSystemServiceLaunchWebBrowser",launch_browser},
     {"sceSystemServiceGetDisplaySafeAreaInfo",safe_area}, {"sceSystemServiceDisableMusicPlayer",disable_music_player},

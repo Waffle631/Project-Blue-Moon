@@ -26,6 +26,14 @@ static int printed_lines(void (*f)(void)) {
 }
 static void shareplay_twice(void) { assert(shareplay_initialize(NULL,0x1800)==0 && shareplay_initialize(NULL,0x1800)==0); }
 static void live_streaming_twice(void) { assert(live_streaming_initialize(0x4000)==0 && live_streaming_initialize(0x4000)==0); }
+/* The game's capture policy (eboot +0xee550) in mode 0, then mode 1; it ignores every result. */
+static void capture_policy(void) {
+    assert(screenshot_disable()==0 && screenshot_overlay("/app0/image/corp.png",0,0,3)==0 && screenshot_enable()==0);
+    assert(live_streaming_enable(1)==0 && shareplay_prohibition(0)==0);
+    uint32_t prohibited=0; assert(video_recording_info(0xd,&prohibited,4)==0);
+    assert(screenshot_disable()==0 && live_streaming_enable(0)==0 && shareplay_prohibition(2)==0);
+    prohibited=1; assert(video_recording_info(0xd,&prohibited,4)==0);
+}
 
 int main(void) {
     unsigned char param[128]={0}, result[64]={0}; /* the game zeroes the pointers it does not want */
@@ -105,6 +113,10 @@ int main(void) {
     assert(printed_lines(shareplay_twice)==0 && no_effect_calls[SHAREPLAY_INITIALIZE]==4);
     assert(printed_lines(live_streaming_twice)==1 && no_effect_calls[LIVE_STREAMING_INITIALIZE]==2);
     assert(printed_lines(live_streaming_twice)==0 && no_effect_calls[LIVE_STREAMING_INITIALIZE]==4 && no_effect_calls[SHAREPLAY_INITIALIZE]==4);
+    assert(printed_lines(capture_policy)==6 && no_effect_calls[SCREENSHOT_DISABLE]==2 && no_effect_calls[SCREENSHOT_OVERLAY]==1);
+    assert(no_effect_calls[SCREENSHOT_ENABLE]==1 && no_effect_calls[LIVE_STREAMING_ENABLE]==2);
+    assert(no_effect_calls[SHAREPLAY_PROHIBITION]==2 && no_effect_calls[VIDEO_RECORDING_INFO]==2);
+    assert(printed_lines(capture_policy)==0 && no_effect_calls[SCREENSHOT_DISABLE]==4);
     puts("services test: ok");
     return 0;
 }
