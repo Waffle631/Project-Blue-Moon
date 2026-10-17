@@ -559,7 +559,10 @@ static ABI int32_t playgo_terminate(void) { playgo_handle=0; return 0; }
 static ABI int32_t discmap_on_hdd(const char *path,int64_t offset,int64_t size,int32_t *result) {
     (void)path; (void)offset; (void)size; (void)result; return DISC_MAP_NO_BITMAP;
 }
-static ABI int32_t discmap_8a82(const char *path,int64_t offset,int64_t size,int32_t *flags,int32_t *r1,int32_t *r2) {
+/* The two unnamed queries 0x7C980FFB0AA27E7A and 0x8A828CAEE7EDD5E9 (the NIDs' bytes) give a file's
+ * LBA package location. libSceFios2.prx calls the first (+0x3411a) and falls back to its own ordering
+ * on any nonzero result; the real library answers this way while it has no bitmap. */
+static ABI int32_t discmap_location(const char *path,int64_t offset,int64_t size,int32_t *flags,int32_t *r1,int32_t *r2) {
     (void)path; (void)offset; (void)size; (void)flags; (void)r1; (void)r2; return DISC_MAP_NO_BITMAP;
 }
 
@@ -699,7 +702,8 @@ static const RuntimeExport exports[]={
     {"scePlayGoSetToDoList",playgo_todo}, {"scePlayGoClose",playgo_close}, {"scePlayGoTerminate",playgo_terminate},
     {"sceMouseInit",ok_void}, {"sceMouseOpen",mouse_open}, {"sceMouseRead",mouse_read}, {"sceMouseClose",mouse_close},
     {"sceAudioInOpen",audio_in_open},
-    {"sceDiscMapIsRequestOnHDD",discmap_on_hdd}, {"sceDiscMap_8A828CAEE7EDD5E9",discmap_8a82},
+    {"sceDiscMapIsRequestOnHDD",discmap_on_hdd}, {"sceDiscMap_8A828CAEE7EDD5E9",discmap_location},
+    {"sceDiscMap_7C980FFB0AA27E7A",discmap_location},
     {"sceVoiceInit",ok_void}, {"sceVoiceEnd",ok_void},
 };
 uintptr_t runtime_services_resolve(const char *name) { return RUNTIME_LOOKUP(exports,name); }

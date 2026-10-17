@@ -234,6 +234,18 @@ static void savedata_mount2(void) {
     Mount2 m={1,0,dir,0x60,1,{0}};
     assert(mount && (uint32_t)mount(&m,result)==0x809F0008 && (uint32_t)mount(NULL,result)==0x809F0000);
 }
+/* Spec 3: fJgP+wqifno is DiscMap 0x7C980FFB0AA27E7A (the NID's bytes). libSceFios2.prx asks it for a
+   file's LBA package location (call at +0x3411a) and takes its fallback path on any nonzero result.
+   Like its twin ioKMruft1ek, it reports that no disc bitmap exists and leaves the outputs alone. */
+static void discmap_location(void) {
+    typedef int32_t (ABI *Location)(const char *,int64_t,int64_t,uint64_t *,uint64_t *,uint64_t *);
+    const char *nids[]={"fJgP+wqifno#libSceDiscMap","ioKMruft1ek#libSceDiscMap"};
+    for (int i=0;i<2;++i) {
+        Location f=GET(Location,nids[i]);
+        uint64_t where=7,lba=7,size=7;
+        assert(f && (uint32_t)f("/app0/image/allscr.mrg",0,1,&where,&lba,&size)==0x81100004 && where==7 && lba==7 && size==7);
+    }
+}
 static void direct_memory(void) {
     Allocate alloc=GET(Allocate,"rTXw65xmLIA#libkernel");
     Map map=GET(Map,"L-Q3LEjIbgA#libkernel");
@@ -469,7 +481,7 @@ int main(int argc,char **argv) {
     if (argc>1 && !strcmp(argv[1],"--rtld-underflow")) {
         static int dso; GET(DsoCount,"8OnWXlgQlvo#libkernel")(&dso); return 99;
     }
-    libc_support(); posix_mutexes(); wall_time(); kernel_time_names(); sanitizer_and_neo(); heap_trace_info(); audiodec_provisional(); savedata_initialize3(); savedata_mount2(); exit_handlers(); guards(); mutexes(); direct_memory(); memory_primitives();
+    libc_support(); posix_mutexes(); wall_time(); kernel_time_names(); sanitizer_and_neo(); heap_trace_info(); audiodec_provisional(); savedata_initialize3(); savedata_mount2(); discmap_location(); exit_handlers(); guards(); mutexes(); direct_memory(); memory_primitives();
     rw_lifecycle(); rw_concurrency(); rw_timeouts();
     puts("PASS: callback lifecycle, guard ABI, mutex errors, shared direct memory, memory primitives, resolver scope");
     return 0;
