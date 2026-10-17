@@ -58,7 +58,7 @@ offline no tiene (PSN, capturas, Share Play, streaming).
 | `lUoqwTQu4Go` | `sceUserServiceGetUserColor` | UserService | falta | ver 4.1 |
 | `Lr8ovHH9l6A` | `sceMsgDialogGetResult` | MsgDialog | código existe | solo `import_names.inc` |
 | `fJgP+wqifno` | **sin nombre** | DiscMap | falta | se identifica por el sitio de llamada (4.3) |
-| `NWtTN10cJzE` | `sceLibcHeapGetTraceInfo` | LibcInternalExt | falta | ver 4.3 |
+| `NWtTN10cJzE` | `sceLibcHeapGetTraceInfo` | LibcInternalExt | hecha | ver 4.3 |
 
 Por ser APIs que el juego solo llama si ocurre algo concreto, se trabaja con el mismo criterio que la
 Spec 2: un import sin implementar solo detiene el juego al llamarlo. Se implementa lo que aparece
@@ -96,6 +96,15 @@ implementará con los datos reales de `probe.c`.
   argumento y uso del valor devuelto.
 - `sceLibcHeapGetTraceInfo`: la usa la libc del sistema para trazas del montón; se devuelve un error
   explícito de "no disponible" salvo que el sitio de llamada muestre otro uso.
+  Verificado (2026-10-17, libc `+0x2c6da` y `+0x2c211`): **no es solo para trazas**. libc pasa una
+  copia de `{u64 size=0x20; u32 1; u32 trace; u64 *id_mask; void **mstates}` e ignora el valor
+  devuelto, pero su `malloc` usa siempre los dos punteros: la init hace `*id_mask = 0`, cada mspace
+  toma el bit libre más bajo de `*id_mask` (`lock cmpxchg`, id = bit + 1) y se guarda en
+  `mstates[id]`, y `free` comprueba el dueño de cada bloque con `mstates[bits 48..54 de su cabecera]`.
+  Con la estructura intacta (punteros nulos) libc falla en `+0x2c79f`. Implementada en
+  `src/runtime_kernel.c`: devuelve 0, `trace = 0` (trazas desactivadas) y apunta a una máscara y una
+  tabla de 128 entradas del runtime (en la consola las comparten todas las libc del proceso; aquí hay
+  una). `EINVAL` si la estructura es nula o `size < 0x20`.
 
 ### 4.4 SaveData
 

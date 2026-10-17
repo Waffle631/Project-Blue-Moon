@@ -200,6 +200,16 @@ static void sanitizer_and_neo(void) {
     assert(m && n && asan && neo);
     assert(!m() && !m() && !n() && asan()==0 && neo()==0 && neo()==0);
 }
+static void heap_trace_info(void) {
+    typedef int32_t (ABI *TraceInfo)(void *);
+    TraceInfo f=GET(TraceInfo,"NWtTN10cJzE#libSceLibcInternalExt");
+    assert(f);
+    struct { uint64_t size; uint32_t version,trace; uint64_t *mask; void **mstates; } a={0x20,1,0,0,0},b=a,small={0x18,1,0,0,0};
+    assert(f(&a)==0 && a.size==0x20 && a.version==1 && a.trace==0 && a.mask && a.mstates);
+    assert(f(&b)==0 && b.mask==a.mask && b.mstates==a.mstates); /* one table for the process */
+    *a.mask=0; a.mstates[127]=&a; assert(a.mstates[127]==&a); a.mstates[127]=0;
+    assert((uint32_t)f(&small)==0x80020016 && !small.mask && (uint32_t)f(NULL)==0x80020016);
+}
 static void direct_memory(void) {
     Allocate alloc=GET(Allocate,"rTXw65xmLIA#libkernel");
     Map map=GET(Map,"L-Q3LEjIbgA#libkernel");
@@ -435,7 +445,7 @@ int main(int argc,char **argv) {
     if (argc>1 && !strcmp(argv[1],"--rtld-underflow")) {
         static int dso; GET(DsoCount,"8OnWXlgQlvo#libkernel")(&dso); return 99;
     }
-    libc_support(); posix_mutexes(); wall_time(); kernel_time_names(); sanitizer_and_neo(); exit_handlers(); guards(); mutexes(); direct_memory(); memory_primitives();
+    libc_support(); posix_mutexes(); wall_time(); kernel_time_names(); sanitizer_and_neo(); heap_trace_info(); exit_handlers(); guards(); mutexes(); direct_memory(); memory_primitives();
     rw_lifecycle(); rw_concurrency(); rw_timeouts();
     puts("PASS: callback lifecycle, guard ABI, mutex errors, shared direct memory, memory primitives, resolver scope");
     return 0;

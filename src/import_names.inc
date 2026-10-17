@@ -796,3 +796,5 @@
 {"bnZxYgAFeA0#libkernel","sceKernelGetSanitizerNewReplaceExternal"},
 {"jh+8XiK4LeE#libkernel","sceKernelIsAddressSanitizerEnabled"},
 {"WslcK1FQcGI#libkernel","sceKernelIsNeoMode"},
+/* Heap trace query from libc.prx init (spec 3, 4.3). */
+{"NWtTN10cJzE#libSceLibcInternalExt","sceLibcHeapGetTraceInfo"},

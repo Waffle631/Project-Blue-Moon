@@ -179,6 +179,19 @@ static ABI const void *sanitizer_malloc_replace(void) { log_once(&malloc_replace
 static ABI const void *sanitizer_new_replace(void) { log_once(&new_replace_seen,"sceKernelGetSanitizerNewReplaceExternal: no replacement"); return NULL; }
 static ABI int32_t asan_enabled(void) { log_once(&asan_seen,"sceKernelIsAddressSanitizerEnabled: 0"); return 0; }
 static ABI int32_t is_neo_mode(void) { log_once(&neo_seen,"sceKernelIsNeoMode: 0 (base PS4)"); return 0; }
+/* libc.prx init passes a copy of {u64 size=0x20; u32 1; u32 trace; u64 *id_mask; void **mstates}
+ * and ignores the result. Its malloc always uses the two pointers: an mspace takes the lowest clear
+ * bit of *id_mask (lock cmpxchg, id = bit+1) and stores itself in mstates[id]; free checks a chunk's
+ * owner against mstates[bits 48..54 of its header]. On the console that storage is shared by every
+ * libc in the process; here there is one. trace=0 keeps libc's heap tracing off. */
+typedef struct { uint64_t size; uint32_t version,trace; uint64_t *id_mask; void **mstates; } HeapTraceInfo;
+static uint64_t heap_id_mask; static void *heap_mstates[128];
+static int heap_trace_seen;
+static ABI int32_t heap_trace_info(HeapTraceInfo *info) {
+    if (!info || info->size<sizeof *info) return ERR(22);
+    info->trace=0; info->id_mask=&heap_id_mask; info->mstates=heap_mstates;
+    log_once(&heap_trace_seen,"sceLibcHeapGetTraceInfo: heap id table provided, tracing off"); return 0;
+}
 static ABI int32_t kernel_mlock(const void *address,uint64_t size) { (void)address; (void)size; return 0; }
 /* libc's C++ exception unwinder. The game does not throw (no __cxa_throw import): unwinding
  * finds no frame data, and resuming a context is a stop, never a silent success. */
@@ -338,6 +351,7 @@ static const RuntimeExport exports[]={
     {"sceKernelGetSanitizerMallocReplaceExternal",sanitizer_malloc_replace},
     {"sceKernelGetSanitizerNewReplaceExternal",sanitizer_new_replace},
     {"sceKernelIsAddressSanitizerEnabled",asan_enabled}, {"sceKernelIsNeoMode",is_neo_mode},
+    {"sceLibcHeapGetTraceInfo",heap_trace_info},
     {"__elf_phdr_match_addr",elf_phdr_match_addr}, {"_is_signal_return",is_signal_return},
     {"__pthread_cxa_finalize",pthread_cxa_finalize}, {"sigreturn",unwind_resume},
     {"__Ux86_64_setcontext",unwind_resume},
