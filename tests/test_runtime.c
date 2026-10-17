@@ -224,6 +224,16 @@ static void savedata_initialize3(void) {
     Init init=GET(Init,"TywrFKCoLGY#libSceSaveData");
     assert(init && init(NULL)==0);
 }
+/* Spec 3: sceSaveDataMount2 had code but no name either. The game mounts its save read-only with
+   0x60 blocks at eboot +0x121716 and, on 0x809F0008 (no save yet), takes its "no save" path. */
+static void savedata_mount2(void) {
+    typedef struct { int32_t user,pad; const char *dir; uint64_t blocks; uint32_t mode; uint8_t reserved[36]; } Mount2;
+    typedef int32_t (ABI *Mount)(const Mount2 *,void *);
+    Mount mount=GET(Mount,"0z45PIH+SNI#libSceSaveData");
+    char dir[32]="SPEC2_NO_SUCH_SAVE", result[64];
+    Mount2 m={1,0,dir,0x60,1,{0}};
+    assert(mount && (uint32_t)mount(&m,result)==0x809F0008 && (uint32_t)mount(NULL,result)==0x809F0000);
+}
 static void direct_memory(void) {
     Allocate alloc=GET(Allocate,"rTXw65xmLIA#libkernel");
     Map map=GET(Map,"L-Q3LEjIbgA#libkernel");
@@ -459,7 +469,7 @@ int main(int argc,char **argv) {
     if (argc>1 && !strcmp(argv[1],"--rtld-underflow")) {
         static int dso; GET(DsoCount,"8OnWXlgQlvo#libkernel")(&dso); return 99;
     }
-    libc_support(); posix_mutexes(); wall_time(); kernel_time_names(); sanitizer_and_neo(); heap_trace_info(); audiodec_provisional(); savedata_initialize3(); exit_handlers(); guards(); mutexes(); direct_memory(); memory_primitives();
+    libc_support(); posix_mutexes(); wall_time(); kernel_time_names(); sanitizer_and_neo(); heap_trace_info(); audiodec_provisional(); savedata_initialize3(); savedata_mount2(); exit_handlers(); guards(); mutexes(); direct_memory(); memory_primitives();
     rw_lifecycle(); rw_concurrency(); rw_timeouts();
     puts("PASS: callback lifecycle, guard ABI, mutex errors, shared direct memory, memory primitives, resolver scope");
     return 0;
