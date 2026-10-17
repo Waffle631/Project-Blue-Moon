@@ -171,7 +171,7 @@ TEB TLS slot on Windows, patched by `patch_tcb_loads`).
 Known limits for other eboots: SELF must be unencrypted/uncompressed; image ≤ 512 MiB; ≤ 16 linked
 modules, TLS module IDs 2–7; relocation types 1, 6, 7, 8 only; extra bundled `.prx` need
 `link_modules.py --modules` (not exposed by `run.py`). Not implemented: libSceNgs2, libSceFiber,
-kernel event flags, AIO, `sceKernelLoadStartModule`.
+AIO, `sceKernelLoadStartModule`.
 
 ## Debugging
 

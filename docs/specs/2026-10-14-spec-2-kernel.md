@@ -52,11 +52,11 @@ Fuera de alcance: servicios de plataforma (Spec 3), audio (Spec 4), vídeo (Spec
 | `WhCc1w3EhSI` | `_sceKernelSetThreadAtexitReport` | falta |
 | `Tz4RNUCBbGI` | `_sceKernelRtldThreadAtexitIncrement` | **nombre nuevo**; falta |
 | `8OnWXlgQlvo` | `_sceKernelRtldThreadAtexitDecrement` | **nombre nuevo**; falta |
-| `BpFoboUJoZU` | `sceKernelCreateEventFlag` | falta |
-| `8mql9OcQnd4` | `sceKernelDeleteEventFlag` | falta |
-| `JTvBflhYazQ` | `sceKernelWaitEventFlag` | falta |
-| `IOnSvHzqu6A` | `sceKernelSetEventFlag` | falta |
-| `PZku4ZrXJqg` | `sceKernelCancelEventFlag` | falta |
+| `BpFoboUJoZU` | `sceKernelCreateEventFlag` | hecha (`src/runtime_eventflag.c`) |
+| `8mql9OcQnd4` | `sceKernelDeleteEventFlag` | hecha (`src/runtime_eventflag.c`) |
+| `JTvBflhYazQ` | `sceKernelWaitEventFlag` | hecha (`src/runtime_eventflag.c`) |
+| `IOnSvHzqu6A` | `sceKernelSetEventFlag` | hecha (`src/runtime_eventflag.c`) |
+| `PZku4ZrXJqg` | `sceKernelCancelEventFlag` | hecha (`src/runtime_eventflag.c`) |
 | `fgxnMeTNUtY` | `sceKernelGetProcessTimeCounter` | **código existe**, falta línea en `import_names.inc` |
 | `BNowx2l588E` | `sceKernelGetProcessTimeCounterFrequency` | **código existe**, falta línea |
 | `-o5uEDpN+oY` | `sceKernelConvertUtcToLocaltime` | falta |
@@ -284,7 +284,9 @@ nuevo). Windows: comprobar si `gpu/CMakeLists.txt` enumera `runtime_*.c` explíc
 
 ## 8. Criterios de aceptación
 
-- [ ] `out/eventflag-test` pasa con los 9 casos; el estrés no se cuelga ni pierde señales.
+- [x] `out/eventflag-test` pasa con los 9 casos; el estrés no se cuelga ni pierde señales
+  (2026-10-17: 4 pares de hilos, 100 000 idas y vueltas en ~0,4 s; prueba de mutación del orden de
+  limpieza, el resultado antes de limpiar, SINGLE, Cancel y Delete: todas detectadas).
 - [ ] `bash build.sh --test` y `python3 -m unittest discover -s tests` siguen en la línea base.
 - [ ] El juego pasa de `libc` a ejecutar su propio código (el log muestra su primera llamada).
 - [ ] Se llega al hito de primer fotograma sin `STOP:` de `libkernel`.

@@ -798,3 +798,9 @@
 {"WslcK1FQcGI#libkernel","sceKernelIsNeoMode"},
 /* Heap trace query from libc.prx init (spec 3, 4.3). */
 {"NWtTN10cJzE#libSceLibcInternalExt","sceLibcHeapGetTraceInfo"},
+/* Kernel event flags (spec 2, block B; src/runtime_eventflag.c). */
+{"BpFoboUJoZU#libkernel","sceKernelCreateEventFlag"},
+{"8mql9OcQnd4#libkernel","sceKernelDeleteEventFlag"},
+{"JTvBflhYazQ#libkernel","sceKernelWaitEventFlag"},
+{"IOnSvHzqu6A#libkernel","sceKernelSetEventFlag"},
+{"PZku4ZrXJqg#libkernel","sceKernelCancelEventFlag"},
