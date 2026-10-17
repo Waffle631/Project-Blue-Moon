@@ -37,27 +37,27 @@ offline no tiene (PSN, capturas, Share Play, streaming).
 | NID | Nombre | Biblioteca | Estado | Comportamiento |
 |---|---|---|---|---|
 | `TywrFKCoLGY` | `sceSaveDataInitialize3` | SaveData | **hecha** (`2a43953`) | solo `import_names.inc`; el juego la llama con `NULL` (eboot `+0xed2eb`) |
-| `0z45PIH+SNI` | `sceSaveDataMount2` | SaveData | código existe | solo `import_names.inc` |
-| `VwadwBBBJ80` | `sceSaveDataUmountWithBackup` | SaveData | falta | igual que `sceSaveDataUmount` (`save_umount`); no crea copia |
+| `0z45PIH+SNI` | `sceSaveDataMount2` | SaveData | **hecha** (`7b14f96`) | solo `import_names.inc`; eboot `+0x121716`, modo 1 (solo lectura); sin partida, `NOT_FOUND` |
+| `VwadwBBBJ80` | `sceSaveDataUmountWithBackup` | SaveData | **hecha** (`991fc5d`) | igual que `sceSaveDataUmount` (`save_umount`); no crea copia (ver 4.4) |
 | `RQOqDbk3bSU` | `sceSaveDataCheckBackupData` | SaveData | falta | `NOT_FOUND` (0x809F0008): no hay copia de seguridad |
 | `lU9YRFsgwSU` | `sceSaveDataRestoreBackupData` | SaveData | falta | `NOT_FOUND` |
-| `2xxUtuC-RzE` | `sceScreenShotEnable` | ScreenShot | falta | 0, sin efecto |
-| `tIYf0W5VTi8` | `sceScreenShotDisable` | ScreenShot | falta | 0, sin efecto |
-| `73WQ4Jj0nJI` | `sceScreenShotSetOverlayImageWithOrigin` | ScreenShot | falta | 0, sin efecto |
+| `2xxUtuC-RzE` | `sceScreenShotEnable` | ScreenShot | **hecha** (`61ec55c`) | 0, sin efecto (política de captura, 4.1) |
+| `tIYf0W5VTi8` | `sceScreenShotDisable` | ScreenShot | **hecha** (`61ec55c`) | 0, sin efecto (política de captura, 4.1) |
+| `73WQ4Jj0nJI` | `sceScreenShotSetOverlayImageWithOrigin` | ScreenShot | **hecha** (`61ec55c`) | 0, sin efecto; `("/app0/image/corp.png", 0, 0, 3)` |
 | `isruqthpYcw` | `sceSharePlayInitialize` | SharePlay | **hecha** (`1f701d3`) | 0, sin efecto; `(NULL, 0x1800)` en eboot `+0xed32e`, resultado ignorado |
 | `UaLjloJinow` | `sceSharePlayTerminate` | SharePlay | falta | 0, sin efecto |
-| `co2NCj--pnc` | `sceSharePlaySetProhibition` | SharePlay | falta | 0, sin efecto |
-| `kvYEw2lBndk` | `sceGameLiveStreamingInitialize` | GameLiveStreaming | falta (**siguiente `STOP:`**) | 0, sin efecto; `(0x4000)` en eboot `+0xed338` |
+| `co2NCj--pnc` | `sceSharePlaySetProhibition` | SharePlay | **hecha** (`61ec55c`) | 0, sin efecto; `(0)` o `(2)` |
+| `kvYEw2lBndk` | `sceGameLiveStreamingInitialize` | GameLiveStreaming | **hecha** (`93a9b2b`) | 0, sin efecto; `(0x4000)` en eboot `+0xed338`, resultado ignorado |
 | `9yK6Fk8mKOQ` | `sceGameLiveStreamingTerminate` | GameLiveStreaming | falta | 0, sin efecto |
-| `dWM80AX39o4` | `sceGameLiveStreamingEnableLiveStreaming` | GameLiveStreaming | falta | 0 y retransmisión "no activa" **[H]** |
-| `Fc8qxlKINYQ` | `sceVideoRecordingSetInfo` | VideoRecording | falta | 0, sin efecto |
+| `dWM80AX39o4` | `sceGameLiveStreamingEnableLiveStreaming` | GameLiveStreaming | **hecha** (`61ec55c`) | 0, sin efecto: es un setter `(bool)`, no una consulta (**[V]**, 4.1) |
+| `Fc8qxlKINYQ` | `sceVideoRecordingSetInfo` | VideoRecording | **hecha** (`61ec55c`) | 0, sin efecto; `(0xd, &prohibido, 4)` |
 | `hHrGoGoNf+s` | `sceSysmoduleLoadModuleInternalWithArg` | Sysmodule | **hecha** (`673559f`) | como `module_load`; los argumentos se registran (**[V]**, ver 4.3) |
 | `4fU5yvOkVG4` | `sceSysmoduleGetModuleInfoForUnwind` | Sysmodule | falta | error explícito (ver 4.2) |
 | `SsC-m-S9JTA` | `sceSystemServiceParamGetString` | SystemService | **hecha** (`6e40c0e`) | ver 4.1 |
 | `9kPCz7Or+1Y` | `sceSystemServiceReenableMusicPlayer` | SystemService | falta | 0, sin efecto (`sceSystemServiceDisableMusicPlayer` ya existe) |
 | `lUoqwTQu4Go` | `sceUserServiceGetUserColor` | UserService | falta | ver 4.1 |
 | `Lr8ovHH9l6A` | `sceMsgDialogGetResult` | MsgDialog | código existe | solo `import_names.inc` |
-| `fJgP+wqifno` | **sin nombre** | DiscMap | falta | se identifica por el sitio de llamada (4.3) |
+| `fJgP+wqifno` | `sceDiscMap_7C980FFB0AA27E7A` (sin nombre real) | DiscMap | **hecha** (`d80dea5`) | `NO_BITMAP_INFO`, como su gemela (4.3) |
 | `NWtTN10cJzE` | `sceLibcHeapGetTraceInfo` | LibcInternalExt | hecha | ver 4.3 |
 
 Por ser APIs que el juego solo llama si ocurre algo concreto, se trabaja con el mismo criterio que la
@@ -85,8 +85,17 @@ verdad.
 - Mecanismo común (`runtime_services.c`, desde la iteración 5): una tabla de nombres y contadores y
   `no_effect(api)`, que devuelve 0 y escribe `Service: <nombre> accepted, no effect` solo en la
   primera llamada; `runtime_services_report()` saca los contadores en `runtime_report`. Añadir otra
-  API "sin efecto" es una entrada en el `enum`, su nombre y su función. Por ahora solo está
-  `sceSharePlayInitialize`.
+  API "sin efecto" es una entrada en el `enum`, su nombre y su función. Hay ocho (2026-10-17, hasta la
+  iteración 9 de la fase 2A): `sceSharePlayInitialize`, `sceGameLiveStreamingInitialize` y las seis
+  de la política de captura.
+- **Política de captura del juego [V]** (eboot `+0xee550`, iteración 9). Con modo 0, que es el del
+  arranque, llama a `sceScreenShotDisable`, a
+  `sceScreenShotSetOverlayImageWithOrigin("/app0/image/corp.png", 0, 0, 3)` y a `sceScreenShotEnable`.
+  Con otro modo, solo a `Disable`. Después, en cualquier modo, llama a
+  `sceGameLiveStreamingEnableLiveStreaming(modo == 0)`, `sceSharePlaySetProhibition(0 o 2)` y
+  `sceVideoRecordingSetInfo(0xd, &prohibido, 4)`. Ignora todos los resultados.
+  `EnableLiveStreaming` es un setter, no una consulta: la **[H]** de la tabla queda resuelta como
+  "sin efecto".
 - `sceUserServiceGetUserColor(user, *color)` **[H]**: color fijo del usuario 1. Solo para el usuario
   que el runtime ya reporta (`user_initial`); cualquier otro id devuelve el error de usuario.
 
@@ -107,9 +116,19 @@ implementará con los datos reales de `probe.c`.
   `module_load`, con `*res = 0` (un módulo del host no tiene función de inicio). Un id de más de 16
   bits (internos `0x8000xxxx`) da `STOP:`, porque aún no se ha visto ninguno.
 
-- `fJgP+wqifno` (DiscMap): no coincide con ningún nombre probado. El dump trae `sce_discmap.plt`, lo
-  que indica uso real de DiscMap. Mismo método que la Spec 2 (paso 5.7): sitio de llamada, primer
-  argumento y uso del valor devuelto.
+- `fJgP+wqifno` (DiscMap) **[V]** (2026-10-17, fase 2A, iteración 8): no tiene nombre real. Sus
+  bytes en base64 son `7C980FFB0AA27E7A`, así que se llama `sceDiscMap_7C980FFB0AA27E7A`, con el
+  mismo convenio que su gemela `ioKMruft1ek` (`sceDiscMap_8A828CAEE7EDD5E9`), que ya existía.
+  `libSceFios2.prx` la llama en `+0x3411a` con `(ruta, 0, n, &ubicación, &lba, &tamaño)`, tras poner
+  a cero las tres salidas de 64 bits, para conocer la ubicación LBA del archivo en el paquete
+  (`"FIOS2 WARNING: An unexpected value of %ld was returned for the LBA package location"` si la
+  ubicación es ≥ 2). Con un resultado distinto de 0, usa su camino de reserva.
+  - Respuesta: `NO_BITMAP_INFO` (`0x81100004`) sin tocar las salidas. Es lo que ya hacían su gemela
+    y `sceDiscMapIsRequestOnHDD`, y lo que responde la librería real mientras no tiene bitmap (análisis
+    del PR #2686 de shadPS4).
+  - shadPS4 upstream devuelve OK con las salidas a cero para esta función. Aquí eso sería una
+    ubicación inventada.
+  - En la ejecución real, Fios2 sigue y el juego carga datos.
 - `sceLibcHeapGetTraceInfo`: la usa la libc del sistema para trazas del montón; se devuelve un error
   explícito de "no disponible" salvo que el sitio de llamada muestre otro uso.
   Verificado (2026-10-17, libc `+0x2c6da` y `+0x2c211`): **no es solo para trazas**. libc pasa una
@@ -125,7 +144,10 @@ implementará con los datos reales de `probe.c`.
 ### 4.4 SaveData
 
 `UmountWithBackup`, `CheckBackupData` y `RestoreBackupData` no crean ni consultan copias: el runtime
-no las implementa. `CheckBackupData` y `RestoreBackupData` devuelven `NOT_FOUND` (el juego recibe
+no las implementa. `UmountWithBackup` **[V]** (2026-10-17, fase 2A, iteración 10): el juego la llama
+en eboot `+0x1214e2` sobre la partida `savedata000` que acaba de crear en el primer arranque (después
+de escribirla y de `SaveIcon`) e ignora el resultado. Desmonta con `save_umount`, escribe una línea
+de log en la primera llamada y `runtime_report` cuenta los desmontajes sin copia. `CheckBackupData` y `RestoreBackupData` devuelven `NOT_FOUND` (el juego recibe
 "no hay copia"), no éxito. Si el juego muestra una pantalla de "restaurar copia", la usa el camino de
 error del propio juego.
 
@@ -162,7 +184,8 @@ coincide con `nid()` (script de comprobación en `tests/test_import_names.py`, n
 - [ ] `--check-imports` no lista ninguna de las 23 (junto con las Specs 2 y 4).
 - [ ] `out/services-test` cubre las APIs nuevas y pasa.
 - [ ] `tests/test_import_names.py` confirma NID y nombre de cada una.
-- [ ] En un arranque real, cada API "sin efecto" que se llame deja su línea de log.
+- [ ] En un arranque real, cada API "sin efecto" que se llame deja su línea de log (2026-10-17: se
+  cumple para las ocho llamadas hasta ahora, `out/run-2a-10b.log`).
 - [ ] Ninguna API de PSN/red devuelve éxito.
 
 ## 9. Preguntas abiertas

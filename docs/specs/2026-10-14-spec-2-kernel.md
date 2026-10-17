@@ -235,9 +235,25 @@ su `STOP:`, su sitio de llamada, la respuesta, un test y un commit (logs `out/ru
 | 3 | `VjhsmxpcezI` `sceAudiodecInitLibrary` | eboot `+0x10e20c`: `(1)` (ATRAC9); ignora el resultado | error provisional `0x807F0001` (fase A de la Spec 4) | **4** | `18ad4dc` |
 | 4 | `TywrFKCoLGY` `sceSaveDataInitialize3` | eboot `+0xed2eb`: `(NULL)` | ya existía; faltaba la línea de `import_names.inc` | 3 | `2a43953` |
 | 5 | `isruqthpYcw` `sceSharePlayInitialize` | eboot `+0xed32e`: `(NULL, 0x1800)`; ignora el resultado | "sin efecto": 0, una línea de log y un contador | 3 (4.1) | `1f701d3` |
+| 6 | `kvYEw2lBndk` `sceGameLiveStreamingInitialize` | eboot `+0xed338`: `(0x4000)`, justo después de Share Play; ignora el resultado | "sin efecto" | 3 (4.1) | `93a9b2b` |
+| 7 | `0z45PIH+SNI` `sceSaveDataMount2` | eboot `+0x121716`: `{usuario, dir, 0x60 bloques, modo 1 = solo lectura}`; con `0x809F0008` (sin partida) toma su camino de "partida nueva" | ya existía; faltaba la línea de `import_names.inc` | 3 | `7b14f96` |
+| 8 | `fJgP+wqifno` DiscMap, sin nombre | Fios2 `+0x3411a`: `(ruta, 0, n, &ubicación, &lba, &tamaño)`, la "LBA package location" del archivo; con un resultado ≠0 usa su camino de reserva | `sceDiscMap_7C980FFB0AA27E7A` (los bytes del NID, como su gemela `ioKMruft1ek`): `NO_BITMAP_INFO` (`0x81100004`) sin tocar las salidas | 3 (4.3) | `d80dea5` |
+| 9 | `tIYf0W5VTi8` `sceScreenShotDisable` | eboot `+0xee582`, dentro de la política de captura del juego (`+0xee550`), que llama a seis APIs seguidas e ignora todos los resultados | las seis "sin efecto" en una sola iteración | 3 (4.1) | `61ec55c` |
+| 10 | `VwadwBBBJ80` `sceSaveDataUmountWithBackup` | eboot `+0x1214e2`, sobre la partida `savedata000` que el juego acaba de crear; ignora el resultado | desmonta como `sceSaveDataUmount` y no guarda copia; una línea de log | 3 (4.4) | `991fc5d` |
 
-Siguiente `STOP:` (sin hacer): `kvYEw2lBndk#libSceGameLiveStreaming` `sceGameLiveStreamingInitialize(0x4000)`,
-eboot `+0xed338`. Después, en el mismo bloque de init (`+0xed2e9`…), el juego sigue con más servicios.
+**Punto de parada (iteración 10).** Después de la iteración 10 no aparece ningún `STOP:` en 60 s. El
+watchdog de `GOW3_TIMEOUT=60` corta el proceso con el juego vivo: no hay cuelgue. Con
+`GOW3_GPU_LOG=debug` (`out/run-2a-10c.log`) se ve lo siguiente:
+
+- el juego abre `VideoOut` nada más entrar en su código: 1920×1080, 3 búferes, `A8R8G8B8Srgb`;
+- empieza a llamar a `sceGnmSubmitAndFlipCommandBuffers` justo después de ocultar el splash y montar
+  la partida, y sigue a ~60 por segundo (2344 envíos en ~40 s);
+- después abre `image/movie/prologue_en.mp4` con AvPlayer (una pista de audio y una de vídeo) y su
+  bucle de tareas sigue girando.
+
+Este es el punto de parada de la fase 2A y el resultado (a) del H1 del hito de primer fotograma. Falta
+saber si esos envíos contienen draws y qué se ve en pantalla: el log no tiene contadores (H2 del
+hito) ni captura de píxeles (H3).
 
 Conclusiones de las cinco iteraciones (2026-10-17):
 
@@ -247,10 +263,33 @@ Conclusiones de las cinco iteraciones (2026-10-17):
   draw. El roadmap suponía que el hito de primer fotograma solo dependía de esta spec. Mientras el
   juego ignore lo que devuelve Audiodec, basta la respuesta provisional de la fase A de la Spec 4. El
   hito tampoco ha llegado aún: el log no muestra ningún envío a la GPU ni un `VideoOut` abierto por el
-  juego (solo las líneas de arranque del propio runtime).
+  juego (solo las líneas de arranque del propio runtime). *Corregido en la iteración 10: el juego sí
+  abría `VideoOut` desde la entrada (antes de Audiodec). `sceVideoOutOpen` se registra a nivel `info`
+  y, con el nivel por defecto (`warn`), no sale en el log.*
 - Hilos y sincronización hasta el `STOP:` de la iteración 5: 39 hilos guest (ninguno ha salido),
   61 mutex, 8 variables de condición, 3 rwlocks, 0 semáforos. Sin cuelgues: con `GOW3_TIMEOUT=60`,
   las cinco ejecuciones terminan en su `STOP:` sin que salte el watchdog.
+
+Conclusiones de las iteraciones 6 a 10 (2026-10-17):
+
+- **Tampoco hay ningún `STOP:` de `libkernel`.** Las diez iteraciones paran en la Spec 3 (nueve) y en
+  la Spec 4 (una). El kernel que hay basta para llegar a presentar fotogramas.
+- **Hay dos caminos de arranque, según exista partida o no:**
+  - Primer arranque: `Mount2` en solo lectura devuelve `NOT_FOUND` y el juego crea `savedata000`
+    (la monta con `CREATE`, escribe el archivo `savedata000`, `SaveIcon` y `UmountWithBackup`).
+  - Con partida: la monta en solo lectura (dos veces).
+
+  Los dos llegan al vídeo. La ejecución de la iteración 9 creó una partida en `user/savedata/1/CUSA47999`
+  y se paró antes de desmontarla; desde entonces, `run.py` sin más arranca por el segundo camino. Para
+  repetir el primer arranque hay que apuntar `GOW3_USER_DIR` a una carpeta vacía (así se verificó la
+  iteración 10, con `out/user-2a-10`).
+- Hilos nuevos tras la init: `task0`, `task_game`, `load thread` (tres), `troph`, `save thread` y
+  `av audio`. El bucle de tareas despierta ~120 veces por segundo (`task event` + semáforo 1).
+- Dos decisiones de esta tanda:
+  - DiscMap devuelve `NO_BITMAP_INFO` y no "OK con ceros" como shadPS4 upstream, porque eso sería una
+    ubicación inventada. Si Fios2 rinde mal por ello, es una línea.
+  - La iteración 9 resuelve seis APIs de una vez: van seguidas en la misma función, sin ramas entre
+    ellas, y el juego ignora todos los resultados.
 
 ## 5. Pasos de verificación (antes de escribir código de cada bloque)
 
@@ -281,6 +320,13 @@ nombrar el import de una ranura de GOT.
    borrados, 36 esperas, 36 `Set`, ningún timeout y ningún `Cancel`. Como son PRIO, se atienden en
    FIFO (sección 3.2). Faltan los argumentos de `Wait` (modos y timeouts): hay que repetirlo con
    `GOW3_TRACE_EVENTFLAG`.
+   Con traza (2026-10-17, iteración 10, `out/run-2a-10b.log`, 60 s): los flags nuevos (`task event`,
+   `task0`, `task_game`, `load thread`, `troph`, `save thread`, `av audio`) también son `0x22` con
+   patrón 0. **Todas las esperas bloqueantes usan `bits = 0x1` y modo `0x11` (AND + CLEAR_ALL)**:
+   ~7100 de `task event` (el bucle de tareas, que alterna con el semáforo 1) y unas pocas de los
+   hilos de audio y del planificador. No se usan OR, CLEAR_PAT ni varios bits. Quedan sin medir los
+   timeouts (la traza no los imprime y el watchdog corta antes de `runtime_report`) y cuántos hilos
+   esperan a la vez.
 4. **`scePthreadCancel`.** Averiguar quién la llama y a qué hilo. Decidir entonces la estrategia.
 5. **Conversión de hora y sanitizer.** Mirar el sitio de llamada para fijar firma y valor devuelto.
 6. **Bloque F.** Mirar quién llama `Utimes` y `Chmod` y sobre qué rutas.
@@ -324,11 +370,13 @@ nuevo). Windows: comprobar si `gpu/CMakeLists.txt` enumera `runtime_*.c` explíc
   (2026-10-17: 4 pares de hilos, 100 000 idas y vueltas en ~0,4 s; prueba de mutación del orden de
   limpieza, el resultado antes de limpiar, SINGLE, Cancel y Delete: todas detectadas).
 - [x] `bash build.sh --test` y `python3 -m unittest discover -s tests` siguen en la línea base
-  (2026-10-17, tras la iteración 5 de la fase 2A: todos los tests C pasan; Python 244 OK, 37 omitidos).
+  (2026-10-17, tras la iteración 10 de la fase 2A: todos los tests C pasan; Python 244 OK, 37 omitidos).
 - [x] El juego pasa de `libc` a ejecutar su propio código (el log muestra su primera llamada)
   (2026-10-17: `Entering original x86-64 code at guest offset 0xef390` y, después, sus llamadas a
   SystemService, Sysmodule, UserService, AudioOut…; ver 4.1).
-- [ ] Se llega al hito de primer fotograma sin `STOP:` de `libkernel`.
+- [x] Se llega al hito de primer fotograma sin `STOP:` de `libkernel` (2026-10-17, iteración 10: el
+  juego presenta ~60 fotogramas por segundo y reproduce el vídeo del prólogo. La captura, los
+  contadores y la decisión son del hito).
 - [ ] Fase 2B: `out/gow3-probe out/boot-linked.bin --app0 Tsukihime/CUSA47999 --check-imports` no lista
   nada de `libkernel`, salvo lo que esta spec deje explícitamente como trampa (por ejemplo
   `scePthreadCancel`) con su motivo anotado.

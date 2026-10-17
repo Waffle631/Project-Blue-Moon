@@ -38,6 +38,18 @@ Tras la Spec 2: ejecutar `GOW3_GAME_DIR=Tsukihime/CUSA47999 python3 run.py` (ví
 en `out/`) con `--timeout`, `GOW3_GPU_LOG=info`, hasta que el juego (a) emita su primer
 `VideoOut`/flip, (b) llegue a otro `STOP:`/`Fault:` o (c) se quede sin pintar. Anotar cuál.
 
+**Resultado (2026-10-17, fin de la fase 2A de la Spec 2): (a).** Con `GOW3_GPU_LOG=debug`
+(`out/run-2a-10c.log`) se ve esto:
+
+- `sceVideoOutOpen` nada más entrar en el código del juego (1920×1080, 3 búferes `A8R8G8B8Srgb`);
+- el primer `sceGnmSubmitAndFlipCommandBuffers` tras ocultar el splash y montar la partida, y después
+  ~60 por segundo (2344 en ~40 s);
+- `image/movie/prologue_en.mp4` por AvPlayer (audio y vídeo).
+
+No hay `STOP:` ni `Fault:` en 60 s. Los únicos avisos de GPU son los de formatos que la tarjeta no
+soporta (sección 2); ningún `Unimplemented`. A nivel `info` los flips no salen: se registran a nivel
+`debug`. Por eso hace falta el H2. Falta saber si hay draws y qué se ve (H2 y H3).
+
 ### H2 — Contadores de GPU en el log
 Si el log no permite saber cuántos draws, flips y envíos hizo el juego, añadir una línea de resumen al
 final de la ejecución (en `runtime_report` o en `gow3gpu.cpp`). Entregable: una línea con

@@ -12,7 +12,7 @@ gow3_pc (God of War III Remastered), que a su vez viene de
 | Plataforma | Linux primero (máquina de desarrollo), Windows 10/11 después; Vulkan 1.3 |
 | Máquina de pruebas | Bazzite 44 (KDE Plasma 6.7, Wayland), AMD Ryzen 5 7600, 16 GB, **AMD Radeon RX 6650 XT** |
 | Dump | `Tsukihime/CUSA47999/` (sin versionar, ~45 GB) |
-| Última actualización | 2026-10-17. La Spec 2 está en su fase 2A, guiada por los `STOP:` (5 iteraciones; el juego ya ejecuta su propio código). La Spec 4 se replantea en dos partes: **4a ATRAC9** (música, voces y efectos `vse`) y **4b HEVAG** (19 efectos de `vag.mrg`). 2026-10-14: revisión del orden tras un análisis adversarial (el kernel va primero, hay un hito de "primer fotograma", el borrado se parte en dos y el renombrado pasa al final; lo específico de GoW3 se elimina, no se desactiva) |
+| Última actualización | 2026-10-17. La fase 2A de la Spec 2 (guiada por los `STOP:`) termina tras 10 iteraciones: el juego abre `VideoOut`, presenta ~60 fotogramas por segundo y reproduce el vídeo del prólogo, sin ningún `STOP:` de libkernel. Falta ver qué pinta (hito). La Spec 4 se replantea en dos partes: **4a ATRAC9** (música, voces y efectos `vse`) y **4b HEVAG** (19 efectos de `vag.mrg`). 2026-10-14: revisión del orden tras un análisis adversarial (el kernel va primero, hay un hito de "primer fotograma", el borrado se parte en dos y el renombrado pasa al final; lo específico de GoW3 se elimina, no se desactiva) |
 
 ---
 
@@ -161,11 +161,11 @@ partida. Se corrige después del hito de primer fotograma, que es el primer mome
 |---|---|---|---|---|---|
 | 0 | Preparar el entorno (Linux) | Setup | — | — | ✅ Concluida |
 | 1 | Inventario de APIs faltantes | Diagnóstico | 0 | — | ✅ Concluida |
-| 2 | Kernel: event flags, tiempo, hilos (y lo mínimo de servicios para arrancar) | **Spec 2** | 1 | 3–5 días | 🟨 En curso (fase 2A) |
+| 2 | Kernel: event flags, tiempo, hilos (y lo mínimo de servicios para arrancar) | **Spec 2** | 1 | 3–5 días | 🟨 En curso (fase 2A terminada; falta la 2B) |
 | 3 | Borrar hooks, patches, touchpad, tests e identidad de GoW3 | **Spec 1a** | 1 (en paralelo con la Spec 2) | 1–2 días | ⬜ Pendiente |
-| 4 | **Hito: primer fotograma** | Hito | Spec 2 | 1 día | ⬜ Pendiente |
+| 4 | **Hito: primer fotograma** | Hito | Spec 2 | 1 día | ⬜ Pendiente (H1 ya cumplido: el juego presenta fotogramas; faltan H2 y H3) |
 | 5 | Borrar las heurísticas de GPU de GoW3 | **Spec 1b** | Spec 1a, hito | 2–3 días | ⬜ Pendiente |
-| 6 | Servicios del sistema que faltan | **Spec 3** | Spec 2 | 2–3 días | 🟨 En curso (5 APIs adelantadas en la Spec 2) |
+| 6 | Servicios del sistema que faltan | **Spec 3** | Spec 2 | 2–3 días | 🟨 En curso (15 de 23 APIs adelantadas en la Spec 2) |
 | 7a | Audio ATRAC9 (`libSceAudiodec`): música → voces → efectos `vse`, con investigación previa | **Spec 4a** | Spec 2 | 1–2 semanas, sin tope | ⬜ Pendiente (respuesta provisional de `InitLibrary` hecha en la Spec 2) |
 | 7b | Audio HEVAG (`libSceAudiodecCpu`): efectos de `vag.mrg`, con investigación previa | **Spec 4b** | Spec 4a (música y voces) | sin estimar, sin tope | ⬜ Pendiente |
 | 8 | Vídeo (AvPlayer) | **Spec 5** | Specs 2 y 3 | 2–4 días | ⬜ Pendiente |
@@ -391,17 +391,23 @@ u otro test C.
 
 **Estado (2026-10-17):** hechos los callbacks de hilo de libc, las respuestas del sanitizer y de Neo,
 `_nanosleep`, los nombres de ProcessTimeCounter y los event flags. Además se adelantaron de la Spec 3
-`sceLibcHeapGetTraceInfo`, `ParamGetString`, `LoadModuleInternalWithArg`, `SaveDataInitialize3` y
-`SharePlayInitialize`. El juego pasa la init de `libc` y de Fios2, entra en su código y no ha vuelto a
-pararse en libkernel. La fase 2A va por la iteración 5: el siguiente `STOP:` es
-`sceGameLiveStreamingInitialize` (registro en la spec, sección 4.1). Por el camino, el juego llama a
-Audiodec **antes del primer draw**; se responde con un error provisional, que el juego ignora.
+`sceLibcHeapGetTraceInfo` y, en las diez iteraciones de la fase 2A, 14 APIs más: `ParamGetString`,
+`LoadModuleInternalWithArg`, tres de SaveData (`Initialize3`, `Mount2` y `UmountWithBackup`), una de
+DiscMap y las ocho "sin efecto" de Share Play, streaming, capturas y grabación.
+La sección 4.1 de la spec tiene el registro completo. El juego pasa la init de `libc` y de Fios2 y
+entra en su código sin volver a pararse en libkernel. Llama a Audiodec **antes del primer draw**; se
+le responde con un error provisional, que el juego ignora.
+
+La fase 2A terminó en la iteración 10. Ya no hay `STOP:`: el juego abre `VideoOut`, llama a
+`sceGnmSubmitAndFlipCommandBuffers` ~60 veces por segundo y reproduce `prologue_en.mp4` por AvPlayer.
+Queda la fase 2B (cerrar libkernel para `--check-imports`) y el hito (saber qué se dibuja).
 
 **Criterios de aceptación**
 
 - [x] Test C de event flags: AND, OR, CLEAR_ALL, CLEAR_PAT, timeout, cancel, varios hilos.
 - [ ] El juego pasa del arranque a los logos sin `STOP:` de libkernel.
-- [ ] Se llega al hito de primer fotograma (ver abajo).
+- [x] Se llega al hito de primer fotograma (ver abajo): el juego presenta fotogramas (2026-10-17). La
+  captura y la decisión son del hito.
 
 ---
 

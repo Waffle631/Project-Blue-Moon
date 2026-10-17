@@ -33,6 +33,12 @@ espera, y que el juego continúe después.
 - **[V]** El audio de los vídeos lo entrega AvPlayer al juego con `GetAudioData`; el juego lo envía a
   `AudioOut`. El vídeo lo entrega con `GetVideoDataEx` y el juego lo sube a una textura.
 - **[V]** ffmpeg completo de RPM Fusion instalado en el contenedor `ps4dev` (`ffmpeg-free` no decodifica H.264).
+- **[V]** Primer vídeo real (2026-10-17, fin de la fase 2A de la Spec 2, `out/run-2a-10b.log`): tras
+  la init y la política de captura, el juego abre `image/movie/prologue_en.mp4` **con
+  `FileReplacement`** ("through the game-provided file replacement"). Tiene dos pistas: audio (0) y
+  vídeo (1). El juego activa las dos y AvPlayer emite `StateReady` y `StatePlay`. El juego crea su hilo
+  `av audio` (prioridad 714) y abre el puerto de audio 3 (2 canales, float, 256 muestras). Sin
+  errores en 60 s. Falta ver si la imagen y el sonido son correctos (hito y paso 2).
 
 ## 3. Diseño: validar antes de corregir
 
