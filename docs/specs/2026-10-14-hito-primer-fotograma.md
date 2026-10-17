@@ -60,9 +60,12 @@ soporta (sección 2); ningún `Unimplemented`. A nivel `info` los flips no salen
   sección 4.1) el vídeo se ve entero hasta el `STOP:` de Audiodec.
 - **Hay draws:** AvPlayer deja cada fotograma en memoria del guest, y solo llega a la pantalla a
   través de los comandos de GPU del propio juego (textura + dibujo + flip).
+- **Primer 2D del propio juego:** antes del vídeo, el juego muestra un aviso sobre el autoguardado
+  (lo vio el usuario; no hay captura). No es un vídeo: en esas ejecuciones AvPlayer solo abre
+  `prologue_en.mp4`. Lo dibuja, por tanto, el motor del juego.
 - **No sustituye a H2 ni a H3:** no hay contadores, las capturas son externas (no del fotograma
-  presentado) y lo que se ha visto es el vídeo, no el 2D propio del juego (fondos, sprites, texto del
-  motor).
+  presentado) y del 2D propio del juego solo se ha visto ese aviso, sin captura ni juicio sobre su
+  aspecto (fondos, sprites y texto de la novela todavía no se han visto).
 
 ### H2 — Contadores de GPU en el log
 Si el log no permite saber cuántos draws, flips y envíos hizo el juego, añadir una línea de resumen al

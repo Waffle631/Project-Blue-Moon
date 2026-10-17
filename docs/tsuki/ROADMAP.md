@@ -163,7 +163,7 @@ partida. Se corrige después del hito de primer fotograma, que es el primer mome
 | 1 | Inventario de APIs faltantes | Diagnóstico | 0 | — | ✅ Concluida |
 | 2 | Kernel: event flags, tiempo, hilos (y lo mínimo de servicios para arrancar) | **Spec 2** | 1 | 3–5 días | 🟨 En curso (fase 2A terminada; falta la 2B) |
 | 3 | Borrar hooks, patches, touchpad, tests e identidad de GoW3 | **Spec 1a** | 1 (en paralelo con la Spec 2) | 1–2 días | ⬜ Pendiente |
-| 4 | **Hito: primer fotograma** | Hito | Spec 2 | 1 día | ⬜ Pendiente (H1 ya cumplido: el juego presenta fotogramas y el vídeo del prólogo se ve bien en capturas del escritorio; faltan H2 y H3) |
+| 4 | **Hito: primer fotograma** | Hito | Spec 2 | 1 día | ⬜ Pendiente (H1 ya cumplido: el juego presenta fotogramas y el vídeo del prólogo se ve bien en capturas del escritorio; antes del vídeo, el usuario vio un aviso de autoguardado, primer 2D del propio juego; faltan H2 y H3) |
 | 5 | Borrar las heurísticas de GPU de GoW3 | **Spec 1b** | Spec 1a, hito | 2–3 días | ⬜ Pendiente |
 | 6 | Servicios del sistema que faltan | **Spec 3** | Spec 2 | 2–3 días | 🟨 En curso (15 de 23 APIs adelantadas en la Spec 2) |
 | 7a | Audio ATRAC9 (`libSceAudiodec`): música → voces → efectos `vse`, con investigación previa | **Spec 4a** | Spec 2 | 1–2 semanas, sin tope | ⬜ Pendiente (respuesta provisional de `InitLibrary` hecha en la Spec 2; `CreateDecoder` para el juego al final del prólogo; estructura de control vista en el desensamblado) |
@@ -684,7 +684,8 @@ a través de `runtime_file.c`.
 - No se salta con Options, Cruz ni Círculo.
 - **[H]** El tiempo de pared (~6 min 4 s de vídeo dentro de 6 min 16 s de proceso) es menor que la
   duración del archivo (6 min 29 s), y no hay `StateStop` en el log. O el vídeo va más rápido que el
-  tiempo real, o el juego lo deja antes de su final. A medir en el paso 2 de la spec.
+  tiempo real, o el juego lo deja antes de su final. A medir en el paso 2 de la spec. El aviso de
+  autoguardado previo no lo explica: resta tiempo al vídeo, no lo suma.
 
 ---
 

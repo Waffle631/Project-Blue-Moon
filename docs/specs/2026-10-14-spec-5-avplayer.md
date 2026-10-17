@@ -61,6 +61,9 @@ espera, y que el juego continúe después.
     últimos ~25 s del archivo son créditos sobre negro y la luna que se apaga.
   - Tampoco hay `StateStop` en el log, y AvPlayer lo registra a nivel `info` cuando lo emite
     (`avplayer_state.cpp:375`).
+  - El aviso de autoguardado que el juego muestra antes del vídeo (hito, H1) no lo explica. Está
+    dentro de los ~12 s previos al vídeo, y cualquier pantalla previa resta tiempo de pared al vídeo
+    en vez de sumarlo: con 6 min 16 s de proceso, el vídeo no cabe aunque empezara en el segundo 0.
   - O el juego dejó el vídeo antes de su final, o decide el final por su cuenta. Hay que medirlo
     en el paso 2: tiempo de pared contra la marca de tiempo de los fotogramas y del audio entregados.
     Es la fila "Se corta o se desincroniza" del paso 3.
