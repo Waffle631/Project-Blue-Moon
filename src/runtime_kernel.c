@@ -170,6 +170,15 @@ static ABI int32_t module_info_from_addr(uint64_t address,int32_t flags,void *in
     if (!info) return ERR(14);
     return ERR(3); /* ESRCH: the runtime keeps no module records */
 }
+/* No sanitizer runtime and a base PS4: libc.prx init asks for the ASan malloc/operator new
+ * replacement tables (NULL = keep its own allocator, then _sceKernelRtldSetApplicationHeapAPI) and
+ * the eboot picks its PS4 Pro paths with IsNeoMode. The first call of each is logged. */
+static void log_once(int *seen,const char *what) { if (!__atomic_exchange_n(seen,1,__ATOMIC_RELAXED)) printf("Runtime: %s\n",what); }
+static int malloc_replace_seen,new_replace_seen,asan_seen,neo_seen;
+static ABI const void *sanitizer_malloc_replace(void) { log_once(&malloc_replace_seen,"sceKernelGetSanitizerMallocReplaceExternal: no replacement"); return NULL; }
+static ABI const void *sanitizer_new_replace(void) { log_once(&new_replace_seen,"sceKernelGetSanitizerNewReplaceExternal: no replacement"); return NULL; }
+static ABI int32_t asan_enabled(void) { log_once(&asan_seen,"sceKernelIsAddressSanitizerEnabled: 0"); return 0; }
+static ABI int32_t is_neo_mode(void) { log_once(&neo_seen,"sceKernelIsNeoMode: 0 (base PS4)"); return 0; }
 static ABI int32_t kernel_mlock(const void *address,uint64_t size) { (void)address; (void)size; return 0; }
 /* libc's C++ exception unwinder. The game does not throw (no __cxa_throw import): unwinding
  * finds no frame data, and resuming a context is a stop, never a silent success. */
@@ -326,6 +335,9 @@ static const RuntimeExport exports[]={
     {"sceKernelPrintBacktraceWithModuleInfo",print_backtrace},
     {"getargc",get_argc}, {"getargv",get_argv}, {"sceKernelStopUnloadModule",stop_unload_module},
     {"sceKernelGetModuleInfoFromAddr",module_info_from_addr}, {"sceKernelMlock",kernel_mlock},
+    {"sceKernelGetSanitizerMallocReplaceExternal",sanitizer_malloc_replace},
+    {"sceKernelGetSanitizerNewReplaceExternal",sanitizer_new_replace},
+    {"sceKernelIsAddressSanitizerEnabled",asan_enabled}, {"sceKernelIsNeoMode",is_neo_mode},
     {"__elf_phdr_match_addr",elf_phdr_match_addr}, {"_is_signal_return",is_signal_return},
     {"__pthread_cxa_finalize",pthread_cxa_finalize}, {"sigreturn",unwind_resume},
     {"__Ux86_64_setcontext",unwind_resume},

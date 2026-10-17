@@ -791,3 +791,8 @@
 {"fgxnMeTNUtY#libkernel","sceKernelGetProcessTimeCounter"},
 {"BNowx2l588E#libkernel","sceKernelGetProcessTimeCounterFrequency"},
 {"NhpspxdjEKU#libkernel","_nanosleep"},
+/* Sanitizer queries from libc.prx init and the PS4 Pro check of the eboot (spec 2, block E). */
+{"py6L8jiVAN8#libkernel","sceKernelGetSanitizerMallocReplaceExternal"},
+{"bnZxYgAFeA0#libkernel","sceKernelGetSanitizerNewReplaceExternal"},
+{"jh+8XiK4LeE#libkernel","sceKernelIsAddressSanitizerEnabled"},
+{"WslcK1FQcGI#libkernel","sceKernelIsNeoMode"},

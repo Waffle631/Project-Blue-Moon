@@ -190,6 +190,16 @@ static void kernel_time_names(void) {
     assert(counter && hz && hz()>0);
     uint64_t a=counter(); nap(rq,NULL); assert(counter()>a);
 }
+/* libc.prx init stops on the sanitizer queries if they are missing; NULL tables keep its own
+   allocator. The game runs as a base PS4. */
+static void sanitizer_and_neo(void) {
+    typedef const void *(ABI *Table)(void);
+    typedef int32_t (ABI *Flag)(void);
+    Table m=GET(Table,"py6L8jiVAN8#libkernel"),n=GET(Table,"bnZxYgAFeA0#libkernel");
+    Flag asan=GET(Flag,"jh+8XiK4LeE#libkernel"),neo=GET(Flag,"WslcK1FQcGI#libkernel");
+    assert(m && n && asan && neo);
+    assert(!m() && !m() && !n() && asan()==0 && neo()==0 && neo()==0);
+}
 static void direct_memory(void) {
     Allocate alloc=GET(Allocate,"rTXw65xmLIA#libkernel");
     Map map=GET(Map,"L-Q3LEjIbgA#libkernel");
@@ -425,7 +435,7 @@ int main(int argc,char **argv) {
     if (argc>1 && !strcmp(argv[1],"--rtld-underflow")) {
         static int dso; GET(DsoCount,"8OnWXlgQlvo#libkernel")(&dso); return 99;
     }
-    libc_support(); posix_mutexes(); wall_time(); kernel_time_names(); exit_handlers(); guards(); mutexes(); direct_memory(); memory_primitives();
+    libc_support(); posix_mutexes(); wall_time(); kernel_time_names(); sanitizer_and_neo(); exit_handlers(); guards(); mutexes(); direct_memory(); memory_primitives();
     rw_lifecycle(); rw_concurrency(); rw_timeouts();
     puts("PASS: callback lifecycle, guard ABI, mutex errors, shared direct memory, memory primitives, resolver scope");
     return 0;
