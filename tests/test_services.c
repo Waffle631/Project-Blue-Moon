@@ -82,6 +82,12 @@ int main(void) {
     assert(trophy_unlock_state(1,1,NULL,&count)==TROPHY_INVALID && trophy_release(0)==TROPHY_INVALID);
 
     float ratio=0; assert(safe_area(&ratio)==0 && ratio==1.0f && safe_area(NULL)==SYSTEM_PARAMETER);
+
+    /* System name (id 6): the game asks with a 65-byte buffer and ignores the result. */
+    char system_name[65]; memset(system_name,'x',sizeof system_name);
+    assert(system_param_string(6,system_name,sizeof system_name)==0 && !strcmp(system_name,"PS4"));
+    assert(system_param_string(6,system_name,3)==SYSTEM_PARAMETER && system_param_string(6,NULL,65)==SYSTEM_PARAMETER);
+    assert(system_param_string(99,system_name,sizeof system_name)==SYSTEM_PARAMETER);
     puts("services test: ok");
     return 0;
 }

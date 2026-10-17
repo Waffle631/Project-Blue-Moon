@@ -584,6 +584,7 @@
 {"ZPD1YOKI+Kw#libSceRtc","sceRtcGetCurrentClockLocalTime"},
 {"JO4yuTuMoKI#libSceNetCtl","sceNetCtlGetNatInfo"},
 {"fZo48un7LK4#libSceSystemService","sceSystemServiceParamGetInt"},
+{"SsC-m-S9JTA#libSceSystemService","sceSystemServiceParamGetString"},
 {"M1TvFst-jrM#libSceRtc","sceRtcConvertUtcToLocalTime"},
 {"8Yr143yEnRo#libSceRtc","sceRtcConvertLocalTimeToUtc"},
 {"rPo6tV8D9bM#libSceSystemService","sceSystemServiceGetStatus"},

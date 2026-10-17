@@ -90,6 +90,14 @@ static ABI int32_t system_param(int32_t id,int32_t *value) {
     }
     return 0;
 }
+/* Only the system name (id 6) is known; the game reads it into a 65-byte buffer at start-up and
+ * ignores the result. Other ids are a defined error, not an empty string. */
+static ABI int32_t system_param_string(int32_t id,char *buf,uint64_t size) {
+    printf("Runtime: sceSystemServiceParamGetString(id %d, size %llu)\n",id,(unsigned long long)size);
+    const char *value=id==6 ? "PS4" : NULL;
+    if (!value || !buf || strlen(value)+1>size) return SYSTEM_PARAMETER;
+    strcpy(buf,value); return 0;
+}
 static ABI int32_t system_status(unsigned char *status) {
     if (!status) return SYSTEM_PARAMETER;
     memset(status,0,12); /* event_num=0, no overlay, foreground, normal CPU mode */
@@ -549,7 +557,8 @@ static const RuntimeExport exports[]={
     {"sceUserServiceInitialize",user_initialize}, {"sceUserServiceTerminate",user_terminate},
     {"sceUserServiceGetInitialUser",user_initial}, {"sceUserServiceGetLoginUserIdList",user_list},
     {"sceUserServiceGetUserName",user_name}, {"sceUserServiceGetEvent",user_event},
-    {"sceSystemServiceParamGetInt",system_param}, {"sceSystemServiceGetStatus",system_status},
+    {"sceSystemServiceParamGetInt",system_param}, {"sceSystemServiceParamGetString",system_param_string},
+    {"sceSystemServiceGetStatus",system_status},
     {"sceSystemServiceReceiveEvent",system_event}, {"sceSystemServiceHideSplashScreen",hide_splash},
     {"sceSystemServiceLaunchWebBrowser",launch_browser},
     {"sceSystemServiceGetDisplaySafeAreaInfo",safe_area}, {"sceSystemServiceDisableMusicPlayer",disable_music_player},
