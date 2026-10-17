@@ -175,6 +175,21 @@ static void wall_time(void) {
     assert(get(NULL,NULL)==0 && get(NULL,z.value)==0);
     assert(!runtime_resolve("n88vx3C5nW8#libc",0));
 }
+/* Names that only existed in runtime_kernel.c's table: without import_names.inc they stopped the
+   game (libc.prx calls _nanosleep while spinning). */
+static void kernel_time_names(void) {
+    typedef int32_t (ABI *Nanosleep)(const int64_t *,int64_t *);
+    typedef uint64_t (ABI *Counter)(void);
+    Nanosleep nap=GET(Nanosleep,"NhpspxdjEKU#libkernel");
+    assert(nap && nap==GET(Nanosleep,"yS8U2TGCe1A#libkernel"));
+    int64_t rq[2]={0,1000000},rem[2]={-1,-1};
+    assert(nap(rq,rem)==0 && rem[0]==0 && rem[1]==0);
+    int64_t bad[2]={0,1000000000};
+    assert(nap(bad,NULL)==-1);
+    Counter counter=GET(Counter,"fgxnMeTNUtY#libkernel"),hz=GET(Counter,"BNowx2l588E#libkernel");
+    assert(counter && hz && hz()>0);
+    uint64_t a=counter(); nap(rq,NULL); assert(counter()>a);
+}
 static void direct_memory(void) {
     Allocate alloc=GET(Allocate,"rTXw65xmLIA#libkernel");
     Map map=GET(Map,"L-Q3LEjIbgA#libkernel");
@@ -410,7 +425,7 @@ int main(int argc,char **argv) {
     if (argc>1 && !strcmp(argv[1],"--rtld-underflow")) {
         static int dso; GET(DsoCount,"8OnWXlgQlvo#libkernel")(&dso); return 99;
     }
-    libc_support(); posix_mutexes(); wall_time(); exit_handlers(); guards(); mutexes(); direct_memory(); memory_primitives();
+    libc_support(); posix_mutexes(); wall_time(); kernel_time_names(); exit_handlers(); guards(); mutexes(); direct_memory(); memory_primitives();
     rw_lifecycle(); rw_concurrency(); rw_timeouts();
     puts("PASS: callback lifecycle, guard ABI, mutex errors, shared direct memory, memory primitives, resolver scope");
     return 0;

@@ -787,3 +787,7 @@
 {"WhCc1w3EhSI#libkernel","_sceKernelSetThreadAtexitReport"},
 {"Tz4RNUCBbGI#libkernel","_sceKernelRtldThreadAtexitIncrement"},
 {"8OnWXlgQlvo#libkernel","_sceKernelRtldThreadAtexitDecrement"},
+/* Implemented in runtime_kernel.c; only the names were missing (spec 2, step 5.7: libc.prx calls _nanosleep). */
+{"fgxnMeTNUtY#libkernel","sceKernelGetProcessTimeCounter"},
+{"BNowx2l588E#libkernel","sceKernelGetProcessTimeCounterFrequency"},
+{"NhpspxdjEKU#libkernel","_nanosleep"},
