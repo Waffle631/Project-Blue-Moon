@@ -781,3 +781,9 @@
 {"iKJMWrAumPE#libkernel","getargc"},
 {"FJmglmTMdr4#libkernel","getargv"},
 {"QKd0qM58Qes#libkernel","sceKernelStopUnloadModule"},
+/* libc.prx thread-exit callbacks (runtime_thread.c; spec 2, step 5.1). */
+{"rNhWz+lvOMU#libkernel","_sceKernelSetThreadDtors"},
+{"pB-yGZ2nQ9o#libkernel","_sceKernelSetThreadAtexitCount"},
+{"WhCc1w3EhSI#libkernel","_sceKernelSetThreadAtexitReport"},
+{"Tz4RNUCBbGI#libkernel","_sceKernelRtldThreadAtexitIncrement"},
+{"8OnWXlgQlvo#libkernel","_sceKernelRtldThreadAtexitDecrement"},

@@ -42,3 +42,13 @@ class RuntimeTests(unittest.TestCase):
     def test_rwlock_timeouts_use_orbis_errors(self):
         r=self.run_case('--rwlock-timeouts')
         self.assertEqual(r.returncode,0,r.stdout+r.stderr)
+
+    def test_libc_thread_dtors_run_on_exiting_thread(self):
+        r=self.run_case('--thread-dtors')
+        self.assertEqual(r.returncode,0,r.stdout+r.stderr)
+        self.assertIn('PASS: thread dtors',r.stdout)
+
+    def test_rtld_atexit_underflow_fails_explicitly(self):
+        r=self.run_case('--rtld-underflow')
+        self.assertEqual(r.returncode,21)
+        self.assertIn('RtldThreadAtexitDecrement',r.stderr)

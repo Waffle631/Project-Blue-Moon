@@ -325,6 +325,57 @@ static void rw_timeouts(void) {
     assert(rw_unlock(&f.lock)==0);
     fixture_destroy(&f);
 }
+/* libc.prx registers its per-thread atexit runner with _sceKernelSetThreadDtors; the kernel calls
+   it on the exiting thread, before TSD key destructors (docs/specs/2026-10-14-spec-2-kernel.md, 5.1). */
+typedef int32_t (ABI *SetCallback)(void *);
+typedef int32_t (ABI *ThreadCreate)(void **,void **,void *(ABI *)(void *),void *,const char *);
+typedef int32_t (ABI *ThreadJoin)(void *,void **);
+typedef int32_t (ABI *KeyCreate)(uint32_t *,void (ABI *)(void *));
+typedef int32_t (ABI *KeySet)(uint32_t,void *);
+typedef int32_t (ABI *DsoCount)(void *);
+static uint32_t dtor_key;
+static _Atomic int dtor_calls, key_calls, dtor_order, key_order, sequence;
+static pthread_t entry_thread, dtor_thread;
+static ABI void thread_dtors(void) { dtor_thread=pthread_self(); dtor_order=++sequence; ++dtor_calls; }
+static ABI void key_destructor(void *value) { (void)value; key_order=++sequence; ++key_calls; }
+static ABI int count_unused(int module) { (void)module; abort(); }
+static ABI void report_unused(int module) { (void)module; abort(); }
+static ABI void *returning_entry(void *argument) {
+    entry_thread=pthread_self();
+    assert(GET(KeySet,"+BzXYkqYeLE#libkernel")(dtor_key,argument)==0);
+    return argument;
+}
+static ABI void *exiting_entry(void *argument) {
+    entry_thread=pthread_self();
+    assert(GET(KeySet,"+BzXYkqYeLE#libkernel")(dtor_key,argument)==0);
+    ((void (ABI *)(void *))GET(void *,"3kg7rT0NQIs#libkernel"))(argument);
+    abort();
+}
+static void run_guest_thread(void *(ABI *entry)(void *)) {
+    void *thread=NULL, *result=NULL; static int value;
+    dtor_calls=key_calls=0; sequence=0;
+    assert(GET(ThreadCreate,"6UgtwV+0zb4#libkernel")(&thread,NULL,entry,&value,"dtors")==0);
+    assert(GET(ThreadJoin,"onNY9Byn-W8#libkernel")(thread,&result)==0 && result==&value);
+}
+static void thread_dtors_contract(void) {
+    SetCallback set_dtors=GET(SetCallback,"rNhWz+lvOMU#libkernel");
+    SetCallback set_count=GET(SetCallback,"pB-yGZ2nQ9o#libkernel");
+    SetCallback set_report=GET(SetCallback,"WhCc1w3EhSI#libkernel");
+    DsoCount increment=GET(DsoCount,"Tz4RNUCBbGI#libkernel"), decrement=GET(DsoCount,"8OnWXlgQlvo#libkernel");
+    assert(set_dtors && set_count && set_report && increment && decrement);
+    assert(GET(KeyCreate,"geDaqgH9lTg#libkernel")(&dtor_key,key_destructor)==0);
+    /* Before libc registers anything, a thread exit runs only the key destructors. */
+    run_guest_thread(returning_entry);
+    assert(dtor_calls==0 && key_calls==1);
+    /* Count and Report only serve module unloading, which never happens: stored, never called. */
+    assert(set_dtors((void *)thread_dtors)==0 && set_count((void *)count_unused)==0 && set_report((void *)report_unused)==0);
+    run_guest_thread(returning_entry);
+    assert(dtor_calls==1 && key_calls==1 && pthread_equal(dtor_thread,entry_thread) && dtor_order<key_order);
+    run_guest_thread(exiting_entry);
+    assert(dtor_calls==1 && key_calls==1 && pthread_equal(dtor_thread,entry_thread) && dtor_order<key_order);
+    static int dso;
+    assert(increment(&dso)==0 && increment(&dso)==0 && decrement(&dso)==0 && decrement(&dso)==0);
+}
 int main(int argc,char **argv) {
     runtime_start(0); assert(runtime_resolve("bzQExy189ZI#libc",0)==0);
     runtime_start(1);
@@ -355,6 +406,10 @@ int main(int argc,char **argv) {
     if (argc>1 && !strcmp(argv[1],"--rwlock-lifecycle")) { rw_lifecycle(); return 0; }
     if (argc>1 && !strcmp(argv[1],"--rwlock-concurrency")) { rw_concurrency(); return 0; }
     if (argc>1 && !strcmp(argv[1],"--rwlock-timeouts")) { rw_timeouts(); return 0; }
+    if (argc>1 && !strcmp(argv[1],"--thread-dtors")) { thread_dtors_contract(); puts("PASS: thread dtors"); return 0; }
+    if (argc>1 && !strcmp(argv[1],"--rtld-underflow")) {
+        static int dso; GET(DsoCount,"8OnWXlgQlvo#libkernel")(&dso); return 99;
+    }
     libc_support(); posix_mutexes(); wall_time(); exit_handlers(); guards(); mutexes(); direct_memory(); memory_primitives();
     rw_lifecycle(); rw_concurrency(); rw_timeouts();
     puts("PASS: callback lifecycle, guard ABI, mutex errors, shared direct memory, memory primitives, resolver scope");

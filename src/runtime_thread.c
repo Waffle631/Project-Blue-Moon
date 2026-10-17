@@ -61,7 +61,15 @@ static _Thread_local GuestThread *current;
 static _Thread_local int32_t guest_errno;
 static const unsigned char *tls_template;
 static uint64_t tls_filesz, tls_memsz, tls_align=16;
-static size_t created, joined_count, exited;
+static size_t created, joined_count, exited, dtors_runs;
+/* libc.prx registers these at init (+0x780; docs/specs/2026-10-14-spec-2-kernel.md, 5.1). The dtors
+ * callback runs libc's per-thread atexit list (thread_local destructors) of the calling thread.
+ * Count/Report only serve module unloading, which this runtime never does: kept, never called. */
+typedef void (ABI *ThreadDtors)(void);
+static ThreadDtors thread_dtors;
+static void *atexit_count, *atexit_report;
+/* References held by per-thread atexit entries; they would block unloading their module. */
+static int64_t rtld_atexit_refs;
 
 void runtime_set_main_tls(const void *data,uint64_t filesz,uint64_t memsz,uint64_t align) {
     tls_template=data; tls_filesz=filesz; tls_memsz=memsz; tls_align=align ? align : 16;
@@ -257,8 +265,12 @@ static void *host_start(void *p) {
     attach(t);
     set_host_name(t->name);
     if (!exit_setjmp(t)) t->result=t->entry(t->argument);
+    /* Normal return and thread_exit (longjmp) both land here, TCB/TLS still attached.
+     * thread_local destructors first, then TSD keys: glibc's order. */
+    pthread_mutex_lock(&lock); ThreadDtors dtors=thread_dtors; pthread_mutex_unlock(&lock);
+    if (dtors) dtors();
     runtime_thread_keys_cleanup();
-    pthread_mutex_lock(&lock); t->finished=1; ++exited; pthread_mutex_unlock(&lock);
+    pthread_mutex_lock(&lock); t->finished=1; ++exited; dtors_runs+=dtors!=NULL; pthread_mutex_unlock(&lock);
     return t->result;
 }
 static int32_t create(GuestThread **out,ThreadAttr **attr_slot,GuestEntry entry,void *argument,const char *name) {
@@ -351,6 +363,33 @@ static ABI int32_t thread_rename(GuestThread *t,const char *name) {
     return 0;
 }
 static ABI int32_t thread_equal(GuestThread *a,GuestThread *b) { return a==b; }
+static ABI int32_t set_thread_dtors(ThreadDtors callback) {
+    pthread_mutex_lock(&lock); thread_dtors=callback; pthread_mutex_unlock(&lock);
+    printf("Runtime: libc thread dtors callback registered (%p)\n",(void *)callback);
+    return 0;
+}
+static ABI int32_t set_atexit_count(void *callback) {
+    pthread_mutex_lock(&lock); atexit_count=callback; pthread_mutex_unlock(&lock);
+    return 0;
+}
+static ABI int32_t set_atexit_report(void *callback) {
+    pthread_mutex_lock(&lock); atexit_report=callback; pthread_mutex_unlock(&lock);
+    return 0;
+}
+/* libc's per-thread atexit registration (+0xb5c70) fails when Increment returns non-zero. */
+static ABI int32_t rtld_atexit_increment(void *dso) {
+    (void)dso;
+    pthread_mutex_lock(&lock); ++rtld_atexit_refs; pthread_mutex_unlock(&lock);
+    return 0;
+}
+static ABI int32_t rtld_atexit_decrement(void *dso) {
+    pthread_mutex_lock(&lock);
+    if (!rtld_atexit_refs) {
+        fprintf(stderr,"STOP: _sceKernelRtldThreadAtexitDecrement(%p) without a matching Increment\n",dso); exit(21);
+    }
+    --rtld_atexit_refs; pthread_mutex_unlock(&lock);
+    return 0;
+}
 
 /* POSIX (libScePosix) variants return positive errno values. */
 static int32_t posix(int32_t r) { return r ? (int32_t)((uint32_t)r&0xffff) : 0; }
@@ -384,6 +423,9 @@ uintptr_t runtime_thread_resolve(const char *name) {
         {"euKRgm0Vn2M#libkernel",posix_attr_set_param}, {"OxhIB8LB-PQ#libkernel",posix_create},
         {"Jmi+9w9u0E4#libkernel",posix_create_name}, {"h9CcP3J0oVM#libkernel",posix_join},
         {"FJrT5LuUBAU#libkernel",thread_exit},
+        {"rNhWz+lvOMU#libkernel",set_thread_dtors}, {"pB-yGZ2nQ9o#libkernel",set_atexit_count},
+        {"WhCc1w3EhSI#libkernel",set_atexit_report}, {"Tz4RNUCBbGI#libkernel",rtld_atexit_increment},
+        {"8OnWXlgQlvo#libkernel",rtld_atexit_decrement},
     };
     for (size_t i=0;i<sizeof(table)/sizeof(*table);++i)
         if (!strcmp(name,table[i].nid)) return (uintptr_t)table[i].fn;
@@ -391,7 +433,8 @@ uintptr_t runtime_thread_resolve(const char *name) {
 }
 void runtime_thread_report(void) {
     pthread_mutex_lock(&lock);
-    printf("Runtime: guest threads created=%zu, exited=%zu, joined=%zu\n",created,exited,joined_count);
+    printf("Runtime: guest threads created=%zu, exited=%zu, joined=%zu, libc dtors runs=%zu, thread atexit refs=%lld\n",
+           created,exited,joined_count,dtors_runs,(long long)rtld_atexit_refs);
     pthread_mutex_unlock(&lock);
 }
 
