@@ -210,6 +210,13 @@ static void heap_trace_info(void) {
     *a.mask=0; a.mstates[127]=&a; assert(a.mstates[127]==&a); a.mstates[127]=0;
     assert((uint32_t)f(&small)==0x80020016 && !small.mask && (uint32_t)f(NULL)==0x80020016);
 }
+/* Spec 4, phase A: until docs/audiodec.md exists, Audiodec answers are explicit errors, never a
+   fake decoder. The game ignores InitLibrary's result (eboot +0x10e211). */
+static void audiodec_provisional(void) {
+    typedef int32_t (ABI *Init)(uint32_t);
+    Init init=GET(Init,"VjhsmxpcezI#libSceAudiodec");
+    assert(init && (uint32_t)init(1)==0x807F0001 && (uint32_t)init(1)==0x807F0001);
+}
 static void direct_memory(void) {
     Allocate alloc=GET(Allocate,"rTXw65xmLIA#libkernel");
     Map map=GET(Map,"L-Q3LEjIbgA#libkernel");
@@ -445,7 +452,7 @@ int main(int argc,char **argv) {
     if (argc>1 && !strcmp(argv[1],"--rtld-underflow")) {
         static int dso; GET(DsoCount,"8OnWXlgQlvo#libkernel")(&dso); return 99;
     }
-    libc_support(); posix_mutexes(); wall_time(); kernel_time_names(); sanitizer_and_neo(); heap_trace_info(); exit_handlers(); guards(); mutexes(); direct_memory(); memory_primitives();
+    libc_support(); posix_mutexes(); wall_time(); kernel_time_names(); sanitizer_and_neo(); heap_trace_info(); audiodec_provisional(); exit_handlers(); guards(); mutexes(); direct_memory(); memory_primitives();
     rw_lifecycle(); rw_concurrency(); rw_timeouts();
     puts("PASS: callback lifecycle, guard ABI, mutex errors, shared direct memory, memory primitives, resolver scope");
     return 0;

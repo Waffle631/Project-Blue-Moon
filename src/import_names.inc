@@ -402,6 +402,7 @@
 {"-qLsfDAywIY#libSceAjm","sceAjmBatchWait"},
 {"Wi7DtlLV+KI#libSceAjm","sceAjmModuleUnregister"},
 {"MHur6qCsUus#libSceAjm","sceAjmFinalize"},
+{"VjhsmxpcezI#libSceAudiodec","sceAudiodecInitLibrary"},
 {"AxoDrINp4J8#libSceAjm","sceAjmInstanceCreate"},
 {"NVDXiUesSbA#libSceAjm","sceAjmBatchCancel"},
 {"RbLbuKv8zho#libSceAjm","sceAjmInstanceDestroy"},

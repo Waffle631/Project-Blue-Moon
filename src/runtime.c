@@ -80,6 +80,7 @@ void runtime_report(void) {
     runtime_content_report();
     runtime_memory_report();
     runtime_ajm_report();
+    runtime_audiodec_report();
     runtime_audio_report();
     runtime_pad_report();
     runtime_savedata_report();
@@ -234,6 +235,8 @@ uintptr_t runtime_resolve(const char *name, int is_data) {
     if (sema) return sema;
     uintptr_t eventflag = runtime_eventflag_resolve(name);
     if (eventflag) return eventflag;
+    uintptr_t audiodec = runtime_audiodec_resolve(name);
+    if (audiodec) return audiodec;
     uintptr_t rwlock = runtime_rwlock_resolve(name);
     if (rwlock) return rwlock;
     uintptr_t memory = runtime_memory_resolve(name);

@@ -46,6 +46,8 @@ unsigned runtime_sema_waiters(uint32_t id);
 uintptr_t runtime_eventflag_resolve(const char *name);
 void runtime_eventflag_report(void);
 unsigned runtime_eventflag_waiters(uint64_t id);
+uintptr_t runtime_audiodec_resolve(const char *name);
+void runtime_audiodec_report(void);
 uintptr_t runtime_time_resolve(const char *name);
 void runtime_content_configure(const uint32_t values[5]);
 uintptr_t runtime_content_resolve(const char *name);
