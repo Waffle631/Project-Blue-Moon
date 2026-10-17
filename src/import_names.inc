@@ -253,6 +253,7 @@
 {"Qs0wWulgl7U#libSceMouse","sceMouseInit"},
 {"cAnT0Rw-IwU#libSceMouse","sceMouseClose"},
 {"eR2bZFAAU0Q#libSceSysmodule","sceSysmoduleUnloadModule"},
+{"hHrGoGoNf+s#libSceSysmodule","sceSysmoduleLoadModuleInternalWithArg"},
 {"CdWp0oHWGr0#libSceUserService","sceUserServiceGetInitialUser"},
 {"RaqxZIf6DvE#libSceMouse","sceMouseOpen"},
 {"x8qnXqh-tiM#libSceMouse","sceMouseRead"},

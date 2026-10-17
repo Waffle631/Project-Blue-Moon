@@ -7,6 +7,7 @@ typedef int32_t (ABI *Module)(uint16_t);
 typedef int32_t (ABI *Init)(const void *,void *);
 typedef int32_t (ABI *Param)(uint32_t,int32_t *);
 typedef int32_t (ABI *List)(uint32_t,void *,uint32_t,uint32_t *);
+typedef int32_t (ABI *LoadArg)(uint32_t,int32_t,const void *,uint64_t,int32_t *);
 #define GET(t,n) ((t)runtime_content_resolve(n))
 int main(int argc,char **argv) {
     Module load=GET(Module,"g8cM39EUZ6o#libSceSysmodule");
@@ -58,6 +59,15 @@ int main(int argc,char **argv) {
     assert((uint32_t)init(initial,b.boot)==0x80d90003);
     assert(unload(0xb4)==0 && (uint32_t)loaded(0xb4)==0x805a1001);
     assert(load(0xb4)==0 && init(initial,b.boot)==0 && unload(0xb4)==0);
+    /* libSceFios2 loads 0xd7 with no arguments and unloads it with the public call on failure:
+     * same id space and reference count; the start result goes to *result. */
+    LoadArg load_arg=GET(LoadArg,"hHrGoGoNf+s#libSceSysmodule");
+    assert(load_arg);
+    struct { int32_t value; uint32_t canary; } start={-1,0x5678};
+    assert(load_arg(0xd7,0,NULL,0,&start.value)==0 && start.value==0 && start.canary==0x5678);
+    assert(loaded(0xd7)==0 && unload(0xd7)==0 && (uint32_t)loaded(0xd7)==0x805a1001);
+    assert(load_arg(0xd7,0,NULL,0,NULL)==0 && unload(0xd7)==0);
+    assert((uint32_t)load_arg(0,0,NULL,0,&start.value)==0x805a1000);
     puts("PASS: AppContent lifecycle, profile and output boundaries");
     return 0;
 }

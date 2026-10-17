@@ -33,6 +33,16 @@ static ABI int32_t module_load(uint16_t id) {
     else printf("Runtime: system module 0x%x loaded (host implementation)\n",id);
     return 0;
 }
+/* libSceFios2 loads 0xd7 (DiscMap) this way with argc=0, argv=NULL and unloads it with the public
+ * sceSysmoduleUnloadModule: same ids and references. A host module has no start function, so its
+ * start result is 0. Ids beyond 16 bits (internal 0x8000xxxx) have not been seen and stop. */
+static ABI int32_t module_load_arg(uint32_t id,int32_t argc,const void *argv,uint64_t flags,int32_t *result) {
+    if (id>0xffff) { fprintf(stderr,"STOP: unsupported internal system module id 0x%x\n",id); exit(21); }
+    printf("Runtime: sceSysmoduleLoadModuleInternalWithArg(0x%x, argc=%d, argv=%p, flags=0x%llx)\n",id,argc,argv,(unsigned long long)flags);
+    int32_t loaded=module_load((uint16_t)id);
+    if (!loaded && result) *result=0;
+    return loaded;
+}
 static ABI int32_t module_loaded(uint16_t id) {
     if (!id) return INVALID_ID;
     return module_refs[id] ? 0 : NOT_LOADED;
@@ -79,6 +89,7 @@ static ABI int32_t addon_list(uint32_t service,void *list,uint32_t capacity,uint
 }
 uintptr_t runtime_content_resolve(const char *name) {
     if (!strcmp(name,"g8cM39EUZ6o#libSceSysmodule")) return (uintptr_t)module_load;
+    if (!strcmp(name,"hHrGoGoNf+s#libSceSysmodule")) return (uintptr_t)module_load_arg;
     if (!strcmp(name,"fMP5NHUOaMk#libSceSysmodule")) return (uintptr_t)module_loaded;
     if (!strcmp(name,"eR2bZFAAU0Q#libSceSysmodule")) return (uintptr_t)module_unload;
     if (!strcmp(name,"R9lA82OraNs#libSceAppContent")) return (uintptr_t)content_init;
