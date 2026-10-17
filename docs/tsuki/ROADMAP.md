@@ -12,7 +12,7 @@ gow3_pc (God of War III Remastered), que a su vez viene de
 | Plataforma | Linux primero (máquina de desarrollo), Windows 10/11 después; Vulkan 1.3 |
 | Máquina de pruebas | Bazzite 44 (KDE Plasma 6.7, Wayland), AMD Ryzen 5 7600, 16 GB, **AMD Radeon RX 6650 XT** |
 | Dump | `Tsukihime/CUSA47999/` (sin versionar, ~45 GB) |
-| Última actualización | 2026-10-17 (tarde). Sin watchdog, el juego reproduce entero el vídeo del prólogo (se ve y se oye bien) y después para en `sceAudiodecCreateDecoder`, el primer decodificador ATRAC9 (Spec 4a). Su sitio de llamada da la estructura de control de Audiodec (Spec 4, 2.5). Por decisión del usuario solo se documenta. Antes, 2026-10-17: la fase 2A de la Spec 2 (guiada por los `STOP:`) termina tras 10 iteraciones: el juego abre `VideoOut`, presenta ~60 fotogramas por segundo y reproduce el vídeo del prólogo, sin ningún `STOP:` de libkernel. Falta ver qué pinta (hito). La Spec 4 se replantea en dos partes: **4a ATRAC9** (música, voces y efectos `vse`) y **4b HEVAG** (19 efectos de `vag.mrg`). 2026-10-14: revisión del orden tras un análisis adversarial (el kernel va primero, hay un hito de "primer fotograma", el borrado se parte en dos y el renombrado pasa al final; lo específico de GoW3 se elimina, no se desactiva) |
+| Última actualización | 2026-10-17 (noche). **La Spec 2 queda cerrada** con la fase 2B: en libkernel solo quedan las tres trampas decididas (`scePthreadCancel` y las dos de información de módulo), ya con nombre; `--check-imports` baja de 28 a 19, todo de las specs 3 y 4. Antes, 2026-10-17 (tarde): sin watchdog, el juego reproduce entero el vídeo del prólogo (se ve y se oye bien) y después para en `sceAudiodecCreateDecoder`, el primer decodificador ATRAC9 (Spec 4a). Su sitio de llamada da la estructura de control de Audiodec (Spec 4, 2.5). Por decisión del usuario solo se documenta. Antes, 2026-10-17: la fase 2A de la Spec 2 (guiada por los `STOP:`) termina tras 10 iteraciones: el juego abre `VideoOut`, presenta ~60 fotogramas por segundo y reproduce el vídeo del prólogo, sin ningún `STOP:` de libkernel. Falta ver qué pinta (hito). La Spec 4 se replantea en dos partes: **4a ATRAC9** (música, voces y efectos `vse`) y **4b HEVAG** (19 efectos de `vag.mrg`). 2026-10-14: revisión del orden tras un análisis adversarial (el kernel va primero, hay un hito de "primer fotograma", el borrado se parte en dos y el renombrado pasa al final; lo específico de GoW3 se elimina, no se desactiva) |
 
 ---
 
@@ -161,7 +161,7 @@ partida. Se corrige después del hito de primer fotograma, que es el primer mome
 |---|---|---|---|---|---|
 | 0 | Preparar el entorno (Linux) | Setup | — | — | ✅ Concluida |
 | 1 | Inventario de APIs faltantes | Diagnóstico | 0 | — | ✅ Concluida |
-| 2 | Kernel: event flags, tiempo, hilos (y lo mínimo de servicios para arrancar) | **Spec 2** | 1 | 3–5 días | 🟨 En curso (fase 2A terminada; falta la 2B) |
+| 2 | Kernel: event flags, tiempo, hilos (y lo mínimo de servicios para arrancar) | **Spec 2** | 1 | 3–5 días | ✅ Concluida (fases 2A y 2B; en libkernel solo quedan las 3 trampas decididas) |
 | 3 | Borrar hooks, patches, touchpad, tests e identidad de GoW3 | **Spec 1a** | 1 (en paralelo con la Spec 2) | 1–2 días | ⬜ Pendiente |
 | 4 | **Hito: primer fotograma** | Hito | Spec 2 | 1 día | ⬜ Pendiente (H1 ya cumplido: el juego presenta fotogramas y el vídeo del prólogo se ve bien en capturas del escritorio; antes del vídeo, el usuario vio un aviso de autoguardado, primer 2D del propio juego; faltan H2 y H3) |
 | 5 | Borrar las heurísticas de GPU de GoW3 | **Spec 1b** | Spec 1a, hito | 2–3 días | ⬜ Pendiente |
@@ -206,6 +206,7 @@ flowchart LR
 | — | Dump CUSA47999 v01.00 extraído (ShadPS4Plus `pkg_extractor`) en `Tsukihime/CUSA47999/`, ignorado en `.gitignore`. | — |
 | — | `prepare.py` y `link_modules.py` procesan el eboot sin errores: 104 enlaces nativos a `libc`/`Fios2`, 359 imports para el runtime, 0 parches `fs→gs`. | — |
 | 1 | Inventario estático (sección de la etapa 1): ~61 APIs sin implementación, 57 con nombre. | — |
+| 2 | Spec 2 (kernel) cerrada: 26 de las 29 APIs de libkernel implementadas y 3 trampas con nombre; en la fase 2A se adelantaron 15 APIs de la Spec 3 y una provisional de la 4. | `2531937`…`7244263` |
 
 ### Flujo de cada spec
 
@@ -285,7 +286,7 @@ AvPlayer existen en las tablas de shadPS4; **~61 sin implementación**.
 
 | Biblioteca | Faltan | Funciones | Spec |
 |---|---|---|---|
-| libkernel | 29 | Event flags (Create, Delete, Wait, Set, Cancel); GetProcessTimeCounter(+Frequency); ConvertUtcToLocaltime / LocaltimeToUtc; IsNeoMode; `_sceKernelSetThreadDtors`, `SetThreadAtexitCount`, `SetThreadAtexitReport`; GetSanitizerMalloc/NewReplaceExternal, IsAddressSanitizerEnabled; InternalMemoryGetModuleSegmentInfo, GetModuleInfoForUnwind; Getdents, Utimes, Chmod; `scePthreadCancel`, `scePthreadGetname`; `pthread_rwlock_rdlock/wrlock/unlock`; 3 sin nombre (`NhpspxdjEKU`, `Tz4RNUCBbGI`, `8OnWXlgQlvo`) | 2 |
+| libkernel | 29 | Event flags (Create, Delete, Wait, Set, Cancel); GetProcessTimeCounter(+Frequency); ConvertUtcToLocaltime / LocaltimeToUtc; IsNeoMode; `_sceKernelSetThreadDtors`, `SetThreadAtexitCount`, `SetThreadAtexitReport`; GetSanitizerMalloc/NewReplaceExternal, IsAddressSanitizerEnabled; InternalMemoryGetModuleSegmentInfo, GetModuleInfoForUnwind; Getdents, Utimes, Chmod; `scePthreadCancel`, `scePthreadGetname`; `pthread_rwlock_rdlock/wrlock/unlock`; 3 sin nombre (`NhpspxdjEKU`, `Tz4RNUCBbGI`, `8OnWXlgQlvo`; después: `_nanosleep` y `_sceKernelRtldThreadAtexitIncrement/Decrement`). **Cerrada (2026-10-17):** 26 hechas y 3 trampas con nombre (`scePthreadCancel`, `InternalMemoryGetModuleSegmentInfo`, `GetModuleInfoForUnwind`) | 2 |
 | libSceAudiodec | 6 | InitLibrary, TermLibrary, CreateDecoder, DeleteDecoder, Decode, ClearContext | 4a |
 | libSceAudiodecCpu | 3 | QueryMemSize, InitDecoder, Decode | 4b |
 | libSceSaveData | 5 | Initialize3, Mount2, UmountWithBackup, CheckBackupData, RestoreBackupData | 3 |
@@ -336,7 +337,8 @@ Native libc initialization is incomplete; game entry has not run.
   `Tz4RNUCBbGI` = `_sceKernelRtldThreadAtexitIncrement` y `8OnWXlgQlvo` =
   `_sceKernelRtldThreadAtexitDecrement`. Siguen sin nombre `NhpspxdjEKU` (libkernel) y
   `fJgP+wqifno` (DiscMap). Se resuelven desde el sitio de llamada cuando aparezcan como `STOP:`
-  (el log da "Caller return offset" y el primer argumento).
+  (el log da "Caller return offset" y el primer argumento). *Resueltos después (Spec 2):
+  `NhpspxdjEKU` = `_nanosleep` y `fJgP+wqifno` = `sceDiscMap_7C980FFB0AA27E7A`.*
 - **Cinco de los 61 ya tienen código** y solo les falta su línea en `src/import_names.inc`
   (`runtime_lookup` no los encuentra sin ella): `sceKernelGetProcessTimeCounter`,
   `sceKernelGetProcessTimeCounterFrequency`, `sceSaveDataInitialize3`, `sceSaveDataMount2` y
@@ -400,17 +402,33 @@ le responde con un error provisional, que el juego ignora.
 
 La fase 2A terminó en la iteración 10. Ya no hay `STOP:`: el juego abre `VideoOut`, llama a
 `sceGnmSubmitAndFlipCommandBuffers` ~60 veces por segundo y reproduce `prologue_en.mp4` por AvPlayer.
-Queda la fase 2B (cerrar libkernel para `--check-imports`) y el hito (saber qué se dibuja).
+Quedaban la fase 2B (cerrar libkernel para `--check-imports`; hecha, ver abajo) y el hito (saber qué se dibuja).
 
 Después, sin watchdog (`out/run-prologo.log`), el juego reproduce entero el vídeo del prólogo
 (6 min 29 s) y luego para en `sceAudiodecCreateDecoder`, de la Spec 4a. Sigue sin aparecer ningún
 `STOP:` de libkernel. El prólogo no se pudo saltar con Options, Cruz ni Círculo, así que cada prueba
 de lo que viene después cuesta esos 6 min 29 s. Registro en la sección 4.1 de la spec.
 
+**Fase 2B (2026-10-17, `7244263`): spec cerrada.** Se miró el sitio de llamada de las 12 que faltaban
+antes de escribir código. Todas menos `scePthreadCancel` las llama solo `libc.prx`:
+
+- `pthread_rwlock_*` POSIX: el lock de su tabla de módulos.
+- `scePthreadGetname`: el informe de `atexit` por hilo.
+- `ConvertUtcToLocaltime`/`LocaltimeToUtc`: `localtime`, `mktime` y `strftime %z`, con el desfase del
+  host y el horario de verano incluido, como `sceKernelGettimezone`.
+- `Getdents`/`Utimes`/`Chmod`: su `<filesystem>`, con `/app0` de solo lectura.
+
+Las tres trampas decididas tienen ya nombre, así que su `STOP:` dice qué API es. `--check-imports` no
+lista nada más de libkernel, y una ejecución de 60 s se comporta como la de la iteración 10. Queda
+abierto: las ramas Windows nuevas no se han compilado, y `tm_isdst` sale siempre 0 (spec, sección 9).
+
 **Criterios de aceptación**
 
 - [x] Test C de event flags: AND, OR, CLEAR_ALL, CLEAR_PAT, timeout, cancel, varios hilos.
-- [ ] El juego pasa del arranque a los logos sin `STOP:` de libkernel.
+- [ ] El juego pasa del arranque a los logos sin `STOP:` de libkernel. *Sin logos todavía: el
+  arranque llega sin `STOP:` de libkernel al aviso de autoguardado y al vídeo del prólogo, y lo
+  siguiente para en `sceAudiodecCreateDecoder` (Spec 4a). Se comprueba cuando la 4a deje pasar del
+  prólogo. No depende de más trabajo de esta spec.*
 - [x] Se llega al hito de primer fotograma (ver abajo): el juego presenta fotogramas (2026-10-17). La
   captura y la decisión son del hito.
 

@@ -41,6 +41,9 @@ with before/after captures; the `gow3` → `tsuki` rename is Spec 7, done last).
   libSceAudiodec (6) + libSceAudiodecCpu (3) — the game decodes audio through these, **not AJM** —
   SaveData (Initialize3, Mount2, backup APIs), ScreenShot, SharePlay, GameLiveStreaming,
   VideoRecording, Sysmodule, SystemService, UserService, MsgDialog, DiscMap, LibcInternalExt.
+  Spec 2 is closed (2026-10-17): libkernel has only three deliberate traps left
+  (`scePthreadCancel`, `sceKernelGetModuleInfoForUnwind`, `sceKernelInternalMemoryGetModuleSegmentInfo`);
+  `--check-imports` lists 19, all from Specs 3 and 4.
   GnmDriver/VideoOut/AvPlayer NIDs all exist in the shadPS4 tables. Cutscenes are 134 `.mp4` in
   `image/movie/` played through **`sceAvPlayer`** (not `sceVideodec`). libSceMouse is used and
   already covered. Start bring-up with

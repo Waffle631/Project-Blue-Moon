@@ -1,6 +1,7 @@
 # Spec 2 — Kernel: arranque de libc, event flags, tiempo, hilos y archivos
 
-Fecha: 2026-10-14. Estado: **borrador para aprobación**. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 2".
+Fecha: 2026-10-14. Estado: **cerrada (2026-10-17)**. Las fases 2A y 2B están hechas, y en libkernel
+solo quedan las tres trampas decididas en la sección 9. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 2".
 
 Marcas usadas en este documento: **[V]** hecho comprobado en el repo o en los logs (con el comando o
 la ruta); **[H]** hipótesis que hay que confirmar antes de implementar (cada una tiene su paso de
@@ -47,37 +48,37 @@ Fuera de alcance: servicios de plataforma (Spec 3), audio (Spec 4), vídeo (Spec
 
 | NID | Nombre | Estado |
 |---|---|---|
-| `rNhWz+lvOMU` | `_sceKernelSetThreadDtors` | falta |
-| `pB-yGZ2nQ9o` | `_sceKernelSetThreadAtexitCount` | falta |
-| `WhCc1w3EhSI` | `_sceKernelSetThreadAtexitReport` | falta |
-| `Tz4RNUCBbGI` | `_sceKernelRtldThreadAtexitIncrement` | **nombre nuevo**; falta |
-| `8OnWXlgQlvo` | `_sceKernelRtldThreadAtexitDecrement` | **nombre nuevo**; falta |
-| `BpFoboUJoZU` | `sceKernelCreateEventFlag` | hecha (`src/runtime_eventflag.c`) |
-| `8mql9OcQnd4` | `sceKernelDeleteEventFlag` | hecha (`src/runtime_eventflag.c`) |
-| `JTvBflhYazQ` | `sceKernelWaitEventFlag` | hecha (`src/runtime_eventflag.c`) |
-| `IOnSvHzqu6A` | `sceKernelSetEventFlag` | hecha (`src/runtime_eventflag.c`) |
-| `PZku4ZrXJqg` | `sceKernelCancelEventFlag` | hecha (`src/runtime_eventflag.c`) |
-| `fgxnMeTNUtY` | `sceKernelGetProcessTimeCounter` | **código existe**, falta línea en `import_names.inc` |
-| `BNowx2l588E` | `sceKernelGetProcessTimeCounterFrequency` | **código existe**, falta línea |
-| `-o5uEDpN+oY` | `sceKernelConvertUtcToLocaltime` | falta |
-| `0NTHN1NKONI` | `sceKernelConvertLocaltimeToUtc` | falta |
-| `WslcK1FQcGI` | `sceKernelIsNeoMode` | falta |
-| `py6L8jiVAN8` | `sceKernelGetSanitizerMallocReplaceExternal` | falta |
-| `bnZxYgAFeA0` | `sceKernelGetSanitizerNewReplaceExternal` | falta |
-| `jh+8XiK4LeE` | `sceKernelIsAddressSanitizerEnabled` | falta |
-| `-YTW+qXc3CQ` | `sceKernelInternalMemoryGetModuleSegmentInfo` | falta |
-| `RpQJJVKTiFM` | `sceKernelGetModuleInfoForUnwind` | falta |
-| `j2AIqSqJP0w` | `sceKernelGetdents` | falta (existe `sceKernelGetdirentries`, que es otra) |
-| `0Cq8ipKr9n0` | `sceKernelUtimes` | falta |
-| `fgIsQ10xYVA` | `sceKernelChmod` | falta |
-| `qBDmpCyGssE` | `scePthreadCancel` | falta |
-| `How7B8Oet6k` | `scePthreadGetname` | falta |
-| `iGjsr1WAtI0` | `pthread_rwlock_rdlock` | falta |
-| `sIlRvQqsN2Y` | `pthread_rwlock_wrlock` | falta |
-| `EgmLo6EWgso` | `pthread_rwlock_unlock` | falta |
-| `NhpspxdjEKU` | `_nanosleep` (**resuelto en el paso 5.7**) | falta (mismo contrato que `nanosleep`) |
+| `rNhWz+lvOMU` | `_sceKernelSetThreadDtors` | hecha (`src/runtime_thread.c`, `2531937`) |
+| `pB-yGZ2nQ9o` | `_sceKernelSetThreadAtexitCount` | hecha (se guarda y no se llama, `2531937`) |
+| `WhCc1w3EhSI` | `_sceKernelSetThreadAtexitReport` | hecha (se guarda y no se llama, `2531937`) |
+| `Tz4RNUCBbGI` | `_sceKernelRtldThreadAtexitIncrement` | **nombre nuevo**; hecha (`2531937`) |
+| `8OnWXlgQlvo` | `_sceKernelRtldThreadAtexitDecrement` | **nombre nuevo**; hecha (`2531937`) |
+| `BpFoboUJoZU` | `sceKernelCreateEventFlag` | hecha (`src/runtime_eventflag.c`, `93f6896`) |
+| `8mql9OcQnd4` | `sceKernelDeleteEventFlag` | hecha (`src/runtime_eventflag.c`, `93f6896`) |
+| `JTvBflhYazQ` | `sceKernelWaitEventFlag` | hecha (`src/runtime_eventflag.c`, `93f6896`) |
+| `IOnSvHzqu6A` | `sceKernelSetEventFlag` | hecha (`src/runtime_eventflag.c`, `93f6896`) |
+| `PZku4ZrXJqg` | `sceKernelCancelEventFlag` | hecha (`src/runtime_eventflag.c`, `93f6896`) |
+| `fgxnMeTNUtY` | `sceKernelGetProcessTimeCounter` | hecha: el código existía y faltaba la línea de `import_names.inc` (`60bc6aa`) |
+| `BNowx2l588E` | `sceKernelGetProcessTimeCounterFrequency` | hecha: solo faltaba la línea (`60bc6aa`) |
+| `-o5uEDpN+oY` | `sceKernelConvertUtcToLocaltime` | hecha (`src/runtime_kernel.c`, `7244263`) |
+| `0NTHN1NKONI` | `sceKernelConvertLocaltimeToUtc` | hecha (`src/runtime_kernel.c`, `7244263`) |
+| `WslcK1FQcGI` | `sceKernelIsNeoMode` | hecha: 0 (`dd95b87`) |
+| `py6L8jiVAN8` | `sceKernelGetSanitizerMallocReplaceExternal` | hecha: `NULL` (`dd95b87`) |
+| `bnZxYgAFeA0` | `sceKernelGetSanitizerNewReplaceExternal` | hecha: `NULL` (`dd95b87`) |
+| `jh+8XiK4LeE` | `sceKernelIsAddressSanitizerEnabled` | hecha: 0 (`dd95b87`) |
+| `-YTW+qXc3CQ` | `sceKernelInternalMemoryGetModuleSegmentInfo` | **trampa** con nombre (sección 9, `7244263`) |
+| `RpQJJVKTiFM` | `sceKernelGetModuleInfoForUnwind` | **trampa** con nombre (sección 9, `7244263`) |
+| `j2AIqSqJP0w` | `sceKernelGetdents` | hecha: `getdirentries` sin base (`src/runtime_file.c`, `7244263`) |
+| `0Cq8ipKr9n0` | `sceKernelUtimes` | hecha (`src/runtime_file.c`, `7244263`) |
+| `fgIsQ10xYVA` | `sceKernelChmod` | hecha (`src/runtime_file.c`, `7244263`) |
+| `qBDmpCyGssE` | `scePthreadCancel` | **trampa** con nombre (sección 9, `7244263`) |
+| `How7B8Oet6k` | `scePthreadGetname` | hecha (`src/runtime_thread.c`, `7244263`) |
+| `iGjsr1WAtI0` | `pthread_rwlock_rdlock` | hecha (`src/runtime_rwlock.c`, `7244263`) |
+| `sIlRvQqsN2Y` | `pthread_rwlock_wrlock` | hecha (`src/runtime_rwlock.c`, `7244263`) |
+| `EgmLo6EWgso` | `pthread_rwlock_unlock` | hecha (`src/runtime_rwlock.c`, `7244263`) |
+| `NhpspxdjEKU` | `_nanosleep` (**resuelto en el paso 5.7**) | hecha: reutiliza `posix_nanosleep` (`60bc6aa`) |
 
-Total: 29, todos con nombre. Esta spec añade los 29 a `import_names.inc`.
+Total: 29, todos con nombre y con su línea en `import_names.inc`: 26 implementadas y 3 trampas.
 
 ## 3. Diseño
 
@@ -171,9 +172,28 @@ Diagnóstico: `GOW3_TRACE_EVENTFLAG` imprime las esperas bloqueantes (igual que 
 ### 3.3 Bloque C — Tiempo
 
 - `GetProcessTimeCounter(+Frequency)`: solo `import_names.inc`.
-- `sceKernelConvertUtcToLocaltime` / `...LocaltimeToUtc` **[H]**: convierten un `time_t` usando la
-  zona horaria del host y devuelven el desfase; la firma exacta se saca del sitio de llamada del
-  juego (paso 5.5). Reutilizar `kernel_gettimezone` de `src/runtime_kernel.c`.
+- `sceKernelConvertUtcToLocaltime` / `...LocaltimeToUtc` **[V]** (paso 5.5). Solo las llama libc:
+  `localtime_r`, `mktime` y `strftime %z`. Firmas:
+
+  ```
+  typedef struct { time_t t; int32_t westsec; int32_t dstsec; } SceKernelTimesec;  /* 16 bytes */
+  int sceKernelConvertUtcToLocaltime(time_t utc, time_t *local, SceKernelTimesec *ts,
+                                     uint64_t *dst_sec /* NULL en los tres sitios */);
+  int sceKernelConvertLocaltimeToUtc(time_t local, int isdst /* tm_isdst */, time_t *utc,
+                                     SceKernelTimesec *ts, int32_t *dst_sec);
+  ```
+
+  - libc lee `local = utc + westsec + dstsec`. Pese al nombre, `westsec` son segundos al **este**:
+    `strftime %z` imprime `westsec` (más `*dst_sec` si `tm_isdst > 0`) como `+hhmm`.
+  - Fuera del registro, `mktime` usa `*dst_sec` para los casos de `tm_isdst > 0` sin horario de
+    verano y para las horas que no existen o se repiten.
+  - Modelo: el de `kernel_gettimezone`, que ahora comparte `utc_offset()` con ellas. El desfase es el
+    del host en ese instante, con el horario de verano incluido, y `dstsec` y `*dst_sec` valen
+    siempre 0. Por eso `isdst` no tiene nada que elegir y se ignora.
+  - LocaltimeToUtc busca el desfase en dos pasos: primero con `local` leído como UTC y después con
+    el resultado. Con un solo paso, una hora justo después de un cambio saldría con una hora de error.
+  - Si el puntero de resultado es NULL (`local` en UtcToLocaltime, `utc` en LocaltimeToUtc),
+    devuelven `EINVAL`. `ts` y `dst_sec` son opcionales.
 
 ### 3.4 Bloque D — Hilos y rwlock
 
@@ -182,14 +202,22 @@ Diagnóstico: `GOW3_TRACE_EVENTFLAG` imprime las esperas bloqueantes (igual que 
   este runtime devuelven un `errno` FreeBSD positivo (ver `posix(...)` en `src/runtime_thread.c`),
   no `0x8002xxxx`. Se escribe un envoltorio que convierta `0x8002xxxx` → `xxxx`. Los inicializadores
   estáticos (`PTHREAD_RWLOCK_INITIALIZER`) se comprueban con un test.
+  **[V]** Los seis sitios de llamada (libc `+0xb75e1`…`+0xbac12`) usan el mismo rwlock global
+  (`libc+0x128f60`, a 0 en la imagen: inicializador estático). Protege la tabla de módulos que
+  recorren el desenrollado y el iterador de módulos, y libc ignora el resultado.
 - `scePthreadGetname(thread, buf)`: copia `GuestThread.name` (campo que ya existe,
   `src/runtime_thread.c:47`, 32 bytes) al buffer del guest, con terminador. La API no recibe tamaño
   (el SDK usa un buffer de 32 bytes), así que no hay `ERANGE`: `ESRCH` si el hilo no existe y
-  `EINVAL` si `buf` es NULL.
-- `scePthreadCancel(thread)` **[H]**: la cancelación asíncrona de un hilo del juego dentro de
-  nuestras esperas (variables de condición) puede dejar el estado del runtime a medias. No se
-  implementa a ciegas: primero se mira quién la llama (paso 5.4). Hasta entonces queda como trampa
-  con `STOP:`, que es el comportamiento correcto para una API no implementada.
+  `EINVAL` si `buf` es NULL. **[V]** Su único sitio es el callback de informe de `atexit` por hilo
+  (`libc+0xb63a0`, que el runtime nunca llama), con un buffer de 32 bytes en la pila.
+- `scePthreadCancel(thread)`: la cancelación asíncrona de un hilo del juego dentro de nuestras
+  esperas (variables de condición) puede dejar el estado del runtime a medias. **[V]** (paso 5.4)
+  - La llaman solo los dos destructores de la clase de hilo del eboot (vtable `0x433110`;
+    `+0x12af2e`, `+0x12af9e`) y su método de parada (`+0x12b1d4`), y solo si el hilo sigue vivo
+    (`obj+0x78 ≠ 0`). Después llaman al método virtual `+0x40` y limpian el objeto.
+  - En los 6 min del prólogo salieron 3 hilos y no se llamó nunca.
+  - Queda como trampa con nombre (sección 9): si aparece, el `STOP:` dice `API: scePthreadCancel` y
+    el sitio de llamada indica qué hilo era.
 
 ### 3.5 Bloque E — Respuestas explícitas
 
@@ -197,12 +225,13 @@ Diagnóstico: `GOW3_TRACE_EVENTFLAG` imprime las esperas bloqueantes (igual que 
 |---|---|---|
 | `sceKernelIsNeoMode` | 0 | El runtime representa una PS4 base. Neo hace que algunos juegos pidan más resolución y memoria |
 | `sceKernelIsAddressSanitizerEnabled` | 0 | No hay sanitizer |
-| `sceKernelGetSanitizerMallocReplaceExternal` / `...NewReplaceExternal` **[H]** | devuelven "no hay reemplazo" | libc consulta si el malloc está reemplazado; la forma exacta (valor devuelto o parámetro de salida) sale del sitio de llamada |
-| `sceKernelGetModuleInfoForUnwind` | trampa (`STOP:`) hasta que el juego la llame (decidido, sección 9) | Lo usa el desenrollado de excepciones de C++. Devolver datos falsos corrompería el desenrollado. Si el juego lanza excepciones, aparecerá como `STOP:` y se implementa con los datos reales de `probe.c` |
-| `sceKernelInternalMemoryGetModuleSegmentInfo` | igual: trampa hasta ver el sitio de llamada | |
+| `sceKernelGetSanitizerMallocReplaceExternal` / `...NewReplaceExternal` **[V]** | `NULL` = "no hay reemplazo" (`dd95b87`) | Devuelven un puntero a una tabla de reemplazos de ASan (libc `+0x27d2e` y `+0x99ba4`). Con `NULL`, libc mantiene su asignador y sigue con `_sceKernelRtldSetApplicationHeapAPI` |
+| `sceKernelGetModuleInfoForUnwind` | trampa (`STOP:`) hasta que el juego la llame (decidido, sección 9) | Lo usa el desenrollado de excepciones de C++ (**[V]** único sitio: libc `+0xb8191`, `(addr, 1, &info)` con `info.size = 0x130`). Devolver datos falsos corrompería el desenrollado. Si el juego lanza excepciones, aparecerá como `STOP:` y se implementa con los datos reales de `probe.c` |
+| `sceKernelInternalMemoryGetModuleSegmentInfo` | igual: trampa hasta ver el sitio de llamada | **[V]** libc `+0x2c30e` y `+0x2c73f`, en un camino del montón que no se toma (ni en la init ni en los 6 min del prólogo). Si fallara, libc haría `int 0x44`, así que una respuesta inventada solo movería el fallo |
 
 Estas respuestas no son éxito simulado: devuelven un valor definido y se registran en el log la
-primera vez que se llaman.
+primera vez que se llaman. Las tres trampas tienen su nombre en `import_names.inc` para que el `STOP:`
+diga qué API es, y no se resuelven (test `--decided-traps`).
 
 ### 3.6 Bloque F — Archivos
 
@@ -212,6 +241,24 @@ primera vez que se llaman.
   `runtime_file_translate`; `/app0` es de solo lectura (`EROFS`/`EACCES`). Se detalla el valor tras
   ver quién las llama. Montajes escribibles (`/savedataN`, `/temp0`, `/download0`, `/data`): operan
   sobre el archivo del host.
+
+**[V]** (paso 5.6) Las tres las usa solo el `<filesystem>` de libc, no el eboot:
+
+- `Getdents` (libc `+0x95141`): el iterador de directorios. La API devuelve bytes, y libc trata
+  ≤ 0 como fin o error.
+- `Utimes(path, times)` (`+0x959c8`): `times` es `timeval[2]` (`{i64 sec; i64 usec}`, acceso y
+  modificación). libc mira solo si devuelve 0.
+- `Chmod(path, u16 mode)` (`+0x95cb6`, `+0x96367`): un error `0x8002xxxx` pasa a errno `xxxx`.
+
+Valores elegidos:
+
+- `/app0` y `/hostapp` devuelven `EROFS`, como `mkdir`/`unlink`/`rename` (`path_op`). La comprobación
+  va antes de traducir la ruta, así que un archivo que no existe en `/app0` también da `EROFS`.
+- `Utimes` con `NULL` pone la hora actual (como `utimes(2)`). Con `usec` fuera de [0, 10⁶) devuelve
+  `EINVAL`.
+- `Chmod` aplica `mode & 07777`.
+- En Windows, `Utimes` guarda segundos enteros (`_utime64`) y `Chmod` solo el bit de escritura del
+  dueño (el atributo de solo lectura).
 
 ## 4. Fases
 
@@ -318,6 +365,28 @@ Caller return offset: 0x113177; first argument: 0x1006eb2048
   botón o una pulsación más larga. Hasta saberlo, cada prueba de lo que va después del prólogo cuesta
   6 min 29 s.
 
+### 4.2 Fase 2B: cierre (2026-10-17, commit `7244263`)
+
+Quedaban 12 APIs sin nombre. Antes de escribir código se miraron sus sitios de llamada (pasos 5.4 a
+5.6; tabla de sitios en `out/callers-2b.txt`). Todas, salvo `scePthreadCancel`, las llama solo
+`libc.prx`, y ninguna salió como `STOP:` en la fase 2A.
+
+- Bloque D: `pthread_rwlock_*` con nombre POSIX y `scePthreadGetname` (sección 3.4).
+- Bloque C: las dos conversiones de hora (sección 3.3).
+- Bloque F: `Getdents`, `Utimes` y `Chmod` (sección 3.6).
+- Trampas: `scePthreadCancel`, `GetModuleInfoForUnwind` e `InternalMemoryGetModuleSegmentInfo`
+  siguen sin resolverse, pero ya tienen nombre en `import_names.inc` (sección 3.5).
+
+Resultado:
+
+- `--check-imports` (`out/check-2b.log`): en libkernel solo quedan las tres trampas, con nombre. El
+  total baja de 28 a 19, y los otros 16 son de las specs 3 y 4.
+- Tests: `bash build.sh --test` pasa entero (`out/test-2b.log`), y `python3 -m unittest discover -s
+  tests` da 250 OK y 37 omitidos (`out/pytest-2b.log`; 244 de la línea base más 6 nuevos).
+- Ejecución real de 60 s con partida (`out/run-2b.log`): igual que en la iteración 10. El juego entra
+  en `0xef390`, monta la partida y lo corta el watchdog, sin ningún `STOP:` de import ni `Fault:`. Las
+  APIs nuevas no se llaman en ese tramo, así que esta ejecución solo descarta regresiones del arranque.
+
 ## 5. Pasos de verificación (antes de escribir código de cada bloque)
 
 Método común: `objdump -D -b binary -mi386:x86-64 -M intel` sobre `out/boot-linked.bin` (la
@@ -339,8 +408,8 @@ nombrar el import de una ranura de GOT.
      registro devuelve -1) y Decrement(`dso`) en los caminos de error (sin memoria).
    - Hilo principal: no sale por `host_start`; ver la sección 3.1.
 2. **Event flags. ✅ (2026-10-17)** Tabla de la sección 3.2 corregida con shadPS4 upstream.
-3. **Uso real.** Con `GOW3_TRACE_EVENTFLAG` ver con qué argumentos llama el juego (atributos,
-   patrones, timeouts) y cuántos hilos esperan a la vez.
+3. **Uso real. ✅ (2026-10-17, cerrado con lo medido)** Con `GOW3_TRACE_EVENTFLAG` ver con qué
+   argumentos llama el juego (atributos, patrones, timeouts) y cuántos hilos esperan a la vez.
    Primeros datos, sin traza (2026-10-17, `out/run-2a-5.log`): 69 flags, **todos con `attr = 0x22`
    (PRIO + MULTI) y patrón inicial 0**: `scheduler event` (1), `waveout thread` (2), `at9 event` y
    `at9 thread` (32 de cada), `hevag decode thread` y `hevag waveout thread` (1 de cada). Hay 36
@@ -354,9 +423,22 @@ nombrar el import de una ranura de GOT.
    hilos de audio y del planificador. No se usan OR, CLEAR_PAT ni varios bits. Quedan sin medir los
    timeouts (la traza no los imprime y el watchdog corta antes de `runtime_report`) y cuántos hilos
    esperan a la vez.
-4. **`scePthreadCancel`.** Averiguar quién la llama y a qué hilo. Decidir entonces la estrategia.
-5. **Conversión de hora y sanitizer.** Mirar el sitio de llamada para fijar firma y valor devuelto.
-6. **Bloque F.** Mirar quién llama `Utimes` y `Chmod` y sobre qué rutas.
+   Cierre: los contadores de `runtime_report` del prólogo entero (`out/run-prologo.log`, sección 4.1)
+   dan 80 flags, 90 021 esperas y **ningún timeout** en 6 min. Sigue sin medirse cuántos hilos
+   esperan a la vez. No bloquea: los flags son MULTI, el test de estrés cubre varias esperas
+   simultáneas y en todo el prólogo no hubo ningún cuelgue.
+4. **`scePthreadCancel`. ✅ (2026-10-17)** Averiguar quién la llama y a qué hilo. Decidir entonces la
+   estrategia. Nota: la llaman los destructores de la clase de hilo del eboot y su método de parada,
+   solo si el hilo sigue vivo. No se llamó nunca en el prólogo, así que queda como trampa (sección 3.4).
+5. **Conversión de hora y sanitizer. ✅ (2026-10-17)** Mirar el sitio de llamada para fijar firma y
+   valor devuelto. Nota:
+   - Sanitizer: adelantado en `dd95b87` (sección 3.5).
+   - Conversión de hora: solo la usan `localtime_r` (libc `+0x1777`), `localtime` (`+0xb8d8`),
+     `mktime` (`+0xc104`…`+0xc15d`) y `strftime %z` (`+0x1fb73`). La firma, el registro de 16 bytes
+     y el sentido de `westsec` están en la sección 3.3.
+6. **Bloque F. ✅ (2026-10-17)** Mirar quién llama `Utimes` y `Chmod` y sobre qué rutas. Nota: solo el
+   `<filesystem>` de libc; las rutas son las que le pase el juego, y el eboot no lo usa en lo visto
+   hasta ahora. Contratos en la sección 3.6.
 7. **`NhpspxdjEKU`. ✅ (2026-10-17)** Es `_nanosleep` (NID calculado con `nid()`). libc lo llama en
    bucles de espera activa con `(&timespec, NULL)` (`+0x277f5`, `+0xbf745`, `+0xbf805`). Mismo
    contrato que `nanosleep`: reutiliza `posix_nanosleep` de `src/runtime_kernel.c`.
@@ -382,6 +464,23 @@ test de `pthread_rwlock_*` con nombre POSIX. Ejecución real: `GOW3_GAME_DIR=Tsu
 python3 run.py` con `--timeout` y el log bajo `out/` (el `/tmp` del sandbox no es visible en el
 contenedor).
 
+Hechos (2026-10-17). Todos entran por NID en `tests/test_runtime.c`, se ejecutan en el modo por
+defecto de `out/runtime-test` (`build.sh --test`) y cada uno tiene su subcomando y su test en
+`tests/test_runtime.py`. Se vieron fallar antes de implementar:
+
+- `--posix-rwlocks`: inicializador estático (handle NULL), los mismos objetos que `scePthreadRwlock*`,
+  errno positivos (`EDEADLK`, `EPERM`, `EINVAL`).
+- `--thread-name`: nombre corto, nombre de más de 31 caracteres recortado sin pasar de los 32 bytes,
+  `EINVAL` y `ESRCH`.
+- `--time-conversion`: zona `EST5EDT,M3.2.0,M11.1.0`. Invierno y verano en los dos sentidos, `isdst`
+  −1/0/1, la hora que se repite en noviembre, las 03:00 tras el cambio y la hora que no existe en
+  marzo. Un mutante con el desfase en un solo paso falla.
+- `--file-metadata`: `Getdents` hasta el fin del directorio, `EFAULT`/`EINVAL`/`EBADF`; `Utimes` con
+  microsegundos y con `NULL`, `EINVAL`, `EROFS` y `ENOENT`; `Chmod` en los mismos casos.
+- `--decided-traps`: las tres trampas tienen nombre y no se resuelven.
+- `test_explicit_answers_log_first_call_once` (solo Python): cada respuesta del bloque E escribe su
+  línea de log una sola vez, aunque se llame dos veces.
+
 ## 7. Archivos
 
 Nuevos: `src/runtime_eventflag.c`, `tests/test_eventflag.c`, `tests/test_eventflag.py`.
@@ -389,7 +488,10 @@ Modificados: `src/runtime.h` y `src/runtime.c` (resolver y `runtime_report`),
 `src/import_names.inc` (29 nombres), `tools/got_import.py` (`--linked`), `src/runtime_thread.c` (callbacks de salida de hilo,
 `scePthreadGetname`), `src/runtime_rwlock.c` (variantes POSIX), `src/runtime_kernel.c` (conversión de
 hora y respuestas explícitas), `src/runtime_file.c` (Getdents, Utimes, Chmod), `build.sh` (test
-nuevo). Windows: comprobar si `gpu/CMakeLists.txt` enumera `runtime_*.c` explícitamente.
+nuevo), `tests/test_runtime.c` y `tests/test_runtime.py`. Windows: `gpu/CMakeLists.txt` recoge
+`../src/runtime*.c` con `file(GLOB)`, así que no hay que tocarla. Las ramas `_WIN32` nuevas
+(`_utime64`, `_chmod`, `compat_utc_offset` en `utc_offset`) **no se han compilado**: falta probarlas
+en MSYS2.
 
 ## 8. Criterios de aceptación
 
@@ -397,17 +499,21 @@ nuevo). Windows: comprobar si `gpu/CMakeLists.txt` enumera `runtime_*.c` explíc
   (2026-10-17: 4 pares de hilos, 100 000 idas y vueltas en ~0,4 s; prueba de mutación del orden de
   limpieza, el resultado antes de limpiar, SINGLE, Cancel y Delete: todas detectadas).
 - [x] `bash build.sh --test` y `python3 -m unittest discover -s tests` siguen en la línea base
-  (2026-10-17, tras la iteración 10 de la fase 2A: todos los tests C pasan; Python 244 OK, 37 omitidos).
+  (2026-10-17, tras la iteración 10 de la fase 2A: todos los tests C pasan; Python 244 OK, 37 omitidos.
+  Tras la fase 2B: todos los tests C pasan; Python 250 OK, 37 omitidos).
 - [x] El juego pasa de `libc` a ejecutar su propio código (el log muestra su primera llamada)
   (2026-10-17: `Entering original x86-64 code at guest offset 0xef390` y, después, sus llamadas a
   SystemService, Sysmodule, UserService, AudioOut…; ver 4.1).
 - [x] Se llega al hito de primer fotograma sin `STOP:` de `libkernel` (2026-10-17, iteración 10: el
   juego presenta ~60 fotogramas por segundo y reproduce el vídeo del prólogo. La captura, los
   contadores y la decisión son del hito).
-- [ ] Fase 2B: `out/gow3-probe out/boot-linked.bin --app0 Tsukihime/CUSA47999 --check-imports` no lista
+- [x] Fase 2B: `out/gow3-probe out/boot-linked.bin --app0 Tsukihime/CUSA47999 --check-imports` no lista
   nada de `libkernel`, salvo lo que esta spec deje explícitamente como trampa (por ejemplo
-  `scePthreadCancel`) con su motivo anotado.
-- [ ] Cada respuesta explícita escribe una línea de log la primera vez que se llama.
+  `scePthreadCancel`) con su motivo anotado (2026-10-17, `out/check-2b.log`: solo `scePthreadCancel`,
+  `sceKernelInternalMemoryGetModuleSegmentInfo` y `sceKernelGetModuleInfoForUnwind`, ya con nombre.
+  Los motivos están en las secciones 3.4 y 3.5, y la decisión en la 9).
+- [x] Cada respuesta explícita escribe una línea de log la primera vez que se llama (2026-10-17: las
+  cuatro del bloque E, desde `dd95b87`. `test_runtime.py` comprueba que cada línea sale una sola vez).
 
 ## 9. Riesgos y preguntas abiertas
 
@@ -420,3 +526,9 @@ nuevo). Windows: comprobar si `gpu/CMakeLists.txt` enumera `runtime_*.c` explíc
 - **Decidido (2026-10-17, usuario):** `scePthreadCancel`, `GetModuleInfoForUnwind` y
   `InternalMemoryGetModuleSegmentInfo` quedan como trampa (`STOP:`) hasta que el juego las llame, en vez
   de implementarlas "por si acaso". Es la opción que respeta la regla de no fingir éxito.
+- **Abierto tras el cierre:** con el horario de verano incluido en el desfase, `localtime` deja
+  siempre `tm_isdst = 0`. La hora de pared es correcta, pero el juego no puede saber si hay horario de
+  verano. Para una novela visual (como mucho, fechas de partidas) no debería importar. Si importara,
+  `dstsec` tendría que salir de las reglas del host, también en `sceKernelGettimezone`.
+- **Abierto tras el cierre:** las ramas Windows del bloque F y de `utc_offset` están sin compilar
+  (sección 7).
