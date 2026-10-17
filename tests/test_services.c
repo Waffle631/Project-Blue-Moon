@@ -25,6 +25,7 @@ static int printed_lines(void (*f)(void)) {
     fclose(tmp); return lines;
 }
 static void shareplay_twice(void) { assert(shareplay_initialize(NULL,0x1800)==0 && shareplay_initialize(NULL,0x1800)==0); }
+static void live_streaming_twice(void) { assert(live_streaming_initialize(0x4000)==0 && live_streaming_initialize(0x4000)==0); }
 
 int main(void) {
     unsigned char param[128]={0}, result[64]={0}; /* the game zeroes the pointers it does not want */
@@ -102,6 +103,8 @@ int main(void) {
     /* "No effect" services (Spec 3, 4.1): 0, a log line on the first call only, every call counted. */
     assert(printed_lines(shareplay_twice)==1 && no_effect_calls[SHAREPLAY_INITIALIZE]==2);
     assert(printed_lines(shareplay_twice)==0 && no_effect_calls[SHAREPLAY_INITIALIZE]==4);
+    assert(printed_lines(live_streaming_twice)==1 && no_effect_calls[LIVE_STREAMING_INITIALIZE]==2);
+    assert(printed_lines(live_streaming_twice)==0 && no_effect_calls[LIVE_STREAMING_INITIALIZE]==4 && no_effect_calls[SHAREPLAY_INITIALIZE]==4);
     puts("services test: ok");
     return 0;
 }

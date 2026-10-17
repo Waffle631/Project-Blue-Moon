@@ -763,6 +763,7 @@
 {"1n37q1Bvc5Y#libSceSystemService","sceSystemServiceGetDisplaySafeAreaInfo"},
 {"x1UB9bwDSOw#libSceSystemService","sceSystemServiceDisableMusicPlayer"},
 {"isruqthpYcw#libSceSharePlay","sceSharePlayInitialize"},
+{"kvYEw2lBndk#libSceGameLiveStreaming","sceGameLiveStreamingInitialize"},
 {"HTrcDKlFKuM#libSceMsgDialog","sceMsgDialogClose"},
 {"wTpfglkmv34#libSceMsgDialog","sceMsgDialogProgressBarSetValue"},
 {"ERKzksauAJA#libSceSaveDataDialog","sceSaveDataDialogGetStatus"},
