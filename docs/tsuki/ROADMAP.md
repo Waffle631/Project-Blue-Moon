@@ -163,7 +163,7 @@ partida. Se corrige después del hito de primer fotograma, que es el primer mome
 | 1 | Inventario de APIs faltantes | Diagnóstico | 0 | — | ✅ Concluida |
 | 2 | Kernel: event flags, tiempo, hilos (y lo mínimo de servicios para arrancar) | **Spec 2** | 1 | 3–5 días | ✅ Concluida (fases 2A y 2B; en libkernel solo quedan las 3 trampas decididas) |
 | 3 | Borrar hooks, patches, touchpad, tests e identidad de GoW3 | **Spec 1a** | 1 (en paralelo con la Spec 2) | 1–2 días | ⬜ Pendiente |
-| 4 | **Hito: primer fotograma** | Hito | Spec 2 | 1 día | 🟨 En curso (H1 ya cumplido: el juego presenta fotogramas y el vídeo del prólogo se ve bien en capturas del escritorio; antes del vídeo, el usuario vio un aviso de autoguardado, primer 2D del propio juego; spec aprobada el 2026-10-18 con plan de implementación; faltan H2, H3 y H4) |
+| 4 | **Hito: primer fotograma** | Hito | Spec 2 | 1 día | 🟨 En curso (H1 ya cumplido: el juego presenta fotogramas y el vídeo del prólogo se ve bien en capturas del escritorio; antes del vídeo, el usuario vio un aviso de autoguardado, primer 2D del propio juego; spec aprobada el 2026-10-18 con plan de implementación; H2 hecho el 2026-10-18, línea `GPU:` al final del log; faltan H3 y H4) |
 | 5 | Borrar las heurísticas de GPU de GoW3 | **Spec 1b** | Spec 1a, hito | 2–3 días | ⬜ Pendiente |
 | 6 | Servicios del sistema que faltan | **Spec 3** | Spec 2 | 2–3 días | 🟨 En curso (15 de 23 APIs adelantadas en la Spec 2) |
 | 7a | Audio ATRAC9 (`libSceAudiodec`): música → voces → efectos `vse`, con investigación previa | **Spec 4a** | Spec 2 | 1–2 semanas, sin tope | ⬜ Pendiente (respuesta provisional de `InitLibrary` hecha en la Spec 2; `CreateDecoder` para el juego al final del prólogo; estructura de control vista en el desensamblado) |

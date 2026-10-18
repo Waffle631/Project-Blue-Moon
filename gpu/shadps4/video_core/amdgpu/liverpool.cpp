@@ -1336,8 +1336,11 @@ Liverpool::Task Liverpool::ProcessGraphics(std::span<const u32> dcb, std::span<c
     if (draw_prep) {
         draw_prep->EndSubmission();
     }
-    if (seq != NoSeq && Gow3Stats::enabled) {
+    // gow3: counted always, the final GPU: line of runtime_report reads it (gow3gpu_get_stats).
+    if (seq != NoSeq) {
         Gow3Stats::submissions.fetch_add(1, std::memory_order_relaxed);
+    }
+    if (seq != NoSeq && Gow3Stats::enabled) {
 #ifndef _WIN32 // gow3: per-thread rusage statistics are Linux-only
         if (rusage usage{}; getrusage(RUSAGE_THREAD, &usage) == 0) {
             Gow3Stats::gpu_user_us.store(u64(usage.ru_utime.tv_sec) * 1000000 + usage.ru_utime.tv_usec,

@@ -34,7 +34,8 @@ mayor incógnita. El hito termina con (a) una o más capturas reales, (b) una li
 - **[V]** *(Añadido el 2026-10-18.)* **Ya hay contadores, pero no salen en el log.** `Gow3Stats::draws`,
   `dispatches` y `submissions` (`gpu/shim/gow3_toggles.h`) se incrementan siempre
   (`vk_rasterizer.cpp`, `liverpool.cpp`); solo se imprimen cada 5 s con `GOW3_FRAME_STATS=1`
-  (`videoout/driver.cpp`). Faltan `flips` y `unimplemented`.
+  (`videoout/driver.cpp`). Faltan `flips` y `unimplemented`. *(Corregido el 2026-10-18, paso 1:
+  `submissions` solo se contaba con `GOW3_FRAME_STATS=1`; ahora se cuenta siempre.)*
 - **[V]** *(Añadido el 2026-10-18.)* **`runtime_report()` no se ejecuta con `--timeout`.** El watchdog
   (`src/probe.c`, `watchdog`) solo vuelca pilas y hace `_exit`, que es cómo terminó el H1. La línea de
   H2 debe salir también desde el watchdog.
@@ -182,10 +183,16 @@ siguiente. Todo se compila y ejecuta en el distrobox `ps4dev` (`docs/ENTORNO.md`
 
 0. **Spec corregida y aprobada.** ✅ (2026-10-18) Secciones 2, H2, H3 y 4 actualizadas con el volcado
    en bruto, los contadores existentes y el watchdog.
-1. **H2, contadores.**
+1. **H2, contadores.** ✅ (2026-10-18) Ejecución de 60 s con `--timeout 60`: el log termina con
+   `GPU: submits=7074 draws=145653 dispatches=0 flips=3537 unimplemented=0` (~59 flips/s).
+   Cambios respecto a lo previsto: `submissions` pasa a contarse siempre (antes solo con
+   `GOW3_FRAME_STATS=1`, ver sección 2); `flips` se cuenta al entrar en `Present`, antes de los
+   `return` por ventana minimizada o imagen del swapchain perdida; `unimplemented` también cuenta
+   `unimplemented` en minúscula (`vk_pipeline_cache.cpp`); el formato de la línea vive en
+   `runtime_gpu_stats_line` (`runtime.c`, sin stdio), que usan `runtime_report` y el watchdog.
    - `Gow3Stats` (`gow3_toggles.h`): añadir `flips` y `unimplemented`.
-   - `Presenter::Present`: `flips++` junto a `DebugState.IncFlipFrameNum()` (misma condición,
-     `!is_reusing_frame && is_game_frame`).
+   - `Presenter::Present`: `flips++` con la misma condición que `DebugState.IncFlipFrameNum()`
+     (`!is_reusing_frame && is_game_frame`).
    - `Common::Log::Write` (`log.cpp`): `unimplemented++` si el mensaje contiene `Unimplemented`.
    - `gow3gpu.h`/`gow3gpu.cpp`: `Gow3GpuStats` y `gow3gpu_get_stats` (solo lecturas atómicas).
    - `runtime_report` (`runtime.c`) imprime la línea `GPU:`; el watchdog (`probe.c`) la escribe con

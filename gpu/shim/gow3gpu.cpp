@@ -280,6 +280,13 @@ extern "C" unsigned gow3gpu_symbol_count(void) {
     return unsigned(g_symbols.size());
 }
 
+extern "C" void gow3gpu_get_stats(Gow3GpuStats* out) {
+    constexpr auto relaxed = std::memory_order_relaxed;
+    *out = {Gow3Stats::submissions.load(relaxed), Gow3Stats::draws.load(relaxed),
+            Gow3Stats::dispatches.load(relaxed), Gow3Stats::flips.load(relaxed),
+            Gow3Stats::unimplemented.load(relaxed)};
+}
+
 // Kernel service thread: runs boost::asio timers for equeue timer events.
 namespace Libraries::Kernel {
 boost::asio::io_context io_context;

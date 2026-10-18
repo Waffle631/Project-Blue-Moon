@@ -35,6 +35,11 @@ int gow3gpu_choice_begin(const char *title, const char *const *items, const char
 int gow3gpu_choice_poll(void);
 /* 1 while the in-game settings menu is open: the game's pad input is held neutral. */
 int gow3gpu_overlay_captures_input(void);
+/* Counters for the final GPU: line (runtime_report and the watchdog): command buffer
+ * submissions, draws, dispatches, guest flips presented, and warnings logged as unimplemented
+ * (only those passing GOW3_GPU_LOG). Atomic loads only: safe in a signal handler. */
+typedef struct { uint64_t submits, draws, dispatches, flips, unimplemented; } Gow3GpuStats;
+void gow3gpu_get_stats(Gow3GpuStats *out);
 /* Number of symbols registered by the vendored libraries (diagnostics). */
 unsigned gow3gpu_symbol_count(void);
 #ifdef __cplusplus

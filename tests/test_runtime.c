@@ -576,6 +576,21 @@ static void decided_traps(void) {
         {"-YTW+qXc3CQ#libkernel","sceKernelInternalMemoryGetModuleSegmentInfo"}};
     for (int i=0;i<3;++i) assert(!strcmp(runtime_import_name(traps[i][0]),traps[i][1]) && !runtime_resolve(traps[i][0],0));
 }
+/* runtime_report ends with the GPU: line (hito H2); nothing ran on the GPU, so all zero. */
+static void gpu_stats_line(void) {
+    char line[160];
+    size_t n=runtime_gpu_stats_line(line,sizeof(line));
+    assert(n==strlen(line) && !strcmp(line,"GPU: submits=0 draws=0 dispatches=0 flips=0 unimplemented=0\n"));
+    char small[8]; assert(runtime_gpu_stats_line(small,sizeof(small))==7 && !strcmp(small,"GPU: su"));
+    FILE *capture=tmpfile(); assert(capture);
+    fflush(stdout); int saved=dup(1); assert(saved>=0 && dup2(fileno(capture),1)==1);
+    runtime_report(); fflush(stdout);
+    assert(dup2(saved,1)==1); close(saved);
+    static char text[65536]; rewind(capture);
+    size_t length=fread(text,1,sizeof(text)-1,capture); text[length]=0; fclose(capture);
+    const char *last=strstr(text,"GPU: submits=");
+    assert(last && !strcmp(last,line));
+}
 int main(int argc,char **argv) {
     runtime_start(0); assert(runtime_resolve("bzQExy189ZI#libc",0)==0);
     runtime_start(1);
@@ -615,10 +630,10 @@ int main(int argc,char **argv) {
     if (argc>1 && !strcmp(argv[1],"--rtld-underflow")) {
         static int dso; GET(DsoCount,"8OnWXlgQlvo#libkernel")(&dso); return 99;
     }
-    libc_support(); posix_mutexes(); wall_time(); kernel_time_names(); sanitizer_and_neo(); heap_trace_info(); audiodec_provisional(); savedata_initialize3(); savedata_mount2(); savedata_umount_with_backup(); discmap_location(); exit_handlers(); guards(); mutexes(); direct_memory(); memory_primitives();
+    libc_support(); posix_mutexes(); wall_time(); kernel_time_names(); sanitizer_and_neo(); heap_trace_info(); audiodec_provisional(); savedata_initialize3(); savedata_mount2(); savedata_umount_with_backup(); discmap_location(); gpu_stats_line(); exit_handlers(); guards(); mutexes(); direct_memory(); memory_primitives();
     rw_lifecycle(); rw_concurrency(); rw_timeouts(); posix_rwlocks(); thread_get_name(); file_metadata(); decided_traps();
     time_conversion(); /* last: changes TZ */
     puts("PASS: callback lifecycle, guard ABI, mutex errors, shared direct memory, memory primitives, resolver scope, "
-         "POSIX rwlocks, thread names, file metadata, time conversion");
+         "POSIX rwlocks, thread names, file metadata, time conversion, GPU stats line");
     return 0;
 }

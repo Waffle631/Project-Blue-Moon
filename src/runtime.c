@@ -67,6 +67,22 @@ void runtime_start(uint64_t flags) {
 #endif
     stack_canary &= ~UINT64_C(255);
 }
+/* No stdio: the watchdog (probe.c) writes this line from its signal handler. */
+size_t runtime_gpu_stats_line(char *out, size_t size) {
+    Gow3GpuStats stats; gow3gpu_get_stats(&stats);
+    const char *names[] = {"GPU: submits=", " draws=", " dispatches=", " flips=", " unimplemented="};
+    const uint64_t values[] = {stats.submits, stats.draws, stats.dispatches, stats.flips, stats.unimplemented};
+    size_t n = 0;
+    for (int i = 0; i < 5; ++i) {
+        for (const char *c = names[i]; *c && n + 1 < size; ++c) out[n++] = *c;
+        char digits[20]; int d = 0; uint64_t v = values[i];
+        do { digits[d++] = (char)('0' + v % 10); v /= 10; } while (v);
+        while (d && n + 1 < size) out[n++] = digits[--d];
+    }
+    if (n + 1 < size) out[n++] = '\n';
+    if (size) out[n] = 0;
+    return n;
+}
 static void (*report_hook)(void); /* loader extras (ISA site counts) */
 void runtime_report(void) {
     printf("Runtime: _init_env=%zu, atexit=%zu, __cxa_atexit=%zu, registered handlers=%zu\n",
@@ -88,6 +104,7 @@ void runtime_report(void) {
     runtime_file_report();
     printf("Runtime: memory operations=%zu\n", (size_t)memory_calls);
     if (report_hook) report_hook();
+    char gpu[160]; runtime_gpu_stats_line(gpu, sizeof(gpu)); fputs(gpu, stdout); /* last line: docs/specs hito H2 */
 }
 void runtime_set_report_hook(void (*hook)(void)) { report_hook = hook; }
 static ABI void init_env(void) {

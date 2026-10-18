@@ -15,6 +15,7 @@
 #include "gow3_overlay.h"
 #include "gow3_settings.h"
 #include "gow3_graphics.h"
+#include "gow3_toggles.h"
 #include "video_core/renderer_vulkan/vk_temporal_upscaler.h"
 #include "video_core/renderer_vulkan/vk_presenter.h"
 #include "video_core/renderer_vulkan/vk_warmup_inbox.h"
@@ -667,6 +668,10 @@ void Presenter::PresentLoadingFrame() {
 }
 
 void Presenter::Present(Frame* frame, bool is_reusing_frame, bool is_game_frame) {
+    // gow3: counted before the early returns (minimized window, lost swapchain image).
+    if (!is_reusing_frame && is_game_frame) {
+        Gow3Stats::flips.fetch_add(1, std::memory_order_relaxed);
+    }
     // Free the frame for reuse
     const auto free_frame = [&] {
         if (!is_reusing_frame) {

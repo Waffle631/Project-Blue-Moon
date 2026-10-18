@@ -335,6 +335,8 @@ static void watchdog(int sig, siginfo_t *info, void *context) {
             at+=d->reclen;
         }
     usleep(100000);
+    char gpu[160]; size_t gpu_length=runtime_gpu_stats_line(gpu,sizeof(gpu)); /* last line, as in runtime_report */
+    { ssize_t written_=write(2,gpu,gpu_length); (void)written_; }
     _exit(128 + sig);
 }
 #endif

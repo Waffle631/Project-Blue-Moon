@@ -20,6 +20,9 @@ typedef void (ABI *GuestCallback)(void);
 void runtime_start(uint64_t capabilities);
 uintptr_t runtime_resolve(const char *name, int is_data);
 void runtime_report(void);
+/* "GPU: submits=… draws=… dispatches=… flips=… unimplemented=…\n" into out (NUL-terminated,
+ * truncated to size); returns its length. Async-signal-safe (probe.c watchdog). */
+size_t runtime_gpu_stats_line(char *out, size_t size);
 /* Called at the end of runtime_report (the loader adds its own counters). */
 void runtime_set_report_hook(void (*hook)(void));
 void runtime_finalize(void *dso);
