@@ -198,12 +198,21 @@ siguiente. Todo se compila y ejecuta en el distrobox `ps4dev` (`docs/ENTORNO.md`
    - `runtime_report` (`runtime.c`) imprime la línea `GPU:`; el watchdog (`probe.c`) la escribe con
      `write(2, …)` desde un búfer local, sin stdio en el manejador.
    - Test: `tests/test_runtime.c` comprueba que `runtime_report` imprime la línea `GPU:`.
-2. **H3a, módulo de captura** (`gow3_screenshot.{h,cpp}`, sin Vulkan): `ParseFrameList` sobre
-   `GOW3_SCREENSHOT_AT`, `GOW3_SCREENSHOT_DIR` (por defecto `out/baseline/`, se crea),
-   `RequestNow`/`ShouldCapture`, `FileName` (`frame_<NNNNNN>_<w>x<h>.png`) y `EncodePng` con FFmpeg
-   (`Bgra`/`Rgba`). Test `screenshot-test` en `gpu/CMakeLists.txt`, junto a `png-decode-test`:
-   codifica un buffer sintético, lo decodifica con `Gow3Png::DecodeRgba` y compara píxel a píxel; prueba
-   también la lista de fotogramas. Se ejecuta con `ninja -C out/gpu screenshot-test && out/gpu/screenshot-test`.
+2. **H3a, módulo de captura.** ✅ (2026-10-18) `gpu/shim/gow3_screenshot.{h,cpp}` y `screenshot-test`
+   en PASS; el módulo está en `libgow3gpu` pero nadie lo llama hasta el paso 3. Cambios respecto a lo
+   previsto: la lista y la petición de F12 viven en una clase `Schedule` (`Global()` la construye una
+   vez desde `GOW3_SCREENSHOT_AT`; una lista mal formada se avisa por stderr y no captura nada);
+   `OutputDirectory()` no crea el directorio al arrancar, lo crea `SavePng` en la primera captura;
+   `SavePng` (nuevo) codifica, escribe `<nombre>.part` y renombra, para que nunca quede un PNG a
+   medias; el PNG es RGB, sin alfa (el alfa presentado no significa nada y a menudo vale 0). El test
+   usa un gradiente de 7×5 con alfa variable en los dos órdenes, comprueba que el orden equivocado
+   intercambia rojo y azul, y cubre listas inválidas, la petición de un solo uso y los errores de escritura.
+   - Previsto: `gow3_screenshot.{h,cpp}`, sin Vulkan: `ParseFrameList` sobre
+     `GOW3_SCREENSHOT_AT`, `GOW3_SCREENSHOT_DIR` (por defecto `out/baseline/`, se crea),
+     `RequestNow`/`ShouldCapture`, `FileName` (`frame_<NNNNNN>_<w>x<h>.png`) y `EncodePng` con FFmpeg
+     (`Bgra`/`Rgba`). Test `screenshot-test` en `gpu/CMakeLists.txt`, junto a `png-decode-test`:
+     codifica un buffer sintético, lo decodifica con `Gow3Png::DecodeRgba` y compara píxel a píxel; prueba
+     también la lista de fotogramas. Se ejecuta con `ninja -C out/gpu screenshot-test && out/gpu/screenshot-test`.
 3. **H3b, presentador y tecla.** `PrepareFrame` cuenta fotogramas y, si `ShouldCapture(n)`, reutiliza el
    camino de `frame_dump` para `output` (generalizar `DumpRaw` en vez de duplicarlo); el callback
    codifica el PNG. F12 en `gow3_overlay.cpp:HandleEvent` llama a `RequestNow()` (sin variable de

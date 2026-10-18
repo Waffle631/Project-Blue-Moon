@@ -301,6 +301,10 @@ target_link_libraries(motion-shader-test PRIVATE gow3gpu)
 add_executable(png-decode-test EXCLUDE_FROM_ALL ../tests/test_png_decode.cpp shim/gow3_png.cpp)
 target_compile_options(png-decode-test PRIVATE -UNDEBUG -Wall -Wextra -Werror)
 target_link_libraries(png-decode-test PRIVATE PkgConfig::FFMPEG)
+add_executable(screenshot-test EXCLUDE_FROM_ALL ../tests/test_screenshot.cpp shim/gow3_screenshot.cpp
+    shim/gow3_png.cpp)
+target_compile_options(screenshot-test PRIVATE -UNDEBUG -Wall -Wextra -Werror)
+target_link_libraries(screenshot-test PRIVATE PkgConfig::FFMPEG)
 add_executable(aliasing-test EXCLUDE_FROM_ALL ../tests/test_aliasing.cpp
     shadps4/video_core/texture_cache/aliasing.cpp shadps4/video_core/texture_cache/host_compatibility.cpp)
 target_compile_options(aliasing-test PRIVATE -UNDEBUG)
