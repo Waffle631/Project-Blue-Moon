@@ -163,7 +163,7 @@ partida. Se corrige después del hito de primer fotograma, que es el primer mome
 | 1 | Inventario de APIs faltantes | Diagnóstico | 0 | — | ✅ Concluida |
 | 2 | Kernel: event flags, tiempo, hilos (y lo mínimo de servicios para arrancar) | **Spec 2** | 1 | 3–5 días | ✅ Concluida (fases 2A y 2B; en libkernel solo quedan las 3 trampas decididas) |
 | 3 | Borrar hooks, patches, touchpad, tests e identidad de GoW3 | **Spec 1a** | 1 (en paralelo con la Spec 2) | 1–2 días | ⬜ Pendiente |
-| 4 | **Hito: primer fotograma** | Hito | Spec 2 | 1 día | ⬜ Pendiente (H1 ya cumplido: el juego presenta fotogramas y el vídeo del prólogo se ve bien en capturas del escritorio; antes del vídeo, el usuario vio un aviso de autoguardado, primer 2D del propio juego; faltan H2 y H3) |
+| 4 | **Hito: primer fotograma** | Hito | Spec 2 | 1 día | 🟨 En curso (H1 ya cumplido: el juego presenta fotogramas y el vídeo del prólogo se ve bien en capturas del escritorio; antes del vídeo, el usuario vio un aviso de autoguardado, primer 2D del propio juego; spec aprobada el 2026-10-18 con plan de implementación; faltan H2, H3 y H4) |
 | 5 | Borrar las heurísticas de GPU de GoW3 | **Spec 1b** | Spec 1a, hito | 2–3 días | ⬜ Pendiente |
 | 6 | Servicios del sistema que faltan | **Spec 3** | Spec 2 | 2–3 días | 🟨 En curso (15 de 23 APIs adelantadas en la Spec 2) |
 | 7a | Audio ATRAC9 (`libSceAudiodec`): música → voces → efectos `vse`, con investigación previa | **Spec 4a** | Spec 2 | 1–2 semanas, sin tope | ⬜ Pendiente (respuesta provisional de `InitLibrary` hecha en la Spec 2; `CreateDecoder` para el juego al final del prólogo; estructura de control vista en el desensamblado) |
@@ -217,7 +217,7 @@ flowchart LR
 5. Validación: tests automáticos y ejecución real del juego. Si la spec toca el renderizador, se
    captura el mismo fotograma antes y después con la herramienta de captura de píxeles del hito y se
    comparan con `tools/compare_captures.sh`.
-6. El usuario hace el commit (Claude no hace commits) y se actualiza el estado en esta página.
+6. Puedes hacer commits y se actualiza el estado en esta página.
 
 ---
 
@@ -495,9 +495,11 @@ cómo dibuja este juego en el traductor de GPU, y es la mayor incógnita del pro
    draws) o hasta el siguiente `STOP:`.
 2. Capturar los primeros fotogramas y guardarlos en `out/baseline/` (**no se versionan**: son imágenes
    del juego). `GOW3_FRAME_CAPTURE_KEY=1` + F11 **no sirve para esto**: escribe una lista de pasos en
-   texto, no una imagen, y el proyecto no tiene captura de píxeles (se quitó al vendorizar el
-   presentador). Hacer esa herramienta, **en proceso** (decidido el 2026-10-14), es un entregable del
-   hito (ver su spec).
+   texto, no una imagen, y el proyecto no tiene captura de píxeles en PNG (se quitó al vendorizar el
+   presentador). Sí existe un volcado en bruto (`GOW3_FRAME_DUMP_TRIGGER`, archivos `.raw`), que la
+   herramienta nueva reutiliza (revisado el 2026-10-18). Hacer esa herramienta, **en proceso**
+   (decidido el 2026-10-14), es un entregable del hito (ver su spec, que desde el 2026-10-18 incluye el
+   plan de implementación en la sección 7).
 3. Anotar los avisos de GPU del log (`Unimplemented ...`, formatos no soportados, etc.).
 4. Decidir según el resultado:
 
@@ -856,7 +858,6 @@ Las configuraciones y saves antiguos no se migran (no hay usuarios de los nombre
 | Mirar el resultado del hito de primer fotograma y decidir con el autor cómo seguir | Hito |
 | Aprobar las capturas de línea base (una por una) | Hito, Spec 1b, Spec 6 |
 | Probar el recorrido en el juego e informar de lo que vio y oyó | Specs 4 a 6 |
-| Hacer los commits (Claude no los hace) | Todas |
 
 ---
 
