@@ -157,6 +157,9 @@ dispositivos y `MESA_VK_DEVICE_SELECT=<vendor:device>` fuerza uno.
   GOW3_GAME_DIR=Tsukihime/CUSA47999 GOW3_FULLSCREEN=1 GOW3_TIMEOUT=40 \
     GOW3_SCREENSHOT_AT=300,1500 python3 run.py > out/run-capturas.log 2>&1
   ```
+- `tools/compare_captures.sh a.png b.png` compara dos capturas píxel a píxel (filtro `psnr` de
+  ffmpeg, sin tolerancia): `idéntico` (sale 0) o `diferente: PSNR=<dB>` (sale 1). Un archivo que
+  falta, que no es una imagen o de otro tamaño es un error (sale 2).
 - `GOW3_PAD_FILE`, `GOW3_PAD_RECORD` / `GOW3_PAD_REPLAY` — entrada de mando por guion.
 - `gdb --args out/gow3-probe out/boot-linked.bin --app0 Tsukihime/CUSA47999` — `gdb` viene en el
   bloque `dnf`.

@@ -236,7 +236,20 @@ siguiente. Todo se compila y ejecuta en el distrobox `ps4dev` (`docs/ENTORNO.md`
    camino de `frame_dump` para `output` (generalizar `DumpRaw` en vez de duplicarlo); el callback
    codifica el PNG. F12 en `gow3_overlay.cpp:HandleEvent` llama a `RequestNow()` (sin variable de
    activación, a diferencia de F11). Una línea de log por captura: `Screenshot: <ruta> (fotograma N)`.
-4. **H3c, comparación.** `tools/compare_captures.sh a.png b.png` (`psnr` de ffmpeg): `idéntico` si el
+4. **H3c, comparación.** ✅ (2026-10-18) `tools/compare_captures.sh` y
+   `tests/test_compare_captures.py` (4 tests) en PASS. Python: 254 OK / 37 saltados. Con capturas
+   reales del paso 3, el fotograma 300 contra sí mismo da `idéntico` y contra el 900 da
+   `diferente: PSNR=20.029325`; eso ya cumple el criterio de `compare_captures.sh` de la sección 5,
+   que se marca al cerrar el hito.
+   Cambios respecto a lo previsto: además de los argumentos mal puestos, también salen con código 2 un
+   archivo que falta, uno que no es una imagen y dos imágenes de distinto tamaño (con `ffprobe` antes
+   del `psnr`, que si no fallaría con un error poco claro). Los mensajes de error van a stderr.
+   **[V]** Las fuentes `color`/`testsrc` de lavfi se generan en YUV y pierden los cambios de un solo
+   paso en RGB: `color=c=0x000001` sale idéntico byte a byte a `0x000000`. Por eso el test de "sin
+   tolerancia" crea el PNG desde `rawvideo` RGB y cambia en 1 un canal de un solo píxel. El `psnr` lo
+   detecta, porque compara en RGB (`r:`/`g:`/`b:`) y no en YUV. Se comprobó que el test falla si el
+   script tolera PSNR ≥ 50.
+   - Previsto: `tools/compare_captures.sh a.png b.png` (`psnr` de ffmpeg): `idéntico` si el
    promedio es `inf` (salida 0), `diferente: PSNR=<dB>` (salida 1), error de uso (salida 2).
    `tests/test_compare_captures.py` (se salta sin `ffmpeg`) con PNG sintéticos.
 5. **H4, ejecución real.** Barrido con `GOW3_SCREENSHOT_AT=$(seq -s, 120 300 3000)` y
