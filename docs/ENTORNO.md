@@ -144,7 +144,19 @@ dispositivos y `MESA_VK_DEVICE_SELECT=<vendor:device>` fuerza uno.
   `python3 tools/got_import.py [--linked] <offset>` dice qué import está enlazado a un slot de la GOT
   (`--linked`: lee `out/boot-linked.bin`, que incluye `libc.prx`).
 - `--timeout N` arma el watchdog; `kill -USR2 <tid>` vuelca la pila de un hilo.
-- `GOW3_FRAME_CAPTURE_KEY` (F11 por defecto) — captura de un frame.
+- `GOW3_FRAME_CAPTURE_KEY=1` + F11 — escribe la lista de pasos de un fotograma en texto
+  (`frame_<fecha>_<n>.txt`); no es una imagen.
+- Capturas PNG del fotograma presentado (sin el overlay de ImGui): F12 captura el siguiente, y
+  `GOW3_SCREENSHOT_AT=120,600` los fotogramas de presentación indicados (el primero es el 1). Van a
+  `GOW3_SCREENSHOT_DIR` (por defecto `out/baseline/`, sin versionar) como
+  `frame_<NNNNNN>_<ancho>x<alto>.png`, y cada una deja `Screenshot: <ruta> (frame N)` en el log. El
+  tamaño es el de la ventana: para comparar ejecuciones, usar siempre `GOW3_FULLSCREEN=1`
+  (1920×1080 en este monitor). Con `run.py`, `GOW3_TIMEOUT=N` arma el watchdog.
+
+  ```bash
+  GOW3_GAME_DIR=Tsukihime/CUSA47999 GOW3_FULLSCREEN=1 GOW3_TIMEOUT=40 \
+    GOW3_SCREENSHOT_AT=300,1500 python3 run.py > out/run-capturas.log 2>&1
+  ```
 - `GOW3_PAD_FILE`, `GOW3_PAD_RECORD` / `GOW3_PAD_REPLAY` — entrada de mando por guion.
 - `gdb --args out/gow3-probe out/boot-linked.bin --app0 Tsukihime/CUSA47999` — `gdb` viene en el
   bloque `dnf`.

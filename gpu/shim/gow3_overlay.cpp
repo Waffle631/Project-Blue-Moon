@@ -18,6 +18,7 @@
 #include "gow3_actors.h"
 #include "gow3_graphics.h"
 #include "gow3_perf_stats.h"
+#include "gow3_screenshot.h"
 #include "../../src/actor_hook.h"
 
 extern Gow3ActorSlot gow3_actor_slots[2];
@@ -971,6 +972,11 @@ bool HandleEvent(const SDL_Event& event) {
         }();
         if (down && !event.key.repeat && capture_key && event.key.key == SDLK_F11) {
             Vulkan::FrameCapture::Request();
+            return true;
+        }
+        // PNG of the next presented frame (gow3_screenshot.h); always on, unlike F11.
+        if (down && !event.key.repeat && event.key.key == SDLK_F12) {
+            Gow3Screenshot::Global().RequestNow();
             return true;
         }
         if (down && !event.key.repeat &&

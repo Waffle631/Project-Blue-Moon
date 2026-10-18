@@ -13,6 +13,7 @@
 #include "video_core/renderdoc.h"
 #include "video_core/renderer_vulkan/vk_platform.h"
 #include "gow3_overlay.h"
+#include "gow3_screenshot.h"
 #include "gow3_settings.h"
 #include "gow3_graphics.h"
 #include "gow3_toggles.h"
@@ -33,9 +34,11 @@
 #include <ctime>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iomanip>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <span>
 #include <sstream>
 #include <system_error>
@@ -347,10 +350,11 @@ static vk::Format GetFrameViewFormat(const Libraries::VideoOut::PixelFormat form
     return {};
 }
 
-// gow3: raw copy of an image for GOW3_FRAME_DUMP_TRIGGER, written once the GPU is done.
-static void DumpRaw(const Instance& instance, Scheduler& scheduler, vk::CommandBuffer cmdbuf,
-                    vk::Image image, vk::ImageLayout layout, u32 w, u32 h, const char* name,
-                    int index) {
+// gow3: copies a 32-bit image to host memory and hands the pixels to `sink` on the scheduler's
+// priority thread once the GPU is done (GOW3_FRAME_DUMP_TRIGGER raw dumps, PNG screenshots).
+using HostImageSink = std::function<void(const u8* pixels, u32 w, u32 h)>;
+static void CopyToHost(const Instance& instance, Scheduler& scheduler, vk::CommandBuffer cmdbuf,
+                       vk::Image image, vk::ImageLayout layout, u32 w, u32 h, HostImageSink sink) {
     const VkBufferCreateInfo buffer_ci{.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
                                        .size = VkDeviceSize(w) * h * 4,
                                        .usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT};
@@ -362,24 +366,50 @@ static void DumpRaw(const Instance& instance, Scheduler& scheduler, vk::CommandB
     VmaAllocationInfo info{};
     if (vmaCreateBuffer(instance.GetAllocator(), &buffer_ci, &alloc_ci, &buffer, &allocation,
                         &info) != VK_SUCCESS) {
+        LOG_WARNING(Render_Vulkan, "No host buffer for a {}x{} frame copy", w, h);
         return;
     }
     cmdbuf.copyImageToBuffer(image, layout, buffer,
                              vk::BufferImageCopy{.imageSubresource = {vk::ImageAspectFlagBits::eColor, 0, 0, 1},
                                                  .imageExtent = {w, h, 1}});
+    scheduler.DeferPriorityOperation([allocator = instance.GetAllocator(), buffer, allocation, info,
+                                      w, h, sink = std::move(sink)] {
+        vmaInvalidateAllocation(allocator, allocation, 0, VK_WHOLE_SIZE);
+        sink(static_cast<const u8*>(info.pMappedData), w, h);
+        vmaDestroyBuffer(allocator, buffer, allocation);
+    });
+}
+
+// gow3: GOW3_FRAME_DUMP_TRIGGER: the pixels as they are, in GOW3_DUMP_DIR (default out/dump).
+static void DumpRaw(const Instance& instance, Scheduler& scheduler, vk::CommandBuffer cmdbuf,
+                    vk::Image image, vk::ImageLayout layout, u32 w, u32 h, const char* name,
+                    int index) {
     const char* dir = std::getenv("GOW3_DUMP_DIR");
     char path[512];
     std::snprintf(path, sizeof(path), "%s/%s_%03d_%ux%u.raw", dir && *dir ? dir : "out/dump", name,
                   index, w, h);
-    scheduler.DeferPriorityOperation([allocator = instance.GetAllocator(), buffer, allocation, info,
-                                      size = buffer_ci.size, file = std::string{path}] {
-        vmaInvalidateAllocation(allocator, allocation, 0, VK_WHOLE_SIZE);
-        if (FILE* f = std::fopen(file.c_str(), "wb")) {
-            std::fwrite(info.pMappedData, 1, size, f);
-            std::fclose(f);
-        }
-        vmaDestroyBuffer(allocator, buffer, allocation);
-    });
+    CopyToHost(instance, scheduler, cmdbuf, image, layout, w, h,
+               [file = std::string{path}](const u8* pixels, u32 w, u32 h) {
+                   if (FILE* f = std::fopen(file.c_str(), "wb")) {
+                       std::fwrite(pixels, 1, std::size_t(w) * h * 4, f);
+                       std::fclose(f);
+                   }
+               });
+}
+
+// gow3: byte order of a presented frame for Gow3Screenshot; nothing for formats a PNG would
+// misrepresent (10-bit, HDR), which are reported and never captured with swapped channels.
+static std::optional<Gow3Screenshot::PixelOrder> ScreenshotOrder(vk::Format format) {
+    switch (format) {
+    case vk::Format::eB8G8R8A8Unorm:
+    case vk::Format::eB8G8R8A8Srgb:
+        return Gow3Screenshot::PixelOrder::Bgra;
+    case vk::Format::eR8G8B8A8Unorm:
+    case vk::Format::eR8G8B8A8Srgb:
+        return Gow3Screenshot::PixelOrder::Rgba;
+    default:
+        return std::nullopt;
+    }
 }
 
 Frame* Presenter::PrepareFrame(const Libraries::VideoOut::BufferAttributeGroup& attribute,
@@ -390,6 +420,11 @@ Frame* Presenter::PrepareFrame(const Libraries::VideoOut::BufferAttributeGroup& 
     static const char* frame_dump_trigger = std::getenv("GOW3_FRAME_DUMP_TRIGGER");
     static int frame_dump_index = 0;
     const bool frame_dump = frame_dump_trigger && std::remove(frame_dump_trigger) == 0;
+    // gow3: presentation frame number (one PrepareFrame per guest flip, the first is 1) for
+    // GOW3_SCREENSHOT_AT and F12 (gow3_screenshot.h): the presented image is saved as a PNG.
+    static u64 presented_frames = 0;
+    const u64 frame_number = ++presented_frames;
+    const bool screenshot = Gow3Screenshot::Global().ShouldCapture(frame_number);
     // gow3: scaled upscaler presets: the output-size display buffer drawn by the port.
     TemporalUpscaler::Display display{};
     const bool upscaled = rasterizer->GetUpscaler().DisplayOverride(cpu_address, display);
@@ -498,16 +533,44 @@ Frame* Presenter::PrepareFrame(const Libraries::VideoOut::BufferAttributeGroup& 
     pp_settings.srgb_input =
         attribute.attrib.pixel_format == Libraries::VideoOut::PixelFormat::A2R10G10B10Srgb;
     pp_pass.Render(cmdbuf, image_view, image_size, *frame, pp_settings);
-    if (frame_dump) {
+    const auto screenshot_order = ScreenshotOrder(swapchain.GetSurfaceFormat().format);
+    const bool save_png = screenshot && screenshot_order && !frame->is_hdr;
+    if (screenshot && !save_png) {
+        LOG_WARNING(Render_Vulkan, "Screenshot of frame {} skipped: format {}{} has no PNG mapping",
+                    frame_number, vk::to_string(swapchain.GetSurfaceFormat().format),
+                    frame->is_hdr ? " (HDR)" : "");
+    }
+    if (frame_dump || save_png) {
         // The presented image as the swapchain blit reads it (General after the pass).
         const vk::MemoryBarrier2 done{.srcStageMask = vk::PipelineStageFlagBits2::eAllCommands,
                                       .srcAccessMask = vk::AccessFlagBits2::eMemoryWrite,
                                       .dstStageMask = vk::PipelineStageFlagBits2::eTransfer,
                                       .dstAccessMask = vk::AccessFlagBits2::eTransferRead};
         cmdbuf.pipelineBarrier2({.memoryBarrierCount = 1, .pMemoryBarriers = &done});
+    }
+    if (frame_dump) {
         DumpRaw(instance, draw_scheduler, cmdbuf, frame->image, vk::ImageLayout::eGeneral,
                 frame->width, frame->height, "output", frame_dump_index);
         ++frame_dump_index;
+    }
+    if (save_png) {
+        // Only the game's frame: the ImGui overlay is drawn later, into the swapchain image.
+        CopyToHost(instance, draw_scheduler, cmdbuf, frame->image, vk::ImageLayout::eGeneral,
+                   frame->width, frame->height,
+                   [frame_number, order = *screenshot_order](const u8* pixels, u32 w, u32 h) {
+                       std::filesystem::path written;
+                       std::string error;
+                       if (Gow3Screenshot::SavePng(Gow3Screenshot::OutputDirectory(), frame_number,
+                                                   pixels, w, h, order, written, error)) {
+                           // Straight to stderr: the default GPU log level hides LOG_INFO.
+                           std::fprintf(stderr, "Screenshot: %s (frame %llu)\n",
+                                        written.string().c_str(),
+                                        static_cast<unsigned long long>(frame_number));
+                       } else {
+                           LOG_WARNING(Render_Vulkan, "Screenshot of frame {} failed: {}",
+                                       frame_number, error);
+                       }
+                   });
     }
 
     // Flush frame creation commands.

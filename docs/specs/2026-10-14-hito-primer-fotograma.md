@@ -110,7 +110,11 @@ Captura en proceso del fotograma presentado, en PNG.
   `gow3gpu.cpp:328-331` se dejan como están: son la API de upstream para capturas con y sin overlays,
   y H3 usa su propio módulo.
 - El número de fotograma de presentación es un contador de llamadas a `PrepareFrame` (una por flip del
-  guest).
+  guest). *(Paso 3: el primero es el 1.)*
+- **[V]** *(Añadido el 2026-10-18, paso 3.)* `output` tiene el tamaño de la **ventana**, no el del
+  búfer del guest (1781×1002 en una ventana normal, 1920×1080 con `GOW3_FULLSCREEN=1`). Dos capturas
+  solo son comparables con el mismo tamaño, así que las capturas de referencia se hacen siempre con
+  `GOW3_FULLSCREEN=1`.
 - Comparación: `tools/compare_captures.sh a.png b.png` con el filtro `psnr` de ffmpeg
   (`ffmpeg -i a.png -i b.png -lavfi psnr -f null -`); "idéntico" = `inf`. Sin dependencias nuevas.
 - Determinismo: las escenas estáticas (logo, ventana de texto, menú) son repetibles; para el resto
@@ -213,7 +217,22 @@ siguiente. Todo se compila y ejecuta en el distrobox `ps4dev` (`docs/ENTORNO.md`
      (`Bgra`/`Rgba`). Test `screenshot-test` en `gpu/CMakeLists.txt`, junto a `png-decode-test`:
      codifica un buffer sintético, lo decodifica con `Gow3Png::DecodeRgba` y compara píxel a píxel; prueba
      también la lista de fotogramas. Se ejecuta con `ninja -C out/gpu screenshot-test && out/gpu/screenshot-test`.
-3. **H3b, presentador y tecla.** `PrepareFrame` cuenta fotogramas y, si `ShouldCapture(n)`, reutiliza el
+3. **H3b, presentador y tecla.** ✅ (2026-10-18) Ejecución de 40 s con
+   `GOW3_SCREENSHOT_AT=1,300,900,1500,2100`: cinco PNG con los colores bien (aviso de autoguardado en
+   el 300, vídeo del prólogo en el 1500) y una línea `Screenshot:` por captura; el log sigue terminando
+   con `GPU: … unimplemented=0`. Con `GOW3_FULLSCREEN=1`, `frame_000300_1920x1080.png`. Tests sin
+   cambios (`build.sh --test` en PASS, Python 250 OK / 37 saltados, `--vulkan-only` PASS).
+   Cambios respecto a lo previsto: `DumpRaw` se parte en `CopyToHost` (copia a un buffer del host y
+   entrega los píxeles a un destino en el hilo de prioridad del planificador) y un `DumpRaw` que solo
+   escribe el `.raw`; la captura PNG es otro destino de `CopyToHost`. La línea es
+   `Screenshot: <ruta> (frame N)`, en inglés como el resto del log, y se escribe con `fprintf(stderr)`:
+   con `LOG_INFO` no se vería con el nivel de log por defecto (`warn`). Los fallos de escritura van por
+   `LOG_WARNING`. Además de los formatos que no son `B8G8R8A8*`/`R8G8B8A8*`, tampoco se captura con HDR
+   activo (los valores van en PQ). El tamaño es el de la ventana (sección H3). F12 no funciona mientras
+   el diálogo de elección del overlay está abierto (`HandleChoiceEvent` se lleva los eventos antes).
+   Sin test nuevo: lo que se puede probar sin Vulkan ya lo cubre `screenshot-test` (paso 2); el resto
+   se comprobó en la ejecución real. La pulsación real de F12 queda para el paso 5.
+   - Previsto: `PrepareFrame` cuenta fotogramas y, si `ShouldCapture(n)`, reutiliza el
    camino de `frame_dump` para `output` (generalizar `DumpRaw` en vez de duplicarlo); el callback
    codifica el PNG. F12 en `gow3_overlay.cpp:HandleEvent` llama a `RequestNow()` (sin variable de
    activación, a diferencia de F11). Una línea de log por captura: `Screenshot: <ruta> (fotograma N)`.
@@ -221,7 +240,7 @@ siguiente. Todo se compila y ejecuta en el distrobox `ps4dev` (`docs/ENTORNO.md`
    promedio es `inf` (salida 0), `diferente: PSNR=<dB>` (salida 1), error de uso (salida 2).
    `tests/test_compare_captures.py` (se salta sin `ffmpeg`) con PNG sintéticos.
 5. **H4, ejecución real.** Barrido con `GOW3_SCREENSHOT_AT=$(seq -s, 120 300 3000)` y
-   `GOW3_GPU_LOG=info` (log en `out/run-hito.log`); elegir al menos dos escenas (aviso de autoguardado
+   `GOW3_GPU_LOG=info` y `GOW3_FULLSCREEN=1` (log en `out/run-hito.log`); elegir al menos dos escenas (aviso de autoguardado
    y un fotograma del vídeo), repetirlas y comprobar su determinismo con `compare_captures.sh`; leer la
    línea `GPU:`; aplicar la tabla de H4; escribir la decisión y la re-estimación en el roadmap.
 
