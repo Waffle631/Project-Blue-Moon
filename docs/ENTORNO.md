@@ -159,7 +159,11 @@ dispositivos y `MESA_VK_DEVICE_SELECT=<vendor:device>` fuerza uno.
   ```
 - `tools/compare_captures.sh a.png b.png` compara dos capturas píxel a píxel (filtro `psnr` de
   ffmpeg, sin tolerancia): `idéntico` (sale 0) o `diferente: PSNR=<dB>` (sale 1). Un archivo que
-  falta, que no es una imagen o de otro tamaño es un error (sale 2).
+  falta, que no es una imagen o de otro tamaño es un error (sale 2). Entre dos ejecuciones, el mismo
+  número de fotograma da la misma imagen en el 2D del juego (el aviso de autoguardado, fotograma 300),
+  pero no en los vídeos: AvPlayer sigue el reloj real.
+- Para ver qué teclas recibe el juego: `SDL_EVENT_LOGGING=1 SDL_LOGGING='*=info'` escribe cada evento
+  de SDL en el log (`SDL EVENT: SDL_EVENT_KEY_DOWN …`).
 - `GOW3_PAD_FILE`, `GOW3_PAD_RECORD` / `GOW3_PAD_REPLAY` — entrada de mando por guion.
 - `gdb --args out/gow3-probe out/boot-linked.bin --app0 Tsukihime/CUSA47999` — `gdb` viene en el
   bloque `dnf`.

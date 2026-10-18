@@ -12,7 +12,7 @@ gow3_pc (God of War III Remastered), que a su vez viene de
 | Plataforma | Linux primero (máquina de desarrollo), Windows 10/11 después; Vulkan 1.3 |
 | Máquina de pruebas | Bazzite 44 (KDE Plasma 6.7, Wayland), AMD Ryzen 5 7600, 16 GB, **AMD Radeon RX 6650 XT** |
 | Dump | `Tsukihime/CUSA47999/` (sin versionar, ~45 GB) |
-| Última actualización | 2026-10-17 (noche). **La Spec 2 queda cerrada** con la fase 2B: en libkernel solo quedan las tres trampas decididas (`scePthreadCancel` y las dos de información de módulo), ya con nombre; `--check-imports` baja de 28 a 19, todo de las specs 3 y 4. Antes, 2026-10-17 (tarde): sin watchdog, el juego reproduce entero el vídeo del prólogo (se ve y se oye bien) y después para en `sceAudiodecCreateDecoder`, el primer decodificador ATRAC9 (Spec 4a). Su sitio de llamada da la estructura de control de Audiodec (Spec 4, 2.5). Por decisión del usuario solo se documenta. Antes, 2026-10-17: la fase 2A de la Spec 2 (guiada por los `STOP:`) termina tras 10 iteraciones: el juego abre `VideoOut`, presenta ~60 fotogramas por segundo y reproduce el vídeo del prólogo, sin ningún `STOP:` de libkernel. Falta ver qué pinta (hito). La Spec 4 se replantea en dos partes: **4a ATRAC9** (música, voces y efectos `vse`) y **4b HEVAG** (19 efectos de `vag.mrg`). 2026-10-14: revisión del orden tras un análisis adversarial (el kernel va primero, hay un hito de "primer fotograma", el borrado se parte en dos y el renombrado pasa al final; lo específico de GoW3 se elimina, no se desactiva) |
+| Última actualización | 2026-10-18. **El hito de primer fotograma queda cerrado:** hay imagen correcta, así que se sigue el orden previsto. El aviso de autoguardado, primer 2D del propio juego, sale nítido y con los colores bien, y el vídeo del prólogo también. En los logs no hay ningún `Unimplemented` (línea `GPU:` al final). Hay herramienta de captura PNG (`GOW3_SCREENSHOT_AT`, F12) y de comparación exacta (`tools/compare_captures.sh`), con la línea base en `out/baseline/`. Esfuerzos re-estimados en la sección 4. Antes, 2026-10-17 (noche): **la Spec 2 queda cerrada** con la fase 2B: en libkernel solo quedan las tres trampas decididas (`scePthreadCancel` y las dos de información de módulo), ya con nombre; `--check-imports` baja de 28 a 19, todo de las specs 3 y 4. Antes, 2026-10-17 (tarde): sin watchdog, el juego reproduce entero el vídeo del prólogo (se ve y se oye bien) y después para en `sceAudiodecCreateDecoder`, el primer decodificador ATRAC9 (Spec 4a). Su sitio de llamada da la estructura de control de Audiodec (Spec 4, 2.5). Por decisión del usuario solo se documenta. Antes, 2026-10-17: la fase 2A de la Spec 2 (guiada por los `STOP:`) termina tras 10 iteraciones: el juego abre `VideoOut`, presenta ~60 fotogramas por segundo y reproduce el vídeo del prólogo, sin ningún `STOP:` de libkernel. Falta ver qué pinta (hito). La Spec 4 se replantea en dos partes: **4a ATRAC9** (música, voces y efectos `vse`) y **4b HEVAG** (19 efectos de `vag.mrg`). 2026-10-14: revisión del orden tras un análisis adversarial (el kernel va primero, hay un hito de "primer fotograma", el borrado se parte en dos y el renombrado pasa al final; lo específico de GoW3 se elimina, no se desactiva) |
 
 ---
 
@@ -155,7 +155,9 @@ El orden sigue una regla: **primero lo que acerca el juego a pintar algo, luego 
 comprobar con eso, y lo que solo es limpieza, al final.**
 
 La columna de esfuerzo es una **propuesta gruesa del autor, sin medir**, para tener un punto de
-partida. Se corrige después del hito de primer fotograma, que es el primer momento con datos reales.
+partida. Se corrigió al cerrar el hito de primer fotograma (2026-10-18), el primer momento con datos
+reales: la Spec 1b baja de 2–3 a 1–2 días y la Spec 5 de 2–4 a 2–3 días; las demás no cambian. Los
+motivos están en la sección "Hito".
 
 | # | Etapa | Tipo | Depende de | Esfuerzo (propuesta) | Estado |
 |---|---|---|---|---|---|
@@ -163,13 +165,13 @@ partida. Se corrige después del hito de primer fotograma, que es el primer mome
 | 1 | Inventario de APIs faltantes | Diagnóstico | 0 | — | ✅ Concluida |
 | 2 | Kernel: event flags, tiempo, hilos (y lo mínimo de servicios para arrancar) | **Spec 2** | 1 | 3–5 días | ✅ Concluida (fases 2A y 2B; en libkernel solo quedan las 3 trampas decididas) |
 | 3 | Borrar hooks, patches, touchpad, tests e identidad de GoW3 | **Spec 1a** | 1 (en paralelo con la Spec 2) | 1–2 días | ⬜ Pendiente |
-| 4 | **Hito: primer fotograma** | Hito | Spec 2 | 1 día | 🟨 En curso (H1 ya cumplido: el juego presenta fotogramas y el vídeo del prólogo se ve bien en capturas del escritorio; antes del vídeo, el usuario vio un aviso de autoguardado, primer 2D del propio juego; spec aprobada el 2026-10-18 con plan de implementación; H2 hecho el 2026-10-18, línea `GPU:` al final del log; faltan H3 y H4) |
-| 5 | Borrar las heurísticas de GPU de GoW3 | **Spec 1b** | Spec 1a, hito | 2–3 días | ⬜ Pendiente |
+| 4 | **Hito: primer fotograma** | Hito | Spec 2 | 1 día (real: ~1 día) | ✅ Concluido el 2026-10-18 (imagen correcta: el aviso de autoguardado y el vídeo del prólogo se ven bien; `unimplemented=0`; capturas PNG y `compare_captures.sh` con línea base en `out/baseline/`; se sigue el orden previsto) |
+| 5 | Borrar las heurísticas de GPU de GoW3 | **Spec 1b** | Spec 1a, hito | 1–2 días (antes 2–3) | ⬜ Pendiente (el hito ya está) |
 | 6 | Servicios del sistema que faltan | **Spec 3** | Spec 2 | 2–3 días | 🟨 En curso (15 de 23 APIs adelantadas en la Spec 2) |
 | 7a | Audio ATRAC9 (`libSceAudiodec`): música → voces → efectos `vse`, con investigación previa | **Spec 4a** | Spec 2 | 1–2 semanas, sin tope | ⬜ Pendiente (respuesta provisional de `InitLibrary` hecha en la Spec 2; `CreateDecoder` para el juego al final del prólogo; estructura de control vista en el desensamblado) |
 | 7b | Audio HEVAG (`libSceAudiodecCpu`): efectos de `vag.mrg`, con investigación previa | **Spec 4b** | Spec 4a (música y voces) | sin estimar, sin tope | ⬜ Pendiente |
-| 8 | Vídeo (AvPlayer) | **Spec 5** | Specs 2 y 3 | 2–4 días | ⬜ Pendiente (el prólogo se ve y se oye entero; no se salta con botones; posible reproducción más rápida que el tiempo real) |
-| 9 | 2D correcto, ratón y saves | **Spec 6** | Hito (empieza), Specs 1b, 3, 4 y 5 (cierra) | 1–3 semanas | ⬜ Pendiente |
+| 8 | Vídeo (AvPlayer) | **Spec 5** | Specs 2 y 3 | 2–3 días (antes 2–4) | ⬜ Pendiente (el prólogo se ve y se oye entero; no se salta con botones; posible reproducción más rápida que el tiempo real) |
+| 9 | 2D correcto, ratón y saves | **Spec 6** | Hito (empieza), Specs 1b, 3, 4 y 5 (cierra) | 1–3 semanas | ⬜ Pendiente (se puede empezar: el hito está cerrado) |
 | 10 | Renombrar `gow3` → `tsuki` | **Spec 7** | Spec 6 | 2–3 días | ⬜ Pendiente |
 
 **Total: 8 specs (la 4 en dos partes) y 1 hito** (pueden crecer según lo que aparezca al ejecutar el juego).
@@ -207,6 +209,7 @@ flowchart LR
 | — | `prepare.py` y `link_modules.py` procesan el eboot sin errores: 104 enlaces nativos a `libc`/`Fios2`, 359 imports para el runtime, 0 parches `fs→gs`. | — |
 | 1 | Inventario estático (sección de la etapa 1): ~61 APIs sin implementación, 57 con nombre. | — |
 | 2 | Spec 2 (kernel) cerrada: 26 de las 29 APIs de libkernel implementadas y 3 trampas con nombre; en la fase 2A se adelantaron 15 APIs de la Spec 3 y una provisional de la 4. | `2531937`…`7244263` |
+| 4 | Hito de primer fotograma cerrado: línea `GPU:` al final del log, capturas PNG del fotograma presentado (`GOW3_SCREENSHOT_AT`, F12), `tools/compare_captures.sh`, línea base en `out/baseline/` y decisión: seguir el orden previsto. | `8c40e39`…`5acfafe` + cierre |
 
 ### Flujo de cada spec
 
@@ -513,6 +516,39 @@ cómo dibuja este juego en el traductor de GPU, y es la mayor incógnita del pro
 
 **Listo cuando:** hay al menos una captura del juego en `out/baseline/` y una decisión anotada.
 
+**Resultado (cerrado el 2026-10-18).** Los detalles están en la spec, secciones H1 a H4 y 7.
+
+- **Qué se ve.** El juego muestra primero el aviso de autoguardado: es su propio 2D, con texto nítido
+  con antialiasing, colores correctos y el icono animado de "Saving…". Después viene el vídeo del
+  prólogo, con la imagen y los subtítulos en inglés correctos. Ni franjas ni corrupción.
+- **Log.** Un barrido de 60 s termina con
+  `GPU: submits=7090 draws=147129 dispatches=0 flips=3545 unimplemented=0`. Los únicos avisos son 5 de
+  formatos que la tarjeta no soporta y 1 de una extensión que falta, ninguno del juego.
+- **Herramientas nuevas.**
+  - Capturas PNG del fotograma presentado: `GOW3_SCREENSHOT_AT=<n,…>` o la tecla F12.
+  - `tools/compare_captures.sh`: compara exacto, sin tolerancia.
+  - Para capturas comparables hay que lanzar siempre con `GOW3_FULLSCREEN=1`, porque la captura tiene
+    el tamaño de la ventana.
+  - Comandos en `docs/ENTORNO.md`.
+- **Línea base.** `out/baseline/` tiene 10 capturas, una cada 300 fotogramas entre el 120 y el 2820.
+- **Determinismo.**
+  - El aviso, pedido por número de fotograma, sale idéntico en dos ejecuciones (fotograma 300).
+  - El vídeo no: AvPlayer sigue el reloj real, y el fotograma 1620 da `PSNR=31.9` entre ejecuciones
+    (misma escena, otro instante).
+  - Por tanto, las comparaciones píxel a píxel valen para el 2D del juego. El vídeo solo se puede
+    comparar a ojo.
+- **Decisión: primera fila de la tabla, se sigue el orden previsto.** No hace falta una spec de
+  renderizado.
+- **Límite de lo visto.** La ventana de texto, los fondos, los sprites y los fundidos llegan después
+  del prólogo, y el juego para antes en `sceAudiodecCreateDecoder`. Hasta que la Spec 4a (fase A) deje
+  pasar del prólogo, la Spec 6 y la Spec 1b solo pueden comparar el aviso y el vídeo.
+- **Re-estimación.** El hito costó ~1 día, como se preveía.
+  - Spec 1b: de 2–3 a 1–2 días. La captura y la comparación ya existen y hay una escena repetible.
+  - Spec 5: de 2–4 a 2–3 días. El vídeo ya se ve bien; quedan la sincronía, saltarlo con botones y la
+    velocidad.
+  - Specs 1a, 3, 4a, 4b, 6 y 7: sin cambios. Casi todo el 2D de la novela sigue sin verse, así que la
+    Spec 6 mantiene sus 1–3 semanas.
+
 ---
 
 ### Spec 1b — Eliminar las heurísticas de GPU de GoW3
@@ -531,6 +567,9 @@ tiene forma de comprobarse. Por eso esta spec va después del hito.
 **Orden de trabajo**
 
 1. Con las heurísticas aún presentes, capturar los fotogramas del hito (ya están en `out/baseline/`).
+   Para comparar píxel a píxel sirve el aviso de autoguardado pedido por número de fotograma (por
+   ejemplo `GOW3_SCREENSHOT_AT=300`, con `GOW3_FULLSCREEN=1`). Los fotogramas del vídeo cambian entre
+   ejecuciones porque siguen el reloj real (ver el resultado del hito).
 2. Borrar una heurística, compilar, pasar tests y recapturar.
 3. Comparar las capturas (diferencia de píxeles). Si cambian, entender por qué antes de seguir; si el
    cambio es el esperado (la heurística actuaba sobre algo de GoW3), anotarlo y actualizar la línea base.
@@ -834,7 +873,7 @@ Las configuraciones y saves antiguos no se migran (no hay usuarios de los nombre
 | `libSceAudiodec` no tiene implementación HLE de referencia: ABI, estructuras y errores se deducen del juego | Alto | Spec 4a con fase de investigación y `docs/audiodec.md` antes de implementar; sin tope de tiempo. Para `libSceAudiodecCpu` hay estructuras en el PR #5289 de shadPS4 (sin fusionar) |
 | HEVAG no lo decodifica ni LibAtrac9 ni FFmpeg | Bajo (solo 19 efectos) | Adaptar `decode_hevag` de vgmstream (licencia tipo ISC, compatible con la GPL-2.0), Spec 4b |
 | Audiodec se llama antes del primer draw y podría bloquear el hito | Medio | Respuesta provisional con error explícito, que el juego ignora. Visto el 2026-10-17: `CreateDecoder` no llega hasta el final del prólogo, así que no bloquea el hito, pero sí pasar del prólogo (fase A de 4a) |
-| El traductor de GPU no dibuja bien una novela visual (nunca se ha visto un draw de este juego) | Alto | Hito de primer fotograma antes que la implementación del audio y del vídeo; Spec 6 empieza en cuanto hay hito; revisar el roadmap tras el hito |
+| El traductor de GPU no dibuja bien una novela visual | Medio (antes Alto) | Hito cerrado el 2026-10-18: el aviso de autoguardado (2D del juego) y el vídeo salen bien y no hay ningún `Unimplemented`. Queda el resto del 2D de la novela, que no se verá hasta pasar del prólogo (Spec 4a); la Spec 6 lo revisa con capturas aprobadas |
 | "Cubierta" se confunde con "funciona" (Mouse parecía cubierta y es un stub) | Medio | Cubierta solo si tiene test o el juego la llamó en un recorrido real; ratón pasa a la Spec 6 como trabajo nuevo |
 | SDK 11.008, mucho más nuevo que el de GoW3: comportamientos del kernel no vistos | Medio | Seguir la semántica de shadPS4; registrar todo lo nuevo en el log |
 | AvPlayer de shadPS4 inmaduro (sincronía, eventos) | Medio | Probar opening y títulos de capítulo pronto; seguir upstream |
@@ -842,9 +881,9 @@ Las configuraciones y saves antiguos no se migran (no hay usuarios de los nombre
 | Borrar heurísticas del renderizador (Spec 1b) rompe el dibujo sin que se sepa qué cambió | Medio | Se hace después del hito, una heurística por vez, con captura antes y después |
 | Borrar por error código compartido con lo genérico | Medio | Borrar por pasos, compilar y pasar los tests tras cada uno; la historia queda en git y en la rama `gow3` |
 | El renombrado masivo rompe el build o una variable queda a medias (el juego ignora la opción sin avisar) | Medio | Va al final (Spec 7), con recorrido grabado y capturas como oráculo; renombrar por capas con `git mv`; sin alias; script de comprobación con excepciones explícitas |
-| Defecto de render RDNA2 (franjas oscuras) documentado en `docs/plans/2026-10-12-gpu-corruption-rdna2.md`; la máquina de pruebas es una Navi 23 | Bajo | Visto solo en Windows y en la ruta de MSAA de GoW3, que borra la Spec 1b; `--vulkan-only` pasa en RADV. Se revisa si aparece algo parecido en el hito |
+| Defecto de render RDNA2 (franjas oscuras) documentado en `docs/plans/2026-10-12-gpu-corruption-rdna2.md`; la máquina de pruebas es una Navi 23 | Bajo | Visto solo en Windows y en la ruta de MSAA de GoW3, que borra la Spec 1b; `--vulkan-only` pasa en RADV. En el hito (2026-10-18) no apareció nada parecido |
 | El juego no elige inglés o mezcla recursos de otro idioma | Bajo | El runtime ya reporta inglés; verificar `_en` en el log de archivos abiertos |
-| Sin estimaciones fiables de esfuerzo | Bajo | Las de la sección 4 son una propuesta; se corrigen tras el hito |
+| Sin estimaciones fiables de esfuerzo | Bajo | Las de la sección 4 son una propuesta; se corrigieron tras el hito (2026-10-18) y se vuelven a revisar cuando se vea el 2D de la novela |
 | Licencia | Bajo | Mantener GPL-2.0 y los créditos; no distribuir nunca archivos del juego (tampoco capturas: `out/baseline/` no se versiona) |
 
 ---
@@ -855,7 +894,7 @@ Las configuraciones y saves antiguos no se migran (no hay usuarios de los nombre
 |---|---|
 | Compilar en la máquina de desarrollo y registrar la línea base de tests | Etapa 0 |
 | Aprobar cada spec antes de la implementación | Specs 1a, 1b, 2 a 7 |
-| Mirar el resultado del hito de primer fotograma y decidir con el autor cómo seguir | Hito |
+| ~~Mirar el resultado del hito de primer fotograma y decidir con el autor cómo seguir~~ Hecho el 2026-10-18: seguir el orden previsto | Hito |
 | Aprobar las capturas de línea base (una por una) | Hito, Spec 1b, Spec 6 |
 | Probar el recorrido en el juego e informar de lo que vio y oyó | Specs 4 a 6 |
 

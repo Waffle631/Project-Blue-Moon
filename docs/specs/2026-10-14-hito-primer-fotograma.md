@@ -1,6 +1,7 @@
 # Hito — Primer fotograma (y herramienta de captura de píxeles)
 
-Fecha: 2026-10-14. Estado: **aprobada el 2026-10-18** (con las correcciones de la sección 2 y el plan
+Fecha: 2026-10-14. Estado: **cerrada el 2026-10-18**: hay imagen correcta y se sigue el orden del
+roadmap (H4). Aprobada el mismo día (con las correcciones de la sección 2 y el plan
 de la sección 7). Roadmap: `docs/tsuki/ROADMAP.md`, sección "Hito".
 
 Marcas: **[V]** comprobado en el repo; **[D]** decisión del usuario.
@@ -94,6 +95,14 @@ Decidido (2026-10-18): el log no lo permite (los contadores existen pero no se i
 (en `Common::Log::Write`, solo a nivel ≥ `warn`), se exponen con `gow3gpu_get_stats` y la línea
 `GPU: submits=… draws=… dispatches=… flips=… unimplemented=…` sale de `runtime_report` y del watchdog.
 
+**Resultado (2026-10-18, paso 5):** el barrido de 60 s (`out/run-hito.log`, `GOW3_GPU_LOG=info`)
+termina con `GPU: submits=7090 draws=147129 dispatches=0 flips=3545 unimplemented=0`, unos 59 flips/s
+y unos 41 draws por fotograma. La GPU solo deja avisos de arranque, 6 en total y ningún error: 5 de
+formatos que la tarjeta no soporta (`A2B10G10R10S{norm,int}Pack32`, `R32G32B32*`) y 1 de extensión
+(`VK_NV_framebuffer_mixed_samples`). El único `STOP:` es el del watchdog. Los `draws` cambian un poco
+de una ejecución a otra (116662 y 118202 en dos de 40 s) aunque los `flips` coinciden (2344): el
+vídeo se decodifica al ritmo del reloj, no al de los fotogramas.
+
 ### H3 — Herramienta de captura de píxeles (decidido: en proceso, 2026-10-14)
 Captura en proceso del fotograma presentado, en PNG.
 
@@ -143,6 +152,27 @@ una búsqueda larga de un defecto.
 
 Las capturas **no se versionan** (`out/baseline/` está ignorado): son imágenes del juego.
 
+**Resultado (2026-10-18, pasos 2 a 5):** la herramienta funciona y es el oráculo de las specs 1b y 6.
+
+- **Línea base.** `out/baseline/` tiene 10 capturas de 1920×1080 del barrido (fotogramas 120 a 2820,
+  cada 300). Los fotogramas 120 y 420 son el aviso de autoguardado; del 720 en adelante es el vídeo del
+  prólogo ("I awake suddenly.", el pasillo con los shōji, los subtítulos en inglés).
+- **Determinismo.** Se hicieron dos ejecuciones de 40 s con `GOW3_SCREENSHOT_AT=300,1620`
+  (`out/hito-rep{1,2}/`):
+  - El fotograma 300 (aviso de autoguardado) sale **`idéntico`** en las dos.
+  - El 1620 (vídeo) sale **`diferente: PSNR=31.885455`**: es la misma escena en otro instante, con el
+    texto que se escribe letra a letra más o menos avanzado. AvPlayer sigue el reloj real, así que el
+    número de fotograma no fija un fotograma del vídeo.
+  - Dentro de una misma ejecución, el aviso tampoco es estático: el icono de "Saving…" gira, y el 120
+    contra el 420 da `PSNR=47.33`.
+  - Consecuencia: comparar píxel a píxel con el mismo número de fotograma vale para el 2D del propio
+    juego. Para el vídeo solo vale mirar la escena a ojo, hasta que haya una forma de fijar su reloj.
+- **F12.** Se probó en una ejecución real en pantalla completa, con el teclado del usuario y con una
+  pulsación simulada con `ydotool` (`SDL_EVENT_LOGGING=1`). Cada `KEY_DOWN` de F12 sin repetición da
+  exactamente una captura: 3 eventos, 3 PNG.
+- **Coste.** Pedir capturas no cambia el ritmo de presentación: 3545 flips en 60 s con 10 capturas,
+  frente a 3537 sin ninguna en el paso 1. Sin petición, no hay ninguna copia a CPU.
+
 ### H4 — Decisión
 Con H1–H3 en la mano, el autor y el usuario deciden según la tabla del roadmap y re-estiman las
 specs restantes.
@@ -152,6 +182,30 @@ specs restantes.
 | Hay imagen correcta (logo legible, colores bien) | seguir con el orden del roadmap |
 | Hay draws pero la imagen está mal (negra, colores raros, corrupción) | abrir una spec de renderizado antes de las Specs 4 y 5 |
 | No llega a pintar | es otro `STOP:`/`Fault:`: volver a la Spec 2/3 |
+
+**Resultado (2026-10-18): primera fila, se sigue el orden del roadmap.** El aviso de autoguardado,
+el único 2D que dibuja el propio juego hasta ahora, sale correcto:
+- texto nítido con antialiasing y colores bien;
+- el icono de "Saving…" con su brillo azul y su animación;
+- sin franjas ni bordes rotos, y con los avisos de GPU limpios (H2).
+
+El vídeo del prólogo también se ve bien. No hace falta una spec de renderizado.
+Límite de lo visto: ventana de texto, fondos, sprites y fundidos de la novela llegan después del
+prólogo, y el juego para antes en `sceAudiodecCreateDecoder` (Spec 4a, fase A). Hasta entonces, la
+Spec 6 y las comparaciones de la Spec 1b solo pueden apoyarse en el aviso y en el vídeo.
+
+Re-estimación (propuesta del autor, con lo visto en el hito):
+
+| Spec | Antes | Ahora | Motivo |
+|---|---|---|---|
+| Hito | 1 día | ✅ ~1 día (H1 el 2026-10-17; H2–H4 el 2026-10-18) | Según lo previsto |
+| 1a | 1–2 días | 1–2 días | El hito no la toca |
+| 1b | 2–3 días | 1–2 días | La captura y la comparación ya existen, y hay una escena repetible (el aviso); queda borrar y comparar |
+| 3 | 2–3 días | 2–3 días | El hito no la toca |
+| 4a / 4b | 1–2 semanas / sin estimar | igual | El hito no las toca; 4a pasa a ser lo que deja ver más del juego |
+| 5 | 2–4 días | 2–3 días | El vídeo ya se ve bien; quedan sincronía, saltar con botones y la velocidad |
+| 6 | 1–3 semanas | 1–3 semanas | El primer 2D sale bien, pero casi todo el 2D de la novela sigue sin verse |
+| 7 | 2–3 días | 2–3 días | El hito no la toca |
 
 ## 4. Archivos
 
@@ -164,12 +218,16 @@ specs restantes.
 
 ## 5. Criterios de aceptación
 
-- [ ] El log termina con la línea de contadores de GPU (H2) o se documenta que ya existe.
-- [ ] Existe al menos una captura PNG del juego en `out/baseline/`, hecha con la herramienta (H3).
-- [ ] La herramienta de captura pasa su test con un buffer sintético.
-- [ ] `tools/compare_captures.sh` devuelve "idéntico" para una captura contra sí misma y una
-  diferencia medible para dos distintas.
-- [ ] La decisión (H4) queda escrita en el roadmap, con el esfuerzo de las specs re-estimado.
+- [x] El log termina con la línea de contadores de GPU (H2) o se documenta que ya existe. *(Pasos 1 y
+  5: `GPU: … unimplemented=0`, también cuando corta el watchdog.)*
+- [x] Existe al menos una captura PNG del juego en `out/baseline/`, hecha con la herramienta (H3).
+  *(10 capturas del barrido del paso 5.)*
+- [x] La herramienta de captura pasa su test con un buffer sintético. *(`screenshot-test`, paso 2.)*
+- [x] `tools/compare_captures.sh` devuelve "idéntico" para una captura contra sí misma y una
+  diferencia medible para dos distintas. *(Pasos 4 y 5: el aviso sale `idéntico` entre dos ejecuciones
+  y dos escenas distintas dan `PSNR=20.03`.)*
+- [x] La decisión (H4) queda escrita en el roadmap, con el esfuerzo de las specs re-estimado.
+  *(`docs/tsuki/ROADMAP.md`, sección 4 y sección "Hito".)*
 
 ## 6. Riesgos
 
@@ -178,7 +236,9 @@ specs restantes.
 - Una captura sola puede ser engañosa; por eso se piden varias escenas en la Spec 6.
 - El conteo de `unimplemented` depende del nivel de log: con `GOW3_GPU_LOG=error` se pierde.
 - El número de fotograma de presentación puede variar entre ejecuciones (el aviso de autoguardado
-  puede tardar distinto); el paso 5 comprueba el determinismo antes de fiarse de él.
+  puede tardar distinto); el paso 5 comprueba el determinismo antes de fiarse de él. *(Paso 5: con el
+  aviso, el mismo número da la misma imagen en dos ejecuciones. Con el vídeo no, porque sigue el reloj
+  real; ver el resultado de H3.)*
 
 ## 7. Plan de implementación (aprobado el 2026-10-18)
 
@@ -231,7 +291,7 @@ siguiente. Todo se compila y ejecuta en el distrobox `ps4dev` (`docs/ENTORNO.md`
    activo (los valores van en PQ). El tamaño es el de la ventana (sección H3). F12 no funciona mientras
    el diálogo de elección del overlay está abierto (`HandleChoiceEvent` se lleva los eventos antes).
    Sin test nuevo: lo que se puede probar sin Vulkan ya lo cubre `screenshot-test` (paso 2); el resto
-   se comprobó en la ejecución real. La pulsación real de F12 queda para el paso 5.
+   se comprobó en la ejecución real. La pulsación real de F12 queda para el paso 5 *(hecha: ver H3)*.
    - Previsto: `PrepareFrame` cuenta fotogramas y, si `ShouldCapture(n)`, reutiliza el
    camino de `frame_dump` para `output` (generalizar `DumpRaw` en vez de duplicarlo); el callback
    codifica el PNG. F12 en `gow3_overlay.cpp:HandleEvent` llama a `RequestNow()` (sin variable de
@@ -252,7 +312,19 @@ siguiente. Todo se compila y ejecuta en el distrobox `ps4dev` (`docs/ENTORNO.md`
    - Previsto: `tools/compare_captures.sh a.png b.png` (`psnr` de ffmpeg): `idéntico` si el
    promedio es `inf` (salida 0), `diferente: PSNR=<dB>` (salida 1), error de uso (salida 2).
    `tests/test_compare_captures.py` (se salta sin `ffmpeg`) con PNG sintéticos.
-5. **H4, ejecución real.** Barrido con `GOW3_SCREENSHOT_AT=$(seq -s, 120 300 3000)` y
+5. **H4, ejecución real.** ✅ (2026-10-18) Resultados en H2, H3 y H4 (sección 3).
+   - Barrido de 60 s: `out/run-hito.log`, 10 capturas en `out/baseline/`.
+   - Determinismo: `out/run-hito-rep{1,2}.log`, con el fotograma 300 (aviso) y el 1620 (vídeo).
+   - F12: `out/run-hito-f12{,b}.log`.
+   - Decisión: primera fila de la tabla, seguir con el orden del roadmap.
+
+   Cambios respecto a lo previsto:
+   - Solo una de las dos escenas es repetible: el aviso sí; el vídeo no, porque sigue el reloj real.
+   - F12 se probó con el teclado del usuario y con `ydotool` en el host: un demonio solo de teclado que
+     se lanzó para la prueba y se paró después. `SDL_EVENT_LOGGING=1` confirma 3 eventos y 3 capturas.
+     La primera ejecución dio 14 capturas, pero eran pulsaciones del usuario más la simulada, no un
+     fallo.
+   - Previsto: barrido con `GOW3_SCREENSHOT_AT=$(seq -s, 120 300 3000)` y
    `GOW3_GPU_LOG=info` y `GOW3_FULLSCREEN=1` (log en `out/run-hito.log`); elegir al menos dos escenas (aviso de autoguardado
    y un fotograma del vídeo), repetirlas y comprobar su determinismo con `compare_captures.sh`; leer la
    línea `GPU:`; aplicar la tabla de H4; escribir la decisión y la re-estimación en el roadmap.
@@ -261,3 +333,11 @@ siguiente. Todo se compila y ejecuta en el distrobox `ps4dev` (`docs/ENTORNO.md`
 (sin regresiones sobre 238 OK / 37 saltados), `out/gow3-probe --vulkan-only` en PASS, ejecución de
 60 s con `--timeout` cuyo log termina con `GPU:`, al menos un PNG en `out/baseline/` y comprobar que
 sin petición de captura no hay copia a CPU (los FPS no cambian).
+*(Cumplida el 2026-10-18:*
+- *`build.sh --test` PASS, sin avisos de compilación;*
+- *Python 254 OK / 37 saltados;*
+- *`screenshot-test`, `frame-capture-test` y `png-decode-test` ok;*
+- *`--vulkan-only` PASS en la RX 6650 XT;*
+- *el barrido de 60 s termina con `GPU:`;*
+- *10 PNG en `out/baseline/`;*
+- *el ritmo de presentación es el mismo con y sin capturas.)*
