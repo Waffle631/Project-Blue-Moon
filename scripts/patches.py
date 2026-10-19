@@ -154,13 +154,11 @@ def compile_patches(xml, names, app_version, segments, image=None, skipped=None)
 
 
 PATCHES_DIR=Path(__file__).resolve().parent.parent/'patches'
-# Built-in patch file per game: its title IDs, the AppVer its metadata is tagged with and the
-# title that also recognizes a release under an ID not listed. The signatures find the sites in
-# any region or version whose code matches, so the eboot.bin build is not checked.
-GAMES=[({'CUSA01623','CUSA01715','CUSA01720'},PATCHES_DIR/'God_of_War_III_Remastered.xml','01.02',
-        'God of War III')]
-# The build the built-in Address values and third-party patch files are written for.
-REFERENCE_SHA256='d85c8135d330c3b601bf5dc3f1dd86bd6119fb8a9fce372bed2c9785f9a79299'
+# Built-in patch file per game: (title IDs, PATCHES_DIR/<file>.xml, the AppVer its metadata is
+# tagged with, the title that also recognizes a release under an ID not listed). The signatures
+# find the sites in any region or version whose code matches, so the eboot.bin build is not
+# checked. None yet: a game without a profile gets no patches.
+GAMES=[]
 DMEM_RETAIL_MB=5056  # runtime_memory.c POOL_SIZE default
 
 
@@ -319,7 +317,8 @@ def main():
     p.add_argument('--patches-config',type=Path,help='patches.json: enabled/disabled external patches')
     p.add_argument('--extra',default='',help='additional patch names, separated by ";"')
     p.add_argument('--out',type=Path,default=Path(__file__).resolve().parent.parent/'out')
-    p.add_argument('--game-dir',type=Path,default=Path(os.environ.get('GOW3_GAME_DIR','../CUSA01623')))
+    p.add_argument('--game-dir',type=Path,default=Path(os.environ.get('GOW3_GAME_DIR',
+                   Path(__file__).resolve().parent.parent/'Tsukihime'/'CUSA47999')))
     a=p.parse_args()
     title=game_title_id(a.game_dir)
     profile=game_profile_for(a.game_dir)
@@ -337,9 +336,9 @@ def main():
     writes=compile_patches(xml,names,None,segments,eboot_image(elf),skipped)
     for name,reason in skipped.items():
         print(f'Patches: {name} skipped ({reason} in this eboot.bin)')
-    if a.patches_dir and sha==REFERENCE_SHA256:
-        # Third-party files use the absolute addresses of the reference build, so they are only
-        # applied there. After the built-in ones: an external patch of the same bytes wins.
+    if a.patches_dir:
+        # Third-party files: absolute addresses, written as they are (no signatures). After the
+        # built-in ones: an external patch of the same bytes wins.
         writes+=compile_external(external_selection(external_patches(a.patches_dir,tag,xml,ids),
                                                     a.patches_config),segments)
     write_patches(a.out,writes)

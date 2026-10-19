@@ -1,4 +1,9 @@
-from paths import ROOT  # noqa: F401  (puts scripts/ on the path)
+from paths import ROOT  # also puts scripts/ on the path
+import contextlib
+import io
+import os
+import struct
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -64,6 +69,16 @@ def synthetic_xml(test):
     xml = Path(directory.name) / 'Synthetic_Game.xml'
     xml.write_text(SYNTH_XML)
     return xml
+
+
+def tiny_elf(size):
+    """An eboot.elf with one PT_LOAD of size zero bytes at vaddr 0 (eboot_segments, eboot_image)."""
+    header = bytearray(0x40)
+    header[:4] = b'\x7fELF'
+    struct.pack_into('<Q', header, 0x20, 0x40)
+    struct.pack_into('<HH', header, 0x36, 56, 1)
+    load = struct.pack('<IIQQQQQQ', 1, 5, 0x100, 0, 0, size, size, 0x4000)
+    return bytes(header) + load + bytes(0x100 - 0x78) + bytes(size)
 
 
 class ExternalPatchTests(unittest.TestCase):
@@ -160,8 +175,55 @@ class GameProfileTests(unittest.TestCase):
 
 class BuiltInProfileTests(unittest.TestCase):
     def test_without_profile_nothing_applies(self):
+        self.assertEqual(patches.GAMES, [])  # God of War III's was the only built-in profile
         self.assertIsNone(game_profile('CUSA47999'))
         self.assertIsNone(game_profile('CUSA47999', 'TSUKIHIME -A piece of blue glass moon-'))
+
+
+class PatchesMainTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        self.out = self.root / 'out'
+        self.out.mkdir()
+
+    def run_main(self, *args, sfo=None):
+        """patches.py's main() with these arguments and param.sfo values: (its output, the number
+        of writes in patches.bin, the game folders it read)."""
+        seen = []
+        output = io.StringIO()
+        with mock.patch.object(sys, 'argv', ['patches.py', '--out', str(self.out), *args]), \
+                mock.patch.dict(os.environ), \
+                mock.patch.object(patches, 'game_sfo', side_effect=lambda game: seen.append(game) or dict(sfo or {})), \
+                contextlib.redirect_stdout(output):
+            os.environ.pop('GOW3_GAME_DIR', None)
+            os.environ.pop('GOW3_PATCHES_ONLY', None)
+            patches.main()
+        return output.getvalue(), struct.unpack_from('<8sQQ', (self.out / 'patches.bin').read_bytes())[2], seen
+
+    def test_default_game_folder(self):
+        _, _, seen = self.run_main()
+        self.assertEqual(Path(seen[0]), ROOT / 'Tsukihime' / 'CUSA47999')
+
+    def test_no_profile_and_no_patch_folders(self):
+        # patches/ is gone from the tree, and the data folder may have no patches/ either.
+        output, writes, _ = self.run_main('--game-dir', str(self.root / 'game'),
+                                          '--patches-dir', str(self.root / 'missing'), sfo={'TITLE_ID': 'CUSA47999'})
+        self.assertIn('Patches: no patch profile for CUSA47999: none applied', output)
+        self.assertEqual(writes, 0)
+
+    def test_external_patches_do_not_need_a_reference_build(self):
+        xml = synthetic_xml(self)
+        (self.out / 'eboot.elf').write_bytes(tiny_elf(0x10000))
+        folder = self.root / 'external'
+        folder.mkdir()
+        (folder / 'extra.xml').write_text(EXTERNAL)
+        with mock.patch.object(patches, 'GAMES', [(SYNTH_IDS, xml, '01.00', 'Synthetic Game')]):
+            output, writes, _ = self.run_main('--game-dir', str(self.root / 'game'), '--patches-dir', str(folder),
+                                              sfo={'TITLE_ID': SYNTH_ID, 'APP_VER': '01.00'})
+        self.assertIn('Patches: external extra.xml/On (1 writes)', output)
+        self.assertEqual(writes, 2)  # the built-in texture fix and the external patch
 
 
 class SignatureTests(unittest.TestCase):

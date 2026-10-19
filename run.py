@@ -157,7 +157,7 @@ def main():
         sys.exit(20)
     missing = parse_cpu_features(features.stdout)
 
-    game = Path(env.get('GOW3_GAME_DIR', PORT.parent / 'CUSA01623'))
+    game = Path(env.get('GOW3_GAME_DIR', PORT / 'Tsukihime' / 'CUSA47999'))
     if not (game / 'eboot.bin').is_file():
         fail(f'No eboot.bin in {game} (set GOW3_GAME_DIR).')
     update_view = None

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Signatures for patch and hook sites, from the reference eboot.bin (needs capstone).
+"""Signatures for patch sites, from the reference eboot.bin (needs capstone).
 
 Each site gets the shortest window of original bytes around it that occurs exactly once in the
 image, with "??" where another build of the game may differ: rip-relative displacements and rel32
