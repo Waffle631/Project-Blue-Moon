@@ -92,7 +92,7 @@ class LoaderTests(unittest.TestCase):
         r = self.run_game(TITLE_ID='CUSA47999', TITLE='TSUKIHIME')
         self.assertNotEqual(r.returncode, 30, r.stdout + r.stderr)
         self.assertNotIn('unsupported title', r.stdout)
-        cases = (('another game', {'TITLE_ID': 'CUSA01623'}, None, 'CUSA01623'),
+        cases = (('another game', {'TITLE_ID': 'CUSA12345'}, None, 'CUSA12345'),
                  ('no TITLE_ID', {'TITLE': 'TSUKIHIME'}, None, 'unknown'),
                  ('corrupt param.sfo', {}, b'not a PSF file', 'unknown'),
                  ('no param.sfo', {}, None, 'unknown'))
