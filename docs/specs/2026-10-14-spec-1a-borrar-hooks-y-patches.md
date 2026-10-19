@@ -1,7 +1,7 @@
 # Spec 1a — Eliminar hooks, patches, touchpad, tests e identidad de GoW3
 
 Fecha: 2026-10-14. Revisada el 2026-10-18 tras auditar el repo (la spec seguía sin implementar).
-Estado: **en curso**: pasos 0, 1, 4 y 2 hechos el 2026-10-19, en ese orden (commits `9f86fc1`, `f90d6ac`, `ad33479`); faltan 3 y 5. Desde el paso 2 fallan 4 tests del launcher (ver su resultado). Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 1a".
+Estado: **en curso**: pasos 0, 1, 4, 2 y 3 hechos el 2026-10-19, en ese orden (commits `9f86fc1`, `f90d6ac`, `ad33479`, `2e8474d`); falta el 5. Desde el paso 2 fallan 4 tests del launcher (ver su resultado). Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 1a".
 
 Marcas: **[V]** comprobado en el repo (comando indicado); **[D]** decisión que debe tomar el usuario.
 
@@ -226,6 +226,44 @@ comprobación de que `touchpad_left` y `touchpad_right` del archivo de pad dan `
 (`touch_count==0`); se conserva la parte del touchpad real (`:115-143`). `tests/test_pad_map.c` pasa a
 afirmar que los tres nombres aceptan el mismo botón del host y que las únicas fuentes por defecto
 (`Tab` y el clic del touchpad real) dan `BTN_TOUCHPAD`, y que `Backspace` y `Back` ya no pulsan nada.
+
+**Resultado (2026-10-19, commit `2e8474d`).**
+
+- Hecho como se describe arriba:
+  - Fuera `CLICK_LEFT/RIGHT`, `play_click` y sus tiempos.
+  - Los tres nombres dan `BTN_TOUCHPAD`.
+  - Por defecto, `Tab` en el teclado y el clic real en el mando. `Backspace` y `Back/View` no tienen fuente.
+  - El comportamiento queda en el comentario de cabecera de `runtime_pad.c`.
+- Dos cambios que este paso no preveía, necesarios para el OR y para "tal cual, como hoy":
+  - `apply_button_map` aplica juntas las entradas de un valor. De un mismo nombre cuenta la última,
+    como antes, y nombres distintos del mismo botón se suman. Antes, un botón asignado perdía todas
+    sus fuentes anteriores. Sin el cambio, `touchpad_left=X,touchpad_right=Y` (lo que escribe el
+    launcher si se cambian los dos lados) dejaría solo `Y`.
+  - El clic del touchpad real se lee junto a sus dedos, fuera del mapa del mando (que pasa de 15 a 13
+    entradas). Así, asignar un nombre del touchpad en `GOW3_PAD_MAP` no lo quita; antes tampoco se podía.
+- `pad-map-test` entra en `build.sh --test`. En CMake solo existe para Windows, así que en Linux no se
+  ejecutaba.
+- Tests. La parte de clics sintéticos de `test_pad.c` ocupaba `:28-113` y `:145-186`, no solo
+  `:150-164`. En su lugar se comprueba que:
+  - Los tres nombres en el archivo de pad dan `BTN_TOUCHPAD` sin toque y sin retardo.
+  - Un clic real sin dedos da solo el botón.
+  - `Back` no pulsa nada, tampoco con L1.
+  - Con `GOW3_PAD_MAP=touchpad=misc1`, el clic real sigue funcionando y `misc1` también pulsa.
+
+  `test_pad_map.c` cubre los alias que se suman, el mismo nombre dos veces y las fuentes por defecto.
+- Rojo visto:
+  - `pad-test`: el botón llegaba con retardo.
+  - `pad-map-test`: `Back` seguía como fuente.
+  - Con solo el cambio literal del plan, `pad-map-test` seguía en rojo: `touchpad=misc1` quitaba el clic real.
+- Verde:
+  - `build.sh --test` sale con 0.
+  - `git grep -nE 'CLICK_LEFT|CLICK_RIGHT|play_click' -- src tests` no da resultados.
+  - Python, igual que tras el paso 2: 254 ejecutados y 35 omitidos; solo fallan los 4 tests del launcher.
+  - Arranque (`out/first-run-after-t3.log`): el mismo log y la misma parada que tras el paso 2.
+- No se migran las grabaciones antiguas de `GOW3_PAD_RECORD` con los bits `0x40000000`/`0x80000000`:
+  ahora llegan al juego tal cual.
+- Para la limpieza del launcher: sigue mostrando `Backspace` y `back` como valores por defecto de
+  "Touchpad right" y solo escribe los botones cambiados, así que quien no los cambie no tiene esa fuente.
 
 ### Paso 4 — Tests
 Reescribir `tests/test_patches.py` con un **perfil sintético** definido en el propio test (un XML
