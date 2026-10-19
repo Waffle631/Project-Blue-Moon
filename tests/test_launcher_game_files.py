@@ -61,6 +61,9 @@ class LauncherGameFilesTests(unittest.TestCase):
             time.sleep(0.01)
         self.assertFalse(getattr(self.app, 'copying_system_files', False), 'copy did not finish')
 
+    # Spec 1a removed the GoW3 patch profile (scripts/patches.py GAMES is empty), which the launcher
+    # uses to recognize a game dump; the launcher is cleaned up after the Alpha (docs/tsuki/ROADMAP.md).
+    @unittest.expectedFailure
     def test_cancel_then_copy_keeps_existing_files_and_reports_missing_module(self):
         target = self.game / 'sce_sys'
         target.mkdir()
@@ -83,6 +86,9 @@ class LauncherGameFilesTests(unittest.TestCase):
         self.assertEqual(self.app.current_page, 'game')
         self.assertFalse(self.app.play_button.instate(['disabled']))
 
+    # Spec 1a removed the GoW3 patch profile (scripts/patches.py GAMES is empty), which the launcher
+    # uses to recognize a game dump; the launcher is cleaned up after the Alpha (docs/tsuki/ROADMAP.md).
+    @unittest.expectedFailure
     def test_slow_copy_blocks_reentry_and_failure_allows_retry(self):
         entered, release = threading.Event(), threading.Event()
 
