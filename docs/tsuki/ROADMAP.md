@@ -12,7 +12,7 @@ gow3_pc (God of War III Remastered), que a su vez viene de
 | Plataforma | Linux primero (máquina de desarrollo), Windows 10/11 después; Vulkan 1.3 |
 | Máquina de pruebas | Bazzite 44 (KDE Plasma 6.7, Wayland), AMD Ryzen 5 7600, 16 GB, **AMD Radeon RX 6650 XT** |
 | Dump | `Tsukihime/CUSA47999/` (sin versionar, ~45 GB) |
-| Última actualización | 2026-10-19. **La Spec 1a queda cerrada.** Están fuera del árbol los hooks, el perfil y el XML de parches, la semántica del touchpad, los tests de GoW3 y los textos de identidad, y el cargador solo arranca CUSA47999 (código 30 para cualquier otro juego). El log de arranque pierde las diez líneas "code not found" y para en el mismo punto. Las capturas no cambian: el fotograma 300 sale idéntico, y lo demás es el icono que gira o el vídeo. Fallan 4 tests del launcher, marcados como fallo esperado hasta que se limpie después de la Alpha. Queda sin decidir la elección de parches de resolución y de frame rate por nombre de GoW3, que sin perfil no hace nada (ver la spec). Antes, 2026-10-18: **el hito de primer fotograma queda cerrado:** hay imagen correcta, así que se sigue el orden previsto. El aviso de autoguardado, primer 2D del propio juego, sale nítido y con los colores bien, y el vídeo del prólogo también. En los logs no hay ningún `Unimplemented` (línea `GPU:` al final). Hay herramienta de captura PNG (`GOW3_SCREENSHOT_AT`, F12) y de comparación exacta (`tools/compare_captures.sh`), con la línea base en `out/baseline/`. Esfuerzos re-estimados en la sección 4. Antes, 2026-10-17 (noche): **la Spec 2 queda cerrada** con la fase 2B: en libkernel solo quedan las tres trampas decididas (`scePthreadCancel` y las dos de información de módulo), ya con nombre; `--check-imports` baja de 28 a 19, todo de las specs 3 y 4. Antes, 2026-10-17 (tarde): sin watchdog, el juego reproduce entero el vídeo del prólogo (se ve y se oye bien) y después para en `sceAudiodecCreateDecoder`, el primer decodificador ATRAC9 (Spec 4a). Su sitio de llamada da la estructura de control de Audiodec (Spec 4, 2.5). Por decisión del usuario solo se documenta. Antes, 2026-10-17: la fase 2A de la Spec 2 (guiada por los `STOP:`) termina tras 10 iteraciones: el juego abre `VideoOut`, presenta ~60 fotogramas por segundo y reproduce el vídeo del prólogo, sin ningún `STOP:` de libkernel. Falta ver qué pinta (hito). La Spec 4 se replantea en dos partes: **4a ATRAC9** (música, voces y efectos `vse`) y **4b HEVAG** (19 efectos de `vag.mrg`). 2026-10-14: revisión del orden tras un análisis adversarial (el kernel va primero, hay un hito de "primer fotograma", el borrado se parte en dos y el renombrado pasa al final; lo específico de GoW3 se elimina, no se desactiva) |
+| Última actualización | 2026-10-19. **La Spec 1a queda cerrada.** Están fuera del árbol los hooks, el perfil y el XML de parches, la semántica del touchpad, los tests de GoW3 y los textos de identidad, y el cargador solo arranca CUSA47999 (código 30 para cualquier otro juego). El log de arranque pierde las diez líneas "code not found" y para en el mismo punto. Las capturas no cambian: el fotograma 300 sale idéntico, y lo demás es el icono que gira o el vídeo. Fallan 4 tests del launcher, marcados como fallo esperado hasta que se limpie después de la Alpha. La elección de parches de resolución y de frame rate por nombre de GoW3, que sin perfil no hace nada, se deja para después de la Alpha, con el launcher (decisión del usuario, 2026-10-19). Antes, 2026-10-18: **el hito de primer fotograma queda cerrado:** hay imagen correcta, así que se sigue el orden previsto. El aviso de autoguardado, primer 2D del propio juego, sale nítido y con los colores bien, y el vídeo del prólogo también. En los logs no hay ningún `Unimplemented` (línea `GPU:` al final). Hay herramienta de captura PNG (`GOW3_SCREENSHOT_AT`, F12) y de comparación exacta (`tools/compare_captures.sh`), con la línea base en `out/baseline/`. Esfuerzos re-estimados en la sección 4. Antes, 2026-10-17 (noche): **la Spec 2 queda cerrada** con la fase 2B: en libkernel solo quedan las tres trampas decididas (`scePthreadCancel` y las dos de información de módulo), ya con nombre; `--check-imports` baja de 28 a 19, todo de las specs 3 y 4. Antes, 2026-10-17 (tarde): sin watchdog, el juego reproduce entero el vídeo del prólogo (se ve y se oye bien) y después para en `sceAudiodecCreateDecoder`, el primer decodificador ATRAC9 (Spec 4a). Su sitio de llamada da la estructura de control de Audiodec (Spec 4, 2.5). Por decisión del usuario solo se documenta. Antes, 2026-10-17: la fase 2A de la Spec 2 (guiada por los `STOP:`) termina tras 10 iteraciones: el juego abre `VideoOut`, presenta ~60 fotogramas por segundo y reproduce el vídeo del prólogo, sin ningún `STOP:` de libkernel. Falta ver qué pinta (hito). La Spec 4 se replantea en dos partes: **4a ATRAC9** (música, voces y efectos `vse`) y **4b HEVAG** (19 efectos de `vag.mrg`). 2026-10-14: revisión del orden tras un análisis adversarial (el kernel va primero, hay un hito de "primer fotograma", el borrado se parte en dos y el renombrado pasa al final; lo específico de GoW3 se elimina, no se desactiva) |
 
 ---
 
@@ -96,12 +96,12 @@ la rama `gow3`).
   *(Spec 1a, ✅: además, cualquier juego que no sea CUSA47999 sale con código 30.)* El acceso de Steam,
   los textos del launcher, el empaquetado y los README se dejan para el final (ver "Después de la
   Alpha").
-- **Sin decidir:** la elección de parches de resolución y de frame rate usa todavía los nombres de los
+- **Después de la Alpha** (decidido el 2026-10-19): la elección de parches de resolución y de frame rate usa todavía los nombres de los
   parches de GoW3 ("Resolution Patch", "Frame Rate Patch", "Bug Fix - Texture Corruption Fix"). Está
   en `scripts/patches.py`, `scripts/graphics_options.py`, `run.py`, el menú del juego y sus ajustes.
   Sin perfil de parches no hace nada, pero `run.py` sigue diciendo en cada arranque que no encontró el
   parche de frame rate. La Spec 1a no la cubría, y el launcher importa `EXCLUSIVE_PREFIX` de
-  `patches.py` (ver "Pendientes del usuario").
+  `patches.py`, así que se borra junto con el launcher (ver "Después de la Alpha").
 - Heurísticas de GPU de GoW3: `gbuffer_draw` y la constante de cámara de 864 bytes en
   `vk_rasterizer.cpp`; decisión de MSAA por vendor; `GOW3_READBACK_LINEAR=1` por defecto en `run.py`.
   *(Spec 1b, después del hito de primer fotograma)* El escalado a 1920×1080 **se conserva**: el
@@ -175,7 +175,7 @@ motivos están en la sección "Hito".
 | 0 | Preparar el entorno (Linux) | Setup | — | — | ✅ Concluida |
 | 1 | Inventario de APIs faltantes | Diagnóstico | 0 | — | ✅ Concluida |
 | 2 | Kernel: event flags, tiempo, hilos (y lo mínimo de servicios para arrancar) | **Spec 2** | 1 | 3–5 días | ✅ Concluida (fases 2A y 2B; en libkernel solo quedan las 3 trampas decididas) |
-| 3 | Borrar hooks, patches, touchpad, tests e identidad de GoW3 | **Spec 1a** | 1 (en paralelo con la Spec 2) | 1–2 días (real: 1 día) | ✅ Concluida el 2026-10-19 (otro juego sale con código 30; 4 tests del launcher marcados como fallo esperado hasta su limpieza; queda por decidir la elección de parches por nombre de GoW3) |
+| 3 | Borrar hooks, patches, touchpad, tests e identidad de GoW3 | **Spec 1a** | 1 (en paralelo con la Spec 2) | 1–2 días (real: 1 día) | ✅ Concluida el 2026-10-19 (otro juego sale con código 30; 4 tests del launcher marcados como fallo esperado hasta su limpieza; la elección de parches por nombre de GoW3 queda para después de la Alpha) |
 | 4 | **Hito: primer fotograma** | Hito | Spec 2 | 1 día (real: ~1 día) | ✅ Concluido el 2026-10-18 (imagen correcta: el aviso de autoguardado y el vídeo del prólogo se ven bien; `unimplemented=0`; capturas PNG y `compare_captures.sh` con línea base en `out/baseline/`; se sigue el orden previsto) |
 | 5 | Borrar las heurísticas de GPU de GoW3 | **Spec 1b** | Spec 1a, hito | 1–2 días (antes 2–3) | ⬜ Pendiente (se puede empezar: la Spec 1a y el hito están cerrados) |
 | 6 | Servicios del sistema que faltan | **Spec 3** | Spec 2 | 2–3 días | 🟨 En curso (15 de 23 APIs adelantadas en la Spec 2) |
@@ -496,7 +496,7 @@ los tests y fuentes eliminados.
   antes del cambio (se comparan `out/first-run.log` antes y después: mismo punto de parada).
   *(2026-10-19: sin las líneas de hooks y con la misma parada. Siguen las dos líneas `Patches:` del
   cargador genérico, que la spec pide, y el aviso de `run.py` de que no encontró el parche de frame
-  rate, que va con la elección de parches por nombre todavía sin decidir.)*
+  rate, que va con la elección de parches por nombre y se quita después de la Alpha.)*
 - [x] Un juego que no sea CUSA47999 se rechaza con mensaje claro (test). *(2026-10-19:
   `STOP: unsupported title <id|unknown>: this build only runs CUSA47999`, código 30;
   `tests/test_probe.py`.)*
@@ -530,7 +530,7 @@ los tests y fuentes eliminados.
   - El launcher ya no reconoce un dump, porque usaba el perfil de GoW3.
   - El empaquetado copia `patches/` con `cp -r`, y esa carpeta ya no existe.
   - Las dos cosas van con la limpieza de después de la Alpha.
-- **Sin decidir:** la elección de parches por nombre de GoW3 (ver la sección 2).
+- **Después de la Alpha:** la elección de parches por nombre de GoW3 (decidido el 2026-10-19; ver la sección 2).
 - **Esfuerzo:** 1 día, el mínimo de lo previsto.
 
 ---
@@ -954,7 +954,7 @@ Las configuraciones y saves antiguos no se migran (no hay usuarios de los nombre
 | Aprobar cada spec antes de la implementación | Specs 1a, 1b, 2 a 7 |
 | ~~Mirar el resultado del hito de primer fotograma y decidir con el autor cómo seguir~~ Hecho el 2026-10-18: seguir el orden previsto | Hito |
 | Aprobar las capturas de línea base (una por una) | Hito, Spec 1b, Spec 6 |
-| Decidir qué hacer con la elección de parches de resolución y de frame rate por nombre de GoW3 (sección 2): una spec propia, dentro de la Spec 1b (cuyo último paso ya toca los valores por defecto de `run.py` y `scripts/graphics_options.py`) o con el launcher después de la Alpha | Spec 1b |
+| ~~Decidir qué hacer con la elección de parches de resolución y de frame rate por nombre de GoW3 (sección 2)~~ Hecho el 2026-10-19: se deja para después de la Alpha, con el launcher | Spec 1b |
 | Probar el recorrido en el juego e informar de lo que vio y oyó | Specs 4 a 6 |
 
 ---
@@ -973,6 +973,10 @@ Ideas para versiones siguientes, sin compromiso:
   - Dar un mensaje propio al código 30.
   - Quitar el `cp -r patches` de `packaging/linux/build.sh` y de `packaging/windows/package.sh`.
   - Quitar la mención de `tools/gow3_frame_map.py` en `docs/upscaler.md`.
+  - Quitar la elección de parches de resolución y de frame rate por nombre de GoW3 (sección 2), con
+    el aviso de `run.py` sobre el parche de frame rate. Está en `scripts/patches.py`
+    (`EXCLUSIVE_PREFIX`, que importa el launcher), `scripts/graphics_options.py`, `run.py`, el menú
+    del juego, sus ajustes y sus tests. Decidido el 2026-10-19.
 - Launcher con idioma, resolución de ventana y remapeo pensados para una novela visual.
 - Escalado limpio para 1440p/4K (FSR 1 o escalado entero) de fondos y texto.
 - Windows y Steam Deck.

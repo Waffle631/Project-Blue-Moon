@@ -411,7 +411,8 @@ launcher.
   - Ritmo: 3544 flips en 60 s, frente a 3545 en el barrido del hito.
 - Rechazo de otro juego: test en `test_probe.py` y prueba con el cargador real (paso 5).
 
-**Queda fuera, para decidir.** No está en el plan ni en la lista cerrada:
+**Queda fuera.** No está en el plan ni en la lista cerrada. Por decisión del usuario (2026-10-19), se
+hace después de la Alpha, con la limpieza del launcher:
 
 - La elección de parches de resolución y de frame rate usa nombres de parches de GoW3 ("Resolution
   Patch", "Frame Rate Patch", "Bug Fix - Texture Corruption Fix"). Está en:
