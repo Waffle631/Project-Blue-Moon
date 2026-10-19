@@ -4,8 +4,13 @@
  * Default keyboard layout (GOW3_KEY_MAP changes the buttons, see apply_button_map):
  *   WASD left stick, arrow keys right stick, Space Cross, LShift Circle,
  *   E Square, Q Triangle, 1 L1, 3 R1, R L2, F R2, Z L3, C R3,
- *   Enter Options, Tab left touchpad (photo mode), Backspace right touchpad (pause menu),
- *   IJKL d-pad (I up, K down, J left, L right). */
+ *   Enter Options, Tab touchpad click, IJKL d-pad (I up, K down, J left, L right).
+ *
+ * The touchpad click (BTN_TOUCHPAD) reaches the game as a plain button: a key, a gamepad button
+ * or the pad file press it with no touch, and only a real touchpad reports fingers. touchpad,
+ * touchpad_left and touchpad_right are three names of that one button, so maps written when the
+ * two sides were apart still load. Back/View (Share on a DualSense) and Backspace press nothing
+ * unless mapped. */
 #define _GNU_SOURCE
 #include "runtime.h"
 #include "gpu/gow3gpu.h"
@@ -27,9 +32,6 @@ enum {
     BTN_L3=0x2, BTN_R3=0x4, BTN_OPTIONS=0x8, BTN_UP=0x10, BTN_RIGHT=0x20, BTN_DOWN=0x40, BTN_LEFT=0x80,
     BTN_L2=0x100, BTN_R2=0x200, BTN_L1=0x400, BTN_R1=0x800, BTN_TRIANGLE=0x1000, BTN_CIRCLE=0x2000,
     BTN_CROSS=0x4000, BTN_SQUARE=0x8000, BTN_TOUCHPAD=0x100000,
-    /* Host-only sources, never shown to the game: a click on one side of the touchpad from a
-     * button or key without a touch surface (play_click turns them into a touch and a click). */
-    CLICK_LEFT=0x40000000, CLICK_RIGHT=0x80000000,
 };
 typedef struct { uint16_t x, y; uint8_t id, reserve[3]; } PadTouch;
 typedef struct {
@@ -71,38 +73,6 @@ static uint16_t touch_axis(float v, int max) {
     return (uint16_t)(v<=0.0f ? 0 : v>=1.0f ? max : (int)(v*max+0.5f));
 }
 
-/* A click without a touch surface (Back/View, Tab, Backspace, the pad file) is played like a
- * finger: the touch is reported CLICK_LEAD_US before the button, the button stays at least
- * CLICK_HOLD_US, and the touch lingers CLICK_TAIL_US after the release. God of War III opens
- * photo mode on the release of a left click with the finger still down, and ignores a touch
- * that comes and goes with the button. The side is chosen when the click starts and kept: the
- * right source with L1 held is a left click (photo mode on pads without a touchpad). */
-enum { CLICK_LEAD_US=50000, CLICK_HOLD_US=50000, CLICK_TAIL_US=100000 };
-static struct { int side; uint64_t pressed, released; } click={-1,0,0};
-static void play_click(PadData *d) {
-    const uint64_t now=d->timestamp;
-    uint32_t sources=d->buttons & (CLICK_LEFT|CLICK_RIGHT);
-    d->buttons&=~(CLICK_LEFT|CLICK_RIGHT);
-    if ((d->buttons & BTN_TOUCHPAD) && !d->touch_count) { /* a replay, or a pad without fingers */
-        d->buttons&=~BTN_TOUCHPAD;
-        sources|=CLICK_LEFT;
-    }
-    const int side=(sources & CLICK_LEFT) ? 0 : (sources & CLICK_RIGHT) ? !(d->buttons & BTN_L1) : -1;
-    if (side>=0 && (click.side<0 || click.released)) { click.side=side; click.pressed=now; click.released=0; }
-    else if (side<0 && click.side>=0 && !click.released) click.released=now;
-    if (click.side<0) return;
-    const uint64_t down=click.pressed+CLICK_LEAD_US;
-    uint64_t up=down+CLICK_HOLD_US;
-    if (!click.released) up=UINT64_MAX;
-    else if (click.released>up) up=click.released;
-    if (now>=up && now-up>=CLICK_TAIL_US) { click.side=-1; return; }
-    if (d->touch_count<2) {
-        d->touches[d->touch_count]=(PadTouch){.x=click.side ? 1440 : 480,.y=471,.id=d->touch_count};
-        ++d->touch_count;
-    }
-    if (now>=down && now<up) d->buttons|=BTN_TOUCHPAD;
-}
-
 /* Opens the first gamepad SDL knows about; called under lock. */
 static SDL_Gamepad *current_gamepad(void) {
     if (!sdl_ready) sdl_ready = SDL_WasInit(SDL_INIT_GAMEPAD) ? 1 : SDL_InitSubSystem(SDL_INIT_GAMEPAD) ? 1 : -1;
@@ -123,14 +93,13 @@ static SDL_Gamepad *current_gamepad(void) {
  * changed per PS4 button with GOW3_PAD_MAP (gamepad) and GOW3_KEY_MAP (keyboard), e.g.
  * GOW3_KEY_MAP="cross=Q,square=Left Shift" or GOW3_PAD_MAP="cross=b,circle=a": comma-separated
  * <ps4 button>=<SDL key or gamepad button name>. A mapped PS4 button loses its default sources.
- * touchpad_left (alias touchpad) and touchpad_right are the two sides of the touchpad click:
- * photo mode and the pause menu. Back/View (Share on a DualSense) is the right click, and with
- * L1 held the left one. Sticks, triggers, the real touchpad click and the overlay shortcuts are
- * not remapped. */
+ * touchpad, touchpad_left and touchpad_right all name the touchpad click and their entries add
+ * up, so a map saved when the two sides were apart keeps both. Sticks, triggers, the real
+ * touchpad click and the overlay shortcuts are read apart and not remapped. */
 static const struct { const char *name; uint32_t ps; } ps_names[]={
     {"cross",BTN_CROSS}, {"circle",BTN_CIRCLE}, {"square",BTN_SQUARE}, {"triangle",BTN_TRIANGLE},
     {"l1",BTN_L1}, {"r1",BTN_R1}, {"l2",BTN_L2}, {"r2",BTN_R2}, {"l3",BTN_L3}, {"r3",BTN_R3},
-    {"options",BTN_OPTIONS}, {"touchpad",CLICK_LEFT}, {"touchpad_left",CLICK_LEFT}, {"touchpad_right",CLICK_RIGHT},
+    {"options",BTN_OPTIONS}, {"touchpad",BTN_TOUCHPAD}, {"touchpad_left",BTN_TOUCHPAD}, {"touchpad_right",BTN_TOUCHPAD},
     {"up",BTN_UP}, {"down",BTN_DOWN}, {"left",BTN_LEFT}, {"right",BTN_RIGHT},
 };
 typedef struct { int source; uint32_t ps; } ButtonSource;
@@ -140,18 +109,17 @@ static ButtonMap pad_map={{
     {SDL_GAMEPAD_BUTTON_WEST,BTN_SQUARE}, {SDL_GAMEPAD_BUTTON_NORTH,BTN_TRIANGLE},
     {SDL_GAMEPAD_BUTTON_LEFT_SHOULDER,BTN_L1}, {SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER,BTN_R1},
     {SDL_GAMEPAD_BUTTON_LEFT_STICK,BTN_L3}, {SDL_GAMEPAD_BUTTON_RIGHT_STICK,BTN_R3},
-    {SDL_GAMEPAD_BUTTON_START,BTN_OPTIONS}, {SDL_GAMEPAD_BUTTON_BACK,CLICK_RIGHT},
-    {SDL_GAMEPAD_BUTTON_TOUCHPAD,BTN_TOUCHPAD},
+    {SDL_GAMEPAD_BUTTON_START,BTN_OPTIONS},
     {SDL_GAMEPAD_BUTTON_DPAD_UP,BTN_UP}, {SDL_GAMEPAD_BUTTON_DPAD_DOWN,BTN_DOWN},
     {SDL_GAMEPAD_BUTTON_DPAD_LEFT,BTN_LEFT}, {SDL_GAMEPAD_BUTTON_DPAD_RIGHT,BTN_RIGHT},
-},15};
+},13};
 static ButtonMap key_map={{
     {SDL_SCANCODE_SPACE,BTN_CROSS}, {SDL_SCANCODE_LSHIFT,BTN_CIRCLE}, {SDL_SCANCODE_E,BTN_SQUARE},
     {SDL_SCANCODE_Q,BTN_TRIANGLE}, {SDL_SCANCODE_1,BTN_L1}, {SDL_SCANCODE_3,BTN_R1},
     {SDL_SCANCODE_R,BTN_L2}, {SDL_SCANCODE_F,BTN_R2}, {SDL_SCANCODE_Z,BTN_L3}, {SDL_SCANCODE_C,BTN_R3},
-    {SDL_SCANCODE_RETURN,BTN_OPTIONS}, {SDL_SCANCODE_TAB,CLICK_LEFT}, {SDL_SCANCODE_BACKSPACE,CLICK_RIGHT},
+    {SDL_SCANCODE_RETURN,BTN_OPTIONS}, {SDL_SCANCODE_TAB,BTN_TOUCHPAD},
     {SDL_SCANCODE_I,BTN_UP}, {SDL_SCANCODE_K,BTN_DOWN}, {SDL_SCANCODE_J,BTN_LEFT}, {SDL_SCANCODE_L,BTN_RIGHT},
-},17};
+},16};
 
 static char *trim(char *text) {
     while (*text==' ' || *text=='\t') ++text;
@@ -161,11 +129,13 @@ static char *trim(char *text) {
 }
 
 /* Applies a GOW3_PAD_MAP/GOW3_KEY_MAP value; returns how many entries were used. Bad entries are
- * logged and skipped, so their PS4 button keeps its default. */
+ * logged and skipped, so their PS4 button keeps its default. Of one name the last entry counts;
+ * the rest are applied together, so different names of one button add up. */
 static int apply_button_map(ButtonMap *map, const char *spec, bool keyboard) {
     if (!spec || !*spec) return 0;
     char copy[1024];
     snprintf(copy,sizeof(copy),"%s",spec);
+    const char *names[48]; ButtonSource found[48]; size_t n=0;
     int used=0;
     char *entry=copy;
     while (entry) {
@@ -188,11 +158,17 @@ static int apply_button_map(ButtonMap *map, const char *spec, bool keyboard) {
             continue;
         }
         size_t kept=0;
-        for (size_t i=0;i<map->count;++i) if (map->entries[i].ps!=ps) map->entries[kept++]=map->entries[i];
-        map->count=kept;
-        if (map->count<sizeof(map->entries)/sizeof(*map->entries)) map->entries[map->count++]=(ButtonSource){source,ps};
+        for (size_t i=0;i<n;++i) if (SDL_strcasecmp(names[i],button)) { names[kept]=names[i]; found[kept++]=found[i]; }
+        n=kept;
+        if (n<sizeof(found)/sizeof(*found)) { names[n]=button; found[n++]=(ButtonSource){source,ps}; }
         ++used;
     }
+    for (size_t j=0;j<n;++j) {
+        size_t kept=0;
+        for (size_t i=0;i<map->count;++i) if (map->entries[i].ps!=found[j].ps) map->entries[kept++]=map->entries[i];
+        map->count=kept;
+    }
+    for (size_t j=0;j<n && map->count<sizeof(map->entries)/sizeof(*map->entries);++j) map->entries[map->count++]=found[j];
     return used;
 }
 
@@ -229,6 +205,7 @@ static void sample_host(PadData *d) {
         if (d->r2>30) d->buttons|=BTN_R2;
         if (mapped & BTN_L2) d->l2=255;
         if (mapped & BTN_R2) d->r2=255;
+        if (SDL_GetGamepadButton(g,SDL_GAMEPAD_BUTTON_TOUCHPAD)) d->buttons|=BTN_TOUCHPAD; /* like its fingers */
         if (SDL_GetNumGamepadTouchpads(g)>0) {
             const int fingers=SDL_GetNumGamepadTouchpadFingers(g,0);
             for (int finger=0;finger<fingers && d->touch_count<2;++finger) {
@@ -255,9 +232,9 @@ static void sample_host(PadData *d) {
 
 /* GOW3_PAD_FILE=<file>: scripted input for automated runs. The file holds whitespace-separated
  * tokens, re-read when it changes: button names (cross circle square triangle l1 r1 l2 r2 l3 r3
- * options touchpad touchpad_left touchpad_right up down left right) are held while listed;
- * touchpad is the left side; lx= ly= rx= ry= (0..255) override the sticks. An empty file
- * releases everything. */
+ * options touchpad touchpad_left touchpad_right up down left right) are held while listed, the
+ * three touchpad names being one button; lx= ly= rx= ry= (0..255) override the sticks. An empty
+ * file releases everything. */
 static struct { uint32_t buttons; int stick[4]; } injected={0,{-1,-1,-1,-1}};
 static int replay_armed;      /* 1 while a GOW3_PAD_REPLAY recording plays, 2 once it ended */
 static uint64_t replay_start; /* 0: (re)start at the next sample */
@@ -366,8 +343,8 @@ static void replay_sample(PadData *d) {
 static int hold_after_capture;
 static void sample(PadData *d) {
     sample_host(d);
-    if (gow3gpu_overlay_captures_input()) { hold_after_capture=1; click.side=-1; return; }
-    record_sample(d); /* the click sources as they are: a replay plays them again */
+    if (gow3gpu_overlay_captures_input()) { hold_after_capture=1; return; }
+    record_sample(d);
     read_inject();
     replay_sample(d);
     d->buttons|=injected.buttons;
@@ -375,7 +352,6 @@ static void sample(PadData *d) {
     if (injected.buttons & BTN_R2) d->r2=255;
     uint8_t *axes[4]={&d->left_x,&d->left_y,&d->right_x,&d->right_y};
     for (int i=0;i<4;++i) if (injected.stick[i]>=0) *axes[i]=(uint8_t)injected.stick[i];
-    play_click(d);
     if (hold_after_capture) {
         if (d->buttons) d->buttons=0;
         else hold_after_capture=0;
