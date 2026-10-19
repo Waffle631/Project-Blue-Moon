@@ -36,6 +36,26 @@ def native_package(name='fixture-native', binding_address=4112, binding_kind=1,
             + struct.pack('<8Q',32,1,0,0,40,1,1,0) + image)
 
 
+def fake_app0(tmp, sfo=None, **values):
+    """A game folder whose sce_sys/param.sfo (PSF 1.1) holds string values, or the bytes sfo;
+    without either it has no param.sfo."""
+    app0 = Path(tmp) / 'app0'
+    (app0 / 'sce_sys').mkdir(parents=True)
+    if sfo is None and values:
+        entries, keys, data = b'', b'', b''
+        for key, value in values.items():
+            text = value.encode() + b'\0'
+            entries += struct.pack('<HHIII', len(keys), 0x204, len(text), len(text), len(data))
+            keys += key.encode() + b'\0'
+            data += text
+        keys_offset = 20 + len(entries)
+        sfo = (struct.pack('<4sIIII', b'\0PSF', 0x101, keys_offset, keys_offset + len(keys), len(values))
+               + entries + keys + data)
+    if sfo is not None:
+        (app0 / 'sce_sys/param.sfo').write_bytes(sfo)
+    return app0
+
+
 @unittest.skipUnless(EXE.exists(), 'build native probe first')
 class LoaderTests(unittest.TestCase):
     def test_invalid_content_profile_is_rejected(self):
@@ -61,6 +81,28 @@ class LoaderTests(unittest.TestCase):
         r = self.run_image(package(b'\xff\x25\x02\0\0\0\x90\x90', [(8, 1, 0, 0)], ['fixture-import']))
         self.assertEqual(r.returncode, 20, r.stderr)
         self.assertIn('first unsupported PS4 import: fixture-import', r.stdout)
+        self.assertNotIn('unsupported title', r.stdout)  # without --app0 no title is checked
+
+    def run_game(self, *options, sfo=None, **values):
+        with tempfile.TemporaryDirectory() as tmp:
+            app0 = fake_app0(tmp, sfo, **values)
+            return self.run_image(package(b'\xc3'), '--app0', str(app0), '--user', str(Path(tmp) / 'user'), *options)
+
+    def test_only_the_supported_title_runs(self):
+        r = self.run_game(TITLE_ID='CUSA47999', TITLE='TSUKIHIME')
+        self.assertNotEqual(r.returncode, 30, r.stdout + r.stderr)
+        self.assertNotIn('unsupported title', r.stdout)
+        cases = (('another game', {'TITLE_ID': 'CUSA01623'}, None, 'CUSA01623'),
+                 ('no TITLE_ID', {'TITLE': 'TSUKIHIME'}, None, 'unknown'),
+                 ('corrupt param.sfo', {}, b'not a PSF file', 'unknown'),
+                 ('no param.sfo', {}, None, 'unknown'))
+        for name, values, sfo, shown in cases:
+            for options in ((), ('--check-imports',)):
+                with self.subTest(name, options=options):
+                    r = self.run_game(*options, sfo=sfo, **values)
+                    self.assertEqual(r.returncode, 30, r.stdout + r.stderr)
+                    self.assertIn(f'STOP: unsupported title {shown}: this build only runs CUSA47999\n', r.stdout)
+                    self.assertNotIn('Imports:', r.stdout)
 
     def test_native_initializer_and_export_return(self):
         r=self.run_image(native_package())

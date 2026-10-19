@@ -359,6 +359,16 @@ static int sfo_value(const char *path, const char *key, char *text, size_t text_
     }
     return 0;
 }
+/* This build runs one game: another game folder, or one without a readable TITLE_ID, stops with
+ * exit code 30 before anything is mounted or a window opens (docs/tsuki/ROADMAP.md). */
+#define SUPPORTED_TITLE_ID "CUSA47999"
+static int check_title(const char *app0) {
+    char sfo[4096], id[16]="";
+    snprintf(sfo,sizeof(sfo),"%s/sce_sys/param.sfo",app0);
+    if (sfo_value(sfo,"TITLE_ID",id,sizeof(id),NULL) && !strcmp(id,SUPPORTED_TITLE_ID)) return 0;
+    printf("STOP: unsupported title %s: this build only runs " SUPPORTED_TITLE_ID "\n",id[0] ? id : "unknown");
+    return 30;
+}
 static int mapped(Segment *segments, uint64_t count, uint64_t address, uint64_t bytes) {
     for (uint64_t i = 0; i < count; ++i)
         if (address >= segments[i].address && bytes <= segments[i].size &&
@@ -509,6 +519,7 @@ int main(int argc, char **argv) {
         printf("STOP: this CPU lacks %s and no rewrite table matches the image\n", missing);
         return 20;
     }
+    if (app0) { int refused=check_title(app0); if (refused) return refused; }
     if (content_profile) {
         FILE *profile=fopen(content_profile,"rb");
         unsigned char data[28];
@@ -667,7 +678,7 @@ int main(int argc, char **argv) {
         return 20;
     }
     if (!cpu_only) {
-        char title[128]="God of War III", serial[16]="UNKNOWN", sfo[4096];
+        char title[128]="", serial[16]="", sfo[4096];
         uint32_t attributes=0;
         snprintf(sfo,sizeof(sfo),"%s/sce_sys/param.sfo",app0 ? app0 : ".");
         sfo_value(sfo,"TITLE",title,sizeof(title),NULL);
