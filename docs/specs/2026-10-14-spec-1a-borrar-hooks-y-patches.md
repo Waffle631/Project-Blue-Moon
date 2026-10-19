@@ -1,7 +1,7 @@
 # Spec 1a — Eliminar hooks, patches, touchpad, tests e identidad de GoW3
 
 Fecha: 2026-10-14. Revisada el 2026-10-18 tras auditar el repo (la spec seguía sin implementar).
-Estado: **en curso**: pasos 0 y 1 hechos el 2026-10-19 (commit `9f86fc1`); faltan 2 a 5. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 1a".
+Estado: **en curso**: pasos 0, 1, 4 y 2 hechos el 2026-10-19, en ese orden (commits `9f86fc1`, `f90d6ac`, `ad33479`); faltan 3 y 5. Desde el paso 2 fallan 4 tests del launcher (ver su resultado). Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 1a".
 
 Marcas: **[V]** comprobado en el repo (comando indicado); **[D]** decisión que debe tomar el usuario.
 
@@ -164,6 +164,42 @@ dice en el log (hoy ya responde "no patch profile for CUSA47999"). `tools/make_s
 si solo genera firmas del XML. `mods.py` y `game_update.py` no cambian. La carpeta `patches/` queda
 vacía (git no la conserva); el código no debe fallar si no existe.
 
+**Resultado (2026-10-19, commit `ad33479`).** Se hizo después del paso 4, que es su precondición (sin él,
+`test_patches.py` fallaba al borrar el XML).
+
+- Borrados:
+  - `patches/God_of_War_III_Remastered.xml`; la carpeta `patches/` desaparece.
+  - La entrada de GoW3 en `GAMES`, que queda como tabla vacía.
+  - `REFERENCE_SHA256`. Los parches externos ya no dependen de él; sin perfil, ese bloque no se alcanza.
+- `tools/make_signatures.py` **se conserva**. Es genérico: recibe cualquier eboot y los sitios por
+  argumento, no lleva datos de GoW3 y genera las firmas `Pattern`/`At` que el motor sigue leyendo. Solo
+  pierde "hook" en su descripción.
+- Carpeta de juego por defecto en `run.py` y `patches.py`: `<repo>/Tsukihime/CUSA47999`, donde está el
+  dump (ignorado en `.gitignore`).
+- Tests nuevos en `test_patches.py`, tres en rojo antes del cambio:
+  - `GAMES` vacío.
+  - La carpeta por defecto.
+  - Parches externos sin build de referencia.
+  - Sin `patches/` ni carpeta de datos (es una guarda y ya pasaba).
+- `patches.py`, con `--game-dir Tsukihime/CUSA47999` y sin él: `Patches: no patch profile for CUSA47999: none applied`.
+- Python: 254 ejecutados y 35 omitidos. **Fallan 4 tests del launcher** (6 fallos y 5 errores contando
+  subtests):
+  - `test_launcher_controls`: `GameFilesTest.test_play_offers_to_adopt_the_system_files` y
+    `.test_system_files_beside_a_pkg_extraction`.
+  - `test_launcher_game_files`: `LauncherGameFilesTests.test_cancel_then_copy_keeps_existing_files_and_reports_missing_module`
+    y `.test_slow_copy_blocks_reentry_and_failure_allows_retry`.
+
+  El launcher reconoce un dump de GoW3 con `patches.game_profile`. Con el perfil y el XML antiguos
+  inyectados en memoria, los 24 tests del launcher pasan, así que esa es la única causa. Según las
+  secciones 3 y 6, se anota y no se arregla.
+- También fuera del ámbito: `packaging/linux/build.sh` y `packaging/windows/package.sh` copian
+  `patches/` con `cp -r` y fallarán hasta que se limpie el empaquetado.
+- Arranque sin `GOW3_GAME_DIR` (`out/first-run-after-t2.log`): usa `Tsukihime/CUSA47999`, y el log es
+  igual al del paso 1 hasta la parada del watchdog.
+  - Las 2 líneas de parches siguen ("no patch profile …" y "0 writes"). Son las de un juego sin perfil,
+    que este paso pide decir en el log.
+  - Para el cierre: esto choca con "ni las de parches" del criterio de la sección 6.
+
 ### Paso 3 — Touchpad
 Se elimina la **semántica de GoW3**: la traducción de clics laterales a modo foto / pausa. Se conserva
 un único botón.
@@ -198,6 +234,26 @@ parches y mods sin un juego concreto; deja de leer el XML de GoW3 y el JSON de s
 `tests/data/eboot_6e72_sites.json`. En `test_game_update.py`, `test_mods.py` y `test_save_backup.py`,
 sustituir `CUSA01623`/`CUSA01715` por IDs ficticios (`CUSA99991`, `CUSA99992`; son datos de prueba, no
 perfiles). Los `test_launcher_*.py` no se tocan. Listar en el cambio los tests borrados y reescritos.
+
+**Resultado (2026-10-19, commit `f90d6ac`).**
+
+- `test_patches.py` usa un perfil sintético: `CUSA99990`, un XML mínimo en un directorio temporal y
+  `GAMES` inyectado con `mock`.
+- Reescritos con ese perfil:
+  - Los 2 tests de `ExternalPatchTests`. El de "el archivo integrado no es externo" ahora también cubre
+    la exclusión por `GAMES`.
+  - 4 de `GameProfileTests`.
+  - `test_requirements_from_patch_notes`, que pasa de `SignatureTests` a `GameProfileTests`.
+  - `test_profile_patches_compile`, que sustituye a `test_gow3_patches_compile`.
+- Nuevo: `test_without_profile_nothing_applies`.
+- Borrados:
+  - `test_signatures_match_the_full_update_eboot`.
+  - `test_gow3_signatures_in_the_reference_and_a_moved_build` y `test_gow3_skip_intro_original_bytes`,
+    que se omitían sin `GOW3_GAME`.
+  - `test_gow3_skip_intro_targets`.
+  - `tests/data/eboot_6e72_sites.json`.
+- `test_game_update.py`, `test_mods.py` y `test_save_backup.py` usan `CUSA99991` y `CUSA99992`.
+- Python: 254 OK y 37 omitidos → **251 OK y 35 omitidos**.
 
 ### Paso 5 — Identidad
 `probe.c`: título y serial vacíos por defecto, leídos siempre del `param.sfo`. Comprobación de juego
