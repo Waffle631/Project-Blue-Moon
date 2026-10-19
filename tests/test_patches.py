@@ -1,44 +1,80 @@
-from paths import ROOT
-import os
+from paths import ROOT  # noqa: F401  (puts scripts/ on the path)
 import tempfile
 import unittest
-import xml.etree.ElementTree as ET
 from pathlib import Path
+from unittest import mock
 
+import patches
 from patches import (compile_patches, external_patches, external_selection, compile_external,
-                     game_profile, selected_patches, patch_requirements, GAMES)
+                     game_profile, selected_patches, patch_requirements)
 
-GOW3 = ROOT / 'patches/God_of_War_III_Remastered.xml'
-GOW3_IDS = {'CUSA01623'}
+# A built-in profile for a game that does not exist: the patch engine is tested without a real one.
+SYNTH_ID = 'CUSA99990'
+SYNTH_IDS = {SYNTH_ID}
 SEGMENTS = [(0, 0x6000000)]
+
+# The file's defaults (isEnabled), a site found by its signature, the resolution patches that
+# replace the texture fix, and notes asking for direct memory and a VBlank rate.
+SYNTH_XML = """<?xml version="1.0"?>
+<Patch>
+  <TitleID><ID>CUSA99990</ID></TitleID>
+  <Metadata Title="Synthetic Game" Name="Bug Fix - Texture Corruption Fix" AppVer="01.00" AppElf="eboot.bin" isEnabled="true">
+    <PatchList><Line Type="bytes" Address="0x00401000" Value="9090"/></PatchList>
+  </Metadata>
+  <Metadata Title="Synthetic Game" Name="Skip Videos" AppVer="01.00" AppElf="eboot.bin" isEnabled="true">
+    <PatchList><Line Type="bytes" Address="0x00402004" Value="9090" Pattern="11 22 ?? 44 55 66" At="1"/></PatchList>
+  </Metadata>
+  <Metadata Title="Synthetic Game" Name="Resolution Patch - 4K" AppVer="01.00" AppElf="eboot.bin" Note="Requires setting DMEM to 6144 MB">
+    <PatchList><Line Type="bytes32" Address="0x00403000" Value="0x00000f00"/></PatchList>
+  </Metadata>
+  <Metadata Title="Synthetic Game" Name="Resolution Patch - 720p" AppVer="01.00" AppElf="eboot.bin">
+    <PatchList><Line Type="bytes32" Address="0x00403000" Value="0x000002d0"/></PatchList>
+  </Metadata>
+  <Metadata Title="Synthetic Game" Name="Frame Rate Patch - 120 FPS" AppVer="01.00" AppElf="eboot.bin" Note="Set VBlank to 120 FPS">
+    <PatchList><Line Type="bytes" Address="0x00404000" Value="01"/></PatchList>
+  </Metadata>
+  <Metadata Title="Synthetic Game" Name="Old" AppVer="00.90" AppElf="eboot.bin" isEnabled="true">
+    <PatchList><Line Type="bytes" Address="0x00405000" Value="90"/></PatchList>
+  </Metadata>
+</Patch>"""
 
 
 EXTERNAL = """<?xml version="1.0"?>
 <Patch>
-  <TitleID><ID>CUSA01623</ID></TitleID>
-  <Metadata Title="God of War III" Name="On" Author="x" PatchVer="1.0" AppVer="01.02" AppElf="eboot.bin" isEnabled="true">
+  <TitleID><ID>CUSA99990</ID></TitleID>
+  <Metadata Title="Synthetic Game" Name="On" Author="x" PatchVer="1.0" AppVer="01.00" AppElf="eboot.bin" isEnabled="true">
     <PatchList><Line Type="bytes" Address="0x00401000" Value="9090"/></PatchList>
   </Metadata>
-  <Metadata Title="God of War III" Name="Off" Author="x" PatchVer="1.0" AppVer="01.02" AppElf="eboot.bin">
+  <Metadata Title="Synthetic Game" Name="Off" Author="x" PatchVer="1.0" AppVer="01.00" AppElf="eboot.bin">
     <PatchList><Line Type="bytes32" Address="0x00402000" Value="0x12345678"/></PatchList>
   </Metadata>
-  <Metadata Title="God of War III" Name="Mask" Author="x" PatchVer="1.0" AppVer="01.02" AppElf="eboot.bin" isEnabled="true">
+  <Metadata Title="Synthetic Game" Name="Mask" Author="x" PatchVer="1.0" AppVer="01.00" AppElf="eboot.bin" isEnabled="true">
     <PatchList><Line Type="mask" Value="90 ?? 90" Offset="0"/></PatchList>
   </Metadata>
-  <Metadata Title="God of War III" Name="Old" Author="x" PatchVer="1.0" AppVer="01.00" AppElf="eboot.bin" isEnabled="true">
+  <Metadata Title="Synthetic Game" Name="Old" Author="x" PatchVer="1.0" AppVer="00.90" AppElf="eboot.bin" isEnabled="true">
     <PatchList><Line Type="bytes" Address="0x00403000" Value="90"/></PatchList>
   </Metadata>
 </Patch>"""
 
 
+def synthetic_xml(test):
+    """SYNTH_XML in a temporary folder, removed after the test."""
+    directory = tempfile.TemporaryDirectory()
+    test.addCleanup(directory.cleanup)
+    xml = Path(directory.name) / 'Synthetic_Game.xml'
+    xml.write_text(SYNTH_XML)
+    return xml
+
+
 class ExternalPatchTests(unittest.TestCase):
     def test_selection_and_unsupported_lines(self):
+        built_in = synthetic_xml(self)
         with tempfile.TemporaryDirectory() as directory:
             folder = Path(directory)
             (folder / 'extra.xml').write_text(EXTERNAL)
-            (folder / 'other.xml').write_text(EXTERNAL.replace('CUSA01623', 'CUSA99999'))
+            (folder / 'other.xml').write_text(EXTERNAL.replace(SYNTH_ID, 'CUSA99999'))
             (folder / 'broken.xml').write_text('<Patch>')
-            found = external_patches(folder, '01.02', GOW3, GOW3_IDS)
+            found = external_patches(folder, '01.00', built_in, SYNTH_IDS)
             self.assertEqual([key for key, _, _ in found],
                              ['extra.xml/On', 'extra.xml/Off', 'extra.xml/Mask'])
             # The file's isEnabled; the mask patch is skipped as a whole.
@@ -50,12 +86,22 @@ class ExternalPatchTests(unittest.TestCase):
             self.assertEqual(writes, [(0x2000, (0x12345678).to_bytes(4, 'little'))])
 
     def test_built_in_file_is_not_external(self):
-        self.assertEqual(external_patches(GOW3.parent, '01.02', GOW3, GOW3_IDS), [])
+        built_in = synthetic_xml(self)
+        self.assertEqual(external_patches(built_in.parent, '01.00', built_in, SYNTH_IDS), [])
+        # Nor any other game's built-in file in the same folder.
+        with mock.patch.object(patches, 'GAMES', [(SYNTH_IDS, built_in, '01.00', 'Synthetic Game')]):
+            self.assertEqual(external_patches(built_in.parent, '01.00', built_in.parent / 'none.xml', SYNTH_IDS), [])
 
 
 class GameProfileTests(unittest.TestCase):
+    def setUp(self):
+        self.xml = synthetic_xml(self)
+        games = mock.patch.object(patches, 'GAMES', [(SYNTH_IDS, self.xml, '01.00', 'Synthetic Game')])
+        games.start()
+        self.addCleanup(games.stop)
+
     def test_profiles_by_title_id(self):
-        self.assertEqual(game_profile('CUSA01623')[1:3], (GOW3, '01.02'))
+        self.assertEqual(game_profile(SYNTH_ID)[1:3], (self.xml, '01.00'))
         self.assertIsNone(game_profile('CUSA99999'))
         self.assertIsNone(game_profile(None))
 
@@ -67,33 +113,55 @@ class GameProfileTests(unittest.TestCase):
                          ['Bug Fix - Texture Corruption Fix', 'Frame Rate Patch - 120 FPS'])
         self.assertEqual(restrict_to_available(['Resolution Patch - 8K'], available), [])
 
-    def test_gow3_defaults_and_extras(self):
-        self.assertEqual(selected_patches(GOW3, '01.02', ''),
-                         ['Bug Fix - Texture Corruption Fix', 'Skip Any Video With X Button'])
-        self.assertEqual(selected_patches(GOW3, '01.02', 'Resolution Patch - 720p; Skip Any Video With X Button'),
-                         ['Skip Any Video With X Button', 'Resolution Patch - 720p'])
-        self.assertEqual(selected_patches(GOW3, '01.00', ''), [])
+    def test_defaults_and_extras(self):
+        self.assertEqual(selected_patches(self.xml, '01.00', ''),
+                         ['Bug Fix - Texture Corruption Fix', 'Skip Videos'])
+        self.assertEqual(selected_patches(self.xml, '01.00', 'Resolution Patch - 720p; Skip Videos'),
+                         ['Skip Videos', 'Resolution Patch - 720p'])
+        self.assertEqual(selected_patches(self.xml, '00.90', ''), ['Old'])
+        self.assertEqual(selected_patches(self.xml, '02.00', ''), [])
         # The launcher's selection is exact: unchecked defaults stay off.
-        self.assertEqual(selected_patches(GOW3, '01.02', 'Skip Any Video With X Button', only=True), ['Skip Any Video With X Button'])
-        self.assertEqual(selected_patches(GOW3, '01.02', '', only=True), [])
+        self.assertEqual(selected_patches(self.xml, '01.00', 'Skip Videos', only=True), ['Skip Videos'])
+        self.assertEqual(selected_patches(self.xml, '01.00', '', only=True), [])
 
-    def test_gow3_resolution_patch_replaces_texture_fix(self):
-        self.assertEqual(selected_patches(GOW3, '01.02', 'Resolution Patch - 4K'),
-                         ['Skip Any Video With X Button', 'Resolution Patch - 4K'])
+    def test_resolution_patch_replaces_texture_fix(self):
+        self.assertEqual(selected_patches(self.xml, '01.00', 'Resolution Patch - 4K'),
+                         ['Skip Videos', 'Resolution Patch - 4K'])
         with self.assertRaises(ValueError):
-            selected_patches(GOW3, '01.02', 'Resolution Patch - 4K;Resolution Patch - 720p')
+            selected_patches(self.xml, '01.00', 'Resolution Patch - 4K;Resolution Patch - 720p')
 
     def test_profile_by_title_for_any_region(self):
-        from unittest import mock
-        import patches
-        self.assertEqual(game_profile('CUSA01715')[1], GOW3)
-        self.assertEqual(game_profile('CUSA99999', 'God of War® III Remastered')[1], GOW3)
+        self.assertEqual(game_profile('CUSA99999', 'Synthetic Game® Remastered')[1], self.xml)
         self.assertIsNone(game_profile('CUSA99999', 'Another Game'))
-        with mock.patch.object(patches, 'game_sfo', return_value={'TITLE_ID': 'CUSA77777', 'TITLE': 'God of War III Remastered'}):
+        with mock.patch.object(patches, 'game_sfo', return_value={'TITLE_ID': 'CUSA77777', 'TITLE': 'Synthetic Game'}):
             self.assertTrue(patches.game_patchable('folder'))
         self.assertFalse(patches.game_patchable(None))
         with tempfile.TemporaryDirectory() as folder:
             self.assertFalse(patches.game_patchable(folder))  # no param.sfo: unknown game
+
+    def test_profile_patches_compile(self):
+        names = selected_patches(self.xml, '01.00', '')
+        # Without the image: the reference Address values.
+        self.assertEqual(compile_patches(self.xml, names, '01.00', SEGMENTS),
+                         [(0x1000, b'\x90\x90'), (0x2004, b'\x90\x90')])
+        # With it: the signature finds the moved site; a line without one keeps its Address.
+        image = bytearray(0x10000)
+        image[0x3000:0x3006] = bytes.fromhex('112233445566')
+        self.assertEqual(compile_patches(self.xml, names, None, [(0, 0x10000)], bytes(image), {}),
+                         [(0x1000, b'\x90\x90'), (0x3001, b'\x90\x90')])
+
+    def test_requirements_from_patch_notes(self):
+        # Notes ask for extra direct memory (shadPS4 "DMEM") and a VBlank rate.
+        self.assertEqual(patch_requirements(self.xml, ['Resolution Patch - 4K', 'Skip Videos'], '01.00'),
+                         (5056 + 6144, None))
+        self.assertEqual(patch_requirements(self.xml, ['Frame Rate Patch - 120 FPS'], '01.00'), (None, 120))
+        self.assertEqual(patch_requirements(self.xml, [], '01.00'), (None, None))
+
+
+class BuiltInProfileTests(unittest.TestCase):
+    def test_without_profile_nothing_applies(self):
+        self.assertIsNone(game_profile('CUSA47999'))
+        self.assertIsNone(game_profile('CUSA47999', 'TSUKIHIME -A piece of blue glass moon-'))
 
 
 class SignatureTests(unittest.TestCase):
@@ -144,89 +212,6 @@ class SignatureTests(unittest.TestCase):
         writes = compile_patches(self.xml, ['Found', 'Call'], '01.02', [(0, 0x10000)])
         self.assertEqual(writes[0], (0x1004, b'\x90\x90'))
         self.assertEqual(writes[1][0], 0x1010)
-
-    def test_signatures_match_the_full_update_eboot(self):
-        # Without that eboot.bin here: the original bytes others published for it must be the
-        # fixed bytes of each signature at its site, with one shift per code region.
-        import json
-        known = json.loads((ROOT / 'tests/data/eboot_6e72_sites.json').read_text())
-        fixed = lambda pattern, at, n: [None if b == '??' else int(b, 16) for b in pattern.split()][at:at + n]
-        shifts = {}
-        metas = {m.get('Name'): list(m.iter('Line')) for m in ET.parse(GOW3).getroot().iter('Metadata')}
-        for name, sites in known['patches'].items():
-            for index, address, original in sites:
-                line = metas[name][index]
-                ours = fixed(line.get('Pattern'), int(line.get('At')), len(original) // 2)
-                self.assertTrue(all(b is None or b == o for b, o in zip(ours, bytes.fromhex(original))),
-                                f'{name} line {index}')
-                reference = int(line.get('Address'), 0)
-                shifts.setdefault(reference >> 16, set()).add(int(address, 0) - reference)
-        self.assertTrue(all(len(s) == 1 for s in shifts.values()), shifts)
-
-    @unittest.skipUnless(os.environ.get('GOW3_GAME'), 'GOW3_GAME (game folder) not set')
-    def test_gow3_signatures_in_the_reference_and_a_moved_build(self):
-        from prepare import parse_self
-        from patches import eboot_image
-        elf, *_ = parse_self((Path(os.environ['GOW3_GAME']) / 'eboot.bin').read_bytes())
-        image = eboot_image(bytes(elf))
-        names = [m.get('Name') for m in ET.parse(GOW3).getroot().iter('Metadata')]
-        segments = [(0, len(image))]
-        # The reference build: the signatures give exactly the Address writes.
-        for name in names:
-            self.assertEqual(compile_patches(GOW3, [name], None, segments, image, {}),
-                             compile_patches(GOW3, [name], '01.02', segments), name)
-        # A build whose code moved like the full 01.02 update's: +0x120 from 0x1f0000 to 0x210000,
-        # data unchanged (the bytes taken out keep the data at its address).
-        moved = image[:0x1f0000] + bytes(0x120) + image[0x1f0000:0x210000] + image[0x210120:]
-        self.assertEqual(len(moved), len(image))
-        shift = lambda at: at + 0x120 if 0x1f0000 <= at < 0x210000 else at
-        for name in ('Resolution Patch - 4K', 'Skip Intro'):
-            reference = compile_patches(GOW3, [name], None, segments, image, {})
-            found = compile_patches(GOW3, [name], None, segments, moved, {})
-            self.assertEqual([at for at, _ in found], [shift(at) for at, _ in reference], name)
-        # Skip Intro's cave moved: the boot call into it is recomputed, the flag (data) is not.
-        writes = dict(compile_patches(GOW3, ['Skip Intro'], None, segments, moved, {}))
-        rel = lambda data, at, end: end + int.from_bytes(data[at:at + 4], 'little', signed=True)
-        self.assertEqual(rel(writes[0x01b36a], 1, 0x01b36f), shift(0x212170))
-        flag = rel(writes[0x0c8440], 2, 0x0c844a)  # the getter (not moved) and the cave share it
-        self.assertEqual(rel(writes[shift(0x212170)], 2, shift(0x212170) + 10), flag)
-
-    def test_gow3_patches_compile(self):
-        names = [m.get('Name') for m in ET.parse(GOW3).getroot().iter('Metadata')]
-        self.assertTrue(compile_patches(GOW3, names, '01.02', SEGMENTS))
-
-    def test_gow3_skip_intro_targets(self):
-        # Ported from the other 01.02 build: every jump must land where this eboot has the code.
-        writes = dict(compile_patches(GOW3, ['Skip Intro'], '01.02', SEGMENTS))
-        rel = lambda data, at, end: end + int.from_bytes(data[at:at + 4], 'little', signed=True)
-        self.assertEqual(writes[0x184950], bytes.fromhex('eb34'))  # jne over the logo start
-        getter = writes[0x0c8440]  # mov [flag], 1; mov eax, 1; ret
-        self.assertEqual(len(getter), 16)
-        self.assertEqual(rel(getter, 2, 0x4c844a), 0x1e79258)
-        call = writes[0x01b36a]  # the boot call now goes through the cave
-        self.assertEqual(rel(call, 1, 0x41b36f), 0x612170)
-        cave = writes[0x212170]  # mov [flag], 1; jmp to the original callee
-        self.assertEqual(len(cave), 15)
-        self.assertEqual(rel(cave, 2, 0x61217a), 0x1e79258)
-        self.assertEqual(rel(cave, 11, 0x61217f), 0x4b4c90)
-
-    @unittest.skipUnless(os.environ.get('GOW3_GAME'), 'GOW3_GAME (game folder) not set')
-    def test_gow3_skip_intro_original_bytes(self):
-        from prepare import parse_self
-        elf, _, ph, _, _ = parse_self((Path(os.environ['GOW3_GAME']) / 'eboot.bin').read_bytes())
-        text = next(p for p in ph if p['type'] == 1 and p['flags'] & 1)
-        original = {0x184950: '7534', 0x0c8440: '488d05955b38008b00c3660f1f440000',
-                    0x01b36a: 'e821990900', 0x212170: '90' * 15}
-        for offset, value in original.items():
-            at = text['offset'] + offset - text['vaddr']
-            self.assertEqual(bytes(elf[at:at + len(value) // 2]).hex(), value, hex(offset))
-
-    def test_requirements_from_patch_notes(self):
-        # Notes ask for extra direct memory (shadPS4 "DMEM") and a VBlank rate.
-        self.assertEqual(patch_requirements(GOW3, ['Resolution Patch - 4K', 'Skip Any Video With X Button'], '01.02'),
-                         (5056 + 6144, None))
-        self.assertEqual(patch_requirements(GOW3, ['Frame Rate Patch - 120 FPS'], '01.02'), (None, 120))
-        self.assertEqual(patch_requirements(GOW3, [], '01.02'), (None, None))
 
 
 if __name__ == '__main__':

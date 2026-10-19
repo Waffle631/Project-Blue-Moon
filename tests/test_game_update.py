@@ -26,7 +26,7 @@ class GameUpdateTests(unittest.TestCase):
         write(self.update / 'SCE_SYS/param.sfo', 'new sfo')
         write(self.update / 'SCE_SYS/icon0.png', 'new icon')
 
-    def view(self, ids=('CUSA01623', 'CUSA01623')):
+    def view(self, ids=('CUSA99991', 'CUSA99991')):
         with mock.patch('patches.game_title_id', side_effect=list(ids)):
             return game_update.create_view(self.base, self.update, self.out)
 
@@ -58,8 +58,8 @@ class GameUpdateTests(unittest.TestCase):
 
     def test_different_titles_and_nested_folders_are_refused(self):
         with self.assertRaises(ValueError):
-            self.view(('CUSA01623', 'CUSA01715'))
-        with mock.patch('patches.game_title_id', return_value='CUSA01623'):
+            self.view(('CUSA99991', 'CUSA99992'))
+        with mock.patch('patches.game_title_id', return_value='CUSA99991'):
             with self.assertRaises(ValueError):
                 game_update.create_view(self.base, self.base / 'EXEC', self.out)
         self.assertEqual(list(self.out.iterdir()) if self.out.exists() else [], [])
