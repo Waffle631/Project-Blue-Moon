@@ -149,7 +149,6 @@ class SignatureTests(unittest.TestCase):
         # Without that eboot.bin here: the original bytes others published for it must be the
         # fixed bytes of each signature at its site, with one shift per code region.
         import json
-        import re
         known = json.loads((ROOT / 'tests/data/eboot_6e72_sites.json').read_text())
         fixed = lambda pattern, at, n: [None if b == '??' else int(b, 16) for b in pattern.split()][at:at + n]
         shifts = {}
@@ -163,16 +162,6 @@ class SignatureTests(unittest.TestCase):
                 reference = int(line.get('Address'), 0)
                 shifts.setdefault(reference >> 16, set()).add(int(address, 0) - reference)
         self.assertTrue(all(len(s) == 1 for s in shifts.values()), shifts)
-        header = (ROOT / 'src/cheat_hook.h').read_text()
-        hooks = re.findall(r'\{(0x[0-9a-f]+),GOW3_CHEAT_\w+,\d+,\d+,\s*\{([^}]*)\},.*?\{"([^"]+)",(\d+)\}\}',
-                           header, re.S)
-        for name, (address, original) in known['cheats'].items():
-            # The cheats' region moved -0x10 (Rage of Sparta has two sites with the same bytes).
-            match = [h for h in hooks if bytes(int(b, 0) for b in h[1].split(',')).hex() == original
-                     and int(h[0], 0) - 0x10 == int(address, 0)]
-            self.assertEqual(len(match), 1, name)
-            _, _, pattern, at = match[0]
-            self.assertEqual(fixed(pattern, int(at), len(original) // 2), list(bytes.fromhex(original)), name)
 
     @unittest.skipUnless(os.environ.get('GOW3_GAME'), 'GOW3_GAME (game folder) not set')
     def test_gow3_signatures_in_the_reference_and_a_moved_build(self):

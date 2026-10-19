@@ -7,6 +7,9 @@
 #include <string>
 #include "gow3_graphics.h"
 #include "gow3_settings.h"
+#ifndef _WIN32
+#define _putenv_s(name, value) setenv(name, value, 1) // "" counts as unset for Load()
+#endif
 
 namespace G = Gow3Graphics;
 
@@ -80,14 +83,18 @@ int main() {
     assert(v.rcas_strength == 75 && v.frames_queued == 1);
     assert(v.async_shaders);
     {
+        // An old gow3.ini with the removed God of War III keys: ignored, and not written back.
         std::ofstream out(path);
-        out << "cheat_double_jumps=1\ncheat_very_hard=1\n";
+        out << "cheat_health=1\nred_orb_multiplier=5.0\ndamage_taken=0.5\nenemy_health_bar=1\nvsync=0\n";
     }
+    v.vsync = true;
     Gow3Settings::Load();
+    assert(!v.vsync);
     Gow3Settings::Save();
-    const std::string cheats = Read(path);
-    assert(cheats.find("cheat_double_jumps=1\n") != std::string::npos);
-    assert(cheats.find("cheat_very_hard=1\n") != std::string::npos);
+    const std::string old = Read(path);
+    for (const char* key : {"cheat_", "orb_multiplier", "damage_", "enemy_health_bar"}) {
+        assert(old.find(key) == std::string::npos);
+    }
     std::remove(path);
     std::puts("PASS: graphics settings");
 }
