@@ -81,16 +81,27 @@ la rama `gow3`).
 
 - Hooks de orbes, daño, cheats y barra de vida del enemigo: los `install_*` de `src/probe.c`,
   `src/*_hook.h`, `gpu/shim/gow3_orbs.cpp`, `gpu/shim/gow3_actors.cpp`, y sus llamadas desde el
-  overlay. *(Spec 1a)* Las del launcher se quitan al final (ver "Después de la Alpha").
-- `tools/gow3_frame_map.py` (herramienta específica de GoW3). *(Spec 1a)*
+  overlay. *(Spec 1a, ✅ 2026-10-19: con ellos se fue la pestaña "Game" del menú del juego.)* Las del
+  launcher se quitan al final (ver "Después de la Alpha").
+- `tools/gow3_frame_map.py` (herramienta específica de GoW3). *(Spec 1a, ✅ borrado.)*
 - `patches/God_of_War_III_Remastered.xml`, el perfil `GAMES` y `REFERENCE_SHA256` de
-  `scripts/patches.py`, y `tools/make_signatures.py` si solo genera firmas de GoW3. *(Spec 1a)*
-- Semántica del touchpad (modo foto / pausa) en `runtime_pad.c`. *(Spec 1a)*
+  `scripts/patches.py`, y `tools/make_signatures.py` si solo genera firmas de GoW3. *(Spec 1a, ✅: el
+  XML y el SHA están borrados y `GAMES` queda vacío. `make_signatures.py` se conserva porque es
+  genérico: sirve para cualquier eboot y no lleva datos de GoW3.)*
+- Semántica del touchpad (modo foto / pausa) en `runtime_pad.c`. *(Spec 1a, ✅: `touchpad`,
+  `touchpad_left` y `touchpad_right` son ahora nombres del mismo botón.)*
 - Tests que solo inspeccionan código de GoW3: `stat-multipliers-test`, `cheat-hooks-test`,
-  `signatures-test` y los de Python que dependen del perfil de GoW3. *(Spec 1a)*
+  `signatures-test` y los de Python que dependen del perfil de GoW3. *(Spec 1a, ✅.)*
 - Identidad de GoW3: título y serial por defecto en `probe.c` y en `run.py`/`scripts/patches.py`.
-  *(Spec 1a)* El acceso de Steam, los textos del launcher, el empaquetado y los README se dejan para
-  el final (ver "Después de la Alpha").
+  *(Spec 1a, ✅: además, cualquier juego que no sea CUSA47999 sale con código 30.)* El acceso de Steam,
+  los textos del launcher, el empaquetado y los README se dejan para el final (ver "Después de la
+  Alpha").
+- **Sin decidir:** la elección de parches de resolución y de frame rate usa todavía los nombres de los
+  parches de GoW3 ("Resolution Patch", "Frame Rate Patch", "Bug Fix - Texture Corruption Fix"). Está
+  en `scripts/patches.py`, `scripts/graphics_options.py`, `run.py`, el menú del juego y sus ajustes.
+  Sin perfil de parches no hace nada, pero `run.py` sigue diciendo en cada arranque que no encontró el
+  parche de frame rate. La Spec 1a no la cubría, y el launcher importa `EXCLUSIVE_PREFIX` de
+  `patches.py` (ver "Pendientes del usuario").
 - Heurísticas de GPU de GoW3: `gbuffer_draw` y la constante de cámara de 864 bytes en
   `vk_rasterizer.cpp`; decisión de MSAA por vendor; `GOW3_READBACK_LINEAR=1` por defecto en `run.py`.
   *(Spec 1b, después del hito de primer fotograma)* El escalado a 1920×1080 **se conserva**: el
@@ -166,7 +177,7 @@ motivos están en la sección "Hito".
 | 2 | Kernel: event flags, tiempo, hilos (y lo mínimo de servicios para arrancar) | **Spec 2** | 1 | 3–5 días | ✅ Concluida (fases 2A y 2B; en libkernel solo quedan las 3 trampas decididas) |
 | 3 | Borrar hooks, patches, touchpad, tests e identidad de GoW3 | **Spec 1a** | 1 (en paralelo con la Spec 2) | 1–2 días (real: 1 día) | ✅ Concluida el 2026-10-19 (otro juego sale con código 30; 4 tests del launcher marcados como fallo esperado hasta su limpieza; queda por decidir la elección de parches por nombre de GoW3) |
 | 4 | **Hito: primer fotograma** | Hito | Spec 2 | 1 día (real: ~1 día) | ✅ Concluido el 2026-10-18 (imagen correcta: el aviso de autoguardado y el vídeo del prólogo se ven bien; `unimplemented=0`; capturas PNG y `compare_captures.sh` con línea base en `out/baseline/`; se sigue el orden previsto) |
-| 5 | Borrar las heurísticas de GPU de GoW3 | **Spec 1b** | Spec 1a, hito | 1–2 días (antes 2–3) | ⬜ Pendiente (el hito ya está) |
+| 5 | Borrar las heurísticas de GPU de GoW3 | **Spec 1b** | Spec 1a, hito | 1–2 días (antes 2–3) | ⬜ Pendiente (se puede empezar: la Spec 1a y el hito están cerrados) |
 | 6 | Servicios del sistema que faltan | **Spec 3** | Spec 2 | 2–3 días | 🟨 En curso (15 de 23 APIs adelantadas en la Spec 2) |
 | 7a | Audio ATRAC9 (`libSceAudiodec`): música → voces → efectos `vse`, con investigación previa | **Spec 4a** | Spec 2 | 1–2 semanas, sin tope | ⬜ Pendiente (respuesta provisional de `InitLibrary` hecha en la Spec 2; `CreateDecoder` para el juego al final del prólogo; estructura de control vista en el desensamblado) |
 | 7b | Audio HEVAG (`libSceAudiodecCpu`): efectos de `vag.mrg`, con investigación previa | **Spec 4b** | Spec 4a (música y voces) | sin estimar, sin tope | ⬜ Pendiente |
@@ -209,7 +220,8 @@ flowchart LR
 | — | `prepare.py` y `link_modules.py` procesan el eboot sin errores: 104 enlaces nativos a `libc`/`Fios2`, 359 imports para el runtime, 0 parches `fs→gs`. | — |
 | 1 | Inventario estático (sección de la etapa 1): ~61 APIs sin implementación, 57 con nombre. | — |
 | 2 | Spec 2 (kernel) cerrada: 26 de las 29 APIs de libkernel implementadas y 3 trampas con nombre; en la fase 2A se adelantaron 15 APIs de la Spec 3 y una provisional de la 4. | `2531937`…`7244263` |
-| 4 | Hito de primer fotograma cerrado: línea `GPU:` al final del log, capturas PNG del fotograma presentado (`GOW3_SCREENSHOT_AT`, F12), `tools/compare_captures.sh`, línea base en `out/baseline/` y decisión: seguir el orden previsto. | `8c40e39`…`5acfafe` + cierre |
+| 3 | Spec 1a cerrada. Fuera del árbol: los hooks de GoW3 y sus backends, la pestaña "Game" del menú, el XML y el perfil de parches, el touchpad en dos mitades, los tests de GoW3 y los textos de identidad. El cargador solo arranca CUSA47999 (código 30 para cualquier otro). Los 4 tests del launcher que rompe quedan como fallo esperado. | `9f86fc1`…`4832164` |
+| 4 | Hito de primer fotograma cerrado: línea `GPU:` al final del log, capturas PNG del fotograma presentado (`GOW3_SCREENSHOT_AT`, F12), `tools/compare_captures.sh`, línea base en `out/baseline/` y decisión: seguir el orden previsto. | `8c40e39`…`5acfafe` y `0e6bf51` (cierre) |
 
 ### Flujo de cada spec
 
@@ -489,6 +501,38 @@ los tests y fuentes eliminados.
   `STOP: unsupported title <id|unknown>: this build only runs CUSA47999`, código 30;
   `tests/test_probe.py`.)*
 
+**Resultado (cerrada el 2026-10-19).** Los detalles de cada paso están en la spec.
+
+- **Orden real:** pasos 0, 1, 4, 2, 3 y 5. El 4 (tests) va antes que el 2 porque borrar el XML rompía
+  `test_patches.py`.
+- **Paso 1, hooks:** se borran con su pestaña "Game" del menú del juego, que solo tenía cheats,
+  multiplicadores y la barra de vida. Las claves de GoW3 de un `gow3.ini` antiguo se ignoran sin error.
+- **Paso 2, parches:** el cargador queda genérico y dice en el log
+  `Patches: no patch profile for CUSA47999: none applied`. La carpeta de juego por defecto es
+  `Tsukihime/CUSA47999`.
+- **Paso 3, touchpad:** los tres nombres son un solo botón, que el juego recibe al momento y sin toque
+  sintético. Por defecto lo pulsan `Tab` y el clic real del touchpad.
+  - Si se asigna más de un nombre, las fuentes se suman, así que los mapas que guarda el launcher
+    siguen sirviendo.
+  - El clic real no se pierde aunque se asigne un nombre.
+- **Paso 5, identidad:** el título y el serial se leen del `param.sfo`. Con `--app0`, cualquier otro
+  juego, o una carpeta sin `TITLE_ID`, sale con código 30 antes de montar nada o abrir la ventana.
+- **Tests:**
+  - C: `bash build.sh --test` pasa. `pad-map-test` entra en él; antes solo existía para Windows.
+  - C++: faltan los 6 destinos borrados, y `graphics-settings-test` y `perf-overlay-test` ya compilan
+    en Linux.
+  - Python: `OK (skipped=35, expected failures=4)` en 255 tests.
+- **Log y capturas:** el log de arranque pierde las líneas de hooks y para en el mismo punto. En las
+  capturas, el fotograma 300 sale idéntico al control del hito. El 120 y el 420 solo difieren en el
+  icono "Saving…", que gira, y del 720 en adelante es el vídeo del prólogo (unos 6 minutos), que no se
+  puede repetir.
+- **Consecuencias en lo que no se tocó:**
+  - El launcher ya no reconoce un dump, porque usaba el perfil de GoW3.
+  - El empaquetado copia `patches/` con `cp -r`, y esa carpeta ya no existe.
+  - Las dos cosas van con la limpieza de después de la Alpha.
+- **Sin decidir:** la elección de parches por nombre de GoW3 (ver la sección 2).
+- **Esfuerzo:** 1 día, el mínimo de lo previsto.
+
 ---
 
 ### Hito — Primer fotograma
@@ -576,7 +620,13 @@ tiene forma de comprobarse. Por eso esta spec va después del hito.
 1. Con las heurísticas aún presentes, capturar los fotogramas del hito (ya están en `out/baseline/`).
    Para comparar píxel a píxel sirve el aviso de autoguardado pedido por número de fotograma (por
    ejemplo `GOW3_SCREENSHOT_AT=300`, con `GOW3_FULLSCREEN=1`). Los fotogramas del vídeo cambian entre
-   ejecuciones porque siguen el reloj real (ver el resultado del hito).
+   ejecuciones porque siguen el reloj real (ver el resultado del hito). Al cerrar la Spec 1a se
+   confirmó con datos:
+   - El 300 sale idéntico entre ejecuciones.
+   - El 120 y el 420 solo difieren en un recuadro de unos 72×68 px alrededor del icono "Saving…", que
+     gira.
+   - El vídeo del prólogo dura unos 6 minutos, así que para ver otro 2D del juego hace falta pasar del
+     prólogo.
 2. Borrar una heurística, compilar, pasar tests y recapturar.
 3. Comparar las capturas (diferencia de píxeles). Si cambian, entender por qué antes de seguir; si el
    cambio es el esperado (la heurística actuaba sobre algo de GoW3), anotarlo y actualizar la línea base.
@@ -886,7 +936,8 @@ Las configuraciones y saves antiguos no se migran (no hay usuarios de los nombre
 | AvPlayer de shadPS4 inmaduro (sincronía, eventos) | Medio | Probar opening y títulos de capítulo pronto; seguir upstream |
 | Defectos 2D (alfa, fundidos, texto) en el traductor | Medio | Línea base de capturas aprobadas por el usuario; captura antes y después de cada corrección |
 | Borrar heurísticas del renderizador (Spec 1b) rompe el dibujo sin que se sepa qué cambió | Medio | Se hace después del hito, una heurística por vez, con captura antes y después |
-| Borrar por error código compartido con lo genérico | Medio | Borrar por pasos, compilar y pasar los tests tras cada uno; la historia queda en git y en la rama `gow3` |
+| Borrar por error código compartido con lo genérico | Medio | Borrar por pasos, compilar y pasar los tests tras cada uno; la historia queda en git y en la rama `gow3`. En la Spec 1a (2026-10-19) no hubo regresiones en tests, log ni capturas |
+| El launcher y el empaquetado se quedan rotos hasta su limpieza: tras la Spec 1a, el launcher no reconoce un dump (usaba el perfil de parches de GoW3) y el empaquetado copia una carpeta `patches/` que ya no existe | Bajo (el launcher solo es de Windows/Tk, y en Linux se usa `run.py`) | Se arreglan juntos después de la Alpha; los 4 tests del launcher afectados están marcados como fallo esperado, y unittest avisa en cuanto vuelvan a pasar |
 | El renombrado masivo rompe el build o una variable queda a medias (el juego ignora la opción sin avisar) | Medio | Va al final (Spec 7), con recorrido grabado y capturas como oráculo; renombrar por capas con `git mv`; sin alias; script de comprobación con excepciones explícitas |
 | Defecto de render RDNA2 (franjas oscuras) documentado en `docs/plans/2026-10-12-gpu-corruption-rdna2.md`; la máquina de pruebas es una Navi 23 | Bajo | Visto solo en Windows y en la ruta de MSAA de GoW3, que borra la Spec 1b; `--vulkan-only` pasa en RADV. En el hito (2026-10-18) no apareció nada parecido |
 | El juego no elige inglés o mezcla recursos de otro idioma | Bajo | El runtime ya reporta inglés; verificar `_en` en el log de archivos abiertos |
@@ -903,6 +954,7 @@ Las configuraciones y saves antiguos no se migran (no hay usuarios de los nombre
 | Aprobar cada spec antes de la implementación | Specs 1a, 1b, 2 a 7 |
 | ~~Mirar el resultado del hito de primer fotograma y decidir con el autor cómo seguir~~ Hecho el 2026-10-18: seguir el orden previsto | Hito |
 | Aprobar las capturas de línea base (una por una) | Hito, Spec 1b, Spec 6 |
+| Decidir qué hacer con la elección de parches de resolución y de frame rate por nombre de GoW3 (sección 2): una spec propia, dentro de la Spec 1b (cuyo último paso ya toca los valores por defecto de `run.py` y `scripts/graphics_options.py`) o con el launcher después de la Alpha | Spec 1b |
 | Probar el recorrido en el juego e informar de lo que vio y oyó | Specs 4 a 6 |
 
 ---
@@ -914,7 +966,13 @@ Ideas para versiones siguientes, sin compromiso:
 - **Beta:** todas las rutas (Arcueid y Ciel) hasta los finales y créditos.
 - **Launcher, empaquetado y documentación de usuario** (se hacen al final, por decisión del
   2026-10-14): identidad de Tsukihime, acceso de Steam, README, `.github`, y quitar del launcher las
-  opciones de funciones ya borradas (orbes, cheats) y sus tests de Python.
+  opciones de funciones ya borradas (orbes, cheats) y sus tests de Python. Tras la Spec 1a, además:
+  - Reconocer el dump sin `patches.game_profile`.
+  - Quitar las marcas `expectedFailure` de sus 4 tests en cuanto vuelvan a pasar.
+  - Dejar de mostrar `Backspace`/`back` como teclas por defecto de "Touchpad right".
+  - Dar un mensaje propio al código 30.
+  - Quitar el `cp -r patches` de `packaging/linux/build.sh` y de `packaging/windows/package.sh`.
+  - Quitar la mención de `tools/gow3_frame_map.py` en `docs/upscaler.md`.
 - Launcher con idioma, resolución de ventana y remapeo pensados para una novela visual.
 - Escalado limpio para 1440p/4K (FSR 1 o escalado entero) de fondos y texto.
 - Windows y Steam Deck.
