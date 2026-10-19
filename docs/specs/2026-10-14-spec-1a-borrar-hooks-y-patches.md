@@ -1,7 +1,7 @@
 # Spec 1a — Eliminar hooks, patches, touchpad, tests e identidad de GoW3
 
 Fecha: 2026-10-14. Revisada el 2026-10-18 tras auditar el repo (la spec seguía sin implementar).
-Estado: **en curso**: pasos 0, 1, 4, 2 y 3 hechos el 2026-10-19, en ese orden (commits `9f86fc1`, `f90d6ac`, `ad33479`, `2e8474d`); falta el 5. Desde el paso 2 fallan 4 tests del launcher (ver su resultado). Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 1a".
+Estado: **implementada** el 2026-10-19. Pasos 0, 1, 4, 2, 3 y 5, en ese orden (commits `9f86fc1`, `f90d6ac`, `ad33479`, `2e8474d`, `77b6319`), y el resto de la identidad en `15c6ad0`. Los resultados están debajo de cada paso y en la sección 6, que también lista lo que queda fuera. Desde el paso 2 fallan 4 tests del launcher (ver su resultado). Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 1a".
 
 Marcas: **[V]** comprobado en el repo (comando indicado); **[D]** decisión que debe tomar el usuario.
 
@@ -312,6 +312,40 @@ soportado:
 pasa a ser `Tsukihime/CUSA47999` (o ninguna). `scripts/steam_shortcut.py` queda para el final junto con el
 launcher.
 
+**Resultado (2026-10-19, commits `77b6319` y `15c6ad0`).**
+
+- `probe.c`: `check_title` y una sola constante, `SUPPORTED_TITLE_ID`.
+  - Con `--app0`, en cualquier modo, lee `TITLE_ID` de `sce_sys/param.sfo` antes de montar nada y de
+    crear la GPU.
+  - Va después de las comprobaciones de CPU, que pueden parar antes con el código 20.
+  - El título y el serial son vacíos por defecto y se leen del `param.sfo`.
+- Tests (`tests/test_probe.py`). `fake_app0` escribe un `param.sfo` mínimo:
+  - CUSA47999 arranca.
+  - Otro juego, un `param.sfo` sin `TITLE_ID`, uno corrupto y una carpeta sin él dan 30, con y sin
+    `--check-imports`.
+  - Sin `--app0` no se comprueba nada.
+  - El "otro juego" es `CUSA12345` y no `CUSA01623`, porque la lista cerrada de la sección 6 también
+    debe dar 0 en `tests/`.
+- Rojo visto: en los 8 casos de rechazo el juego arrancaba.
+- Verde:
+  - `test_probe.py`: 17 OK.
+  - `--check-imports` con `Tsukihime/CUSA47999` sigue dando 19.
+  - El cargador real con un `param.sfo` de CUSA01623 sale con 30 y
+    `STOP: unsupported title CUSA01623: this build only runs CUSA47999`, sin abrir ventana ni crear
+    `user/`.
+- Resto de la identidad (`15c6ad0`):
+  - El título de la ventana (`gow3gpu.cpp`) y la cabecera del menú (`gow3_overlay.cpp`) ya no usan
+    "God of War III" cuando falta el título.
+  - El nombre de aplicación Vulkan de `vulkan_smoke.c` pasa a "gow3 native probe".
+  - `tools/gow3_frame_map.py` está borrado; `docs/upscaler.md` aún lo nombra.
+- Se quedan, a propósito:
+  - Los comentarios que explican por qué algo existe (R3+L2 en el overlay, la regla de parches
+    exclusivos de `scripts/patches.py`).
+  - `scripts/steam_shortcut.py`.
+  - El nombre del ejecutable de Windows en `gpu/CMakeLists.txt`, que es del empaquetado.
+- Sin `--app0`, el serial que recibe la GPU pasa de `UNKNOWN` a vacío. Solo afecta a ejecuciones sin
+  juego (la caché de pipelines queda en la raíz de su carpeta).
+
 ## 5. Requisitos
 
 - Ni hooks, ni parches, ni firmas de God of War III en el árbol (en el ámbito de la sección 3).
@@ -321,11 +355,11 @@ launcher.
 
 ## 6. Pruebas y criterios de aceptación
 
-- [ ] `bash build.sh --test` y `python3 -m unittest discover -s tests` pasan. Se compara contra la
+- [x] `bash build.sh --test` y `python3 -m unittest discover -s tests` pasan. Se compara contra la
   línea base del paso 0 (Python: 254 OK, 37 omitidos; C: `out/baseline-c-1a.log`): la diferencia es
   exactamente la lista de tests borrados o reescritos, anotada en el cambio. Si falla algún test del
   launcher por una función que ya no existe, se anota y no se arregla aquí.
-- [ ] **Comprobación por lista cerrada de símbolos**, con palabra completa:
+- [x] **Comprobación por lista cerrada de símbolos**, con palabra completa:
   `git grep -nwE 'CUSA01623|CUSA01715|CUSA01720|God_of_War_III_Remastered|REFERENCE_SHA256|install_cheats|install_actor_watch|install_orb_multiplier|install_stat_multipliers|install_jump|GOW3_CHEAT_COUNT|GOW3_ORB_PICKUP_LENGTH|GOW3_ORB_PICKUP_OFFSET|GOW3_DAMAGE_HOOK_LENGTH' -- src gpu scripts tests run.py patches tools ':!tests/test_launcher_*.py'`
   sin resultados. Cada patrón da resultados hoy (comprobado el 2026-10-18: 14 en `probe.c`, 6 en
   `damage_hook.h`, etc.), así que se puede verificar que baja a 0. La lista se amplía con los nombres
@@ -333,15 +367,60 @@ launcher.
   cabeceras de FSR. Una segunda búsqueda sin `-w` sobre los mismos directorios para `gow3_orbs`,
   `gow3_actors`, `orb_hook`, `actor_hook`, `cheat_hook`, `damage_hook`, `signature.h`, `Gow3Orbs` y
   `Gow3Actors` también debe dar 0.
-- [ ] `git grep -nE 'CLICK_LEFT|CLICK_RIGHT|play_click' -- src tests` sin resultados.
-- [ ] `out/first-run.log` antes y después: sin las diez líneas de hooks/cheats "code not found" ni
+- [x] `git grep -nE 'CLICK_LEFT|CLICK_RIGHT|play_click' -- src tests` sin resultados.
+- [x] `out/first-run.log` antes y después: sin las diez líneas de hooks/cheats "code not found" ni
   las de parches; por lo demás, el mismo punto de parada.
-- [ ] Un juego distinto de CUSA47999 (se simula con un `param.sfo` de prueba) se rechaza con el mensaje
+- [x] Un juego distinto de CUSA47999 (se simula con un `param.sfo` de prueba) se rechaza con el mensaje
   de la sección 4 y código 30; un `param.sfo` sin `TITLE_ID` y una carpeta sin `param.sfo` también.
   Hay un test en `tests/test_probe.py` que lo cubre, y otro que comprueba que sin `--app0` no se rechaza.
-- [ ] `python3 -m unittest discover -s tests` incluye un test del cargador de parches con perfil sintético.
-- [ ] `tests/test_pad.c` y `tests/test_pad_map.c` cubren que los tres nombres del touchpad dan
+- [x] `python3 -m unittest discover -s tests` incluye un test del cargador de parches con perfil sintético.
+- [x] `tests/test_pad.c` y `tests/test_pad_map.c` cubren que los tres nombres del touchpad dan
   `BTN_TOUCHPAD` sin toque sintético.
+
+**Resultado del cierre (2026-10-19).** Logs y capturas en `out/` (sin versionar).
+
+- Tests frente a la línea base del paso 0:
+  - C (`build.sh --test`, `out/t6-c.log`): sale con 0. Las líneas PASS pasan de 8 a 9: la de
+    `pad-test` cambia de texto (paso 3) y se añade `pad-map-test`, que antes no se ejecutaba en Linux.
+  - C++ (paso 1): faltan los 6 destinos borrados, y `graphics-settings-test` y `perf-overlay-test`
+    ahora compilan y pasan en Linux.
+  - Python (`out/t6-py.log`): de 254 ejecutados y 37 omitidos a 255 y 35.
+    - Paso 4: 4 tests borrados y 1 nuevo; −2 omitidos.
+    - Paso 2: 3 tests nuevos.
+    - Paso 5: 1 test nuevo.
+    - Fallan solo los 4 métodos del launcher del paso 2: 6 fallos y 5 errores, contados por subtest.
+- Las dos búsquedas de la lista cerrada y la del touchpad dan 0. `gow3_frame_map` tampoco aparece.
+- Arranque de 25 s (`out/first-run-after-1a.log`, frente a `out/first-run-before-1a.log`):
+  - Ya no están las diez líneas de hooks "code not found". La parada es la misma: el watchdog a los
+    25 s (flips 1440 frente a 1438).
+  - Siguen las dos líneas `Patches:` del cargador genérico, que el paso 2 pide decir.
+  - Sigue también "Engine frame rate: 60 FPS (the frame rate patch was not found in this eboot.bin)"
+    de `run.py`; ver "Queda fuera".
+- Capturas: barrido de 60 s a pantalla completa (`out/run-after-1a.log`), con 10 capturas en
+  `out/after-1a/` frente a `out/baseline/`.
+  - Ninguna sale `idéntico`, pero ninguna diferencia viene del cambio.
+  - 120 y 420 (aviso de autoguardado): solo difiere un recuadro de unos 72×68 px alrededor del icono
+    "Saving…", que gira. El resto de la imagen coincide.
+  - De la 720 en adelante es el vídeo del prólogo (unos 6 minutos). Sigue el reloj real, así que no es
+    repetible.
+  - Control del hito (`out/run-after-1a-rep.log`): el fotograma 300 sale `idéntico` a
+    `out/hito-rep1` y a `out/hito-rep2`. El 1620 (vídeo) sale diferente, como en el hito.
+  - Ritmo: 3544 flips en 60 s, frente a 3545 en el barrido del hito.
+- Rechazo de otro juego: test en `test_probe.py` y prueba con el cargador real (paso 5).
+
+**Queda fuera, para decidir.** No está en el plan ni en la lista cerrada:
+
+- La elección de parches de resolución y de frame rate usa nombres de parches de GoW3 ("Resolution
+  Patch", "Frame Rate Patch", "Bug Fix - Texture Corruption Fix"). Está en:
+  - `scripts/patches.py`: `EXCLUSIVE_PREFIX` y `REPLACED_BY_EXCLUSIVE`.
+  - `scripts/graphics_options.py`, `run.py`.
+  - `gpu/shim/gow3_graphics.h`, `gow3_settings.*` y `gow3_overlay.cpp`, y su uso en `driver.cpp`.
+  - Sus tests.
+
+  Sin perfil de parches no hace nada. No se toca aquí porque el launcher importa `EXCLUSIVE_PREFIX`
+  de `patches.py`. Por eso `run.py` sigue avisando en cada arranque de que no encontró el parche de
+  frame rate.
+- `docs/upscaler.md` sigue nombrando `tools/gow3_frame_map.py`.
 
 ## 7. Riesgos
 
