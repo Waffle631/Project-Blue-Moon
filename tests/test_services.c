@@ -106,6 +106,11 @@ int main(void) {
 
     float ratio=0; assert(safe_area(&ratio)==0 && ratio==1.0f && safe_area(NULL)==SYSTEM_PARAMETER);
 
+    /* User color: a fixed one for user 1; any other user, or no pointer, is an error that writes nothing. */
+    int32_t color=0x7f; assert(user_color(1,&color)==0 && color==USER_COLOR_BLUE);
+    color=0x7f; assert(user_color(2,&color)==USER_INVALID_ARGUMENT && color==0x7f);
+    assert(user_color(-1,&color)==USER_INVALID_ARGUMENT && color==0x7f && user_color(1,NULL)==USER_INVALID_ARGUMENT);
+
     /* System name (id 6): the game asks with a 65-byte buffer and ignores the result. */
     char system_name[65]; memset(system_name,'x',sizeof system_name);
     assert(system_param_string(6,system_name,sizeof system_name)==0 && !strcmp(system_name,"PS4"));

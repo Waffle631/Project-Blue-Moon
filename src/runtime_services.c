@@ -23,6 +23,7 @@
 #define ORBIS_OK 0
 #define USER_INVALID_ARGUMENT ((int32_t)0x80960005)
 #define USER_NO_EVENT ((int32_t)0x80960007)
+#define USER_COLOR_BLUE 0 /* SceUserServiceUserColor: the first user of a new console is blue */
 #define SYSTEM_NO_EVENT ((int32_t)0x80A10004)
 #define SYSTEM_PARAMETER ((int32_t)0x80A10003)
 #define NET_CTL_NOT_CONNECTED ((int32_t)0x80412108)
@@ -59,6 +60,12 @@ static ABI int32_t user_name(int32_t id,char *name,uint64_t size) {
     const char *value=getenv("GOW3_USER_NAME") ? getenv("GOW3_USER_NAME") : "Hunter";
     if (strlen(value)+1>size) return (int32_t)0x8096000a; /* BUFFER_TOO_SHORT */
     strcpy(name,value); return 0;
+}
+/* Only a getter at eboot +0x11e750 imports it, and nothing in the eboot calls, jumps to or points at that getter.
+ * The getter ignores the result and returns the color as is, so a failing call would hand back stack garbage. */
+static ABI int32_t user_color(int32_t id,int32_t *color) {
+    if (id!=USER_ID || !color) return USER_INVALID_ARGUMENT;
+    *color=USER_COLOR_BLUE; return 0;
 }
 static ABI int32_t user_event(int32_t *event) {
     if (!event) return USER_INVALID_ARGUMENT;
@@ -602,7 +609,8 @@ static ABI int32_t audio_in_open(void) { return AUDIO_IN_NOT_OPENED; }
 static const RuntimeExport exports[]={
     {"sceUserServiceInitialize",user_initialize}, {"sceUserServiceTerminate",user_terminate},
     {"sceUserServiceGetInitialUser",user_initial}, {"sceUserServiceGetLoginUserIdList",user_list},
-    {"sceUserServiceGetUserName",user_name}, {"sceUserServiceGetEvent",user_event},
+    {"sceUserServiceGetUserName",user_name}, {"sceUserServiceGetUserColor",user_color},
+    {"sceUserServiceGetEvent",user_event},
     {"sceSystemServiceParamGetInt",system_param}, {"sceSystemServiceParamGetString",system_param_string},
     {"sceSystemServiceGetStatus",system_status}, {"sceSharePlayInitialize",shareplay_initialize},
     {"sceGameLiveStreamingInitialize",live_streaming_initialize},
