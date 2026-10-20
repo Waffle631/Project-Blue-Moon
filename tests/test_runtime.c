@@ -212,12 +212,12 @@ static void heap_trace_info(void) {
     *a.mask=0; a.mstates[127]=&a; assert(a.mstates[127]==&a); a.mstates[127]=0;
     assert((uint32_t)f(&small)==0x80020016 && !small.mask && (uint32_t)f(NULL)==0x80020016);
 }
-/* Spec 4, phase A: until docs/audiodec.md exists, Audiodec answers are explicit errors, never a
-   fake decoder. The game ignores InitLibrary's result (eboot +0x10e211). */
-static void audiodec_provisional(void) {
+/* Spec 4a (docs/audiodec.md 1.8): InitLibrary(1) succeeds once; a second call is the Vita's
+   ALREADY_INITIALIZED. The game ignores the result (eboot +0x10e211). The rest: tests/test_audiodec.c. */
+static void audiodec_init(void) {
     typedef int32_t (ABI *Init)(uint32_t);
     Init init=GET(Init,"VjhsmxpcezI#libSceAudiodec");
-    assert(init && (uint32_t)init(1)==0x807F0001 && (uint32_t)init(1)==0x807F0001);
+    assert(init && init(1)==0 && (uint32_t)init(1)==0x807F0003);
 }
 /* Spec 3: sceSaveDataInitialize3 had code but no name, so it could not be reached. The game calls
    it with NULL (eboot +0xed2eb). */
@@ -649,7 +649,7 @@ int main(int argc,char **argv) {
     if (argc>1 && !strcmp(argv[1],"--rtld-underflow")) {
         static int dso; GET(DsoCount,"8OnWXlgQlvo#libkernel")(&dso); return 99;
     }
-    libc_support(); posix_mutexes(); wall_time(); kernel_time_names(); sanitizer_and_neo(); heap_trace_info(); audiodec_provisional(); savedata_initialize3(); savedata_mount2(); savedata_umount_with_backup(); savedata_backup_queries(); discmap_location(); gpu_stats_line(); exit_handlers(); guards(); mutexes(); direct_memory(); memory_primitives();
+    libc_support(); posix_mutexes(); wall_time(); kernel_time_names(); sanitizer_and_neo(); heap_trace_info(); audiodec_init(); savedata_initialize3(); savedata_mount2(); savedata_umount_with_backup(); savedata_backup_queries(); discmap_location(); gpu_stats_line(); exit_handlers(); guards(); mutexes(); direct_memory(); memory_primitives();
     rw_lifecycle(); rw_concurrency(); rw_timeouts(); posix_rwlocks(); thread_get_name(); file_metadata(); decided_traps();
     time_conversion(); /* last: changes TZ */
     puts("PASS: callback lifecycle, guard ABI, mutex errors, shared direct memory, memory primitives, resolver scope, "
