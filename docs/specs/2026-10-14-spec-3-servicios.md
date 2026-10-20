@@ -1,7 +1,8 @@
 # Spec 3 — Servicios del sistema que faltan
 
 Fecha: 2026-10-14. Estado: **en curso** desde el 2026-10-19: el plan de implementación tiene 7 tareas y
-la 1 y la 2 están hechas (`f4a5d0a` y `4e09b95`, resultados en la sección 6). Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 3".
+la 1, la 2 y la 3 están hechas (`f4a5d0a`, `4e09b95` y `45ba36b`, resultados en la sección 6). Roadmap:
+`docs/tsuki/ROADMAP.md`, sección "Spec 3".
 
 Marcas: **[V]** comprobado en el repo o en los logs; **[H]** hipótesis a confirmar con el sitio de
 llamada del juego.
@@ -28,6 +29,11 @@ offline no tiene (PSN, capturas, Share Play, streaming).
 - **[V]** (2026-10-19, `4e09b95`) Ya están las 23 líneas. `--check-imports` da 18:
   `sceMsgDialogGetResult` ya resuelve. Las otras 7 siguen en la lista, pero ahora con su nombre en vez de
   "name not resolved".
+- **[V]** (2026-10-19, `45ba36b`) `sceSharePlayTerminate`, `sceGameLiveStreamingTerminate` y
+  `sceSystemServiceReenableMusicPlayer` ya son "sin efecto". `--check-imports` da 15: 8 de Audiodec, las 3
+  trampas de kernel y 4 de esta spec (`GetUserColor`, `Check`/`RestoreBackupData` y
+  `sceSysmoduleGetModuleInfoForUnwind`). Sitios de llamada: los dos Terminate están en la ruta de cierre
+  del juego (eboot `+0xed3f7`) y `ReenableMusicPlayer` solo en un envoltorio al que nada llama (ver 4.1).
 - **[V]** `sceSysmoduleLoadModule`, `...IsLoaded` y `...UnloadModule` ya existen en
   `src/runtime_content.c:81-83` (`module_load`, `module_loaded`, `module_unload`).
 - **[V]** Constantes de error de SaveData ya definidas en `runtime_savedata.c:22-29`:
@@ -53,16 +59,16 @@ offline no tiene (PSN, capturas, Share Play, streaming).
 | `tIYf0W5VTi8` | `sceScreenShotDisable` | ScreenShot | **hecha** (`61ec55c`) | 0, sin efecto (política de captura, 4.1) |
 | `73WQ4Jj0nJI` | `sceScreenShotSetOverlayImageWithOrigin` | ScreenShot | **hecha** (`61ec55c`) | 0, sin efecto; `("/app0/image/corp.png", 0, 0, 3)` |
 | `isruqthpYcw` | `sceSharePlayInitialize` | SharePlay | **hecha** (`1f701d3`) | 0, sin efecto; `(NULL, 0x1800)` en eboot `+0xed32e`, resultado ignorado |
-| `UaLjloJinow` | `sceSharePlayTerminate` | SharePlay | falta | 0, sin efecto |
+| `UaLjloJinow` | `sceSharePlayTerminate` | SharePlay | **hecha** (`45ba36b`) | 0, sin efecto; ruta de cierre, eboot `+0xed406`, resultado ignorado |
 | `co2NCj--pnc` | `sceSharePlaySetProhibition` | SharePlay | **hecha** (`61ec55c`) | 0, sin efecto; `(0)` o `(2)` |
 | `kvYEw2lBndk` | `sceGameLiveStreamingInitialize` | GameLiveStreaming | **hecha** (`93a9b2b`) | 0, sin efecto; `(0x4000)` en eboot `+0xed338`, resultado ignorado |
-| `9yK6Fk8mKOQ` | `sceGameLiveStreamingTerminate` | GameLiveStreaming | falta | 0, sin efecto |
+| `9yK6Fk8mKOQ` | `sceGameLiveStreamingTerminate` | GameLiveStreaming | **hecha** (`45ba36b`) | 0, sin efecto; ruta de cierre, eboot `+0xed40b`, resultado ignorado |
 | `dWM80AX39o4` | `sceGameLiveStreamingEnableLiveStreaming` | GameLiveStreaming | **hecha** (`61ec55c`) | 0, sin efecto: es un setter `(bool)`, no una consulta (**[V]**, 4.1) |
 | `Fc8qxlKINYQ` | `sceVideoRecordingSetInfo` | VideoRecording | **hecha** (`61ec55c`) | 0, sin efecto; `(0xd, &prohibido, 4)` |
 | `hHrGoGoNf+s` | `sceSysmoduleLoadModuleInternalWithArg` | Sysmodule | **hecha** (`673559f`) | como `module_load`; los argumentos se registran (**[V]**, ver 4.3) |
 | `4fU5yvOkVG4` | `sceSysmoduleGetModuleInfoForUnwind` | Sysmodule | falta | error explícito (ver 4.2) |
 | `SsC-m-S9JTA` | `sceSystemServiceParamGetString` | SystemService | **hecha** (`6e40c0e`) | ver 4.1 |
-| `9kPCz7Or+1Y` | `sceSystemServiceReenableMusicPlayer` | SystemService | falta | 0, sin efecto (`sceSystemServiceDisableMusicPlayer` ya existe) |
+| `9kPCz7Or+1Y` | `sceSystemServiceReenableMusicPlayer` | SystemService | **hecha** (`45ba36b`) | 0, sin efecto; solo la usa un envoltorio al que nada llama (4.1) |
 | `lUoqwTQu4Go` | `sceUserServiceGetUserColor` | UserService | falta | ver 4.1 |
 | `Lr8ovHH9l6A` | `sceMsgDialogGetResult` | MsgDialog | **hecha** (`4e09b95`) | solo `import_names.inc`; ya probada en `tests/test_services.c:45-54` |
 | `fJgP+wqifno` | `sceDiscMap_7C980FFB0AA27E7A` (sin nombre real) | DiscMap | **hecha** (`d80dea5`) | `NO_BITMAP_INFO`, como su gemela (4.3) |
@@ -95,7 +101,16 @@ verdad.
   primera llamada; `runtime_services_report()` saca los contadores en `runtime_report`. Añadir otra
   API "sin efecto" es una entrada en el `enum`, su nombre y su función. Hay ocho (2026-10-17, hasta la
   iteración 9 de la fase 2A): `sceSharePlayInitialize`, `sceGameLiveStreamingInitialize` y las seis
-  de la política de captura.
+  de la política de captura. Desde el 2026-10-19 (`45ba36b`) hay once: se suman
+  `sceSharePlayTerminate`, `sceGameLiveStreamingTerminate` y `sceSystemServiceReenableMusicPlayer`.
+- **Ruta de cierre del juego [V]** (eboot `+0xed3f7`, 2026-10-19): llama, en este orden, a
+  `sceSaveDataTerminate`, `sceSaveDataDialogTerminate`, `scePlayGoTerminate`, `sceSharePlayTerminate` y
+  `sceGameLiveStreamingTerminate`, e ignora todos los resultados.
+- **`sceSystemServiceReenableMusicPlayer` [V]** (2026-10-19): solo la importa un envoltorio en eboot
+  `+0x12a8e0` (`flag ? Reenable : DisableMusicPlayer`, con salto final). Nada del eboot lo llama, salta a
+  él, lo carga con `lea` ni lo guarda como puntero (la misma búsqueda sí encuentra punteros a las funciones
+  vecinas), así que lo más probable es que no se llame nunca. `sceSystemServiceDisableMusicPlayer` sigue
+  devolviendo 0 sin log: no es de esta spec.
 - **Política de captura del juego [V]** (eboot `+0xee550`, iteración 9). Con modo 0, que es el del
   arranque, llama a `sceScreenShotDisable`, a
   `sceScreenShotSetOverlayImageWithOrigin("/app0/image/corp.png", 0, 0, 3)` y a `sceScreenShotEnable`.
@@ -203,12 +218,26 @@ cada una junto a una hermana de su biblioteca:
 
 - `test_import_names.py` pasa los dos tests con las 23.
 - No se añade ningún NID duplicado.
-- `bash build.sh --test` en `ps4dev` pasa sin warnings.
+- `bash build.sh --test` en `ps4dev` pasa sin warnings del compilador.
 - Suite Python en `ps4dev`: 257 tests, 35 omitidos y 4 fallos esperados, el resto OK.
 - `--check-imports` da 18 (ver sección 2).
 
 El punto 6 de arriba (`GetResult` tras `Open`) ya estaba cubierto por `tests/test_services.c:45-54`, con
 el diálogo terminado, en curso y con `NULL`.
+
+**Resultado (2026-10-19, commit `45ba36b`).** `sceSharePlayTerminate`, `sceGameLiveStreamingTerminate` y
+`sceSystemServiceReenableMusicPlayer` son tres entradas más de `no_effect`. `tests/test_services.c` prueba
+el punto 1 con ellas:
+
+- Cada una se llama dos veces seguidas, dos rondas. La primera ronda escribe una línea y la segunda
+  ninguna, y el contador queda en 2 y luego en 4.
+- Los Terminate se llaman antes que cualquier `Initialize`, y sus contadores siguen a 0: no dependen de
+  él.
+- El nombre de cada entrada nueva del `enum` es el de su API, que es lo que se lee en el log.
+- Rojo: el test no compila sin las tres funciones. Verde: `services test: ok`.
+- `bash build.sh --test` y la suite Python en `ps4dev` pasan (257 tests, 35 omitidos y 4 fallos
+  esperados).
+- `--check-imports` da 15 (ver sección 2).
 
 ## 7. Archivos
 
@@ -219,7 +248,9 @@ el diálogo terminado, en curso y con `NULL`.
 ## 8. Criterios de aceptación
 
 - [ ] `--check-imports` no lista ninguna de las 23 (junto con las Specs 2 y 4).
-- [ ] `out/services-test` cubre las APIs nuevas y pasa.
+- [ ] `out/services-test` cubre las APIs nuevas y pasa (2026-10-19, `45ba36b`: cubre las tres "sin
+  efecto". Faltan `GetUserColor` (Tarea 4, aquí), las de copia de seguridad (Tarea 5, en
+  `tests/test_runtime.c`) y `GetModuleInfoForUnwind` (Tarea 6, en `tests/test_content.c`)).
 - [x] `tests/test_import_names.py` confirma NID y nombre de cada una (2026-10-19, `4e09b95`: pasan los
   23 NID y los 23 nombres).
 - [ ] En un arranque real, cada API "sin efecto" que se llame deja su línea de log (2026-10-17: se
