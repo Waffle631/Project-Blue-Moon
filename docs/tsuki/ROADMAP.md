@@ -12,7 +12,7 @@ gow3_pc (God of War III Remastered), que a su vez viene de
 | Plataforma | Linux primero (máquina de desarrollo), Windows 10/11 después; Vulkan 1.3 |
 | Máquina de pruebas | Bazzite 44 (KDE Plasma 6.7, Wayland), AMD Ryzen 5 7600, 16 GB, **AMD Radeon RX 6650 XT** |
 | Dump | `Tsukihime/CUSA47999/` (sin versionar, ~45 GB) |
-| Última actualización | 2026-10-19. **La Spec 1a queda cerrada.** Están fuera del árbol los hooks, el perfil y el XML de parches, la semántica del touchpad, los tests de GoW3 y los textos de identidad, y el cargador solo arranca CUSA47999 (código 30 para cualquier otro juego). El log de arranque pierde las diez líneas "code not found" y para en el mismo punto. Las capturas no cambian: el fotograma 300 sale idéntico, y lo demás es el icono que gira o el vídeo. Fallan 4 tests del launcher, marcados como fallo esperado hasta que se limpie después de la Alpha. La elección de parches de resolución y de frame rate por nombre de GoW3, que sin perfil no hace nada, se deja para después de la Alpha, con el launcher (decisión del usuario, 2026-10-19). Antes, 2026-10-18: **el hito de primer fotograma queda cerrado:** hay imagen correcta, así que se sigue el orden previsto. El aviso de autoguardado, primer 2D del propio juego, sale nítido y con los colores bien, y el vídeo del prólogo también. En los logs no hay ningún `Unimplemented` (línea `GPU:` al final). Hay herramienta de captura PNG (`GOW3_SCREENSHOT_AT`, F12) y de comparación exacta (`tools/compare_captures.sh`), con la línea base en `out/baseline/`. Esfuerzos re-estimados en la sección 4. Antes, 2026-10-17 (noche): **la Spec 2 queda cerrada** con la fase 2B: en libkernel solo quedan las tres trampas decididas (`scePthreadCancel` y las dos de información de módulo), ya con nombre; `--check-imports` baja de 28 a 19, todo de las specs 3 y 4. Antes, 2026-10-17 (tarde): sin watchdog, el juego reproduce entero el vídeo del prólogo (se ve y se oye bien) y después para en `sceAudiodecCreateDecoder`, el primer decodificador ATRAC9 (Spec 4a). Su sitio de llamada da la estructura de control de Audiodec (Spec 4, 2.5). Por decisión del usuario solo se documenta. Antes, 2026-10-17: la fase 2A de la Spec 2 (guiada por los `STOP:`) termina tras 10 iteraciones: el juego abre `VideoOut`, presenta ~60 fotogramas por segundo y reproduce el vídeo del prólogo, sin ningún `STOP:` de libkernel. Falta ver qué pinta (hito). La Spec 4 se replantea en dos partes: **4a ATRAC9** (música, voces y efectos `vse`) y **4b HEVAG** (19 efectos de `vag.mrg`). 2026-10-14: revisión del orden tras un análisis adversarial (el kernel va primero, hay un hito de "primer fotograma", el borrado se parte en dos y el renombrado pasa al final; lo específico de GoW3 se elimina, no se desactiva) |
+| Última actualización | 2026-10-19. **La Spec 3 queda cerrada.** Las 23 APIs de plataforma tienen un comportamiento explícito: 15 se adelantaron en la Spec 2 y 8 se cierran ahora. Son tres "sin efecto" con su línea de log, el color del usuario 1, las dos consultas de copia de seguridad (`NOT_FOUND`), un error explícito para la información de desenrollado y la línea que le faltaba a `sceMsgDialogGetResult`. `--check-imports` baja de 19 a 11: los 8 de Audiodec (Spec 4) y las 3 trampas decididas de la Spec 2. En un arranque de 60 s salen las ocho líneas "sin efecto" de siempre y ningún `STOP:` nuevo. Las APIs nuevas no se llaman, porque solo se usan en casos concretos (cierre del juego, partida rota, excepciones de C++). Esfuerzo real: 1 día, frente a los 2–3 previstos. Antes, 2026-10-19: **la Spec 1a queda cerrada.** Están fuera del árbol los hooks, el perfil y el XML de parches, la semántica del touchpad, los tests de GoW3 y los textos de identidad, y el cargador solo arranca CUSA47999 (código 30 para cualquier otro juego). El log de arranque pierde las diez líneas "code not found" y para en el mismo punto. Las capturas no cambian: el fotograma 300 sale idéntico, y lo demás es el icono que gira o el vídeo. Fallan 4 tests del launcher, marcados como fallo esperado hasta que se limpie después de la Alpha. La elección de parches de resolución y de frame rate por nombre de GoW3, que sin perfil no hace nada, se deja para después de la Alpha, con el launcher (decisión del usuario, 2026-10-19). Antes, 2026-10-18: **el hito de primer fotograma queda cerrado:** hay imagen correcta, así que se sigue el orden previsto. El aviso de autoguardado, primer 2D del propio juego, sale nítido y con los colores bien, y el vídeo del prólogo también. En los logs no hay ningún `Unimplemented` (línea `GPU:` al final). Hay herramienta de captura PNG (`GOW3_SCREENSHOT_AT`, F12) y de comparación exacta (`tools/compare_captures.sh`), con la línea base en `out/baseline/`. Esfuerzos re-estimados en la sección 4. Antes, 2026-10-17 (noche): **la Spec 2 queda cerrada** con la fase 2B: en libkernel solo quedan las tres trampas decididas (`scePthreadCancel` y las dos de información de módulo), ya con nombre; `--check-imports` baja de 28 a 19, todo de las specs 3 y 4. Antes, 2026-10-17 (tarde): sin watchdog, el juego reproduce entero el vídeo del prólogo (se ve y se oye bien) y después para en `sceAudiodecCreateDecoder`, el primer decodificador ATRAC9 (Spec 4a). Su sitio de llamada da la estructura de control de Audiodec (Spec 4, 2.5). Por decisión del usuario solo se documenta. Antes, 2026-10-17: la fase 2A de la Spec 2 (guiada por los `STOP:`) termina tras 10 iteraciones: el juego abre `VideoOut`, presenta ~60 fotogramas por segundo y reproduce el vídeo del prólogo, sin ningún `STOP:` de libkernel. Falta ver qué pinta (hito). La Spec 4 se replantea en dos partes: **4a ATRAC9** (música, voces y efectos `vse`) y **4b HEVAG** (19 efectos de `vag.mrg`). 2026-10-14: revisión del orden tras un análisis adversarial (el kernel va primero, hay un hito de "primer fotograma", el borrado se parte en dos y el renombrado pasa al final; lo específico de GoW3 se elimina, no se desactiva) |
 
 ---
 
@@ -178,7 +178,7 @@ motivos están en la sección "Hito".
 | 3 | Borrar hooks, patches, touchpad, tests e identidad de GoW3 | **Spec 1a** | 1 (en paralelo con la Spec 2) | 1–2 días (real: 1 día) | ✅ Concluida el 2026-10-19 (otro juego sale con código 30; 4 tests del launcher marcados como fallo esperado hasta su limpieza; la elección de parches por nombre de GoW3 queda para después de la Alpha) |
 | 4 | **Hito: primer fotograma** | Hito | Spec 2 | 1 día (real: ~1 día) | ✅ Concluido el 2026-10-18 (imagen correcta: el aviso de autoguardado y el vídeo del prólogo se ven bien; `unimplemented=0`; capturas PNG y `compare_captures.sh` con línea base en `out/baseline/`; se sigue el orden previsto) |
 | 5 | Borrar las heurísticas de GPU de GoW3 | **Spec 1b** | Spec 1a, hito | 1–2 días (antes 2–3) | ⬜ Pendiente (se puede empezar: la Spec 1a y el hito están cerrados) |
-| 6 | Servicios del sistema que faltan | **Spec 3** | Spec 2 | 2–3 días | 🟨 En curso (15 de 23 APIs adelantadas en la Spec 2) |
+| 6 | Servicios del sistema que faltan | **Spec 3** | Spec 2 | 2–3 días (real: 1 día, más las 15 adelantadas en la Spec 2) | ✅ Concluida el 2026-10-19 (23 de 23: 15 adelantadas en la Spec 2 y 8 en la Spec 3; `--check-imports` da 11, todos de las Specs 2 y 4) |
 | 7a | Audio ATRAC9 (`libSceAudiodec`): música → voces → efectos `vse`, con investigación previa | **Spec 4a** | Spec 2 | 1–2 semanas, sin tope | ⬜ Pendiente (respuesta provisional de `InitLibrary` hecha en la Spec 2; `CreateDecoder` para el juego al final del prólogo; estructura de control vista en el desensamblado) |
 | 7b | Audio HEVAG (`libSceAudiodecCpu`): efectos de `vag.mrg`, con investigación previa | **Spec 4b** | Spec 4a (música y voces) | sin estimar, sin tope | ⬜ Pendiente |
 | 8 | Vídeo (AvPlayer) | **Spec 5** | Specs 2 y 3 | 2–3 días (antes 2–4) | ⬜ Pendiente (el prólogo se ve y se oye entero; no se salta con botones; posible reproducción más rápida que el tiempo real) |
@@ -222,6 +222,7 @@ flowchart LR
 | 2 | Spec 2 (kernel) cerrada: 26 de las 29 APIs de libkernel implementadas y 3 trampas con nombre; en la fase 2A se adelantaron 15 APIs de la Spec 3 y una provisional de la 4. | `2531937`…`7244263` |
 | 3 | Spec 1a cerrada. Fuera del árbol: los hooks de GoW3 y sus backends, la pestaña "Game" del menú, el XML y el perfil de parches, el touchpad en dos mitades, los tests de GoW3 y los textos de identidad. El cargador solo arranca CUSA47999 (código 30 para cualquier otro). Los 4 tests del launcher que rompe quedan como fallo esperado. | `9f86fc1`…`4832164` |
 | 4 | Hito de primer fotograma cerrado: línea `GPU:` al final del log, capturas PNG del fotograma presentado (`GOW3_SCREENSHOT_AT`, F12), `tools/compare_captures.sh`, línea base en `out/baseline/` y decisión: seguir el orden previsto. | `8c40e39`…`5acfafe` y `0e6bf51` (cierre) |
+| 6 | Spec 3 cerrada: las 23 APIs de plataforma con comportamiento explícito y probado. `tests/test_import_names.py` fija NID y nombre de cada una, y no se finge ninguna conexión a PSN ni a la red. | `f4a5d0a`…`5fcc578` |
 
 ### Flujo de cada spec
 
@@ -662,11 +663,11 @@ llama: capturas, Share Play, streaming, grabación, saves con copia de seguridad
 |---|---|
 | ScreenShot, VideoRecording, GameLiveStreaming, SharePlay | Aceptan la llamada y no hacen nada (consola sin esas funciones); streaming "no activo" |
 | SaveData `Initialize3`, `Mount2` | Igual que las variantes ya implementadas |
-| SaveData con backup | `UmountWithBackup` = desmontar; `CheckBackupData` = "no hay backup"; `RestoreBackupData` = error de no existe |
+| SaveData con backup | `UmountWithBackup` = desmontar; `CheckBackupData` y `RestoreBackupData` = `NOT_FOUND` ("no hay backup") |
 | SystemService `ParamGetString` | Nombre de usuario / valores del sistema; `ReenableMusicPlayer` sin efecto |
 | UserService `GetUserColor` | Color fijo del usuario 1 |
 | MsgDialog `GetResult` | Resultado del diálogo del overlay |
-| Sysmodule | `LoadModuleInternalWithArg` como la carga interna existente; info para unwind |
+| Sysmodule | `LoadModuleInternalWithArg` como la carga interna existente; `GetModuleInfoForUnwind` = error explícito, sin datos inventados |
 | DiscMap, LibcInternalExt | Comportamiento de shadPS4 |
 
 Cada API de comportamiento "sin efecto" escribe una línea en el log la primera vez que el juego la
@@ -674,8 +675,9 @@ llama (`Service: <nombre> accepted, no effect`). Así no son stubs silenciosos y
 juego de verdad. El runtime ya tiene 39 entradas de ese tipo (`ok_void`); esta spec no añade más sin
 esa línea de log.
 
-**Archivos afectados:** `src/runtime_services.c`, `src/runtime_savedata.c`,
-`src/import_names.inc`, `tests/test_services.c`.
+**Archivos afectados:** `src/runtime_services.c`, `src/runtime_savedata.c`, `src/runtime_content.c`,
+`src/import_names.inc`, `tests/test_services.c`, `tests/test_runtime.c`, `tests/test_content.c`,
+`tests/test_import_names.py`.
 
 **Requisitos**
 
@@ -687,8 +689,14 @@ esa línea de log.
 
 **Criterios de aceptación**
 
-- [ ] `--check-imports` termina con 0 faltantes (junto con las specs 2 y 4).
-- [ ] `services-test` cubre las APIs nuevas.
+- [x] `--check-imports` no lista ninguna de las 23 (2026-10-19: da 11, los 8 de Audiodec de la Spec 4 y
+  las 3 trampas decididas de la Spec 2). El criterio original pedía 0 faltantes junto con las Specs 2 y 4,
+  pero con esas tres trampas el total no puede llegar a 0.
+- [x] Las APIs nuevas tienen test: `services-test` (las tres "sin efecto" y `GetUserColor`), `runtime-test`
+  (copias de seguridad) y `content-test` (`GetModuleInfoForUnwind`), cada una donde se compila su código.
+
+**Resultado (2026-10-19).** Spec cerrada en 7 tareas (`f4a5d0a`…`5fcc578`). El detalle de cada API, con su
+sitio de llamada, está en la spec.
 
 ---
 

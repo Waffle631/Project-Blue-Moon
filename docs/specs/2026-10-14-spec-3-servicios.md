@@ -1,8 +1,8 @@
 # Spec 3 — Servicios del sistema que faltan
 
-Fecha: 2026-10-14. Estado: **en curso** desde el 2026-10-19: el plan de implementación tiene 7 tareas y
-de la 1 a la 6 están hechas (`f4a5d0a`, `4e09b95`, `45ba36b`, `82c7d78`, `2ced05c` y `5fcc578`,
-resultados en la sección 6).
+Fecha: 2026-10-14. Estado: **cerrada** el 2026-10-19. El plan de implementación tenía 7 tareas, y
+están todas hechas (`f4a5d0a`, `4e09b95`, `45ba36b`, `82c7d78`, `2ced05c`, `5fcc578` y el cierre). Los
+resultados están en la sección 6, y los criterios, en la 8.
 Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 3".
 
 Marcas: **[V]** comprobado en el repo o en los logs; **[H]** hipótesis a confirmar con el sitio de
@@ -22,7 +22,8 @@ offline no tiene (PSN, capturas, Share Play, streaming).
   (`runtime_lookup`, `src/runtime.c:269`, no las encuentra sin ella): `sceSaveDataInitialize3`
   (`runtime_savedata.c:336`, usa `save_initialize`), `sceSaveDataMount2` (`:337`, `save_mount2`),
   `sceMsgDialogGetResult` (`runtime_services.c:646`, `msg_result`). Con esto el trabajo real baja a
-  20 APIs.
+  20 APIs. *(Corregido el 2026-10-19: eran 8, porque la Spec 2 ya había hecho 15; ver el hecho
+  siguiente.)*
 - **[V]** (2026-10-19, `tests/test_import_names.py`) De las 23, **15 ya tienen su línea** en
   `import_names.inc` y faltan 8: `sceMsgDialogGetResult`, que ya tiene código, y las 7 que siguen como
   "falta" en la tabla. `--check-imports` da 19 faltantes: esas 8, 8 de Audiodec (Spec 4) y las 3 trampas
@@ -85,7 +86,8 @@ offline no tiene (PSN, capturas, Share Play, streaming).
 Por ser APIs que el juego solo llama si ocurre algo concreto, se trabaja con el mismo criterio que la
 Spec 2: un import sin implementar solo detiene el juego al llamarlo. Se implementa lo que aparece
 como `STOP:` y se cierra el resto antes de dar la spec por terminada (para dejar `--check-imports`
-en cero).
+en cero). *(Corregido el 2026-10-19: en cero de las 23 de esta spec. El total no llega a 0 porque las
+3 trampas de la Spec 2 son decididas y Audiodec es de la Spec 4.)*
 
 ## 4. Diseño
 
@@ -235,6 +237,10 @@ Ampliar `tests/test_services.c` (que ya prueba los diálogos, PlayGo y otros) co
 5. `GetUserColor` con usuario 1 devuelve el valor fijo; con otro usuario, error.
 6. `sceMsgDialogGetResult` después de `sceMsgDialogOpen` devuelve el resultado del diálogo del overlay.
 
+*(Corregido el 2026-10-19: los puntos 2 y 3 están en `tests/test_runtime.c`, porque
+`runtime_savedata.c` no se compila en `services-test`. `GetModuleInfoForUnwind` está en
+`tests/test_content.c`.)*
+
 Como el test compila `src/runtime_services.c` por separado, las nuevas líneas de `import_names.inc` se
 comprueban con un test de tabla: cada nombre de la sección 3 está en `import_names.inc` y su NID
 coincide con `nid()` (script de comprobación en `tests/test_import_names.py`, nuevo).
@@ -324,11 +330,31 @@ de un `OrbisSaveDataMountPoint`, pero las dos reciben su propia estructura (ver 
 - Suite Python en `ps4dev`: 258 tests (uno nuevo), 35 omitidos y 4 fallos esperados, el resto OK.
 - `--check-imports` da 11 (ver sección 2).
 
+**Resultado (2026-10-19, Tarea 7, cierre).** Verificación final, todo dentro de `ps4dev`:
+
+- `bash build.sh --test`: salida 0, sin warnings del compilador (`out/spec3-t7-build.log`).
+- Suite Python: 258 tests, 35 omitidos y 4 fallos esperados del launcher, el resto OK
+  (`out/spec3-t7-suite.log`).
+- `--check-imports`: `Imports: 11 missing`. Son los 8 de Audiodec y las 3 trampas de kernel, y ninguna de
+  las 23 (`out/spec3-t7-check-imports.log`).
+- Arranque real de 60 s (`GOW3_GAME_DIR=Tsukihime/CUSA47999 GOW3_TIMEOUT=60 python3 run.py`,
+  `out/spec3-t7-run.log`). Salen las mismas ocho líneas "sin efecto" que en `out/run-2a-10b.log` (dos
+  `Initialize` y la política de captura), y no hay ningún `STOP:` hasta el watchdog. El juego monta la
+  partida que ya existe (solo lectura), y la carga no falla como rota: no sale la línea de
+  `CheckBackupData`. Después arranca el reproductor del prólogo (hilo `av audio` y puerto de audio
+  abiertos).
+- Las APIs nuevas no se llaman en ese arranque, y era lo esperado. Los Terminate están en el cierre del
+  juego. `CheckBackupData` solo se llama si la carga falla como rota. La información de desenrollado
+  solo se pide al desenrollar la pila, por ejemplo en una excepción de C++. `ReenableMusicPlayer` y
+  `GetUserColor` están en funciones a las que nada llama. `RestoreBackupData` tampoco se llama; no se ha
+  comprobado qué camino lleva a sus tres sitios.
+
 ## 7. Archivos
 
 `src/runtime_services.c`, `src/runtime_savedata.c`, `src/runtime_content.c` (Sysmodule),
-`src/import_names.inc` (23 entradas, 22 con nombre), `tests/test_services.c`,
-`tests/test_import_names.py` (nuevo).
+`src/import_names.inc` (23 entradas, 22 con nombre), `tests/test_services.c`, `tests/test_runtime.c`
+(SaveData), `tests/test_content.c` y `tests/test_content.py` (Sysmodule), `tests/test_import_names.py`
+(nuevo).
 
 ## 8. Criterios de aceptación
 
@@ -340,14 +366,25 @@ de un `OrbisSaveDataMountPoint`, pero las dos reciben su propia estructura (ver 
   `out/content-test`, `5fcc578`).
 - [x] `tests/test_import_names.py` confirma NID y nombre de cada una (2026-10-19, `4e09b95`: pasan los
   23 NID y los 23 nombres).
-- [ ] En un arranque real, cada API "sin efecto" que se llame deja su línea de log (2026-10-17: se
-  cumple para las ocho llamadas hasta ahora, `out/run-2a-10b.log`).
-- [ ] Ninguna API de PSN/red devuelve éxito.
+- [x] En un arranque real, cada API "sin efecto" que se llame deja su línea de log (2026-10-17: se
+  cumple para las ocho llamadas hasta ahora, `out/run-2a-10b.log`; 2026-10-19: las mismas ocho, en
+  `out/spec3-t7-run.log`. Las tres nuevas no se llaman en el arranque, y sus tests comprueban la línea).
+- [x] Ninguna API de PSN/red devuelve éxito (2026-10-19). Las únicas APIs de Np que importa el juego son
+  `sceNpSetNpTitleId`, que es configuración local, y las de trofeos, que son locales y funcionan sin
+  conexión en la consola. No importa nada de red (`Net`, `Http`, `Ssl`) ni ninguna API que consulte el
+  estado de PSN. Las que tiene el runtime para otros juegos responden "sin sesión" (`np_signed_out`,
+  `np_state`) o "red caída" (`http_fail`). Esta spec no ha tocado ninguna.
 
 ## 9. Preguntas abiertas
 
 - ¿El juego usa el resultado de `ParamGetString` para mostrar algo (nombre de consola, etc.)? Se
-  sabrá en la primera ejecución.
+  sabrá en la primera ejecución. *Respuesta parcial (2026-10-17, ver 4.1): ignora el valor devuelto y
+  guarda el texto en su objeto. No se sabe si lo muestra; sigue abierta, sin bloquear nada.*
 - ¿Hay un camino de "copia de seguridad" que el juego tome al guardar? Si es así, `UmountWithBackup`
   pasa de "desmontar" a necesitar una copia real (el repositorio ya tiene `scripts/save_backup.py`,
-  que no es del runtime).
+  que no es del runtime). *Respuesta (2026-10-19, Tarea 5, ver 4.4): sí, pero solo para recuperar.
+  El único desmontaje después de escribir es `UmountWithBackup`, con un solo sitio (`+0x1214e2`) y el
+  resultado ignorado. `Umount` solo aparece en la rutina de carga (`+0x121795` y `+0x1217d4`). La
+  copia solo se consulta cuando una partida se lee como rota. Sin copia real, una partida rota lleva
+  al camino de "no hay copia" del propio juego. Hacer copias reales es una mejora de robustez, no un
+  requisito de la Alpha, y queda fuera de esta spec.*

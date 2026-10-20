@@ -43,7 +43,8 @@ with before/after captures; the `gow3` → `tsuki` rename is Spec 7, done last).
   VideoRecording, Sysmodule, SystemService, UserService, MsgDialog, DiscMap, LibcInternalExt.
   Spec 2 is closed (2026-10-17): libkernel has only three deliberate traps left
   (`scePthreadCancel`, `sceKernelGetModuleInfoForUnwind`, `sceKernelInternalMemoryGetModuleSegmentInfo`);
-  `--check-imports` lists 19, all from Specs 3 and 4.
+  Spec 3 is closed (2026-10-19): its 23 platform APIs all have an explicit, logged behaviour (no
+  faked PSN or network). `--check-imports` lists 11: the 8 Audiodec imports (Spec 4) and those 3 traps.
   GnmDriver/VideoOut/AvPlayer NIDs all exist in the shadPS4 tables. Cutscenes are 134 `.mp4` in
   `image/movie/` played through **`sceAvPlayer`** (not `sceVideodec`). libSceMouse is used and
   already covered. Start bring-up with
