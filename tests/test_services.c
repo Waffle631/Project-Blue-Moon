@@ -26,6 +26,9 @@ static int printed_lines(void (*f)(void)) {
 }
 static void shareplay_twice(void) { assert(shareplay_initialize(NULL,0x1800)==0 && shareplay_initialize(NULL,0x1800)==0); }
 static void live_streaming_twice(void) { assert(live_streaming_initialize(0x4000)==0 && live_streaming_initialize(0x4000)==0); }
+static void shareplay_terminate_twice(void) { assert(shareplay_terminate()==0 && shareplay_terminate()==0); }
+static void live_streaming_terminate_twice(void) { assert(live_streaming_terminate()==0 && live_streaming_terminate()==0); }
+static void music_player_reenable_twice(void) { assert(music_player_reenable()==0 && music_player_reenable()==0); }
 /* The game's capture policy (eboot +0xee550) in mode 0, then mode 1; it ignores every result. */
 static void capture_policy(void) {
     assert(screenshot_disable()==0 && screenshot_overlay("/app0/image/corp.png",0,0,3)==0 && screenshot_enable()==0);
@@ -108,7 +111,18 @@ int main(void) {
     assert(system_param_string(6,system_name,sizeof system_name)==0 && !strcmp(system_name,"PS4"));
     assert(system_param_string(6,system_name,3)==SYSTEM_PARAMETER && system_param_string(6,NULL,65)==SYSTEM_PARAMETER);
     assert(system_param_string(99,system_name,sizeof system_name)==SYSTEM_PARAMETER);
-    /* "No effect" services (Spec 3, 4.1): 0, a log line on the first call only, every call counted. */
+    /* "No effect" services (Spec 3, 4.1): 0, a log line on the first call only, every call counted.
+     * The Terminates go first: they must not depend on an Initialize having run. */
+    assert(printed_lines(shareplay_terminate_twice)==1 && no_effect_calls[SHAREPLAY_TERMINATE]==2 && !no_effect_calls[SHAREPLAY_INITIALIZE]);
+    assert(printed_lines(shareplay_terminate_twice)==0 && no_effect_calls[SHAREPLAY_TERMINATE]==4);
+    assert(printed_lines(live_streaming_terminate_twice)==1 && no_effect_calls[LIVE_STREAMING_TERMINATE]==2 && !no_effect_calls[LIVE_STREAMING_INITIALIZE]);
+    assert(printed_lines(live_streaming_terminate_twice)==0 && no_effect_calls[LIVE_STREAMING_TERMINATE]==4);
+    assert(printed_lines(music_player_reenable_twice)==1 && no_effect_calls[MUSIC_PLAYER_REENABLE]==2);
+    assert(printed_lines(music_player_reenable_twice)==0 && no_effect_calls[MUSIC_PLAYER_REENABLE]==4);
+    /* The log line names the API: each enum entry and its name must stay in the same order. */
+    assert(!strcmp(no_effect_names[SHAREPLAY_TERMINATE],"sceSharePlayTerminate"));
+    assert(!strcmp(no_effect_names[LIVE_STREAMING_TERMINATE],"sceGameLiveStreamingTerminate"));
+    assert(!strcmp(no_effect_names[MUSIC_PLAYER_REENABLE],"sceSystemServiceReenableMusicPlayer"));
     assert(printed_lines(shareplay_twice)==1 && no_effect_calls[SHAREPLAY_INITIALIZE]==2);
     assert(printed_lines(shareplay_twice)==0 && no_effect_calls[SHAREPLAY_INITIALIZE]==4);
     assert(printed_lines(live_streaming_twice)==1 && no_effect_calls[LIVE_STREAMING_INITIALIZE]==2);

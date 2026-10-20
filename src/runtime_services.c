@@ -113,10 +113,12 @@ static ABI int32_t launch_browser(void) { note("SystemService: web browser reque
  * returns 0, logs its first call and counts all of them; one whose result the game uses to decide
  * something needs a real implementation instead. ---- */
 enum { SHAREPLAY_INITIALIZE, LIVE_STREAMING_INITIALIZE, SCREENSHOT_DISABLE, SCREENSHOT_OVERLAY, SCREENSHOT_ENABLE,
-       LIVE_STREAMING_ENABLE, SHAREPLAY_PROHIBITION, VIDEO_RECORDING_INFO, NO_EFFECT_COUNT };
+       LIVE_STREAMING_ENABLE, SHAREPLAY_PROHIBITION, VIDEO_RECORDING_INFO, SHAREPLAY_TERMINATE, LIVE_STREAMING_TERMINATE,
+       MUSIC_PLAYER_REENABLE, NO_EFFECT_COUNT };
 static const char *const no_effect_names[NO_EFFECT_COUNT]={"sceSharePlayInitialize","sceGameLiveStreamingInitialize",
     "sceScreenShotDisable","sceScreenShotSetOverlayImageWithOrigin","sceScreenShotEnable",
-    "sceGameLiveStreamingEnableLiveStreaming","sceSharePlaySetProhibition","sceVideoRecordingSetInfo"};
+    "sceGameLiveStreamingEnableLiveStreaming","sceSharePlaySetProhibition","sceVideoRecordingSetInfo",
+    "sceSharePlayTerminate","sceGameLiveStreamingTerminate","sceSystemServiceReenableMusicPlayer"};
 static unsigned no_effect_calls[NO_EFFECT_COUNT];
 static int32_t no_effect(int api) {
     pthread_mutex_lock(&lock); unsigned calls=++no_effect_calls[api]; pthread_mutex_unlock(&lock);
@@ -136,6 +138,13 @@ static ABI int32_t screenshot_overlay(const char *path,int32_t x,int32_t y,int32
 static ABI int32_t live_streaming_enable(int32_t enabled) { (void)enabled; return no_effect(LIVE_STREAMING_ENABLE); }
 static ABI int32_t shareplay_prohibition(int32_t mode) { (void)mode; return no_effect(SHAREPLAY_PROHIBITION); }
 static ABI int32_t video_recording_info(int32_t info,const void *value,uint64_t size) { (void)info; (void)value; (void)size; return no_effect(VIDEO_RECORDING_INFO); }
+/* The shutdown path (eboot +0xed3f7) terminates SaveData, SaveDataDialog, PlayGo, Share Play and live
+ * streaming, in that order, and ignores every result. */
+static ABI int32_t shareplay_terminate(void) { return no_effect(SHAREPLAY_TERMINATE); }
+static ABI int32_t live_streaming_terminate(void) { return no_effect(LIVE_STREAMING_TERMINATE); }
+/* Only the wrapper at eboot +0x12a8e0 (flag ? Reenable : DisableMusicPlayer) imports it, and nothing in the
+ * eboot calls, jumps to or points at that wrapper. */
+static ABI int32_t music_player_reenable(void) { return no_effect(MUSIC_PLAYER_REENABLE); }
 void runtime_services_report(void) {
     pthread_mutex_lock(&lock);
     printf("Runtime: no-effect services:");
@@ -600,10 +609,12 @@ static const RuntimeExport exports[]={
     {"sceScreenShotDisable",screenshot_disable}, {"sceScreenShotEnable",screenshot_enable},
     {"sceScreenShotSetOverlayImageWithOrigin",screenshot_overlay},
     {"sceGameLiveStreamingEnableLiveStreaming",live_streaming_enable}, {"sceSharePlaySetProhibition",shareplay_prohibition},
-    {"sceVideoRecordingSetInfo",video_recording_info},
+    {"sceVideoRecordingSetInfo",video_recording_info}, {"sceSharePlayTerminate",shareplay_terminate},
+    {"sceGameLiveStreamingTerminate",live_streaming_terminate},
     {"sceSystemServiceReceiveEvent",system_event}, {"sceSystemServiceHideSplashScreen",hide_splash},
     {"sceSystemServiceLaunchWebBrowser",launch_browser},
     {"sceSystemServiceGetDisplaySafeAreaInfo",safe_area}, {"sceSystemServiceDisableMusicPlayer",disable_music_player},
+    {"sceSystemServiceReenableMusicPlayer",music_player_reenable},
     {"sceNetInit",net_init}, {"sceNetTerm",net_term}, {"sceNetErrnoLoc",net_errno_loc},
     {"sceNetPoolCreate",net_pool_create}, {"sceNetPoolDestroy",net_pool_destroy},
     {"sceNetEpollCreate",net_epoll_create}, {"sceNetEpollDestroy",net_epoll_destroy},
