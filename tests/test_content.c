@@ -8,7 +8,19 @@ typedef int32_t (ABI *Init)(const void *,void *);
 typedef int32_t (ABI *Param)(uint32_t,int32_t *);
 typedef int32_t (ABI *List)(uint32_t,void *,uint32_t,uint32_t *);
 typedef int32_t (ABI *LoadArg)(uint32_t,int32_t,const void *,uint64_t,int32_t *);
+typedef int32_t (ABI *Unwind)(uintptr_t,int32_t,void *);
 #define GET(t,n) ((t)runtime_content_resolve(n))
+/* libc.prx's unwinder asks for the unwind info of a pc (libc +0xb852c: flags 1, size 0x130 in the
+ * first field) and, on any nonzero result, reports that it has none without reading the info. So the
+ * answer is an error that never writes, whatever the arguments. */
+static void unwind_unavailable(void) {
+    Unwind unwind=GET(Unwind,"4fU5yvOkVG4#libSceSysmodule");
+    unsigned char info[0x130]; memset(info,0xa5,sizeof(info));
+    assert(unwind && (uint32_t)unwind((uintptr_t)unwind_unavailable,1,info)==0x805a1000);
+    assert((uint32_t)unwind((uintptr_t)unwind_unavailable,0,info)==0x805a1000);
+    for (unsigned i=0;i<sizeof(info);++i) assert(info[i]==0xa5);
+    assert((uint32_t)unwind((uintptr_t)unwind_unavailable,1,NULL)==0x805a1000);
+}
 int main(int argc,char **argv) {
     Module load=GET(Module,"g8cM39EUZ6o#libSceSysmodule");
     Module loaded=GET(Module,"fMP5NHUOaMk#libSceSysmodule");
@@ -19,6 +31,8 @@ int main(int argc,char **argv) {
     assert(load && loaded && unload && init && param && list);
     assert(!runtime_content_resolve("g8cM39EUZ6o#libkernel"));
     if (argc>1 && !strcmp(argv[1],"--missing")) { load(0xb4); return 99; }
+    if (argc>1 && !strcmp(argv[1],"--unwind")) { unwind_unavailable(); puts("PASS: no unwind info"); return 0; }
+    unwind_unavailable();
     const uint32_t profile[]={1,13,0x80000000,0,7};
     runtime_content_configure(profile);
     if (argc>1 && !strcmp(argv[1],"--unknown")) {

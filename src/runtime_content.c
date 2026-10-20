@@ -4,10 +4,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdatomic.h>
 #define INVALID_ID ((int32_t)0x805a1000)
 #define NOT_LOADED ((int32_t)0x805a1001)
 #define PARAMETER ((int32_t)0x80d90002)
 #define BUSY ((int32_t)0x80d90003)
+/* Spec 3 (4.2): there is no module info to hand out, and made-up info would corrupt unwinding. libc.prx
+ * (+0xb852c) only tests for nonzero, so the exact code does not matter; INVALID_ID is this library's own
+ * "no such module". */
+#define UNWIND_UNAVAILABLE INVALID_ID
 static unsigned refs, initialized, configured;
 static uint32_t parameters[5];
 static unsigned queries, lists;
@@ -46,6 +51,14 @@ static ABI int32_t module_load_arg(uint32_t id,int32_t argc,const void *argv,uin
 static ABI int32_t module_loaded(uint16_t id) {
     if (!id) return INVALID_ID;
     return module_refs[id] ? 0 : NOT_LOADED;
+}
+/* libc.prx's unwinder asks for the module that holds a pc (flags 1, info size 0x130). On an error it
+ * reports no unwind info for that pc and never reads the info. */
+static atomic_uint unwind_queries;
+static ABI int32_t module_unwind_info(uintptr_t addr,int32_t flags,void *info) {
+    (void)flags; (void)info;
+    if (!atomic_fetch_add(&unwind_queries,1)) printf("Runtime: sceSysmoduleGetModuleInfoForUnwind(0x%llx) unavailable\n",(unsigned long long)addr);
+    return UNWIND_UNAVAILABLE;
 }
 static ABI int32_t module_unload(uint16_t id) {
     int32_t result=module_loaded(id);
@@ -92,11 +105,13 @@ uintptr_t runtime_content_resolve(const char *name) {
     if (!strcmp(name,"hHrGoGoNf+s#libSceSysmodule")) return (uintptr_t)module_load_arg;
     if (!strcmp(name,"fMP5NHUOaMk#libSceSysmodule")) return (uintptr_t)module_loaded;
     if (!strcmp(name,"eR2bZFAAU0Q#libSceSysmodule")) return (uintptr_t)module_unload;
+    if (!strcmp(name,"4fU5yvOkVG4#libSceSysmodule")) return (uintptr_t)module_unwind_info;
     if (!strcmp(name,"R9lA82OraNs#libSceAppContent")) return (uintptr_t)content_init;
     if (!strcmp(name,"99b82IKXpH4#libSceAppContent")) return (uintptr_t)param_int;
     if (!strcmp(name,"xnd8BJzAxmk#libSceAppContent")) return (uintptr_t)addon_list;
     return 0;
 }
 void runtime_content_report(void) {
-    printf("Runtime: AppContent references=%u, initialized=%u, parameter queries=%u, list queries=%u\n",refs,initialized,queries,lists);
+    printf("Runtime: AppContent references=%u, initialized=%u, parameter queries=%u, list queries=%u, unwind info queries=%u\n",
+           refs,initialized,queries,lists,atomic_load(&unwind_queries));
 }

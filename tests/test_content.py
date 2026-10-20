@@ -38,3 +38,7 @@ class ContentTests(unittest.TestCase):
 
     def test_other_modules_are_counted_independently(self):
         r=self.run_case('--unknown');self.assertEqual(r.returncode,0,r.stdout+r.stderr)
+
+    def test_unwind_info_is_an_error_logged_once(self):
+        r=self.run_case('--unwind');self.assertEqual(r.returncode,0,r.stdout+r.stderr)
+        self.assertEqual(r.stdout.count('sceSysmoduleGetModuleInfoForUnwind'),1,r.stdout)
