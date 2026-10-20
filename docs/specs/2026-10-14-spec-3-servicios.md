@@ -1,7 +1,7 @@
 # Spec 3 — Servicios del sistema que faltan
 
-Fecha: 2026-10-14. Estado: **en curso** desde el 2026-10-19: el plan de implementación tiene 7 tareas y la
-1 está hecha (`f4a5d0a`, resultado en la sección 6). Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 3".
+Fecha: 2026-10-14. Estado: **en curso** desde el 2026-10-19: el plan de implementación tiene 7 tareas y
+la 1 y la 2 están hechas (`f4a5d0a` y `4e09b95`, resultados en la sección 6). Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 3".
 
 Marcas: **[V]** comprobado en el repo o en los logs; **[H]** hipótesis a confirmar con el sitio de
 llamada del juego.
@@ -25,6 +25,9 @@ offline no tiene (PSN, capturas, Share Play, streaming).
   `import_names.inc` y faltan 8: `sceMsgDialogGetResult`, que ya tiene código, y las 7 que siguen como
   "falta" en la tabla. `--check-imports` da 19 faltantes: esas 8, 8 de Audiodec (Spec 4) y las 3 trampas
   de libkernel de la Spec 2.
+- **[V]** (2026-10-19, `4e09b95`) Ya están las 23 líneas. `--check-imports` da 18:
+  `sceMsgDialogGetResult` ya resuelve. Las otras 7 siguen en la lista, pero ahora con su nombre en vez de
+  "name not resolved".
 - **[V]** `sceSysmoduleLoadModule`, `...IsLoaded` y `...UnloadModule` ya existen en
   `src/runtime_content.c:81-83` (`module_load`, `module_loaded`, `module_unload`).
 - **[V]** Constantes de error de SaveData ya definidas en `runtime_savedata.c:22-29`:
@@ -61,7 +64,7 @@ offline no tiene (PSN, capturas, Share Play, streaming).
 | `SsC-m-S9JTA` | `sceSystemServiceParamGetString` | SystemService | **hecha** (`6e40c0e`) | ver 4.1 |
 | `9kPCz7Or+1Y` | `sceSystemServiceReenableMusicPlayer` | SystemService | falta | 0, sin efecto (`sceSystemServiceDisableMusicPlayer` ya existe) |
 | `lUoqwTQu4Go` | `sceUserServiceGetUserColor` | UserService | falta | ver 4.1 |
-| `Lr8ovHH9l6A` | `sceMsgDialogGetResult` | MsgDialog | código existe | solo `import_names.inc` |
+| `Lr8ovHH9l6A` | `sceMsgDialogGetResult` | MsgDialog | **hecha** (`4e09b95`) | solo `import_names.inc`; ya probada en `tests/test_services.c:45-54` |
 | `fJgP+wqifno` | `sceDiscMap_7C980FFB0AA27E7A` (sin nombre real) | DiscMap | **hecha** (`d80dea5`) | `NO_BITMAP_INFO`, como su gemela (4.3) |
 | `NWtTN10cJzE` | `sceLibcHeapGetTraceInfo` | LibcInternalExt | hecha | ver 4.3 |
 
@@ -195,6 +198,18 @@ coincide con `nid()` (script de comprobación en `tests/test_import_names.py`, n
   esos 8 fallos. Fuera del contenedor, los tests que ejecutan binarios de `out/` fallan porque no
   encuentran `libavcodec.so.62`.
 
+**Resultado (2026-10-19, commit `4e09b95`).** Se añaden las 8 líneas que faltaban en `import_names.inc`,
+cada una junto a una hermana de su biblioteca:
+
+- `test_import_names.py` pasa los dos tests con las 23.
+- No se añade ningún NID duplicado.
+- `bash build.sh --test` en `ps4dev` pasa sin warnings.
+- Suite Python en `ps4dev`: 257 tests, 35 omitidos y 4 fallos esperados, el resto OK.
+- `--check-imports` da 18 (ver sección 2).
+
+El punto 6 de arriba (`GetResult` tras `Open`) ya estaba cubierto por `tests/test_services.c:45-54`, con
+el diálogo terminado, en curso y con `NULL`.
+
 ## 7. Archivos
 
 `src/runtime_services.c`, `src/runtime_savedata.c`, `src/runtime_content.c` (Sysmodule),
@@ -205,8 +220,8 @@ coincide con `nid()` (script de comprobación en `tests/test_import_names.py`, n
 
 - [ ] `--check-imports` no lista ninguna de las 23 (junto con las Specs 2 y 4).
 - [ ] `out/services-test` cubre las APIs nuevas y pasa.
-- [ ] `tests/test_import_names.py` confirma NID y nombre de cada una (2026-10-19: el test existe y
-  confirma los 23 NID; 15 de los 23 nombres están en `import_names.inc` y faltan 8).
+- [x] `tests/test_import_names.py` confirma NID y nombre de cada una (2026-10-19, `4e09b95`: pasan los
+  23 NID y los 23 nombres).
 - [ ] En un arranque real, cada API "sin efecto" que se llame deja su línea de log (2026-10-17: se
   cumple para las ocho llamadas hasta ahora, `out/run-2a-10b.log`).
 - [ ] Ninguna API de PSN/red devuelve éxito.
