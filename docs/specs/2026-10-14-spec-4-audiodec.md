@@ -2,7 +2,8 @@
 
 Fecha: 2026-10-14, **replanteada el 2026-10-17** con los datos de la fase 2A de la Spec 2 y del
 dump. Estado: **borrador para aprobación** (el usuario aprobó la dirección del replanteo en el chat
-el 2026-10-17). Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 4".
+el 2026-10-17). **En curso desde el 2026-10-19:** el plan de implementación está aprobado; hecha la
+tarea 1 (clips de referencia, `07800f5`). Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 4".
 
 Marcas: **[V]** comprobado (con el comando, la ruta o el log); **[H]** hipótesis que se confirma en
 la fase A; **[D]** decisión del usuario.
@@ -67,6 +68,17 @@ Todo el ATRAC9 pasa por una sola rutina de preparación (2.5) y una sola de deco
 `sector` son los bits 16–19 del número de sector: por ejemplo, la entrada 31 de `bgm.hed` acaba en el
 sector `0x10581` y la 32 vale `0x1_0000581`. `voice.hed` tiene otra forma, todavía sin descifrar.
 
+**[V]** (2026-10-19, `tools/extract_audio_clips.py`) Más detalles del formato:
+- El tercer campo son los 16 bits bajos del tamaño real: `riff_size + 8` en los RIFF y
+  `0x30 + datos` en los `VAGp` (por ejemplo, `0xb4a8` para el RIFF de `0x4eb4a8` bytes de la entrada 1
+  de `bgm`).
+- Las entradas se encadenan sin huecos (sector + sectores = sector de la siguiente) hasta el final
+  del `.mrg`.
+- `vse.hed` tiene 1329 entradas y `vag.hed` 21. En las dos, las dos últimas son centinelas con los
+  8 bytes a `0xFF`, sin datos detrás. `bgm.hed` no tiene centinelas.
+- `vag.hed` tiene la misma forma que `bgm.hed`. Su entrada 0 se llama `dummy` y son 1984 bytes de
+  silencio.
+
 **[V]** Inventario (todas las entradas de `bgm.hed` y `vse.hed`, todas las cabeceras `VAGp` de
 `vag.mrg` y los primeros 200 MB de `voice.mrg`):
 
@@ -79,7 +91,16 @@ sector `0x10581` y la 32 vale `0x1_0000581`. `voice.hed` tiene otra forma, todav
 
 Los RIFF ATRAC9 son `WAVE_FORMAT_EXTENSIBLE` (`0xFFFE`) con el GUID
 `47E142D2-36BA-4D8D-88FC-61654F8C836C` y llevan 4 bytes de configuración ATRAC9 en `+0x40`, que
-empiezan por la marca `0xFE` (`fe 74 09 f0` en la música, `fe 70 04 f0` en `vse`). `se_nam.mrg` es un
+empiezan por la marca `0xFE`. **[V]** (2026-10-19) Hay cinco combinaciones de configuración y tamaño
+de bloque (`+0x20`), todas a 48 kHz:
+
+| Configuración | Bloque | Canales | Entradas | Primera |
+|---|---|---|---|---|
+| `fe740ff0` | 512 | 2 | 131 de `bgm` | `bgm` 1 |
+| `fe7409f0` | 320 | 2 | 1 de `bgm` | `bgm` 0 |
+| `fe740bf0` | 384 | 2 | 1316 de `vse` | `vse` 1 |
+| `fe700bf0` | 384 | 1 | 9 de `vse` | `vse` 775 |
+| `fe7004f0` | 160 | 1 | 2 de `vse` | `vse` 0 | `se_nam.mrg` es un
 archivo `mrgd00` de nombres (`S00`, `S01`…), no audio. **Ningún archivo de audio es MP3 ni AAC**, así
 que FFmpeg no hace falta en esta spec.
 
@@ -335,6 +356,24 @@ hasta el final del vídeo del prólogo (2.5), cuando el H1 del hito ya está cum
   pista de `bgm.mrg` (estéreo), una de las 11 entradas mono de `vse.mrg` (mono, sin MZX: las voces
   necesitarían descomprimir MZX, que el runtime no hace) y un efecto de `vag.mrg` (HEVAG). Los tests
   se omiten si faltan, como los que necesitan el dump. Se documenta el comando que los genera.
+
+  *Hecho (2026-10-19, `07800f5`).* El comando es
+  `python3 tools/extract_audio_clips.py --image Tsukihime/CUSA47999/image --out out/audiodec-clips`.
+  Escribe un clip por cada una de las cinco configuraciones de 2.2, la primera entrada de cada una:
+
+  | Clip | Origen | Configuración | Bloque | Canales | Tamaño |
+  |---|---|---|---|---|---|
+  | `bgm_typ.at9` | `bgm` 1 | `fe740ff0` | 512 | 2 | 5 158 056 B |
+  | `bgm_rare.at9` | `bgm` 0 | `fe7409f0` | 320 | 2 | 30 248 B |
+  | `vse_stereo.at9` | `vse` 1 | `fe740bf0` | 384 | 2 | 951 336 B |
+  | `vse_mono.at9` | `vse` 775 | `fe700bf0` | 384 | 1 | 124 968 B |
+  | `vse_mono_small.at9` | `vse` 0 | `fe7004f0` | 160 | 1 | 7 848 B |
+
+  Además escribe `vag0.vagp`, el primer efecto real de `vag.mrg`: la entrada 1, `moon_se00001_L`
+  (HEVAG `0x00020001`, 48 kHz, 18 800 B). Se salta la entrada 0, `dummy`, porque es silencio.
+
+  Si falta algún clip, la herramienta lo dice, escribe los demás y sale con 1. Sus tests
+  (`tests/test_extract_audio_clips.py`, 9 casos) usan archivos sintéticos y no necesitan el dump.
 - Ejecución real: arrancar con `GOW3_TRACE_AUDIODEC` y escuchar la música, las voces y los efectos del
   prólogo.
 
@@ -385,3 +424,6 @@ aceptar módulos de sistema nuevos, `src/runtime_content.c`.
 - 2026-10-17 (después): sin watchdog, el juego reproduce el prólogo y para en
   `sceAudiodecCreateDecoder`. El sitio de llamada da el bloque de control y la secuencia
   `CreateDecoder` → `Decode` (2.5, sección 6). No se implementa nada (decisión del usuario).
+- 2026-10-19: plan de implementación aprobado. Tarea 1 hecha (`07800f5`): la herramienta de clips de
+  referencia (8). Con ella se ven las cinco configuraciones reales de ATRAC9 y los centinelas de los
+  `.hed` (2.2).
