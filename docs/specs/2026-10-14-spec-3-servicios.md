@@ -1,6 +1,7 @@
 # Spec 3 — Servicios del sistema que faltan
 
-Fecha: 2026-10-14. Estado: **borrador para aprobación**. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 3".
+Fecha: 2026-10-14. Estado: **en curso** desde el 2026-10-19: el plan de implementación tiene 7 tareas y la
+1 está hecha (`f4a5d0a`, resultado en la sección 6). Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 3".
 
 Marcas: **[V]** comprobado en el repo o en los logs; **[H]** hipótesis a confirmar con el sitio de
 llamada del juego.
@@ -20,6 +21,10 @@ offline no tiene (PSN, capturas, Share Play, streaming).
   (`runtime_savedata.c:336`, usa `save_initialize`), `sceSaveDataMount2` (`:337`, `save_mount2`),
   `sceMsgDialogGetResult` (`runtime_services.c:646`, `msg_result`). Con esto el trabajo real baja a
   20 APIs.
+- **[V]** (2026-10-19, `tests/test_import_names.py`) De las 23, **15 ya tienen su línea** en
+  `import_names.inc` y faltan 8: `sceMsgDialogGetResult`, que ya tiene código, y las 7 que siguen como
+  "falta" en la tabla. `--check-imports` da 19 faltantes: esas 8, 8 de Audiodec (Spec 4) y las 3 trampas
+  de libkernel de la Spec 2.
 - **[V]** `sceSysmoduleLoadModule`, `...IsLoaded` y `...UnloadModule` ya existen en
   `src/runtime_content.c:81-83` (`module_load`, `module_loaded`, `module_unload`).
 - **[V]** Constantes de error de SaveData ya definidas en `runtime_savedata.c:22-29`:
@@ -173,6 +178,23 @@ Como el test compila `src/runtime_services.c` por separado, las nuevas líneas d
 comprueban con un test de tabla: cada nombre de la sección 3 está en `import_names.inc` y su NID
 coincide con `nid()` (script de comprobación en `tests/test_import_names.py`, nuevo).
 
+**Resultado (2026-10-19, commit `f4a5d0a`).** `tests/test_import_names.py` tiene la lista de las 23
+`(nombre, biblioteca, NID)` de la sección 3 y dos tests:
+
+- `test_nid_matches_name`: el NID de cada nombre coincide con `nid()`. La excepción es
+  `sceDiscMap_7C980FFB0AA27E7A`, que no es un nombre real (`nid()` da `qYaK2F5LbgM`, no `fJgP+wqifno`). Para
+  ella se comprueba el convenio de 4.3: los 16 hex del nombre son los bytes del NID decodificado en base64.
+  Pasa las 23.
+- `test_every_name_is_in_import_names_inc`: cada `"NID#biblioteca","nombre"` está en `import_names.inc`.
+  Falla con 8, a propósito, hasta que se añadan sus líneas: `sceMsgDialogGetResult`,
+  `sceSharePlayTerminate`, `sceGameLiveStreamingTerminate`, `sceSystemServiceReenableMusicPlayer`,
+  `sceUserServiceGetUserColor`, `sceSaveDataCheckBackupData`, `sceSaveDataRestoreBackupData` y
+  `sceSysmoduleGetModuleInfoForUnwind`.
+- Con la tabla alterada en memoria (NID, hex de DiscMap o biblioteca equivocados), cada error da su fallo.
+- Suite Python completa, dentro de `ps4dev`: 257 tests, 35 omitidos, 4 fallos esperados del launcher y solo
+  esos 8 fallos. Fuera del contenedor, los tests que ejecutan binarios de `out/` fallan porque no
+  encuentran `libavcodec.so.62`.
+
 ## 7. Archivos
 
 `src/runtime_services.c`, `src/runtime_savedata.c`, `src/runtime_content.c` (Sysmodule),
@@ -183,7 +205,8 @@ coincide con `nid()` (script de comprobación en `tests/test_import_names.py`, n
 
 - [ ] `--check-imports` no lista ninguna de las 23 (junto con las Specs 2 y 4).
 - [ ] `out/services-test` cubre las APIs nuevas y pasa.
-- [ ] `tests/test_import_names.py` confirma NID y nombre de cada una.
+- [ ] `tests/test_import_names.py` confirma NID y nombre de cada una (2026-10-19: el test existe y
+  confirma los 23 NID; 15 de los 23 nombres están en `import_names.inc` y faltan 8).
 - [ ] En un arranque real, cada API "sin efecto" que se llame deja su línea de log (2026-10-17: se
   cumple para las ocho llamadas hasta ahora, `out/run-2a-10b.log`).
 - [ ] Ninguna API de PSN/red devuelve éxito.
