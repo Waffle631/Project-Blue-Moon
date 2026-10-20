@@ -50,7 +50,8 @@ llamadas directas a cada PLT):
 
 - `libSceAudiodec`:
   - `InitLibrary` en `+0x10e20c`;
-  - `TermLibrary` en `+0x10df70`;
+  - `TermLibrary` en `+0x10df70` y, como `jmp`, en `+0x10e864` *(2026-10-20: el segundo sitio salió
+    en la revisión de `docs/audiodec.md`; esta lista solo buscó `call`)*;
   - `CreateDecoder` en `+0x113172`;
   - `Decode` en `+0x113398`;
   - `ClearContext` en `+0x11353f`;
@@ -176,7 +177,8 @@ No se implementó (decisión del usuario, 2026-10-17: solo documentar). Todo lo 
 desensamblado del sitio de llamada; el trazador de la fase A tiene que confirmarlo.
 
 - **[V] Rutina de preparación** (`+0x1130b0`), llamada desde `+0x11276b` y `+0x1128ac`, dos objetos
-  de flujo distintos:
+  de flujo distintos *(2026-10-20: `+0x1128ac` está en `+0x112870`, código muerto; solo cuenta
+  `+0x11276b`, `docs/audiodec.md` 1.1)*:
   - Recibe la cabecera RIFF ATRAC9 de la pista (2.2).
   - Solo acepta 12000, 24000 y 48000 Hz (RIFF `+0x18`), con 64, 128 y 256 muestras por trama. Con
     otra frecuencia devuelve "falso" sin llamar a Audiodec.
@@ -304,9 +306,13 @@ Lista original:
    - **Errores:** el juego no distingue códigos; cualquier error corta la pista.
    - **Secuencia por pista:** `CreateDecoder` → `Decode`* → (`ClearContext` en cada vuelta del bucle
      `smpl`) → `DeleteDecoder`. Repetir o empezar en otra posición es borrar y crear de nuevo.
-     `TermLibrary` solo se llama al cerrar.
+     `TermLibrary` está en el destructor y en otro método del mismo objeto al que no se ha visto
+     llamar *(corregido el 2026-10-20; antes decía "solo al cerrar")*.
    - **`ClearContext`** tiene que reiniciar el índice de trama de LibAtrac9: si no, el siguiente
-     `Decode` da `0x82000000`.
+     `Decode` da `0x82000000`. *Revisión (2026-10-20):* volver a llamar a `Atrac9InitDecoder` sobre el
+     mismo handle no lo reinicia; se libera el handle y se crea otro, como `at9_reset` en
+     `src/runtime_ajm.c` **[D]**. El salto cae a mitad de supertrama en 93 de las 132 entradas de
+     `bgm` y en 1 040 de las 1 327 de `vse`.
    - Queda para la ejecución: qué pistas hacen bucle, cuántos decodificadores hay vivos a la vez y el
      desfase real.
 3. **Orden de observación:** la música primero (lo primero que suene en la pantalla de título o en el
@@ -326,6 +332,7 @@ códec, los parámetros, un contexto de LibAtrac9 y un búfer de salida.
 - `Decode`: lee la entrada del guest, la decodifica, escribe el PCM en el formato y tamaño que el
   juego pidió y rellena los bytes consumidos y producidos.
 - `ClearContext`: reinicia el estado del decodificador (para saltar dentro de una pista).
+  *(2026-10-20: con un handle de LibAtrac9 nuevo, `docs/audiodec.md` 1.7.)*
 - `DeleteDecoder` y `TermLibrary`: liberan; un identificador viejo devuelve error, no falla.
 - `InitLibrary` deja de devolver el error provisional cuando `CreateDecoder` existe de verdad.
 
@@ -385,6 +392,8 @@ hasta el final del vídeo del prólogo (2.5), cuando el H1 del hito ya está cum
   referencia por la API del runtime y lo compara, muestra a muestra, con LibAtrac9 llamada
   directamente. Casos: tamaño de salida, bytes consumidos, flujo corrupto (error sin cerrar),
   `ClearContext` seguido de otra decodificación, identificador viejo y códec desconocido (`STOP:`).
+  *(2026-10-20: `ClearContext` después de 1, 2 y 3 tramas de una supertrama, con los clips `vse`; los
+  dos de música vuelven en frontera y no ejercitan el reinicio.)*
 - Para 4b, un test del decodificador HEVAG: tramas sintéticas con índices de tabla bajos (≤ `0x1c`,
   donde HEVAG se comporta como el VAG clásico) y altos, con el resultado calculado aparte. Además, si
   hay un fragmento local, se compara con `vgmstream-cli` cuando esté instalado; si no, se omite.
@@ -454,6 +463,9 @@ aceptar módulos de sistema nuevos, `src/runtime_content.c`.
 - **Un error de `Decode` corta la pista sin avisar** (`docs/audiodec.md` 1.6). Una suposición mal
   validada da silencio, no un mensaje. Se mitiga trazando cada error con su causa y con los tests
   bit-exactos contra LibAtrac9 sobre las cinco configuraciones.
+- **Un `ClearContext` que no reinicia LibAtrac9 pasa las pruebas con música** (los dos clips `bgm`
+  vuelven en frontera de supertrama) y en el juego corta la pista en el primer bucle que acabe a
+  mitad. Se mitiga probando con los tres clips `vse` (`docs/audiodec.md` 1.7).
 
 ## 12. Historial
 
@@ -472,3 +484,9 @@ aceptar módulos de sistema nuevos, `src/runtime_content.c`.
   `docs/audiodec.md` documenta el uso de ATRAC9 entero, y con él se resuelven tres de las cuatro
   hipótesis de 2.5 (PCM, bsi y qué pasa ante un error). También se fija qué devuelve la última trama
   de una supertrama.
+- 2026-10-20: revisión adversarial de `docs/audiodec.md`, comprobada contra el desensamblado,
+  LibAtrac9 y una emulación de la rutina de decodificación sobre los cinco clips. Las tres decisiones
+  de la tarea 2 se sostienen. Cambia `ClearContext`: volver a llamar a `Atrac9InitDecoder` no reinicia
+  LibAtrac9, así que se crea un handle nuevo (4.1, 4.2, 8, 11). Además, `TermLibrary` tiene un segundo
+  sitio (2.1), `+0x1128ac` es código muerto (2.5) y el documento añade el contador de vueltas del
+  bucle, la lectura anticipada de LibAtrac9 y la marca [H] de `pcm.bytes`.
