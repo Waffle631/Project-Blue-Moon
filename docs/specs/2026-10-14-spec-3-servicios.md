@@ -1,8 +1,8 @@
 # Spec 3 — Servicios del sistema que faltan
 
 Fecha: 2026-10-14. Estado: **en curso** desde el 2026-10-19: el plan de implementación tiene 7 tareas y
-de la 1 a la 5 están hechas (`f4a5d0a`, `4e09b95`, `45ba36b`, `82c7d78` y `2ced05c`, resultados en la
-sección 6).
+de la 1 a la 6 están hechas (`f4a5d0a`, `4e09b95`, `45ba36b`, `82c7d78`, `2ced05c` y `5fcc578`,
+resultados en la sección 6).
 Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 3".
 
 Marcas: **[V]** comprobado en el repo o en los logs; **[H]** hipótesis a confirmar con el sitio de
@@ -40,6 +40,8 @@ offline no tiene (PSN, capturas, Share Play, streaming).
   `sceSysmoduleGetModuleInfoForUnwind`.
 - **[V]** (2026-10-19, `2ced05c`) `sceSaveDataCheckBackupData` y `sceSaveDataRestoreBackupData` ya
   resuelven. `--check-imports` da 12. De esta spec solo queda `sceSysmoduleGetModuleInfoForUnwind`.
+- **[V]** (2026-10-19, `5fcc578`) `sceSysmoduleGetModuleInfoForUnwind` ya resuelve. `--check-imports` da
+  11: los 8 de Audiodec (Spec 4) y las 3 trampas de libkernel (Spec 2). Ya no queda ninguna de las 23.
 - **[V]** `sceSysmoduleLoadModule`, `...IsLoaded` y `...UnloadModule` ya existen en
   `src/runtime_content.c:81-83` (`module_load`, `module_loaded`, `module_unload`).
 - **[V]** Constantes de error de SaveData ya definidas en `runtime_savedata.c:22-29`:
@@ -72,7 +74,7 @@ offline no tiene (PSN, capturas, Share Play, streaming).
 | `dWM80AX39o4` | `sceGameLiveStreamingEnableLiveStreaming` | GameLiveStreaming | **hecha** (`61ec55c`) | 0, sin efecto: es un setter `(bool)`, no una consulta (**[V]**, 4.1) |
 | `Fc8qxlKINYQ` | `sceVideoRecordingSetInfo` | VideoRecording | **hecha** (`61ec55c`) | 0, sin efecto; `(0xd, &prohibido, 4)` |
 | `hHrGoGoNf+s` | `sceSysmoduleLoadModuleInternalWithArg` | Sysmodule | **hecha** (`673559f`) | como `module_load`; los argumentos se registran (**[V]**, ver 4.3) |
-| `4fU5yvOkVG4` | `sceSysmoduleGetModuleInfoForUnwind` | Sysmodule | falta | error explícito (ver 4.2) |
+| `4fU5yvOkVG4` | `sceSysmoduleGetModuleInfoForUnwind` | Sysmodule | **hecha** (`5fcc578`) | error explícito `0x805a1000`; la llama `libc.prx` (`+0xb852c`), no el eboot (ver 4.2) |
 | `SsC-m-S9JTA` | `sceSystemServiceParamGetString` | SystemService | **hecha** (`6e40c0e`) | ver 4.1 |
 | `9kPCz7Or+1Y` | `sceSystemServiceReenableMusicPlayer` | SystemService | **hecha** (`45ba36b`) | 0, sin efecto; solo la usa un envoltorio al que nada llama (4.1) |
 | `lUoqwTQu4Go` | `sceUserServiceGetUserColor` | UserService | **hecha** (`82c7d78`) | azul (0) para el usuario 1; solo la usa un getter al que nada llama (4.1) |
@@ -140,6 +142,20 @@ verdad.
 alimentan el desenrollado de excepciones de C++. Devolver datos inventados corrompe el desenrollado.
 Se devuelve un error y se registra; si el juego lanza excepciones, aparecerá como un fallo claro y se
 implementará con los datos reales de `probe.c`.
+
+**[V]** (2026-10-19, Tarea 6) El eboot no importa `sceSysmoduleGetModuleInfoForUnwind`; la importa
+`libc.prx`. Tiene una sola llamada, en `libc.prx +0xb852c`, dentro del desenrollador (`+0xb84e0`):
+
+- Lee el pc del cursor de desenrollado y pide el módulo que lo contiene, con flags 1 y una salida de
+  `0x130` bytes (el tamaño va en su primer campo).
+- Con 0 copia la información. Con cualquier otro valor devuelve "sin datos de desenrollado para este pc"
+  y no lee la salida.
+- La gemela de kernel (`sceKernelGetModuleInfoForUnwind`, trampa de la Spec 2) tiene una llamada con la
+  misma forma en `libc.prx +0xb8191`.
+
+La función devuelve `0x805a1000` (`INVALID_ID`, el "no existe ese módulo" de Sysmodule, con el nombre
+`UNWIND_UNAVAILABLE`) sin escribir en la salida. Escribe una línea de log en la primera llamada, y
+`runtime_content_report` cuenta las consultas.
 
 ### 4.3 Las que se resuelven con el sitio de llamada
 
@@ -294,6 +310,20 @@ de un `OrbisSaveDataMountPoint`, pero las dos reciben su propia estructura (ver 
 - Suite Python en `ps4dev`: 257 tests, 35 omitidos y 4 fallos esperados, el resto OK.
 - `--check-imports` da 12 (ver sección 2).
 
+**Resultado (2026-10-19, commit `5fcc578`).** `sceSysmoduleGetModuleInfoForUnwind` se prueba en
+`tests/test_content.c` (`unwind_unavailable`), porque Sysmodule vive en `runtime_content.c`:
+
+- Con flags 1 (lo que pasa `libc.prx`) y con flags 0 devuelve `0x805a1000`, y los `0x130` bytes de la
+  salida siguen a `0xa5`.
+- Con la salida a `NULL` devuelve el mismo error, sin desreferenciar.
+- `content-test --unwind` hace tres llamadas, y `tests/test_content.py`
+  (`test_unwind_info_is_an_error_logged_once`) comprueba que sale una sola línea de log.
+- Rojo: `content-test` falla porque la función no resuelve, y `test_content.py` tiene 3 fallos. Verde:
+  `content-test` y `test_content.py` (6 tests) pasan.
+- `bash build.sh --test` en `ps4dev` pasa sin warnings del compilador.
+- Suite Python en `ps4dev`: 258 tests (uno nuevo), 35 omitidos y 4 fallos esperados, el resto OK.
+- `--check-imports` da 11 (ver sección 2).
+
 ## 7. Archivos
 
 `src/runtime_services.c`, `src/runtime_savedata.c`, `src/runtime_content.c` (Sysmodule),
@@ -302,10 +332,12 @@ de un `OrbisSaveDataMountPoint`, pero las dos reciben su propia estructura (ver 
 
 ## 8. Criterios de aceptación
 
-- [ ] `--check-imports` no lista ninguna de las 23 (junto con las Specs 2 y 4).
-- [ ] `out/services-test` cubre las APIs nuevas y pasa (2026-10-19: cubre las tres "sin efecto",
-  `45ba36b`, y `GetUserColor`, `82c7d78`. Las de copia de seguridad están en `out/runtime-test`,
-  `2ced05c`. Falta `GetModuleInfoForUnwind` (Tarea 6, en `tests/test_content.c`)).
+- [x] `--check-imports` no lista ninguna de las 23 (2026-10-19, `5fcc578`: da 11, los 8 de Audiodec de la
+  Spec 4 y las 3 trampas de libkernel de la Spec 2).
+- [x] `out/services-test` cubre las APIs nuevas y pasa (2026-10-19: cubre las tres "sin efecto",
+  `45ba36b`, y `GetUserColor`, `82c7d78`. Las APIs de otros archivos se prueban donde se compila su
+  código: las de copia de seguridad en `out/runtime-test`, `2ced05c`, y `GetModuleInfoForUnwind` en
+  `out/content-test`, `5fcc578`).
 - [x] `tests/test_import_names.py` confirma NID y nombre de cada una (2026-10-19, `4e09b95`: pasan los
   23 NID y los 23 nombres).
 - [ ] En un arranque real, cada API "sin efecto" que se llame deja su línea de log (2026-10-17: se
