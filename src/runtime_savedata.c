@@ -57,6 +57,9 @@ typedef struct { uint64_t blocks, free_blocks; uint8_t reserved[32]; } SearchInf
 typedef struct { uint32_t hits; int32_t pad; DirName *names; uint32_t names_capacity, set_count;
                  Param *params; SearchInfo *infos; uint8_t reserved[12]; int32_t pad2; } SearchResult;
 typedef struct { const void *buffer; uint64_t buffer_size, data_size; uint8_t reserved[32]; } Icon;
+/* How OrbisSaveDataCheckBackupData and OrbisSaveDataRestoreBackupData begin; the rest (param, icon,
+ * fingerprint) is never read because there is no copy to describe. */
+typedef struct { int32_t user; int32_t pad; const TitleId *title; const DirName *dir; } BackupQuery;
 _Static_assert(sizeof(Param)==1328,"OrbisSaveDataParam layout");
 _Static_assert(sizeof(Mount1)==80 && sizeof(Mount2)==64,"OrbisSaveDataMount layouts");
 _Static_assert(sizeof(MountResult)==64,"OrbisSaveDataMountResult layout");
@@ -68,7 +71,7 @@ static char title_id[16]="UNKNOWN";
 static struct { int used; char host[700], meta[700]; } slots[SLOTS];
 static char memory_path[720];
 static uint64_t memory_size;
-static size_t mounts_done, memory_writes, umounts_with_backup;
+static size_t mounts_done, memory_writes, umounts_with_backup, backup_checks, backup_restores;
 
 void runtime_savedata_configure(const char *title) {
     if (title && *title) snprintf(title_id,sizeof(title_id),"%s",title);
@@ -199,6 +202,18 @@ static ABI int32_t save_umount_backup(const MountPoint *point) {
     if (calls==1) puts("Runtime: sceSaveDataUmountWithBackup unmounts without keeping a backup copy");
     return result;
 }
+/* With no copy kept there is never one to check or restore. The game checks only after a load fails as
+ * broken (eboot +0x121895) and offers a restore only on 0; its three restore calls take any other
+ * result as a failure. */
+static int32_t no_backup(const BackupQuery *q, size_t *calls, const char *api) {
+    if (!initialized) return ERR_NOT_INITIALIZED;
+    if (!q || !q->dir || !valid_name(q->dir->data,sizeof(q->dir->data))) return ERR_PARAMETER;
+    pthread_mutex_lock(&lock); size_t n=++*calls; pthread_mutex_unlock(&lock);
+    if (n==1) printf("Runtime: %s finds no backup copy for '%s'\n",api,q->dir->data);
+    return ERR_NOT_FOUND;
+}
+static ABI int32_t save_backup_check(const BackupQuery *q) { return no_backup(q,&backup_checks,"sceSaveDataCheckBackupData"); }
+static ABI int32_t save_backup_restore(const BackupQuery *q) { return no_backup(q,&backup_restores,"sceSaveDataRestoreBackupData"); }
 static ABI int32_t save_set_param(const MountPoint *point, uint32_t type, const void *buffer, uint64_t size) {
     if (!initialized) return ERR_NOT_INITIALIZED;
     if (!buffer) return ERR_PARAMETER;
@@ -343,7 +358,8 @@ static const RuntimeExport exports[]={
     {"sceSaveDataInitialize",save_initialize}, {"sceSaveDataInitialize2",save_initialize},
     {"sceSaveDataInitialize3",save_initialize}, {"sceSaveDataTerminate",save_terminate},
     {"sceSaveDataMount",save_mount}, {"sceSaveDataMount2",save_mount2}, {"sceSaveDataUmount",save_umount},
-    {"sceSaveDataUmountWithBackup",save_umount_backup},
+    {"sceSaveDataUmountWithBackup",save_umount_backup}, {"sceSaveDataCheckBackupData",save_backup_check},
+    {"sceSaveDataRestoreBackupData",save_backup_restore},
     {"sceSaveDataSetParam",save_set_param}, {"sceSaveDataSaveIcon",save_icon}, {"sceSaveDataDelete",save_delete},
     {"sceSaveDataDirNameSearch",save_search},
     {"sceSaveDataSetupSaveDataMemory",memory_setup}, {"sceSaveDataGetSaveDataMemory",memory_get},
@@ -351,6 +367,7 @@ static const RuntimeExport exports[]={
 };
 uintptr_t runtime_savedata_resolve(const char *name) { return RUNTIME_LOOKUP(exports,name); }
 void runtime_savedata_report(void) {
-    printf("Runtime: save data mounts=%zu, memory writes=%zu, unmounts without backup=%zu\n",mounts_done,memory_writes,umounts_with_backup);
+    printf("Runtime: save data mounts=%zu, memory writes=%zu, unmounts without backup=%zu, backup checks=%zu, backup restores=%zu\n",
+           mounts_done,memory_writes,umounts_with_backup,backup_checks,backup_restores);
 }
 

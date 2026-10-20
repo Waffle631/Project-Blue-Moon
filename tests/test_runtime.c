@@ -251,6 +251,25 @@ static void savedata_umount_with_backup(void) {
     assert(backup(result)==0 && (uint32_t)backup(result)==0x809F0008 && (uint32_t)umount(result)==0x809F0008);
     snprintf(cmd,sizeof cmd,"rm -rf %s",user); assert(system(cmd)==0);
 }
+/* Spec 3 (4.4): UmountWithBackup keeps no copy, so CheckBackupData and RestoreBackupData find none. The
+   game checks after a load fails as broken (eboot +0x121895) and offers a restore only on 0; it restores
+   at +0x121bb2, +0x1224fd and +0x1257b8 and takes any other result as a failure. */
+static void savedata_backup_queries(void) {
+    typedef struct { int32_t user,pad; const char *title,*dir; uint8_t rest[48]; } Query; /* the 72 bytes the game zeroes */
+    typedef int32_t (ABI *Backup)(const Query *);
+    typedef int32_t (ABI *Init)(const void *);
+    typedef int32_t (ABI *Term)(void);
+    Backup check=GET(Backup,"RQOqDbk3bSU#libSceSaveData"),restore=GET(Backup,"lU9YRFsgwSU#libSceSaveData");
+    Init init=GET(Init,"TywrFKCoLGY#libSceSaveData"); Term term=GET(Term,"yKDy8S5yLA0#libSceSaveData");
+    char dir[32]="savedata000"; Query q={1,0,NULL,dir,{0}}, no_dir={1,0,NULL,NULL,{0}};
+    assert(check && restore && term()==0);
+    assert((uint32_t)check(&q)==0x809F0001 && (uint32_t)restore(&q)==0x809F0001); /* before Initialize3 */
+    assert(init(NULL)==0);
+    assert((uint32_t)check(&q)==0x809F0008 && (uint32_t)restore(&q)==0x809F0008);
+    assert((uint32_t)check(&q)==0x809F0008 && (uint32_t)restore(&q)==0x809F0008);
+    assert((uint32_t)check(NULL)==0x809F0000 && (uint32_t)restore(NULL)==0x809F0000);
+    assert((uint32_t)check(&no_dir)==0x809F0000 && (uint32_t)restore(&no_dir)==0x809F0000);
+}
 /* Spec 3: fJgP+wqifno is DiscMap 0x7C980FFB0AA27E7A (the NID's bytes). libSceFios2.prx asks it for a
    file's LBA package location (call at +0x3411a) and takes its fallback path on any nonzero result.
    Like its twin ioKMruft1ek, it reports that no disc bitmap exists and leaves the outputs alone. */
@@ -630,7 +649,7 @@ int main(int argc,char **argv) {
     if (argc>1 && !strcmp(argv[1],"--rtld-underflow")) {
         static int dso; GET(DsoCount,"8OnWXlgQlvo#libkernel")(&dso); return 99;
     }
-    libc_support(); posix_mutexes(); wall_time(); kernel_time_names(); sanitizer_and_neo(); heap_trace_info(); audiodec_provisional(); savedata_initialize3(); savedata_mount2(); savedata_umount_with_backup(); discmap_location(); gpu_stats_line(); exit_handlers(); guards(); mutexes(); direct_memory(); memory_primitives();
+    libc_support(); posix_mutexes(); wall_time(); kernel_time_names(); sanitizer_and_neo(); heap_trace_info(); audiodec_provisional(); savedata_initialize3(); savedata_mount2(); savedata_umount_with_backup(); savedata_backup_queries(); discmap_location(); gpu_stats_line(); exit_handlers(); guards(); mutexes(); direct_memory(); memory_primitives();
     rw_lifecycle(); rw_concurrency(); rw_timeouts(); posix_rwlocks(); thread_get_name(); file_metadata(); decided_traps();
     time_conversion(); /* last: changes TZ */
     puts("PASS: callback lifecycle, guard ABI, mutex errors, shared direct memory, memory primitives, resolver scope, "
