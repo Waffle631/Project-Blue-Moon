@@ -1,7 +1,8 @@
 # Spec 3 — Servicios del sistema que faltan
 
 Fecha: 2026-10-14. Estado: **en curso** desde el 2026-10-19: el plan de implementación tiene 7 tareas y
-de la 1 a la 4 están hechas (`f4a5d0a`, `4e09b95`, `45ba36b` y `82c7d78`, resultados en la sección 6).
+de la 1 a la 5 están hechas (`f4a5d0a`, `4e09b95`, `45ba36b`, `82c7d78` y `2ced05c`, resultados en la
+sección 6).
 Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 3".
 
 Marcas: **[V]** comprobado en el repo o en los logs; **[H]** hipótesis a confirmar con el sitio de
@@ -37,6 +38,8 @@ offline no tiene (PSN, capturas, Share Play, streaming).
 - **[V]** (2026-10-19, `82c7d78`) `sceUserServiceGetUserColor` ya resuelve. `--check-imports` da 14. De esta
   spec quedan `sceSaveDataCheckBackupData`, `sceSaveDataRestoreBackupData` y
   `sceSysmoduleGetModuleInfoForUnwind`.
+- **[V]** (2026-10-19, `2ced05c`) `sceSaveDataCheckBackupData` y `sceSaveDataRestoreBackupData` ya
+  resuelven. `--check-imports` da 12. De esta spec solo queda `sceSysmoduleGetModuleInfoForUnwind`.
 - **[V]** `sceSysmoduleLoadModule`, `...IsLoaded` y `...UnloadModule` ya existen en
   `src/runtime_content.c:81-83` (`module_load`, `module_loaded`, `module_unload`).
 - **[V]** Constantes de error de SaveData ya definidas en `runtime_savedata.c:22-29`:
@@ -56,8 +59,8 @@ offline no tiene (PSN, capturas, Share Play, streaming).
 | `TywrFKCoLGY` | `sceSaveDataInitialize3` | SaveData | **hecha** (`2a43953`) | solo `import_names.inc`; el juego la llama con `NULL` (eboot `+0xed2eb`) |
 | `0z45PIH+SNI` | `sceSaveDataMount2` | SaveData | **hecha** (`7b14f96`) | solo `import_names.inc`; eboot `+0x121716`, modo 1 (solo lectura); sin partida, `NOT_FOUND` |
 | `VwadwBBBJ80` | `sceSaveDataUmountWithBackup` | SaveData | **hecha** (`991fc5d`) | igual que `sceSaveDataUmount` (`save_umount`); no crea copia (ver 4.4) |
-| `RQOqDbk3bSU` | `sceSaveDataCheckBackupData` | SaveData | falta | `NOT_FOUND` (0x809F0008): no hay copia de seguridad |
-| `lU9YRFsgwSU` | `sceSaveDataRestoreBackupData` | SaveData | falta | `NOT_FOUND` |
+| `RQOqDbk3bSU` | `sceSaveDataCheckBackupData` | SaveData | **hecha** (`2ced05c`) | `NOT_FOUND` (0x809F0008): no hay copia de seguridad; eboot `+0x121895`, solo tras una carga rota (ver 4.4) |
+| `lU9YRFsgwSU` | `sceSaveDataRestoreBackupData` | SaveData | **hecha** (`2ced05c`) | `NOT_FOUND`; eboot `+0x121bb2`, `+0x1224fd` y `+0x1257b8` |
 | `2xxUtuC-RzE` | `sceScreenShotEnable` | ScreenShot | **hecha** (`61ec55c`) | 0, sin efecto (política de captura, 4.1) |
 | `tIYf0W5VTi8` | `sceScreenShotDisable` | ScreenShot | **hecha** (`61ec55c`) | 0, sin efecto (política de captura, 4.1) |
 | `73WQ4Jj0nJI` | `sceScreenShotSetOverlayImageWithOrigin` | ScreenShot | **hecha** (`61ec55c`) | 0, sin efecto; `("/app0/image/corp.png", 0, 0, 3)` |
@@ -183,6 +186,21 @@ de log en la primera llamada y `runtime_report` cuenta los desmontajes sin copia
 "no hay copia"), no éxito. Si el juego muestra una pantalla de "restaurar copia", la usa el camino de
 error del propio juego.
 
+**[V]** (2026-10-19, Tarea 5) Sitios de llamada de las dos:
+
+- `CheckBackupData` tiene una sola llamada, en eboot `+0x121895`, dentro de la rutina de carga
+  (`+0x121650`). La rutina monta la partida con `Mount2` y la lee. Solo pregunta por la copia si la
+  lectura falla con `0x809F000F` (partida rota) o `0x80020060`, y solo pasa al estado de "restaurar" si
+  recibe 0. Con `0x809F0008` o `0x80020002` de la carga va al estado "sin partida".
+- `RestoreBackupData` tiene tres llamadas: `+0x121bb2`, `+0x1224fd` y `+0x1257b8`. Las tres guardan el
+  resultado como último error del objeto de partida y toman cualquier valor distinto de 0 como fallo.
+- Las cuatro llamadas pasan una estructura de 72 bytes a cero con el usuario, el título a `NULL` y el
+  nombre de directorio de la partida (el mismo que acaba de montar).
+
+Además de `NOT_FOUND`, devuelven `NOT_INITIALIZED` antes de `Initialize3` y `PARAMETER` sin
+estructura o sin un nombre de directorio válido, como `sceSaveDataDelete`. Cada una escribe una línea
+de log en su primera llamada, y `runtime_savedata_report` cuenta las consultas y las restauraciones.
+
 ## 5. Requisitos
 
 - El sistema nunca debe fingir que PSN está conectada.
@@ -260,6 +278,22 @@ el punto 1 con ellas:
   esperados).
 - `--check-imports` da 14 (ver sección 2).
 
+**Resultado (2026-10-19, commit `2ced05c`).** `sceSaveDataCheckBackupData` y
+`sceSaveDataRestoreBackupData` se prueban en `tests/test_runtime.c` (`savedata_backup_queries`), no en
+`tests/test_services.c`, porque `runtime_savedata.c` no se compila en `services-test`. El punto 2 habla
+de un `OrbisSaveDataMountPoint`, pero las dos reciben su propia estructura (ver 4.4); el test usa los
+72 bytes que pasa el juego:
+
+- Tras `sceSaveDataTerminate` (antes de inicializar), las dos devuelven `0x809F0001`.
+- Tras `Initialize3`, las dos devuelven `0x809F0008` con `savedata000`, en dos llamadas seguidas.
+- Con `NULL` o sin nombre de directorio, `0x809F0000`.
+- El test no comprueba el log, porque `test_runtime.c` no captura la salida. En el log del verde sale
+  una línea por API aunque cada una devuelve `NOT_FOUND` dos veces.
+- Rojo: `runtime-test` falla porque las dos no resuelven. Verde: `bash build.sh --test` en `ps4dev`
+  pasa sin warnings del compilador.
+- Suite Python en `ps4dev`: 257 tests, 35 omitidos y 4 fallos esperados, el resto OK.
+- `--check-imports` da 12 (ver sección 2).
+
 ## 7. Archivos
 
 `src/runtime_services.c`, `src/runtime_savedata.c`, `src/runtime_content.c` (Sysmodule),
@@ -270,8 +304,8 @@ el punto 1 con ellas:
 
 - [ ] `--check-imports` no lista ninguna de las 23 (junto con las Specs 2 y 4).
 - [ ] `out/services-test` cubre las APIs nuevas y pasa (2026-10-19: cubre las tres "sin efecto",
-  `45ba36b`, y `GetUserColor`, `82c7d78`. Faltan las de copia de seguridad (Tarea 5, en
-  `tests/test_runtime.c`) y `GetModuleInfoForUnwind` (Tarea 6, en `tests/test_content.c`)).
+  `45ba36b`, y `GetUserColor`, `82c7d78`. Las de copia de seguridad están en `out/runtime-test`,
+  `2ced05c`. Falta `GetModuleInfoForUnwind` (Tarea 6, en `tests/test_content.c`)).
 - [x] `tests/test_import_names.py` confirma NID y nombre de cada una (2026-10-19, `4e09b95`: pasan los
   23 NID y los 23 nombres).
 - [ ] En un arranque real, cada API "sin efecto" que se llame deja su línea de log (2026-10-17: se
