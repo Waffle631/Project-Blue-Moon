@@ -1,8 +1,8 @@
 # Spec 3 — Servicios del sistema que faltan
 
 Fecha: 2026-10-14. Estado: **en curso** desde el 2026-10-19: el plan de implementación tiene 7 tareas y
-la 1, la 2 y la 3 están hechas (`f4a5d0a`, `4e09b95` y `45ba36b`, resultados en la sección 6). Roadmap:
-`docs/tsuki/ROADMAP.md`, sección "Spec 3".
+de la 1 a la 4 están hechas (`f4a5d0a`, `4e09b95`, `45ba36b` y `82c7d78`, resultados en la sección 6).
+Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 3".
 
 Marcas: **[V]** comprobado en el repo o en los logs; **[H]** hipótesis a confirmar con el sitio de
 llamada del juego.
@@ -34,6 +34,9 @@ offline no tiene (PSN, capturas, Share Play, streaming).
   trampas de kernel y 4 de esta spec (`GetUserColor`, `Check`/`RestoreBackupData` y
   `sceSysmoduleGetModuleInfoForUnwind`). Sitios de llamada: los dos Terminate están en la ruta de cierre
   del juego (eboot `+0xed3f7`) y `ReenableMusicPlayer` solo en un envoltorio al que nada llama (ver 4.1).
+- **[V]** (2026-10-19, `82c7d78`) `sceUserServiceGetUserColor` ya resuelve. `--check-imports` da 14. De esta
+  spec quedan `sceSaveDataCheckBackupData`, `sceSaveDataRestoreBackupData` y
+  `sceSysmoduleGetModuleInfoForUnwind`.
 - **[V]** `sceSysmoduleLoadModule`, `...IsLoaded` y `...UnloadModule` ya existen en
   `src/runtime_content.c:81-83` (`module_load`, `module_loaded`, `module_unload`).
 - **[V]** Constantes de error de SaveData ya definidas en `runtime_savedata.c:22-29`:
@@ -69,7 +72,7 @@ offline no tiene (PSN, capturas, Share Play, streaming).
 | `4fU5yvOkVG4` | `sceSysmoduleGetModuleInfoForUnwind` | Sysmodule | falta | error explícito (ver 4.2) |
 | `SsC-m-S9JTA` | `sceSystemServiceParamGetString` | SystemService | **hecha** (`6e40c0e`) | ver 4.1 |
 | `9kPCz7Or+1Y` | `sceSystemServiceReenableMusicPlayer` | SystemService | **hecha** (`45ba36b`) | 0, sin efecto; solo la usa un envoltorio al que nada llama (4.1) |
-| `lUoqwTQu4Go` | `sceUserServiceGetUserColor` | UserService | falta | ver 4.1 |
+| `lUoqwTQu4Go` | `sceUserServiceGetUserColor` | UserService | **hecha** (`82c7d78`) | azul (0) para el usuario 1; solo la usa un getter al que nada llama (4.1) |
 | `Lr8ovHH9l6A` | `sceMsgDialogGetResult` | MsgDialog | **hecha** (`4e09b95`) | solo `import_names.inc`; ya probada en `tests/test_services.c:45-54` |
 | `fJgP+wqifno` | `sceDiscMap_7C980FFB0AA27E7A` (sin nombre real) | DiscMap | **hecha** (`d80dea5`) | `NO_BITMAP_INFO`, como su gemela (4.3) |
 | `NWtTN10cJzE` | `sceLibcHeapGetTraceInfo` | LibcInternalExt | hecha | ver 4.3 |
@@ -119,8 +122,14 @@ verdad.
   `sceVideoRecordingSetInfo(0xd, &prohibido, 4)`. Ignora todos los resultados.
   `EnableLiveStreaming` es un setter, no una consulta: la **[H]** de la tabla queda resuelta como
   "sin efecto".
-- `sceUserServiceGetUserColor(user, *color)` **[H]**: color fijo del usuario 1. Solo para el usuario
-  que el runtime ya reporta (`user_initial`); cualquier otro id devuelve el error de usuario.
+- `sceUserServiceGetUserColor(user, *color)` **[V]** (2026-10-19, `82c7d78`): color fijo del usuario 1,
+  azul (`USER_COLOR_BLUE` = 0, el del primer usuario de una consola nueva). Solo para el usuario que el
+  runtime ya reporta (`user_initial`). Cualquier otro id, o un puntero nulo, devuelve
+  `USER_INVALID_ARGUMENT` (0x80960005) y no escribe nada.
+  Sitio de llamada: solo la importa un getter en eboot `+0x11e750`. El getter lee el usuario de su
+  objeto (`+0x4d8`) y, si es negativo, devuelve -1. Si no, devuelve el color sin mirar el resultado, así
+  que una llamada fallida le daría basura de la pila. Nada del eboot llama, salta a ese getter ni apunta a
+  él; su vecino `+0x11e7a0` sí está en una vtable. El valor no decide nada visible y el color fijo basta.
 
 ### 4.2 Errores explícitos en lugar de datos falsos
 
@@ -239,6 +248,18 @@ el punto 1 con ellas:
   esperados).
 - `--check-imports` da 15 (ver sección 2).
 
+**Resultado (2026-10-19, commit `82c7d78`).** `tests/test_services.c` prueba el punto 5 con
+`sceUserServiceGetUserColor`:
+
+- Con el usuario 1 devuelve 0 y escribe azul. La variable de salida vale `0x7f` antes de la llamada, para
+  que se vea que la función la escribe aunque azul sea 0.
+- Con el usuario 2, con -1 (el valor "sin usuario" del getter del juego) y con un puntero nulo devuelve
+  `USER_INVALID_ARGUMENT`, y la salida sigue valiendo `0x7f`.
+- Rojo: el test no compila sin `user_color`. Verde: `services test: ok`.
+- `bash build.sh --test` y la suite Python en `ps4dev` pasan (257 tests, 35 omitidos y 4 fallos
+  esperados).
+- `--check-imports` da 14 (ver sección 2).
+
 ## 7. Archivos
 
 `src/runtime_services.c`, `src/runtime_savedata.c`, `src/runtime_content.c` (Sysmodule),
@@ -248,8 +269,8 @@ el punto 1 con ellas:
 ## 8. Criterios de aceptación
 
 - [ ] `--check-imports` no lista ninguna de las 23 (junto con las Specs 2 y 4).
-- [ ] `out/services-test` cubre las APIs nuevas y pasa (2026-10-19, `45ba36b`: cubre las tres "sin
-  efecto". Faltan `GetUserColor` (Tarea 4, aquí), las de copia de seguridad (Tarea 5, en
+- [ ] `out/services-test` cubre las APIs nuevas y pasa (2026-10-19: cubre las tres "sin efecto",
+  `45ba36b`, y `GetUserColor`, `82c7d78`. Faltan las de copia de seguridad (Tarea 5, en
   `tests/test_runtime.c`) y `GetModuleInfoForUnwind` (Tarea 6, en `tests/test_content.c`)).
 - [x] `tests/test_import_names.py` confirma NID y nombre de cada una (2026-10-19, `4e09b95`: pasan los
   23 NID y los 23 nombres).
