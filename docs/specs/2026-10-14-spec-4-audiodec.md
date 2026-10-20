@@ -2,8 +2,9 @@
 
 Fecha: 2026-10-14, **replanteada el 2026-10-17** con los datos de la fase 2A de la Spec 2 y del
 dump. Estado: **borrador para aprobación** (el usuario aprobó la dirección del replanteo en el chat
-el 2026-10-17). **En curso desde el 2026-10-19:** el plan de implementación está aprobado; hecha la
-tarea 1 (clips de referencia, `07800f5`). Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 4".
+el 2026-10-17). **En curso desde el 2026-10-19:** el plan de implementación está aprobado; hechas la
+tarea 1 (clips de referencia, `07800f5`) y la 2 (fase A estática, `docs/audiodec.md`, `084d16a`). Roadmap:
+`docs/tsuki/ROADMAP.md`, sección "Spec 4".
 
 Marcas: **[V]** comprobado (con el comando, la ruta o el log); **[H]** hipótesis que se confirma en
 la fase A; **[D]** decisión del usuario.
@@ -211,17 +212,26 @@ desensamblado del sitio de llamada; el trazador de la fase A tiene que confirmar
   - Llama a `sceAudiodecDecode(id, ctrl)`. Con un resultado ≠ 0 devuelve "falso"; con 0 resta de los
     pendientes el campo `bytes` del AU. Es decir, **la biblioteca sobrescribe el tamaño del AU con los
     bytes consumidos**.
-  - Una función auxiliar (`+0x1132a0`) devuelve el `u32` de bsi `+0x4`.
-- **[H]** Quedan para el trazador:
+  - Una función auxiliar (`+0x1132a0`) devuelve el `u32` de bsi `+0x4`. *(2026-10-19: es código
+    muerto. El juego lee ese campo en línea en otros tres sitios, y es el número de canales:
+    `docs/audiodec.md` 1.4.)*
+- **[H]** Quedan para el trazador (*2026-10-19: resueltas con el desensamblado, salvo la primera;
+  detalle en `docs/audiodec.md`*):
   - El `1` del segundo campo de los parámetros podría ser el formato del PCM; el juego abre sus
-    puertos de `AudioOut` en float.
+    puertos de `AudioOut` en float. *Sigue [H]: el juego no lo vuelve a leer.*
   - `canales × 512` bytes caben en una trama de 256 muestras en 16 bits o en una de 128 en float.
-  - El contenido de la info del flujo.
+    ***[V]** 16 bits entrelazado: el juego divide `pcm.bytes` entre `canales × 2` (1.5).*
+  - El contenido de la info del flujo. ***[V]** El juego solo lee `+4`, los canales, y lo lee antes del
+    primer `Decode` (1.4).*
   - Qué hace el nivel superior cuando la rutina de decodificación devuelve "falso": silencio,
-    reintento o espera.
+    reintento o espera. ***[V]** Corta la pista: vuelca lo acumulado y borra el decodificador. Si la
+    petición pide repetir, vuelve a llamar a `CreateDecoder` (1.6).*
 - **Consecuencia para la respuesta provisional.** Si `CreateDecoder` devuelve un error, el juego no
   llama a `Decode` para ese flujo. Con la regla "función no llamada = sin resolver", la siguiente
   ejecución no pararía en `Decode` sino en lo que haga el juego con un flujo que no produce nada.
+  *(2026-10-19: con una petición de repetir, eso es un bucle sin espera sobre `CreateDecoder`. Lo
+  mismo pasa con un `Decode` que siempre falla. Por eso la fase A ya no ejecuta el juego con
+  respuestas de error: 4.1.)*
 
 ## 3. Reglas comunes a 4a y 4b
 
@@ -249,6 +259,18 @@ desensamblado del sitio de llamada; el trazador de la fase A tiene que confirmar
 
 Entregable: `docs/audiodec.md`, apartado ATRAC9. Sin él no se pasa a la fase B.
 
+**Orden de la fase A [D] (2026-10-19, aprobado con el plan).** Sustituye al punto 1 de abajo. Cada
+ejecución hasta `CreateDecoder` cuesta 6 min 29 s, y una respuesta de error corta la pista (2.5).
+Por eso el orden es:
+
+1. **Desensamblado estático** del código de llamada. *Hecho el 2026-10-19:* `docs/audiodec.md`
+   (estructuras, consumo por trama, bsi, PCM, errores, bucles y el contrato que se deduce).
+2. **`Decode` real provisional** sobre LibAtrac9. Se apoya en las suposiciones del punto 1 y comprueba
+   cada una en cada llamada, con el trazador de la sección 3; si alguna no se cumple, error y traza.
+3. **Una sola ejecución de confirmación**, que contesta las preguntas de `docs/audiodec.md` 1.9.
+
+Lista original:
+
 1. **Instrumentación:** el trazador de la sección 3 sobre las seis funciones de `libSceAudiodec`, con
    respuestas provisionales de error.
 2. **Qué hay que averiguar (todo [H] hasta entonces):**
@@ -272,6 +294,21 @@ Entregable: `docs/audiodec.md`, apartado ATRAC9. Sin él no se pasa a la fase B.
    - que el juego no llama a `Decode` si `CreateDecoder` falla también está visto;
    - falta todo lo que solo da el trazador: el formato del PCM, la info del flujo, los errores y la
      secuencia completa por pista.
+
+   *Avance (2026-10-19, desensamblado completo, `docs/audiodec.md`):*
+   - **PCM:** 16 bits entrelazado, una trama de 256 muestras por llamada.
+   - **Bytes consumidos:** `au.bytes` es lo que usó la trama, salvo en la última de la supertrama, que
+     consume todo lo que queda, relleno incluido **[D]**. En los clips, el relleno aparece en el 42 %
+     de las supertramas de `bgm_typ` y en casi todas las de `bgm_rare`.
+   - **bsi:** `CreateDecoder` escribe `+4` = canales.
+   - **Errores:** el juego no distingue códigos; cualquier error corta la pista.
+   - **Secuencia por pista:** `CreateDecoder` → `Decode`* → (`ClearContext` en cada vuelta del bucle
+     `smpl`) → `DeleteDecoder`. Repetir o empezar en otra posición es borrar y crear de nuevo.
+     `TermLibrary` solo se llama al cerrar.
+   - **`ClearContext`** tiene que reiniciar el índice de trama de LibAtrac9: si no, el siguiente
+     `Decode` da `0x82000000`.
+   - Queda para la ejecución: qué pistas hacen bucle, cuántos decodificadores hay vivos a la vez y el
+     desfase real.
 3. **Orden de observación:** la música primero (lo primero que suene en la pantalla de título o en el
    prólogo), luego las voces y luego `vse`.
 4. **Fuentes:** el código de llamada del propio juego (desensamblado de `eboot.bin`) y el volcado del
@@ -389,7 +426,8 @@ aceptar módulos de sistema nuevos, `src/runtime_content.c`.
 
 **4a**
 
-- [ ] `docs/audiodec.md` describe el ATRAC9 observado: estructuras, secuencia y errores.
+- [ ] `docs/audiodec.md` describe el ATRAC9 observado: estructuras, secuencia y errores. *(La parte
+  estática está hecha desde el 2026-10-19; falta lo observado en la ejecución de confirmación.)*
 - [ ] `out/audiodec-test` decodifica el clip ATRAC9 de referencia igual que LibAtrac9.
 - [ ] En el juego suena la música; después, las voces; después, los efectos `vse` (lo juzga el usuario).
 - [ ] `--check-imports` no lista ninguna función de `libSceAudiodec`.
@@ -413,6 +451,9 @@ aceptar módulos de sistema nuevos, `src/runtime_content.c`.
   el mutex de la sección 3 y un caso de varios hilos en el test.
 - La salida depende de la cola de `AudioOut` (`src/runtime_audio.c`). Si los chirridos vienen de allí
   y no de Audiodec, se separa el diagnóstico para no culpar a esta spec.
+- **Un error de `Decode` corta la pista sin avisar** (`docs/audiodec.md` 1.6). Una suposición mal
+  validada da silencio, no un mensaje. Se mitiga trazando cada error con su causa y con los tests
+  bit-exactos contra LibAtrac9 sobre las cinco configuraciones.
 
 ## 12. Historial
 
@@ -427,3 +468,7 @@ aceptar módulos de sistema nuevos, `src/runtime_content.c`.
 - 2026-10-19: plan de implementación aprobado. Tarea 1 hecha (`07800f5`): la herramienta de clips de
   referencia (8). Con ella se ven las cinco configuraciones reales de ATRAC9 y los centinelas de los
   `.hed` (2.2).
+- 2026-10-19 (después): tarea 2 hecha (`084d16a`). La fase A empieza por el desensamblado (nuevo orden en 4.1).
+  `docs/audiodec.md` documenta el uso de ATRAC9 entero, y con él se resuelven tres de las cuatro
+  hipótesis de 2.5 (PCM, bsi y qué pasa ante un error). También se fija qué devuelve la última trama
+  de una supertrama.
