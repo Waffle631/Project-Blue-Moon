@@ -3,7 +3,8 @@
 Fecha: 2026-10-14, **replanteada el 2026-10-17** con los datos de la fase 2A de la Spec 2 y del
 dump. Estado: **borrador para aprobación** (el usuario aprobó la dirección del replanteo en el chat
 el 2026-10-17). **En curso desde el 2026-10-19:** el plan de implementación está aprobado; hechas la
-tarea 1 (clips de referencia, `07800f5`) y la 2 (fase A estática, `docs/audiodec.md`, `084d16a`). Roadmap:
+tarea 1 (clips de referencia, `07800f5`), la 2 (fase A estática, `docs/audiodec.md`, `084d16a`) y la 3
+(las seis funciones y la tabla de decodificadores, `731f3b6`). Roadmap:
 `docs/tsuki/ROADMAP.md`, sección "Spec 4".
 
 Marcas: **[V]** comprobado (con el comando, la ruta o el log); **[H]** hipótesis que se confirma en
@@ -35,12 +36,12 @@ son módulos del sistema, que el juego carga con `sceSysmoduleLoadModule` (`src/
 
 | NID | Nombre | Parte | Estado |
 |---|---|---|---|
-| `VjhsmxpcezI` | `sceAudiodecInitLibrary` | 4a | provisional (error explícito, fase 2A, `18ad4dc`) |
-| `h5jSB2QIDV0` | `sceAudiodecTermLibrary` | 4a | falta |
-| `O3f1sLMWRvs` | `sceAudiodecCreateDecoder` | 4a | falta; es el `STOP:` que llega al final del prólogo (2.5) |
-| `Tp+ZEy69mLk` | `sceAudiodecDeleteDecoder` | 4a | falta |
-| `KHXHMDLkILw` | `sceAudiodecDecode` | 4a | falta |
-| `6Vf9WTLDoss` | `sceAudiodecClearContext` | 4a | falta |
+| `VjhsmxpcezI` | `sceAudiodecInitLibrary` | 4a | hecha (`731f3b6`): 0; la segunda vez, `ALREADY_INITIALIZED` |
+| `h5jSB2QIDV0` | `sceAudiodecTermLibrary` | 4a | hecha (`731f3b6`): libera todo; los ids anteriores dan error |
+| `O3f1sLMWRvs` | `sceAudiodecCreateDecoder` | 4a | hecha (`731f3b6`): valida el bloque, crea el handle de LibAtrac9 y escribe bsi `+4` |
+| `Tp+ZEy69mLk` | `sceAudiodecDeleteDecoder` | 4a | hecha (`731f3b6`) |
+| `KHXHMDLkILw` | `sceAudiodecDecode` | 4a | resuelve; error provisional `0x807F0001` hasta la tarea 4 |
+| `6Vf9WTLDoss` | `sceAudiodecClearContext` | 4a | resuelve; error provisional `0x807F0001` hasta la tarea 4 |
 | `ktD2w3D4G2U` | `sceAudiodecCpuQueryMemSize` | 4b | falta |
 | `hdFsxo3MFu8` | `sceAudiodecCpuInitDecoder` | 4b | falta |
 | `lSVTiWV5wLc` | `sceAudiodecCpuDecode` | 4b | falta |
@@ -160,6 +161,11 @@ Que `vse` sean efectos es **[H]**: se deduce del nombre.
 - **[V]** No hay ninguna fuente pública de las estructuras ni de los errores de `libSceAudiodec` de PS4.
   La respuesta provisional usa `0x807F0001` (`INVALID_TYPE` del `libSceAudiodec` de Vita, vitasdk), que
   para PS4 es **[H]**.
+  *(2026-10-20, tarea 3: el runtime usa los de `psp2/audiodec.h` de vitasdk, todos **[H]** para PS4:
+  `INVALID_INIT_PARAM 0x807F0002` (configuración), `ALREADY_INITIALIZED 0x807F0003`, `OUT_OF_MEMORY
+  0x807F0004`, `NOT_INITIALIZED 0x807F0005`, `ALL_HANDLES_IN_USE 0x807F0007`, `INVALID_PTR 0x807F0008`,
+  `INVALID_HANDLE 0x807F0009`, `INVALID_WORD_LENGTH 0x807F000C` e `INVALID_SIZE 0x807F000D`. El juego
+  no distingue códigos, `docs/audiodec.md` 1.6.)*
 - **[V]** `GOW3_AUDIO_TRACE` solo traza aperturas bajo `sound/` (`src/runtime_file.c`), una ruta de
   GoW3: no sirve para Tsukihime. La Spec 6 lo generaliza.
 
@@ -243,6 +249,9 @@ desensamblado del sitio de llamada; el trazador de la fase A tiene que confirmar
 - **Trazador `GOW3_TRACE_AUDIODEC=1`:** por cada llamada, el nombre, los argumentos y un volcado
   hexadecimal acotado (primeros 256 bytes) de cada estructura que el guest pasa por puntero, antes y
   después de la llamada. Sin la variable, se registra solo la primera llamada de cada función.
+  *(2026-10-20, tarea 3: también el primer error de cada función, con su causa, porque un error corta
+  la pista sin avisar. Por ahora es una línea por llamada; el volcado hexadecimal, el tope de 400 líneas
+  y el desfase llegan con `Decode` en la tarea 4.)*
 - **Códec no soportado → `STOP:` con el número**, nunca silencio. **Flujo no válido → código de error
   de la PS4**, sin cerrar el juego.
 - **Memoria del guest:** antes de leer o escribir un búfer del guest, comprobar que es memoria
@@ -379,6 +388,12 @@ hasta el final del vídeo del prólogo (2.5), cuando el H1 del hito ya está cum
 - Cada prueba cuesta los 6 min 29 s del vídeo, porque el prólogo no se ha podido saltar (Spec 2,
   sección 4.1).
 
+**Resultado (2026-10-20, tarea 3, `731f3b6`).** El juego ya no pararía en `CreateDecoder`: las seis
+funciones resuelven y `--check-imports` no lista ninguna de `libSceAudiodec`. Pero `Decode` responde
+con error hasta la tarea 4, y con eso el juego corta cada pista y, si pide repetirla, entra en un bucle
+sin espera sobre `CreateDecoder` (`docs/audiodec.md` 1.6). **No se ejecuta el juego entre la tarea 3
+y la 4.**
+
 ## 7. Requisitos
 
 - Cuando el juego envíe un bloque válido, el sistema debe devolver el PCM en el formato y tamaño que
@@ -388,6 +403,11 @@ hasta el final del vídeo del prólogo (2.5), cuando el H1 del hito ya está cum
 
 ## 8. Pruebas
 
+- *(2026-10-20, tarea 3: `tests/test_audiodec.c` existe y cubre ya el ciclo de vida: resolución,
+  las cinco configuraciones, bsi `+4`, configuración, tamaños y punteros no válidos, ids viejos o nunca
+  creados, ids no reutilizados, tabla llena, `Delete`/`Term` con una referencia tomada, `Term` → `Init`
+  → `Create`, códec desconocido (`STOP:` en `Init`, `Create` y `Term`) y el registro de la primera
+  llamada. Se compila con `build.sh --test` como `out/audiodec-test`.)*
 - `tests/test_audiodec.c` (esquema de `tests/test_mp3.c`) para 4a: decodifica un clip ATRAC9 de
   referencia por la API del runtime y lo compara, muestra a muestra, con LibAtrac9 llamada
   directamente. Casos: tamaño de salida, bytes consumidos, flujo corrupto (error sin cerrar),
@@ -439,7 +459,9 @@ aceptar módulos de sistema nuevos, `src/runtime_content.c`.
   estática está hecha desde el 2026-10-19; falta lo observado en la ejecución de confirmación.)*
 - [ ] `out/audiodec-test` decodifica el clip ATRAC9 de referencia igual que LibAtrac9.
 - [ ] En el juego suena la música; después, las voces; después, los efectos `vse` (lo juzga el usuario).
-- [ ] `--check-imports` no lista ninguna función de `libSceAudiodec`.
+- [x] `--check-imports` no lista ninguna función de `libSceAudiodec`. *(2026-10-20, tarea 3: quedan 6,
+  los 3 de `libSceAudiodecCpu` y las 3 trampas de la Spec 2; `out/spec4-t3-check-imports.log`. Ojo:
+  `Decode` y `ClearContext` resuelven, pero con error provisional hasta la tarea 4.)*
 
 **4b**
 
@@ -490,3 +512,9 @@ aceptar módulos de sistema nuevos, `src/runtime_content.c`.
   LibAtrac9, así que se crea un handle nuevo (4.1, 4.2, 8, 11). Además, `TermLibrary` tiene un segundo
   sitio (2.1), `+0x1128ac` es código muerto (2.5) y el documento añade el contador de vueltas del
   bucle, la lectura anticipada de LibAtrac9 y la marca [H] de `pcm.bytes`.
+- 2026-10-20 (después): tarea 3 hecha (`731f3b6`). Resuelven las seis funciones de `libSceAudiodec`:
+  `InitLibrary`, `TermLibrary`, `CreateDecoder` (valida el bloque, crea el handle de LibAtrac9 y escribe
+  bsi `+4` = canales) y `DeleteDecoder` hacen su trabajo; `Decode` y `ClearContext` dan `0x807F0001`
+  hasta la tarea 4. Tabla de 64 decodificadores con ids crecientes desde 1 y contador de referencias.
+  Códec distinto de 1 → `STOP:` también en `Init` y `Term`. Errores de vitasdk (2.4). `TermLibrary`
+  recibe el códec (`TermLibrary(1)`, 2.1).
