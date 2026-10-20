@@ -323,4 +323,11 @@ cada llamada y se traza cuando no se cumple.
 - Que el desfase acumulado del trazador (bytes que avanza el juego menos bytes usados por LibAtrac9 y
   relleno) sea 0 en todas las supertramas.
 - Que ningún `Decode` reciba un AU que no empiece en una trama.
+- Que el runtime no rechace ningún búfer del juego por no estar en memoria del guest. La comprobación
+  (`runtime_memory_is_mapped`) solo reconoce los mapas de memoria directa y flexible, no la imagen
+  del eboot ni las pilas de los hilos. **[H]** Todos están en esa memoria: el bloque de control y el
+  `at9 input` salen del asignador del juego (`+0x12c430`; `0x1006eb2048` en el log del `STOP:`, por
+  encima de `USER_MIN` = `0x1000000000`), y el PCM del objeto del hilo `+0x98` (`+0x11291a`). En el
+  log no debe aparecer ningún `is not mapped guest memory`, y las direcciones de `ctrl`, `au.data` y
+  `pcm.data` deben estar por encima de `USER_MIN`.
 - Qué suena primero después del prólogo.

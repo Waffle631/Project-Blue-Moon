@@ -485,6 +485,12 @@ aceptar módulos de sistema nuevos, `src/runtime_content.c`.
 - **Un error de `Decode` corta la pista sin avisar** (`docs/audiodec.md` 1.6). Una suposición mal
   validada da silencio, no un mensaje. Se mitiga trazando cada error con su causa y con los tests
   bit-exactos contra LibAtrac9 sobre las cinco configuraciones.
+- **La comprobación de memoria del guest podría rechazar un búfer real del juego** (2026-10-20, tarea
+  3). `runtime_memory_is_mapped` solo reconoce los mapas de memoria directa y flexible, no la imagen
+  del eboot ni las pilas de los hilos. Si el juego pasara un búfer de una de esas zonas, la llamada
+  daría `INVALID_PTR` y la pista no sonaría. Por el desensamblado, todos salen de su asignador o del
+  objeto del hilo (`docs/audiodec.md` 1.9). Se confirma en la ejecución de la tarea 7. Si alguno se
+  rechaza, se decide con el usuario cómo ampliar la comprobación, con un test antes del arreglo.
 - **Un `ClearContext` que no reinicia LibAtrac9 pasa las pruebas con música** (los dos clips `bgm`
   vuelven en frontera de supertrama) y en el juego corta la pista en el primer bucle que acabe a
   mitad. Se mitiga probando con los tres clips `vse` (`docs/audiodec.md` 1.7).
