@@ -181,7 +181,7 @@ motivos están en la sección "Hito".
 | 6 | Servicios del sistema que faltan | **Spec 3** | Spec 2 | 2–3 días (real: 1 día, más las 15 adelantadas en la Spec 2) | ✅ Concluida el 2026-10-19 (23 de 23: 15 adelantadas en la Spec 2 y 8 en la Spec 3; `--check-imports` da 11, todos de las Specs 2 y 4) |
 | 7a | Audio ATRAC9 (`libSceAudiodec`): música → voces → efectos `vse`, con investigación previa | **Spec 4a** | Spec 2 | 1–2 semanas, sin tope | 🟨 En curso (tareas 1–6 del plan hechas: las seis funciones sobre LibAtrac9; desde el 2026-10-20 el juego pasa del prólogo sin errores de Audiodec; falta oír la música, tarea 7) |
 | 7b | Audio HEVAG (`libSceAudiodecCpu`): efectos de `vag.mrg`, con investigación previa | **Spec 4b** | Spec 4a (música y voces) | sin estimar, sin tope | ⬜ Pendiente |
-| 8 | Vídeo (AvPlayer) | **Spec 5** | Specs 2 y 3 | 2–3 días (antes 2–4) | ⬜ Pendiente (el prólogo se ve y se oye entero; no se salta con botones; posible reproducción más rápida que el tiempo real; desde el 2026-10-20 solo sale con una partida sin progreso) |
+| 8 | Vídeo (AvPlayer) | **Spec 5** | Specs 2 y 3 | 2–3 días (antes 2–4) | ⬜ Pendiente (el prólogo se ve y se oye entero; no se salta con botones; posible reproducción más rápida que el tiempo real; desde el 2026-10-20 solo sale con una partida sin progreso; **2026-10-21: se cuelga en `sceAvPlayerStop` al pasar al título del capítulo 1**, sección Spec 5) |
 | 9 | 2D correcto, ratón y saves | **Spec 6** | Hito (empieza), Specs 1b, 3, 4 y 5 (cierra) | 1–3 semanas | ⬜ Pendiente (se puede empezar: el hito está cerrado) |
 | 10 | Renombrar `gow3` → `tsuki` | **Spec 7** | Spec 6 | 2–3 días | ⬜ Pendiente |
 
@@ -827,6 +827,15 @@ a través de `runtime_file.c`.
 - *2026-10-20: el prólogo ya solo sale con una partida sin progreso. La de `user/` guardó progreso
   la primera vez que el juego pasó del vídeo (Spec 4a), y desde entonces el arranque va directo al
   menú de título. Para probar el vídeo hay que restaurar `out/savedata-sin-progreso/`.*
+- **2026-10-21: el juego se cuelga al pasar al título del capítulo 1.** Pasó dos de dos veces.
+  `phasetitle_01_00_en.mp4` empieza y se queda parado. El hilo del juego espera para siempre en un
+  `join` dentro de `sceAvPlayerStop`, y el hilo al que espera ya no existe.
+  - **[H]** La causa sería una carrera en el envoltorio de hilos del shim
+    (`gpu/shim/core/libraries/kernel/threads.h`): los hilos de AvPlayer se desvinculan solos mientras
+    otro hilo hace `join` sobre el mismo objeto.
+  - Audiodec no interviene.
+  - Es el criterio "el título del capítulo 1 se reproduce y el juego continúa", y hoy impide jugar más
+    allá. Evidencia y cómo confirmarla con gdb: spec 5, §2.
 
 ---
 

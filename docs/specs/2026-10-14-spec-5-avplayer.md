@@ -51,6 +51,35 @@ espera, y que el juego continúe después.
   pasó del vídeo (Spec 4, tarea 7), la partida de `user/savedata/1/CUSA47999/` guardó progreso en la primera ejecución que pasó del prólogo (22:58:10), y desde entonces el arranque va directo al menú de título, sin el vídeo.
   Para las pruebas de esta spec con el prólogo hay que restaurar antes la partida sin progreso
   (`out/savedata-sin-progreso/`, copia de la de antes de esa ejecución) en `user/savedata/`.
+- **[V] 2026-10-21: el juego se cuelga en `sceAvPlayerStop` al pasar al título del capítulo 1.** Pasó
+  dos de dos veces. La primera fue en la ejecución `a2` de la Spec 4 (tarea 7, `out/run-audiodec-a2.log`,
+  ~695 s). La segunda, al reproducirlo a propósito (`out/run-hang-a3.log`).
+  - Lo que ve el usuario: el vídeo empieza y se queda parado. El juego ya no responde.
+  - Archivo abierto en ese momento: `image/movie/phasetitle_01_00_en.mp4` (`/proc/<pid>/fd`).
+  - Antes del cuelgue, el log muestra lo mismo que en los vídeos que funcionan:
+    `Stop: Could not stop playback: already stopped` y un hilo `av audio` nuevo. Después, nada.
+  - Pilas, volcadas con `SIGALRM` sobre el proceso colgado (el manejador del watchdog de
+    `src/probe.c`) y simbolizadas con `addr2line` sobre `libgow3gpu.so`, cargada en `0x7f9de1000000`.
+    Las pilas y la lista de hilos están en `out/spec4-t7/a3-stacks.txt` y `a3-hang-snapshot.txt`, sin
+    versionar.
+    - `task_game` está en `pthread_join`. La llamada es eboot `+0x10225a` → `sceAvPlayerStop` →
+      `AvPlayer::Stop` → `AvPlayerState::Stop` → `AvPlayerSource::Stop` (en línea) → `std::thread::join`.
+    - De AvPlayer solo queda vivo `shadPS4:AvController`, que duerme en su bucle de 5 ms. No hay ningún
+      hilo `AvDemuxer`, `AvVideoDecoder` ni `AvAudioDecoder`, así que el `join` espera a un hilo que ya
+      no existe con ninguno de esos nombres.
+    - Audiodec no interviene: todas sus llamadas volvieron y no quedaba ningún decodificador vivo.
+  - **[H] Causa:** una carrera en `Kernel::Thread` (`gpu/shim/core/libraries/kernel/threads.h`). Al
+    acabar, los hilos de AvPlayer hacen `Join()` sobre su propio objeto, que los desvincula (`detach`).
+    El demultiplexor (`avplayer_source.cpp:602-607`) y `AvPlayerSource::Stop` (`:316-318`), desde el
+    hilo del juego, hacen `Join()` o `Stop()` sobre el mismo `std::jthread` sin ninguna sincronización.
+    Si el hilo del juego lee el identificador antes del `detach`, puede hacer `pthread_join` sobre un
+    hilo ya desvinculado, cuya memoria de control ha podido reutilizar otro hilo.
+    - Apoya la hipótesis que la carrera ya se dio sin colgar: el 2026-10-20 (`out/run-audiodec-a1.log`,
+      línea 246) salió `HLE thread: join failed (Invalid argument)` en un cambio de vídeo.
+    - Para confirmarla: en otra reproducción, `gdb -p <pid>` con `info threads` y la pila de
+      `task_game`. El `pthread_t` que espera el `join` es la dirección del bloque de control del hilo,
+      y el volcado da `rdi` = `0x7f9bf7446ce8`, el campo `tid` de ese bloque. Hay que ver de qué hilo
+      vivo es.
 - **[H] El vídeo podría ir más rápido que el tiempo real.** Datos de `out/run-prologo.log`:
 
   | Dato | Valor |
@@ -96,7 +125,7 @@ juego.
 | Se cierra al abrir | Tamaño de las estructuras de `Init/InitEx` del SDK 11.008 frente a las de shadPS4 (la versión de AvPlayer puede haber cambiado) |
 | Se queda negro | `GetVideoDataEx`: formato de píxel, dimensiones, alineación del búfer; textura creada por el juego |
 | Se corta o se desincroniza | Reloj de AvPlayer (`avplayer_source.cpp`), `SetAvSyncMode`, tiempo de `AudioOut` |
-| Cuelgue al terminar o saltar | Evento de fin de flujo (`AvPlayerEvent`), cierre y `Close` desde el guest, hilos de decodificación |
+| Cuelgue al terminar o saltar | Evento de fin de flujo (`AvPlayerEvent`), cierre y `Close` desde el guest, hilos de decodificación. *2026-10-21: visto con `phasetitle_01_00_en.mp4`, en `sceAvPlayerStop`, con un `join` sobre un hilo que ya no existe (§2)* |
 | No encuentra el archivo | Los callbacks del juego pasan por su FIOS → `runtime_file.c` (`/app0/image/movie/…`); mirar `open(...) -> not found` en el log |
 | Cuelga el hilo del host al llamar al guest | Falta de `runtime_thread_attach_host` en un hilo nuevo de AvPlayer |
 
