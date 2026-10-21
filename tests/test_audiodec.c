@@ -500,6 +500,50 @@ static void bad_descriptor_sizes_error(void) {
     expect_first_frame(c,id,b,frame_bytes(c));
     assert(api.remove(id)==0);
 }
+/* ---- Golden blocks (plan task 7): the control block as the game built it, not as fill() lays it out ----
+   tests/data/audiodec_ctrl_<kind>.bin comes from the GOW3_TRACE_AUDIODEC=2 run of 2026-10-21
+   (docs/audiodec.md 1.10): u64 ctrl address in the game, then four 0x80-byte copies of the block from
+   ctrl (+0x08...+0x88), before and after CreateDecoder and before and after the decoder's first Decode.
+   Structures only: the AU is the first superframe of the clip with the same configuration, so after
+   Decode au.bytes is that clip's and not the game's track's (0x83 and 0x25 in the run). */
+#define GOLDEN 0x80
+typedef struct { uint64_t ctrl; uint8_t record[4][GOLDEN]; } Golden;
+static void golden_load(Golden *g, const char *kind) {
+    char path[128]; snprintf(path,sizeof path,"tests/data/audiodec_ctrl_%s.bin",kind);
+    FILE *f=fopen(path,"rb"); assert(f && fread(g,1,sizeof *g,f)==sizeof *g && fgetc(f)==EOF); fclose(f);
+}
+/* Record i with its pointers moved: ctrl's four into block b, au.data and pcm.data (+0x28, +0x40 from
+   ctrl) to stream_input and stream_pcm. */
+static void golden_place(uint8_t *out, const Golden *g, int i, GameBlock *b) {
+    uint8_t *ctrl=(uint8_t *)&b->params; memcpy(out,g->record[i],GOLDEN);
+    for (size_t at=0;at<0x20;at+=8) {
+        uint64_t p; memcpy(&p,out+at,8); assert(p-g->ctrl<GOLDEN);
+        uint8_t *q=ctrl+(p-g->ctrl); memcpy(out+at,&q,8);
+    }
+    const struct { size_t at; uint8_t *to; } data[]={{0x28,stream_input},{0x40,stream_pcm}};
+    for (size_t k=0;k<2;++k) { uint64_t p; memcpy(&p,out+data[k].at,8); uint8_t *q=p ? data[k].to : NULL; memcpy(out+data[k].at,&q,8); }
+}
+static void golden_block(const char *kind, const char *clip) {
+    Golden g; golden_load(&g,kind);
+    GameBlock *b=block(0); uint8_t *ctrl=(uint8_t *)&b->params,expected[GOLDEN];
+    golden_place(ctrl,&g,0,b);
+    int32_t id=api.create(ctrl,1); assert(id>0);
+    golden_place(expected,&g,1,b); assert(!memcmp(ctrl,expected,GOLDEN));
+    char test[48]; snprintf(test,sizeof test,"golden_block(%s)",kind);
+    const Clip *c=need(clip,test);
+    if (c) {
+        golden_place(ctrl,&g,2,b);
+        assert(!memcmp(b->config,c->file+0x40,4) && b->au_desc.bytes==c->block && b->pcm_desc.bytes==c->channels*512);
+        memcpy(stream_input,c->data,c->block); memset(stream_pcm,0xA5,0x400);
+        Reference r; reference_open(&r,c,0); int16_t pcm[256*2]; uint32_t used=reference_frame(&r,pcm);
+        assert(api.decode(id,ctrl)==0);
+        golden_place(expected,&g,3,b); memcpy(expected+0x30,&used,4); /* au.bytes */
+        assert(!memcmp(ctrl,expected,GOLDEN) && !memcmp(stream_pcm,pcm,frame_bytes(c)));
+        Atrac9ReleaseHandle(r.handle);
+    }
+    assert(api.remove(id)==0);
+}
+static void golden_blocks_from_the_game(void) { golden_block("stereo","bgm_typ"); golden_block("mono","vse_mono"); }
 /* ---- The tracer (spec 3, plan task 4) ---- */
 static Stream trace_stream;
 static void trace_one(void) { assert(game_decode(&trace_stream)==0); }
@@ -962,6 +1006,7 @@ int main(int argc, char **argv) {
     clear_context_mid_superframe_then_next_superframe_decodes();
     unmapped_au_or_pcm_pointer_errors();
     bad_descriptor_sizes_error();
+    golden_blocks_from_the_game();
     trace_dumps_structures_and_drift();
     trace_caps_at_400_lines_unless_level_2();
     au_dump_writes_the_consumed_stream();
