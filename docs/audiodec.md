@@ -29,6 +29,9 @@ Las llamadas a imports son `call` a un stub de la PLT (`jmp [rip+X]`); `python3 
 `Atrac9InitDecoder` no reinicia LibAtrac9), `TermLibrary` (1.1: tiene un segundo sitio), el código
 muerto (1.1), el contador de vueltas del bucle (1.7) y la marca de `pcm.bytes` (1.5).
 
+*Ejecución trazada (2026-10-21, 1.10):* el juego confirma el contrato de 1.8. Hubo 158 decodificadores
+sin errores y con desfase 0, y los 18 `ClearContext` cayeron a mitad de supertrama, donde predice 1.7.
+
 ### 1.1 Quién llama y en qué orden
 
 - **[V]** `sceAudiodecInitLibrary(1)` al crear el sistema de audio (`+0x10e20c`, dentro de `+0x10e1c0`,
@@ -44,7 +47,8 @@ muerto (1.1), el contador de vueltas del bucle (1.7) y la marca de `pcm.bytes` (
 - **[H]** `TermLibrary` solo llega al cerrar el juego. No se ha encontrado ninguna llamada a la ranura
   `+0x18`: el dueño solo llama a `+0x10` (`+0x12a4b5`) y a `+0x20` (`+0x12a9b5`). Pero una llamada
   virtual no se resuelve del todo sin ejecutar, así que el runtime tiene que admitir otro
-  `InitLibrary` después de `TermLibrary` (1.8).
+  `InitLibrary` después de `TermLibrary` (1.8). *(2026-10-21, 1.10: no se llamó en 12 minutos de
+  juego.)*
 - **[V]** Todo lo demás corre en los **hilos `at9 thread`**: el nombre se carga en `+0x10e613` y la
   entrada `+0x112350` en `+0x10e61a`. La entrada llama al bucle del hilo `+0x112650`, que por cada
   petición hace esto:
@@ -72,7 +76,8 @@ muerto (1.1), el contador de vueltas del bucle (1.7) y la marca de `pcm.bytes` (
   bucle de decodificación lo borra (`+0x112d28`) antes de repetir. Después de `CreateDecoder` la
   preparación ya no tiene ninguna salida con error (`+0x113177`…`+0x11326f`), así que no se pierde
   ningún identificador.
-- **[H]** Hasta 32 decodificadores a la vez, uno por hilo `at9`.
+- **[H]** Hasta 32 decodificadores a la vez, uno por hilo `at9`. *(2026-10-21, 1.10: como mucho 9 vivos
+  a la vez en la ejecución, con 26 bloques de control distintos, uno por hilo.)*
 
 ### 1.2 Estructuras
 
@@ -316,6 +321,9 @@ cada llamada y se traza cuando no se cumple.
 
 ### 1.9 Preguntas para la ejecución de confirmación (tarea 7)
 
+*Respondidas el 2026-10-21 en 1.10, menos la última: la ejecución trazada arrancó con una partida con
+progreso, sin el prólogo.*
+
 - Qué pistas piden bucle (`smpl`) o repetir, con qué modo y cuántas vueltas, y en qué trama de la
   supertrama cae cada `ClearContext`.
 - Si se llama `TermLibrary` durante la partida (la ranura `+0x18` de la vtable `0x432318`, 1.1).
@@ -331,6 +339,78 @@ cada llamada y se traza cuando no se cumple.
   log no debe aparecer ningún `is not mapped guest memory`, y las direcciones de `ctrl`, `au.data` y
   `pcm.data` deben estar por encima de `USER_MIN`.
 - Qué suena primero después del prólogo.
+
+### 1.10 Lo observado en la ejecución (tarea 7, 2026-10-21)
+
+La ejecución `a2` duró 12 min 13 s. Arrancó con la partida con progreso, así que fue directa al menú de
+título; el usuario jugó hasta el título del capítulo 1. Se lanzó con `GOW3_TRACE_AUDIODEC=2` (cada
+llamada, sin tope) y `GOW3_AUDIODEC_AU_DUMP`.
+
+- Log: `out/run-audiodec-a2.log` (498 MB).
+- Volcados: `out/audiodec-au-a2/`.
+- Análisis: `out/spec4-t7/analyze.py` → `a2-analysis.txt`.
+- Todo sin versionar; es contenido del juego.
+
+`analyze.py` identifica cada flujo por su contenido. Compara cada volcado con los datos de todas las
+entradas de `bgm` y `vse` que empiezan igual. Luego recorre lo que consumió cada `Decode` sobre los datos
+de la pista, desde el principio y, después de cada `ClearContext`, desde la supertrama del inicio del
+bucle (1.7).
+
+- **[V] Ningún error en 158 decodificadores.** Hubo 303 323 tramas: 1 `InitLibrary`, 158
+  `CreateDecoder`, 303 323 `Decode`, 18 `ClearContext` y 158 `DeleteDecoder`, todos con resultado
+  ≥ 0. No hay `STOP:`, `Fault:` ni ningún búfer rechazado por la comprobación de memoria del guest.
+  Todas las direcciones de `ctrl`, `au.data` y `pcm.data` están por encima de `USER_MIN`; la más baja
+  es `0x1006e71348`. Con las dos ejecuciones del 2026-10-20 son 277 decodificadores sin un error.
+- **[V] Desfase 0 en las 303 323 tramas.** El AU siempre empieza en una trama, y lo que el juego avanza
+  coincide con lo que consume LibAtrac9 más el relleno de la última trama (1.3 [D]).
+- **[V] Lo consumido es la pista, byte a byte.** Los 54 flujos que son entradas de `bgm` o `vse` se
+  reproducen exactos sobre los datos de su pista, también tras cada salto de bucle.
+- **[V] El PCM es el que espera el juego** (1.5): capacidad y `pcm.bytes` de `0x400` en estéreo y `0x200`
+  en mono, es decir, 256 muestras × canales × 2. El usuario oye la música y los efectos bien.
+- **[V] bsi** (1.4): el juego lo entrega con `tamaño = 0x24` y ceros. Tras `CreateDecoder` vale `+4` =
+  canales (2 en 54 flujos, 1 en 104) y el resto sigue a cero.
+- **[V] Secuencia por pista** (1.1): `CreateDecoder` → `Decode` → (`ClearContext` → `Decode`)* →
+  `DeleteDecoder`.
+  - Tras `CreateDecoder` y tras cada `ClearContext`, el primer `Decode` es la trama 1 de su supertrama
+    y recibe la supertrama entera.
+  - Las tramas siguen 1, 2, 3, 4, y la última consume el resto.
+  - Los 158 terminan con `DeleteDecoder`.
+- **`TermLibrary`** no se llamó en 12 minutos de juego. Sigue **[H]** que solo llegue al cerrar.
+- **[V] Decodificadores a la vez** (1.1): como mucho 9 vivos a la vez y 26 bloques de control distintos.
+  Encaja con un bloque por hilo `at9`, de los que hay 32: el bloque está en el objeto de flujo del hilo
+  y su dirección no se repite entre hilos.
+- **[V] Bucles** (1.7): 5 decodificadores llamaron a `ClearContext`, 18 veces en total. **Todos** lo
+  hacen en la trama que predice la fórmula de 1.7, y siempre a mitad de supertrama:
+
+  | Pista | `ClearContext` | Trama de la supertrama | `Decode` por pasada (medido = previsto) |
+  |---|---|---|---|
+  | `bgm 34` (música del juego) | 2 | 1 | 33 437, luego 27 645 |
+  | `vse 885` (dos flujos) | 13 + 1 | 2 | 3 114 |
+  | `vse 574` (dos flujos) | 1 + 1 | 3 | 8 979 la primera pasada; el juego la borró en la segunda |
+
+  Es la prueba en el juego de que `ClearContext` tiene que crear un handle nuevo de LibAtrac9: con el
+  mismo handle, el primer `Decode` de cada vuelta habría dado `0x82000000` y cortado la pista.
+- **[V] Pistas sin vuelta.** `bgm 2` (la música del menú de título, el primer flujo) y `bgm 52` se
+  borraron antes del final de su bucle, cuando cambió la escena.
+  - 42 efectos `vse` terminaron 1 o 2 tramas antes de `+0x38`, sin ningún error. **[H]** Sería el corte
+    propio del juego cerca del final (1.6).
+  - Otros 7 los cortó el juego antes, al cambiar de escena.
+- **Qué suena primero** con la partida actual: `bgm 2`, en el menú de título (`ctrl` `0x1006eb2048`).
+  Después del prólogo queda sin ver con traza. El log de la ejecución que pasó el prólogo se perdió
+  (paso 1), aunque su primer flujo tenía el mismo `ctrl` y la misma configuración `fe740ff0`.
+- **[H] Voces.** Hay 104 flujos mono `fe700bf0` (83 576 tramas, ~446 s) que no son ninguna entrada de
+  `bgm` ni de `vse`: solo comparten con los `vse` mono 775–783 la primera supertrama, de silencio. Son
+  103 flujos distintos, y LibAtrac9 los decodifica sin errores. Lo más probable es que sean las voces de
+  `voice.mrg`, que el juego ya entrega descomprimidas (sin `MZX`). Lo confirma la tarea 8.
+- **Fixture dorado** (paso 4): `tests/data/audiodec_ctrl_stereo.bin` (`bgm 2`, decodificador 1) y
+  `audiodec_ctrl_mono.bin` (el primer flujo mono, decodificador 11). Son el bloque de control tal como
+  lo trazó el juego, antes y después de `CreateDecoder` y de su primer `Decode`: `ctrl`, AU, PCM,
+  parámetros y bsi, sin audio. `golden_blocks_from_the_game` (`tests/test_audiodec.c`) exige que el
+  runtime deje el mismo bloque.
+- **Coste de la traza.** Con `=2`, el hilo `hevag` escribe dos líneas por trama. El puerto de HEVAG
+  (puerto 2, 256 tramas) se quedó sin datos en 19 de 146 ventanas de 5 s; con `=1` le pasó en 1 de 112.
+  Hoy no se oye, porque HEVAG suena en silencio hasta la tarea 12. Los puertos de la música (0 y 1) solo
+  se quedaron sin datos en la primera ventana, al arrancar, igual que sin traza.
 
 ## 2. HEVAG (`libSceAudiodecCpu`) — desensamblado previo (2026-10-20, tarea 6)
 
