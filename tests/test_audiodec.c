@@ -1,6 +1,8 @@
 /* Spec 4a (docs/specs/2026-10-14-spec-4-audiodec.md; contract in docs/audiodec.md 1.8): libSceAudiodec
  * through runtime_resolve, with the control block laid out as the game builds it (docs/audiodec.md
- * 1.2) in guest direct memory. Includes the module to reach its decoder table (acquire/release). */
+ * 1.2) in guest direct memory. Includes the module to reach its decoder table (acquire/release).
+ * Decoding uses the reference clips of tools/extract_audio_clips.py (game content, not versioned):
+ * argv[1] or out/audiodec-clips; a missing clip prints SKIP: and its tests do not run. */
 #define _GNU_SOURCE
 #undef NDEBUG /* the checks are asserts; release builds define NDEBUG */
 #include "../src/runtime_audiodec.c"
@@ -20,7 +22,7 @@ typedef int32_t (ABI *Allocate)(int64_t,int64_t,uint64_t,uint64_t,int,int64_t *)
 typedef int32_t (ABI *Map)(void **,uint64_t,int,int,int64_t,uint64_t);
 typedef int32_t (ABI *Unmap)(void *,uint64_t);
 #define GET(t,n) ((t)runtime_resolve(n,0))
-#define E_INVALID_TYPE 0x807F0001u
+#define E_API_FAIL 0x807F0000u
 #define E_INVALID_INIT_PARAM 0x807F0002u
 #define E_ALREADY_INITIALIZED 0x807F0003u
 #define E_NOT_INITIALIZED 0x807F0005u
@@ -47,7 +49,10 @@ static const struct { uint32_t config,channels; } configs[]={
     {0xfe740ff0,2},{0xfe7409f0,2},{0xfe740bf0,2},{0xfe700bf0,1},{0xfe7004f0,1}};
 #define GUEST_BYTES 0x10000
 #define HOLE_BYTES 0x4000
-static uint8_t *guest_base,*guest_next,*hole; /* hole: an unmapped page right after the blocks */
+#define EDGE_BYTES 0x1000
+/* hole: an unmapped page; edge: the bytes right before it, kept out of the block arena. stream_input
+   and stream_pcm stand for the game's "at9 input" buffer (0x800) and its PCM buffer (channels x 512). */
+static uint8_t *guest_base,*guest_next,*edge,*hole,*stream_input,*stream_pcm;
 
 static void fill(GameBlock *b,uint32_t config) {
     memset(b,0,sizeof *b);
@@ -58,7 +63,7 @@ static void fill(GameBlock *b,uint32_t config) {
 /* A new block in guest memory, aligned like the game's (0x40). */
 static GameBlock *block(uint32_t config) {
     GameBlock *b=(GameBlock *)guest_next; guest_next+=0xC0;
-    assert(guest_next<=hole); fill(b,config); return b;
+    assert(guest_next<=edge); fill(b,config); return b;
 }
 static void setup(void) {
     runtime_start(1);
@@ -71,19 +76,23 @@ static void setup(void) {
     int64_t physical=-1; void *address=NULL;
     assert(alloc && map && unmap && alloc(0,536870912,GUEST_BYTES,HOLE_BYTES,0,&physical)==0);
     assert(map(&address,GUEST_BYTES,3,0,physical,HOLE_BYTES)==0);
-    guest_base=guest_next=address; hole=guest_base+GUEST_BYTES-HOLE_BYTES;
+    guest_base=address; stream_input=guest_base; stream_pcm=guest_base+0x800; guest_next=guest_base+0xC00;
+    hole=guest_base+GUEST_BYTES-HOLE_BYTES; edge=hole-EDGE_BYTES;
     assert(unmap(hole,HOLE_BYTES)==0 && runtime_memory_is_mapped((uintptr_t)guest_base,8) && !runtime_memory_is_mapped((uintptr_t)hole,8));
 }
 static void resolves_all_six(void) {
     assert(api.init && api.term && api.create && api.remove && api.decode && api.clear);
 }
-/* Runs f with stdout sent to a temporary file and returns the number of lines it printed. */
+/* Runs f with stdout sent to a temporary file; keeps the start of what it printed in captured and
+   returns the number of lines. */
+static char captured[1<<20];
 static int printed_lines(void (*f)(void)) {
     fflush(stdout); FILE *tmp=tmpfile(); assert(tmp);
     int saved=dup(1); assert(saved>=0 && dup2(fileno(tmp),1)>=0);
     f(); fflush(stdout); dup2(saved,1); close(saved);
-    rewind(tmp); int lines=0,c; while ((c=fgetc(tmp))!=EOF) lines+=c=='\n';
-    fclose(tmp); return lines;
+    rewind(tmp); int lines=0,c; size_t n=0;
+    while ((c=fgetc(tmp))!=EOF) { lines+=c=='\n'; if (n<sizeof captured-1) captured[n++]=(char)c; }
+    captured[n]=0; fclose(tmp); return lines;
 }
 /* Runs f in a child with stderr captured; it must stop with exit 21 and print STOP: and text. */
 static void stops(void (*f)(void),const char *text) {
@@ -165,13 +174,6 @@ static void stale_id_errors(void) {
         assert((uint32_t)api.remove(never[i])==E_INVALID_HANDLE && (uint32_t)api.clear(never[i])==E_INVALID_HANDLE &&
                (uint32_t)api.decode(never[i],&b->params)==E_INVALID_HANDLE);
 }
-/* Until task 4 of the plan, Decode and ClearContext on a live decoder are explicit errors. */
-static void live_decode_and_clear_answer_explicit_error(void) {
-    GameBlock *b=block(0xfe740ff0);
-    int32_t id=api.create(&b->params,1);
-    assert(id>=0 && (uint32_t)api.decode(id,&b->params)==E_INVALID_TYPE && (uint32_t)api.clear(id)==E_INVALID_TYPE);
-    assert(api.remove(id)==0);
-}
 static void ids_never_reused(void) {
     GameBlock *b=block(0xfe740ff0);
     int32_t previous=0;
@@ -227,7 +229,7 @@ static void term_invalidates_ids_and_init_again_creates(void) {
     assert(d>c && b->channels==2 && objects==1 && api.remove(d)==0);
 }
 /* Spec 3: without GOW3_TRACE_AUDIODEC, only the first call and the first error of each function
-   are logged; with it, every call. */
+   are logged; with it, every call, and CreateDecoder adds a line with the structures before it. */
 static GameBlock *log_block,*log_bad;
 static void create_good(void) { assert(api.remove(api.create(&log_block->params,1))==0); }
 static void create_bad(void) { assert(api.create(&log_bad->params,1)<0); }
@@ -239,11 +241,313 @@ static void logs_first_call_and_first_error_only(void) {
     assert(printed_lines(create_good)==0);
     assert(printed_lines(create_bad)==1);
     assert(printed_lines(create_bad)==0);
-    setenv("GOW3_TRACE_AUDIODEC","1",1);
-    assert(printed_lines(create_good)==2 && printed_lines(create_bad)==1);
+    setenv("GOW3_TRACE_AUDIODEC","1",1); trace_lines=0;
+    assert(printed_lines(create_good)==3 && printed_lines(create_bad)==2);
     unsetenv("GOW3_TRACE_AUDIODEC");
 }
-int main(void) {
+/* A success line carries no error cause: a traced success is followed by what the trace shows. */
+static GameBlock *lifecycle_block; static int32_t lifecycle_id;
+static void lifecycle(void) {
+    assert(api.term(1)==0 && api.init(1)==0);
+    lifecycle_id=api.create(&lifecycle_block->params,1); assert(lifecycle_id>0 && api.remove(lifecycle_id)==0);
+}
+static void success_lines_carry_no_cause(void) {
+    lifecycle_block=block(0xfe740ff0);
+    memset(calls,0,sizeof calls); memset(failures,0,sizeof failures);
+    assert(printed_lines(lifecycle)==4);
+    char line[96]; snprintf(line,sizeof line,"sceAudiodecDeleteDecoder(id %d) = 0\n",lifecycle_id);
+    assert(strstr(captured,"sceAudiodecTermLibrary(codec 1) = 0\n") && strstr(captured,"sceAudiodecInitLibrary(codec 1) = 0\n") && strstr(captured,line));
+}
+
+/* ---- Decode (task 4): the reference clips, the game's decode routine and LibAtrac9 straight ---- */
+typedef struct { const char *name; uint32_t config,channels; uint8_t *file; const uint8_t *data; uint32_t data_size,block; } Clip;
+static Clip clips[]={{"bgm_typ",0xfe740ff0,2,0,0,0,0},{"bgm_rare",0xfe7409f0,2,0,0,0,0},{"vse_stereo",0xfe740bf0,2,0,0,0,0},
+                     {"vse_mono",0xfe700bf0,1,0,0,0,0},{"vse_mono_small",0xfe7004f0,1,0,0,0,0}};
+#define CLIPS (sizeof clips/sizeof *clips)
+#define CLIP_SLACK 0x2000 /* zeros after the file: LibAtrac9 reads past the last frame (docs/audiodec.md 1.3) */
+static uint32_t le16(const uint8_t *p) { return (uint32_t)p[0] | (uint32_t)p[1]<<8; }
+static uint32_t le32(const uint8_t *p) { return le16(p) | le16(p+2)<<16; }
+static void load_clips(const char *dir) {
+    for (size_t i=0;i<CLIPS;++i) {
+        Clip *c=&clips[i]; char path[512]; snprintf(path,sizeof path,"%s/%s.at9",dir,c->name);
+        FILE *f=fopen(path,"rb");
+        if (!f) { printf("SKIP: %s missing (python3 tools/extract_audio_clips.py --image Tsukihime/CUSA47999/image --out %s)\n",path,dir); continue; }
+        fseek(f,0,SEEK_END); long n=ftell(f); fseek(f,0,SEEK_SET);
+        assert(n>0x48 && (c->file=calloc(1,(size_t)n+CLIP_SLACK)) && fread(c->file,1,(size_t)n,f)==(size_t)n); fclose(f);
+        /* The RIFF of spec 2.2: channels +0x16, block +0x20, config +0x40; data in its own chunk. */
+        assert(!memcmp(c->file,"RIFF",4) && le16(c->file+0x16)==c->channels && le32(c->file+0x40)==__builtin_bswap32(c->config));
+        c->block=le16(c->file+0x20);
+        for (long at=12;at+8<=n;at+=8+(long)le32(c->file+at+4)+(le32(c->file+at+4)&1))
+            if (!memcmp(c->file+at,"data",4)) { c->data=c->file+at+8; c->data_size=le32(c->file+at+4); }
+        assert(c->data && c->data+c->data_size<=c->file+n && c->data_size>=c->block*4);
+    }
+}
+static const Clip *need(const char *name, const char *test) {
+    for (size_t i=0;i<CLIPS;++i) if (!strcmp(clips[i].name,name)) {
+        if (clips[i].data) return &clips[i];
+        printf("SKIP: %s: needs %s.at9\n",test,name); return NULL;
+    }
+    abort();
+}
+static uint32_t superframes(const Clip *c) { return c->data_size/c->block; }
+static uint32_t frame_bytes(const Clip *c) { return 256*c->channels*2; }
+static void set_au(GameBlock *b, void *data, uint32_t bytes) { b->au_desc.data=data; b->au_desc.bytes=bytes; }
+static void set_pcm(GameBlock *b, void *data, uint32_t bytes) { b->pcm_desc.data=data; b->pcm_desc.bytes=bytes; }
+/* The game's side of a stream (docs/audiodec.md 1.3): one superframe at a time in its input buffer,
+   the AU at buffer + block - pending, pending minus what Decode says it consumed. */
+typedef struct { const Clip *clip; GameBlock *b; int32_t id; uint32_t next,pending; } Stream;
+static void open_stream(Stream *s, const Clip *c) {
+    s->clip=c; s->b=block(c->config); s->next=s->pending=0;
+    s->id=api.create(&s->b->params,1); assert(s->id>0);
+}
+/* The loop-back of +0x113553/+0x113579: reading resumes at a superframe with nothing pending. */
+static void seek_stream(Stream *s, uint32_t superframe) { s->next=superframe; s->pending=0; }
+static int32_t game_decode(Stream *s) {
+    const Clip *c=s->clip; GameBlock *b=s->b;
+    if (!s->pending) { assert(s->next<superframes(c)); memcpy(stream_input,c->data+(size_t)s->next++*c->block,c->block); s->pending=c->block; }
+    set_au(b,stream_input+c->block-s->pending,s->pending); set_pcm(b,stream_pcm,c->channels*512);
+    int32_t r=api.decode(s->id,&b->params);
+    if (!r) s->pending-=b->au_desc.bytes;
+    return r;
+}
+/* LibAtrac9 straight on the clip: the next frame starts where the last one ended, and a superframe's
+   padding is skipped after its last frame. */
+typedef struct { void *handle; const Clip *clip; uint32_t superframe; int frame,frames; const uint8_t *at; } Reference;
+static void reference_open(Reference *r, const Clip *c, uint32_t superframe) {
+    Atrac9CodecInfo info;
+    assert((r->handle=Atrac9GetHandle()) && !Atrac9InitDecoder(r->handle,c->file+0x40) && !Atrac9GetCodecInfo(r->handle,&info));
+    assert(info.superframeSize==(int)c->block && info.channels==(int)c->channels && info.frameSamples==256);
+    r->clip=c; r->superframe=superframe; r->frame=0; r->frames=info.framesInSuperframe; r->at=c->data+(size_t)superframe*c->block;
+}
+static uint32_t reference_frame(Reference *r, int16_t *pcm) {
+    int used=0; assert(!Atrac9Decode(r->handle,r->at,pcm,&used) && used>0); r->at+=used;
+    if (++r->frame==r->frames) r->frame=0, r->at=r->clip->data+(size_t)++r->superframe*r->clip->block;
+    return (uint32_t)used;
+}
+static int all(const uint8_t *p, uint8_t value, size_t n) { for (size_t i=0;i<n;++i) if (p[i]!=value) return 0; return 1; }
+static void decode_matches_libatrac9_sample_by_sample(void) {
+    for (size_t i=0;i<CLIPS;++i) {
+        const Clip *c=&clips[i]; if (!c->data) continue;
+        Stream s; open_stream(&s,c); Reference r; reference_open(&r,c,0);
+        int16_t expected[256*2];
+        for (uint32_t n=0;n<superframes(c)*(uint32_t)r.frames;++n) {
+            uint32_t pending=s.pending ? s.pending : c->block,last=r.frame==r.frames-1,used=reference_frame(&r,expected);
+            assert(game_decode(&s)==0 && s.b->channels==c->channels);
+            assert(s.b->pcm_desc.bytes==frame_bytes(c) && !memcmp(stream_pcm,expected,frame_bytes(c)));
+            assert(s.b->au_desc.bytes==(last ? pending : used));
+        }
+        assert(api.remove(s.id)==0); Atrac9ReleaseHandle(r.handle);
+    }
+}
+/* docs/audiodec.md 1.3 [D]: the last frame of a superframe consumes what is left, padding included,
+   so the game's pending bytes reach 0 exactly at each superframe's end. */
+static void consumed_over_superframe_equals_block_size(void) {
+    for (size_t i=0;i<CLIPS;++i) {
+        const Clip *c=&clips[i]; if (!c->data) continue;
+        Stream s; open_stream(&s,c);
+        for (uint32_t sf=0;sf<superframes(c);++sf) {
+            uint32_t sum=0;
+            for (int k=0;k<4;++k) { assert(game_decode(&s)==0); sum+=s.b->au_desc.bytes; assert((s.pending==0)==(k==3)); }
+            assert(sum==c->block);
+        }
+        assert(api.remove(s.id)==0);
+    }
+}
+/* A decoder with the first superframe of c in stream_input as its AU and stream_pcm filled with 0xA5. */
+static int32_t first_frame_ready(const Clip *c, GameBlock **b) {
+    *b=block(c->config); int32_t id=api.create(&(*b)->params,1); assert(id>0);
+    memcpy(stream_input,c->data,c->block); set_au(*b,stream_input,c->block);
+    memset(stream_pcm,0xA5,0x400); set_pcm(*b,stream_pcm,frame_bytes(c));
+    return id;
+}
+/* Decode returns error and changes nothing: not the control block, not the PCM buffer. */
+static void expect_decode_error(int32_t id, void *control, GameBlock *b, uint32_t error) {
+    GameBlock before=*b; uint8_t pcm[0x400]; memcpy(pcm,stream_pcm,sizeof pcm);
+    uint32_t r=(uint32_t)api.decode(id,control);
+    if (r!=error) { fprintf(stderr,"expected Decode error %#x, got %#x\n",error,r); abort(); }
+    assert(!memcmp(b,&before,sizeof before) && !memcmp(pcm,stream_pcm,sizeof pcm));
+}
+/* After errors that LibAtrac9 never saw, the first frame still decodes as from a new decoder. Decode
+   writes bsi +4 = channels again (docs/audiodec.md 1.4). */
+static void expect_first_frame(const Clip *c, int32_t id, GameBlock *b, uint32_t capacity) {
+    Reference r; reference_open(&r,c,0); int16_t expected[256*2]; uint32_t used=reference_frame(&r,expected);
+    set_au(b,stream_input,c->block); set_pcm(b,stream_pcm,capacity); b->channels=0;
+    assert(api.decode(id,&b->params)==0 && b->au_desc.bytes==used && b->pcm_desc.bytes==frame_bytes(c) && b->channels==c->channels);
+    assert(!memcmp(stream_pcm,expected,frame_bytes(c)));
+    Atrac9ReleaseHandle(r.handle);
+}
+static void output_capacity_too_small_errors_without_writing(void) {
+    const Clip *c=need("vse_mono_small",__func__); if (!c) return;
+    GameBlock *b; int32_t id=first_frame_ready(c,&b);
+    b->pcm_desc.bytes=frame_bytes(c)-2; expect_decode_error(id,&b->params,b,E_INVALID_SIZE);
+    /* More room than a frame: one frame is written and the rest of the buffer is left alone. */
+    expect_first_frame(c,id,b,0x400);
+    assert(all(stream_pcm+frame_bytes(c),0xA5,0x400-frame_bytes(c)));
+    assert(api.remove(id)==0);
+}
+/* An AU shorter than its frame is an error (LibAtrac9 still decodes it from the zeros after the copy:
+   the frame's size is in its header), and the runtime reads no byte past it: the AU ends where
+   the unmapped page starts. A whole superframe there decodes, although LibAtrac9 reads ahead of its
+   last frame (docs/audiodec.md 1.3): the runtime decodes from a copy with zeros after it. */
+static void short_au_errors_without_overread(void) {
+    const Clip *c=need("vse_stereo",__func__); if (!c) return;
+    Reference r; reference_open(&r,c,0); int16_t expected[256*2];
+    uint32_t used=reference_frame(&r,expected);
+    GameBlock *b; int32_t id=first_frame_ready(c,&b);
+    uint8_t *au=hole-(used-1); memcpy(au,c->data,used-1); set_au(b,au,used-1);
+    GameBlock before=*b;
+    uint32_t e=(uint32_t)api.decode(id,&b->params);
+    assert(e==E_INVALID_SIZE && !memcmp(b,&before,sizeof before) && all(stream_pcm,0xA5,0x400));
+    assert(api.clear(id)==0); Atrac9ReleaseHandle(r.handle);
+    /* The first superframe without padding: its last frame ends at the block's last byte. */
+    uint32_t sf=0;
+    for (;;++sf) {
+        assert(sf<superframes(c)); reference_open(&r,c,sf); uint32_t sum=0;
+        for (int k=0;k<r.frames;++k) sum+=reference_frame(&r,expected);
+        Atrac9ReleaseHandle(r.handle);
+        if (sum==c->block) break;
+    }
+    au=hole-c->block; memcpy(au,c->data+(size_t)sf*c->block,c->block); reference_open(&r,c,sf);
+    for (uint32_t pending=c->block,k=0;k<4;++k) {
+        reference_frame(&r,expected); set_au(b,au+c->block-pending,pending); set_pcm(b,stream_pcm,frame_bytes(c));
+        assert(api.decode(id,&b->params)==0 && !memcmp(stream_pcm,expected,frame_bytes(c)));
+        pending-=b->au_desc.bytes;
+    }
+    assert(api.remove(id)==0); Atrac9ReleaseHandle(r.handle);
+}
+/* A frame LibAtrac9 rejects is an error with nothing written; after ClearContext the stream decodes
+   from a superframe as from a new decoder. */
+static void corrupt_frame_errors_and_clear_context_recovers(void) {
+    const Clip *c=need("vse_mono_small",__func__); if (!c) return;
+    Stream s; open_stream(&s,c);
+    memset(stream_input,0xFF,c->block); set_au(s.b,stream_input,c->block);
+    memset(stream_pcm,0xA5,0x400); set_pcm(s.b,stream_pcm,frame_bytes(c));
+    expect_decode_error(s.id,&s.b->params,s.b,E_API_FAIL);
+    assert(api.clear(s.id)==0);
+    Reference r; reference_open(&r,c,0); int16_t expected[256];
+    for (int n=0;n<8;++n) { reference_frame(&r,expected); assert(game_decode(&s)==0 && !memcmp(stream_pcm,expected,frame_bytes(c))); }
+    assert(api.remove(s.id)==0); Atrac9ReleaseHandle(r.handle);
+}
+/* docs/audiodec.md 1.7: the game loops back with ClearContext after 1, 2 or 3 frames of a superframe
+   and goes on at the start of another one; the next Decode must work (LibAtrac9 otherwise answers
+   0x82000000) and give what a new decoder gives there. */
+static void clear_context_mid_superframe_then_next_superframe_decodes(void) {
+    const char *const vse[]={"vse_stereo","vse_mono","vse_mono_small"};
+    for (size_t i=0;i<3;++i) {
+        const Clip *c=need(vse[i],__func__); if (!c) continue;
+        for (int k=1;k<=3;++k) {
+            Stream s; open_stream(&s,c);
+            for (int n=0;n<k;++n) assert(game_decode(&s)==0);
+            assert(api.clear(s.id)==0);
+            seek_stream(&s,1); Reference r; reference_open(&r,c,1); int16_t expected[256*2];
+            for (int n=0;n<8;++n) {
+                reference_frame(&r,expected);
+                int32_t e=game_decode(&s);
+                if (e) { fprintf(stderr,"%s: ClearContext after %d frames, Decode %d after it: %#x\n",c->name,k,n,(unsigned)e); abort(); }
+                assert(!memcmp(stream_pcm,expected,frame_bytes(c)));
+            }
+            assert(api.remove(s.id)==0); Atrac9ReleaseHandle(r.handle);
+        }
+    }
+}
+static void unmapped_au_or_pcm_pointer_errors(void) {
+    const Clip *c=need("vse_mono_small",__func__); if (!c) return;
+    GameBlock *b; int32_t id=first_frame_ready(c,&b);
+    GameBlock host; fill(&host,c->config); host.au_desc=b->au_desc; host.pcm_desc=b->pcm_desc; /* valid, but not guest memory */
+    uint8_t host_data[0x400]; memcpy(host_data,c->data,c->block);
+    expect_decode_error(id,NULL,b,E_INVALID_PTR);
+    expect_decode_error(id,&host.params,b,E_INVALID_PTR);
+    void **at_edge=(void **)(hole-0x10); at_edge[0]=b->params; at_edge[1]=b->bsi; /* ctrl crosses into the hole */
+    expect_decode_error(id,at_edge,b,E_INVALID_PTR);
+    void *au=b->au,*pcm=b->pcm,*bsi=b->bsi;
+    b->au=NULL; expect_decode_error(id,&b->params,b,E_INVALID_PTR);
+    b->au=&host.au_desc; expect_decode_error(id,&b->params,b,E_INVALID_PTR);
+    b->au=au; b->pcm=NULL; expect_decode_error(id,&b->params,b,E_INVALID_PTR);
+    b->pcm=&host.pcm_desc; expect_decode_error(id,&b->params,b,E_INVALID_PTR);
+    b->pcm=pcm; b->bsi=NULL; expect_decode_error(id,&b->params,b,E_INVALID_PTR);
+    b->bsi=&host.bsi_size; expect_decode_error(id,&b->params,b,E_INVALID_PTR);
+    b->bsi=bsi;
+    set_au(b,NULL,c->block); expect_decode_error(id,&b->params,b,E_INVALID_PTR);
+    set_au(b,host_data,c->block); expect_decode_error(id,&b->params,b,E_INVALID_PTR);
+    set_au(b,hole-c->block/2,c->block); expect_decode_error(id,&b->params,b,E_INVALID_PTR);
+    set_au(b,stream_input,c->block);
+    set_pcm(b,NULL,frame_bytes(c)); expect_decode_error(id,&b->params,b,E_INVALID_PTR);
+    set_pcm(b,host_data,frame_bytes(c)); expect_decode_error(id,&b->params,b,E_INVALID_PTR);
+    set_pcm(b,hole-frame_bytes(c)+2,frame_bytes(c)); expect_decode_error(id,&b->params,b,E_INVALID_PTR);
+    expect_first_frame(c,id,b,frame_bytes(c));
+    assert(api.remove(id)==0);
+}
+/* The descriptors the game writes (docs/audiodec.md 1.2): size 0x18, an AU of 1 to block bytes. */
+static void bad_descriptor_sizes_error(void) {
+    const Clip *c=need("vse_mono_small",__func__); if (!c) return;
+    GameBlock *b; int32_t id=first_frame_ready(c,&b);
+    b->au_desc.size=0x10; expect_decode_error(id,&b->params,b,E_INVALID_SIZE); b->au_desc.size=0x18;
+    b->pcm_desc.size=0x20; expect_decode_error(id,&b->params,b,E_INVALID_SIZE); b->pcm_desc.size=0x18;
+    set_au(b,stream_input,0); expect_decode_error(id,&b->params,b,E_INVALID_SIZE);
+    set_au(b,stream_input,c->block+1); expect_decode_error(id,&b->params,b,E_INVALID_SIZE);
+    expect_first_frame(c,id,b,frame_bytes(c));
+    assert(api.remove(id)==0);
+}
+/* ---- The tracer (spec 3, plan task 4) ---- */
+static Stream trace_stream;
+static void trace_one(void) { assert(game_decode(&trace_stream)==0); }
+static void trace_250(void) { for (int n=0;n<250;++n) trace_one(); }
+static void hexof(char *out, const void *p, size_t n) { for (size_t i=0;i<n;++i) sprintf(out+2*i,"%02x",((const uint8_t *)p)[i]); }
+/* The game sends one byte less than LibAtrac9 has left: the AU still starts at the frame. */
+static void trace_short_by_one(void) {
+    Stream *s=&trace_stream; GameBlock *b=s->b;
+    set_au(b,stream_input+s->clip->block-s->pending,s->pending-1); set_pcm(b,stream_pcm,frame_bytes(s->clip));
+    assert(api.decode(s->id,&b->params)==0); s->pending-=b->au_desc.bytes;
+}
+static void trace_dumps_structures_and_drift(void) {
+    const Clip *c=need("vse_mono_small",__func__); if (!c) return;
+    open_stream(&trace_stream,c); GameBlock *b=trace_stream.b;
+    setenv("GOW3_TRACE_AUDIODEC","1",1); trace_lines=0;
+    assert(printed_lines(trace_one)==2 && strstr(captured,"sceAudiodecDecode(id ") && strstr(captured,"before:") && strstr(captured,"after:"));
+    /* Before: the AU descriptor as the game filled it; after: what Decode wrote back. */
+    GameBuffer au={0x18,0,stream_input,c->block,0}; char text[160]; hexof(text,&au,sizeof au);
+    assert(strstr(captured,text));
+    hexof(text,&b->au_desc,sizeof b->au_desc); assert(strstr(captured,text));
+    hexof(text,c->data,16); assert(strstr(captured,text)); /* the first bytes of the AU */
+    hexof(text,stream_pcm,16); assert(strstr(captured,text)); /* and of the PCM */
+    assert(strstr(captured,"frame 1/4") && strstr(captured,"drift 0"));
+    /* A drift is logged once without the variable (the capped trace could miss it), always with it. */
+    unsetenv("GOW3_TRACE_AUDIODEC"); drift_logged=0;
+    assert(printed_lines(trace_short_by_one)==1 && strstr(captured,"drift -1"));
+    assert(printed_lines(trace_short_by_one)==0);
+    setenv("GOW3_TRACE_AUDIODEC","1",1);
+    assert(printed_lines(trace_short_by_one)==2 && strstr(captured,"drift -1") && strstr(captured,"frame 4/4"));
+    unsetenv("GOW3_TRACE_AUDIODEC");
+    assert(api.remove(trace_stream.id)==0);
+}
+/* GOW3_TRACE_AUDIODEC=1 stops after 400 lines (as ajm_trace in runtime_ajm.c) and says so; =2 has no cap. */
+static void trace_caps_at_400_lines_unless_level_2(void) {
+    const Clip *c=need("vse_mono",__func__); if (!c) return;
+    open_stream(&trace_stream,c);
+    trace_one(); /* not the first Decode, which is logged apart from the cap */
+    setenv("GOW3_TRACE_AUDIODEC","1",1); trace_lines=0;
+    assert(printed_lines(trace_250)==401 && strstr(captured,"GOW3_TRACE_AUDIODEC=2"));
+    setenv("GOW3_TRACE_AUDIODEC","2",1);
+    assert(printed_lines(trace_250)==500);
+    unsetenv("GOW3_TRACE_AUDIODEC");
+    assert(api.remove(trace_stream.id)==0);
+}
+/* GOW3_AUDIODEC_AU_DUMP=<dir>: <dir>/dec<id>.au holds the stream as the game fed it, what each
+   Decode consumed one after another; for a whole superframe, the clip's bytes. */
+static void au_dump_writes_the_consumed_stream(void) {
+    const Clip *c=need("vse_mono_small",__func__); if (!c) return;
+    char dir[]="/tmp/audiodec-au-XXXXXX"; assert(mkdtemp(dir));
+    setenv("GOW3_AUDIODEC_AU_DUMP",dir,1);
+    Stream s; open_stream(&s,c);
+    for (int n=0;n<12;++n) assert(game_decode(&s)==0);
+    assert(api.remove(s.id)==0); unsetenv("GOW3_AUDIODEC_AU_DUMP");
+    char path[64]; snprintf(path,sizeof path,"%s/dec%d.au",dir,s.id);
+    FILE *f=fopen(path,"rb"); assert(f);
+    uint8_t got[0x1000]; size_t n=fread(got,1,sizeof got,f); fclose(f);
+    assert(n==3*c->block && !memcmp(got,c->data,n));
+    assert(!unlink(path) && !rmdir(dir));
+}
+int main(int argc, char **argv) {
     setup();
     resolves_all_six();
     assert(api.init(1)==0);
@@ -253,13 +557,25 @@ int main(void) {
     create_bad_config_returns_error();
     create_null_or_unmapped_ctrl_returns_error();
     stale_id_errors();
-    live_decode_and_clear_answer_explicit_error();
     ids_never_reused();
     table_full_errors_without_id();
     delete_while_acquired_defers_free();
     term_while_acquired_defers_free();
     term_invalidates_ids_and_init_again_creates();
     logs_first_call_and_first_error_only();
+    success_lines_carry_no_cause();
+    load_clips(argc>1 ? argv[1] : "out/audiodec-clips");
+    decode_matches_libatrac9_sample_by_sample();
+    consumed_over_superframe_equals_block_size();
+    output_capacity_too_small_errors_without_writing();
+    short_au_errors_without_overread();
+    corrupt_frame_errors_and_clear_context_recovers();
+    clear_context_mid_superframe_then_next_superframe_decodes();
+    unmapped_au_or_pcm_pointer_errors();
+    bad_descriptor_sizes_error();
+    trace_dumps_structures_and_drift();
+    trace_caps_at_400_lines_unless_level_2();
+    au_dump_writes_the_consumed_stream();
     puts("PASS: Audiodec contracts");
     return 0;
 }
