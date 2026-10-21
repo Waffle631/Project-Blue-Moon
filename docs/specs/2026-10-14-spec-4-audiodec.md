@@ -4,8 +4,8 @@ Fecha: 2026-10-14, **replanteada el 2026-10-17** con los datos de la fase 2A de 
 dump. Estado: **borrador para aprobación** (el usuario aprobó la dirección del replanteo en el chat
 el 2026-10-17). **En curso desde el 2026-10-19:** el plan de implementación está aprobado; hechas la
 tarea 1 (clips de referencia, `07800f5`), la 2 (fase A estática, `docs/audiodec.md`, `084d16a`), la 3
-(las seis funciones y la tabla de decodificadores, `731f3b6`) y la 4 (`Decode` y `ClearContext` reales,
-`a1446c0`). Roadmap:
+(las seis funciones y la tabla de decodificadores, `731f3b6`), la 4 (`Decode` y `ClearContext` reales,
+`a1446c0`) y la 5 (concurrencia y reinicio, `af96cb1`). Roadmap:
 `docs/tsuki/ROADMAP.md`, sección "Spec 4".
 
 Marcas: **[V]** comprobado (con el comando, la ruta o el log); **[H]** hipótesis que se confirma en
@@ -38,10 +38,10 @@ son módulos del sistema, que el juego carga con `sceSysmoduleLoadModule` (`src/
 | NID | Nombre | Parte | Estado |
 |---|---|---|---|
 | `VjhsmxpcezI` | `sceAudiodecInitLibrary` | 4a | hecha (`731f3b6`): 0; la segunda vez, `ALREADY_INITIALIZED` |
-| `h5jSB2QIDV0` | `sceAudiodecTermLibrary` | 4a | hecha (`731f3b6`): libera todo; los ids anteriores dan error |
+| `h5jSB2QIDV0` | `sceAudiodecTermLibrary` | 4a | hecha (`731f3b6`): libera todo; los ids anteriores dan error. Desde `af96cb1` espera a los `Decode` en curso |
 | `O3f1sLMWRvs` | `sceAudiodecCreateDecoder` | 4a | hecha (`731f3b6`): valida el bloque, crea el handle de LibAtrac9 y escribe bsi `+4` |
 | `Tp+ZEy69mLk` | `sceAudiodecDeleteDecoder` | 4a | hecha (`731f3b6`) |
-| `KHXHMDLkILw` | `sceAudiodecDecode` | 4a | hecha (`a1446c0`): una trama sobre LibAtrac9 desde una copia del AU; PCM s16, bytes consumidos según `docs/audiodec.md` 1.3 |
+| `KHXHMDLkILw` | `sceAudiodecDecode` | 4a | hecha (`a1446c0`): una trama sobre LibAtrac9 desde una copia del AU; PCM s16, bytes consumidos según `docs/audiodec.md` 1.3. Si `DeleteDecoder` o `TermLibrary` se le adelantan, error sin escribir (`af96cb1`) |
 | `6Vf9WTLDoss` | `sceAudiodecClearContext` | 4a | hecha (`a1446c0`): handle de LibAtrac9 nuevo y contador de tramas a 0 |
 | `ktD2w3D4G2U` | `sceAudiodecCpuQueryMemSize` | 4b | falta |
 | `hdFsxo3MFu8` | `sceAudiodecCpuInitDecoder` | 4b | falta |
@@ -275,6 +275,11 @@ desensamblado del sitio de llamada; el trazador de la fase A tiene que confirmar
   `Atrac9InitDecoder` reescribe. `CreateDecoder` y `ClearContext` lo toman en escritura y `Decode` en
   lectura; debajo va el mutex de cada decodificador. `TermLibrary` y las pruebas con 32 hilos son de la
   tarea 5.)*
+  *(2026-10-20, tarea 5, `af96cb1`: `TermLibrary` también toma el rwlock en escritura, así que vuelve
+  sin ningún `Decode` en curso. Un `Decode` que tomó su decodificador justo antes de `DeleteDecoder` o
+  `TermLibrary` lo comprueba otra vez con los cerrojos tomados y, si ya no está en la tabla, da
+  `INVALID_HANDLE` sin escribir: nada llega a la memoria del guest después de `TermLibrary`. Orden de los
+  cerrojos: el de las tablas, el del decodificador y el de la tabla de decodificadores.)*
 - **Contadores en `runtime_report`:** `Runtime: Audiodec decoders=…, frames=…, errors=…` (y su
   equivalente de AudiodecCpu).
 - **Archivos:** `src/runtime_audiodec.c` (ya existe) para `libSceAudiodec`, y uno nuevo,
@@ -418,6 +423,11 @@ mitad de supertrama tampoco corta la pista. Todavía no se ejecuta el juego: la 
 y la 6 (`AudiodecCpu`, para que un efecto HEVAG no pare con `STOP:` la prueba de música) van antes de
 la ejecución de confirmación (tarea 7).
 
+**Resultado (2026-10-20, tarea 5, `af96cb1`).** Con 32 hilos decodificando a la vez, cada uno con su
+decodificador, todos siguen siendo bit-exactos. `TermLibrary` ya no deja que ningún `Decode` escriba
+después de volver. Falta la tarea 6 (`AudiodecCpu`) antes de la ejecución de confirmación (tarea 7),
+así que todavía no se ejecuta el juego.
+
 ## 7. Requisitos
 
 - Cuando el juego envíe un bloque válido, el sistema debe devolver el PCM en el formato y tamaño que
@@ -449,6 +459,22 @@ la ejecución de confirmación (tarea 7).
 
   *El juego se emula como en `+0x1132b0`: una supertrama cada vez en un búfer de `0x800`, con el AU en
   `búfer + bloque − pendientes`. Si falta un clip, sale un `SKIP:` visible. Mutaciones: 19 de 19.)*
+  *(2026-10-20, tarea 5, `af96cb1`: siete tests con hilos:*
+  - *32 hilos, un decodificador cada uno y su clip entero, bit-exactos y con los contadores de
+    `runtime_report` sumando;*
+  - *un hilo con `CreateDecoder` y `ClearContext` en bucle mientras 8 decodifican con configuraciones
+    distintas;*
+  - *`TermLibrary` con un `Decode` en curso (espera), un `Decode` que tomó su decodificador antes de
+    `TermLibrary` y `DeleteDecoder` con un `Decode` esperando (error sin escribir, sin liberar debajo);*
+  - *`TermLibrary` con 8 hilos en bucle y después `InitLibrary` y `CreateDecoder` otra vez;*
+  - *la línea de contadores de `runtime_report`.*
+
+  *`build.sh` corre `out/audiodec-test` con `timeout 60` (tarda 1,8 s). `Atrac9InitDecoder` reescribe
+  las tablas siempre con los mismos valores, así que en x86 quitar el rwlock no cambia el PCM y ningún
+  test bit-exacto lo ve. Lo ve ThreadSanitizer (`clang -fsanitize=thread`, con LibAtrac9
+  instrumentada; script local sin versionar): los mutantes sin el cerrojo de escritura o sin el de
+  lectura dan la carrera entre `InitDecoder` y `Atrac9Decode`, y el código actual no da ninguna. No va en
+  `build.sh` porque necesita clang y tarda minutos. Mutaciones: 8 de 8.)*
 - Para 4b, un test del decodificador HEVAG: tramas sintéticas con índices de tabla bajos (≤ `0x1c`,
   donde HEVAG se comporta como el VAG clásico) y altos, con el resultado calculado aparte. Además, si
   hay un fragmento local, se compara con `vgmstream-cli` cuando esté instalado; si no, se omite.
@@ -516,7 +542,9 @@ aceptar módulos de sistema nuevos, `src/runtime_content.c`.
 - El decodificador HEVAG de vgmstream salió de ingeniería inversa y puede redondear distinto que el de
   Sony. El impacto es bajo: son 19 efectos cortos.
 - 32 hilos `at9` decodificando a la vez: una tabla mal protegida da fallos aleatorios. Se mitiga con
-  el mutex de la sección 3 y un caso de varios hilos en el test.
+  el mutex de la sección 3 y un caso de varios hilos en el test. *(2026-10-20, tarea 5: hecho, con el
+  rwlock y siete tests con hilos. Pero una regresión del cerrojo de las tablas solo la ve
+  ThreadSanitizer, que no está en `build.sh` (8).)*
 - La salida depende de la cola de `AudioOut` (`src/runtime_audio.c`). Si los chirridos vienen de allí
   y no de Audiodec, se separa el diagnóstico para no culpar a esta spec.
 - **Un error de `Decode` corta la pista sin avisar** (`docs/audiodec.md` 1.6). Una suposición mal
@@ -570,3 +598,6 @@ aceptar módulos de sistema nuevos, `src/runtime_content.c`.
   - El trazador tiene volcados, desfase y tope, y está `GOW3_AUDIODEC_AU_DUMP`.
   - Una trama rechazada da `API_FAIL` (2.4).
   - Los tests son bit-exactos contra LibAtrac9 con los cinco clips (8).
+- 2026-10-20 (después): tarea 5 hecha (`af96cb1`). `TermLibrary` espera a los `Decode` en curso, y un
+  `Decode` que pierde su decodificador antes de tomar los cerrojos da error sin escribir (3). Siete
+  tests con hilos, entre ellos 32 a la vez bit-exactos, y comprobación con ThreadSanitizer (8).
