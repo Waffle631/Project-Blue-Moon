@@ -3,8 +3,9 @@
 Fecha: 2026-10-14, **replanteada el 2026-10-17** con los datos de la fase 2A de la Spec 2 y del
 dump. Estado: **borrador para aprobación** (el usuario aprobó la dirección del replanteo en el chat
 el 2026-10-17). **En curso desde el 2026-10-19:** el plan de implementación está aprobado; hechas la
-tarea 1 (clips de referencia, `07800f5`), la 2 (fase A estática, `docs/audiodec.md`, `084d16a`) y la 3
-(las seis funciones y la tabla de decodificadores, `731f3b6`). Roadmap:
+tarea 1 (clips de referencia, `07800f5`), la 2 (fase A estática, `docs/audiodec.md`, `084d16a`), la 3
+(las seis funciones y la tabla de decodificadores, `731f3b6`) y la 4 (`Decode` y `ClearContext` reales,
+`a1446c0`). Roadmap:
 `docs/tsuki/ROADMAP.md`, sección "Spec 4".
 
 Marcas: **[V]** comprobado (con el comando, la ruta o el log); **[H]** hipótesis que se confirma en
@@ -40,8 +41,8 @@ son módulos del sistema, que el juego carga con `sceSysmoduleLoadModule` (`src/
 | `h5jSB2QIDV0` | `sceAudiodecTermLibrary` | 4a | hecha (`731f3b6`): libera todo; los ids anteriores dan error |
 | `O3f1sLMWRvs` | `sceAudiodecCreateDecoder` | 4a | hecha (`731f3b6`): valida el bloque, crea el handle de LibAtrac9 y escribe bsi `+4` |
 | `Tp+ZEy69mLk` | `sceAudiodecDeleteDecoder` | 4a | hecha (`731f3b6`) |
-| `KHXHMDLkILw` | `sceAudiodecDecode` | 4a | resuelve; error provisional `0x807F0001` hasta la tarea 4 |
-| `6Vf9WTLDoss` | `sceAudiodecClearContext` | 4a | resuelve; error provisional `0x807F0001` hasta la tarea 4 |
+| `KHXHMDLkILw` | `sceAudiodecDecode` | 4a | hecha (`a1446c0`): una trama sobre LibAtrac9 desde una copia del AU; PCM s16, bytes consumidos según `docs/audiodec.md` 1.3 |
+| `6Vf9WTLDoss` | `sceAudiodecClearContext` | 4a | hecha (`a1446c0`): handle de LibAtrac9 nuevo y contador de tramas a 0 |
 | `ktD2w3D4G2U` | `sceAudiodecCpuQueryMemSize` | 4b | falta |
 | `hdFsxo3MFu8` | `sceAudiodecCpuInitDecoder` | 4b | falta |
 | `lSVTiWV5wLc` | `sceAudiodecCpuDecode` | 4b | falta |
@@ -166,6 +167,10 @@ Que `vse` sean efectos es **[H]**: se deduce del nombre.
   0x807F0004`, `NOT_INITIALIZED 0x807F0005`, `ALL_HANDLES_IN_USE 0x807F0007`, `INVALID_PTR 0x807F0008`,
   `INVALID_HANDLE 0x807F0009`, `INVALID_WORD_LENGTH 0x807F000C` e `INVALID_SIZE 0x807F000D`. El juego
   no distingue códigos, `docs/audiodec.md` 1.6.)*
+  *(2026-10-20, tarea 4: una trama que LibAtrac9 rechaza da `API_FAIL 0x807F0000`; en vitasdk el único
+  código propio de ATRAC9 es `AT9_ERROR_INVALID_CONFIG 0x807F2000`. Una trama más larga que el AU, un AU
+  vacío o mayor que una supertrama y una capacidad de PCM menor que una trama dan `INVALID_SIZE`.
+  También [H].)*
 - **[V]** `GOW3_AUDIO_TRACE` solo traza aperturas bajo `sound/` (`src/runtime_file.c`), una ruta de
   GoW3: no sirve para Tsukihime. La Spec 6 lo generaliza.
 
@@ -252,12 +257,24 @@ desensamblado del sitio de llamada; el trazador de la fase A tiene que confirmar
   *(2026-10-20, tarea 3: también el primer error de cada función, con su causa, porque un error corta
   la pista sin avisar. Por ahora es una línea por llamada; el volcado hexadecimal, el tope de 400 líneas
   y el desfase llegan con `Decode` en la tarea 4.)*
+  *(2026-10-20, tarea 4, `a1446c0`: hecho. `CreateDecoder` y `Decode` escriben una línea `before:` y
+  otra con el resultado y `after:`, con `ctrl`, parámetros, bsi y los dos descriptores en hexadecimal.
+  `Decode` añade 16 bytes de `au.data` y del PCM, `frame k/N`, `used` y `drift`. El **desfase** son los
+  bytes del AU que manda el juego menos los que le quedan a LibAtrac9 en la supertrama: la diferencia
+  acumulada de las dos posiciones. Solo se traza, porque una lectura corta al final del archivo da
+  desfase con un AU válido. El primero distinto de 0 se registra siempre, para que el tope no lo
+  esconda. `=1` corta en 400 líneas y avisa; `=2` no tiene tope. `GOW3_AUDIODEC_AU_DUMP=<dir>` escribe
+  en `<dir>/dec<id>.au` lo que consumió cada `Decode`, uno detrás de otro.)*
 - **Códec no soportado → `STOP:` con el número**, nunca silencio. **Flujo no válido → código de error
   de la PS4**, sin cerrar el juego.
 - **Memoria del guest:** antes de leer o escribir un búfer del guest, comprobar que es memoria
   mapeada (`runtime_memory_is_mapped`).
 - **Concurrencia:** el juego tiene 32 hilos `at9` y uno `hevag`, así que la tabla de decodificadores y
   los contadores van protegidos por un mutex. Cada decodificador puede usarse desde cualquier hilo.
+  *(2026-10-20, tarea 4: además hay un rwlock global para las tablas de LibAtrac9, que
+  `Atrac9InitDecoder` reescribe. `CreateDecoder` y `ClearContext` lo toman en escritura y `Decode` en
+  lectura; debajo va el mutex de cada decodificador. `TermLibrary` y las pruebas con 32 hilos son de la
+  tarea 5.)*
 - **Contadores en `runtime_report`:** `Runtime: Audiodec decoders=…, frames=…, errors=…` (y su
   equivalente de AudiodecCpu).
 - **Archivos:** `src/runtime_audiodec.c` (ya existe) para `libSceAudiodec`, y uno nuevo,
@@ -394,6 +411,13 @@ con error hasta la tarea 4, y con eso el juego corta cada pista y, si pide repet
 sin espera sobre `CreateDecoder` (`docs/audiodec.md` 1.6). **No se ejecuta el juego entre la tarea 3
 y la 4.**
 
+**Resultado (2026-10-20, tarea 4, `a1446c0`).** `Decode` y `ClearContext` hacen su trabajo. Por los
+tests, el juego ya no cortaría ninguna pista ATRAC9: los cinco clips se decodifican enteros como lo
+hace LibAtrac9 directamente, con los bytes consumidos que esperan sus pendientes. Un `ClearContext` a
+mitad de supertrama tampoco corta la pista. Todavía no se ejecuta el juego: la tarea 5 (concurrencia)
+y la 6 (`AudiodecCpu`, para que un efecto HEVAG no pare con `STOP:` la prueba de música) van antes de
+la ejecución de confirmación (tarea 7).
+
 ## 7. Requisitos
 
 - Cuando el juego envíe un bloque válido, el sistema debe devolver el PCM en el formato y tamaño que
@@ -414,6 +438,17 @@ y la 4.**
   `ClearContext` seguido de otra decodificación, identificador viejo y códec desconocido (`STOP:`).
   *(2026-10-20: `ClearContext` después de 1, 2 y 3 tramas de una supertrama, con los clips `vse`; los
   dos de música vuelven en frontera y no ejercitan el reinicio.)*
+  *(2026-10-20, tarea 4, `a1446c0`: hecho. Los tests nuevos son:*
+  - *`decode_matches_libatrac9_sample_by_sample` y `consumed_over_superframe_equals_block_size`, sobre
+    los cinco clips enteros (40 296 tramas en `bgm_typ`);*
+  - *capacidad de salida pequeña (con canario) y AU corto que acaba justo antes de una página sin
+    mapear. Ahí también se decodifica una supertrama sin relleno, que LibAtrac9 lee por delante;*
+  - *trama corrupta y luego `ClearContext`, `ClearContext` a mitad de supertrama, punteros y tamaños no
+    válidos;*
+  - *el trazador (volcados, desfase, tope de 400 líneas) y `GOW3_AUDIODEC_AU_DUMP`.*
+
+  *El juego se emula como en `+0x1132b0`: una supertrama cada vez en un búfer de `0x800`, con el AU en
+  `búfer + bloque − pendientes`. Si falta un clip, sale un `SKIP:` visible. Mutaciones: 19 de 19.)*
 - Para 4b, un test del decodificador HEVAG: tramas sintéticas con índices de tabla bajos (≤ `0x1c`,
   donde HEVAG se comporta como el VAG clásico) y altos, con el resultado calculado aparte. Además, si
   hay un fragmento local, se compara con `vgmstream-cli` cuando esté instalado; si no, se omite.
@@ -457,7 +492,9 @@ aceptar módulos de sistema nuevos, `src/runtime_content.c`.
 
 - [ ] `docs/audiodec.md` describe el ATRAC9 observado: estructuras, secuencia y errores. *(La parte
   estática está hecha desde el 2026-10-19; falta lo observado en la ejecución de confirmación.)*
-- [ ] `out/audiodec-test` decodifica el clip ATRAC9 de referencia igual que LibAtrac9.
+- [x] `out/audiodec-test` decodifica el clip ATRAC9 de referencia igual que LibAtrac9. *(2026-10-20,
+  tarea 4: los cinco clips, muestra a muestra y trama a trama, con los bytes consumidos;
+  `out/spec4-t4-green.log`.)*
 - [ ] En el juego suena la música; después, las voces; después, los efectos `vse` (lo juzga el usuario).
 - [x] `--check-imports` no lista ninguna función de `libSceAudiodec`. *(2026-10-20, tarea 3: quedan 6,
   los 3 de `libSceAudiodecCpu` y las 3 trampas de la Spec 2; `out/spec4-t3-check-imports.log`. Ojo:
@@ -524,3 +561,12 @@ aceptar módulos de sistema nuevos, `src/runtime_content.c`.
   hasta la tarea 4. Tabla de 64 decodificadores con ids crecientes desde 1 y contador de referencias.
   Códec distinto de 1 → `STOP:` también en `Init` y `Term`. Errores de vitasdk (2.4). `TermLibrary`
   recibe el códec (`TermLibrary(1)`, 2.1).
+- 2026-10-20 (después): tarea 4 hecha (`a1446c0`).
+  - `Decode` decodifica una trama sobre LibAtrac9 desde una copia del AU con ceros detrás, escribe PCM
+    s16 solo si cabe y rellena los bytes consumidos (la última trama de la supertrama se queda el
+    relleno).
+  - `ClearContext` crea un handle nuevo.
+  - rwlock global para las tablas de LibAtrac9.
+  - El trazador tiene volcados, desfase y tope, y está `GOW3_AUDIODEC_AU_DUMP`.
+  - Una trama rechazada da `API_FAIL` (2.4).
+  - Los tests son bit-exactos contra LibAtrac9 con los cinco clips (8).
