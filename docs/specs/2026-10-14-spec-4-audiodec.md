@@ -5,9 +5,9 @@ dump. Estado: **borrador para aprobación** (el usuario aprobó la dirección de
 el 2026-10-17). **En curso desde el 2026-10-19:** el plan de implementación está aprobado; hechas la
 tarea 1 (clips de referencia, `07800f5`), la 2 (fase A estática, `docs/audiodec.md`, `084d16a`), la 3
 (las seis funciones y la tabla de decodificadores, `731f3b6`), la 4 (`Decode` y `ClearContext` reales,
-`a1446c0`), la 5 (concurrencia y reinicio, `af96cb1`) y la 6 (`AudiodecCpu` trazada, con respuestas
-explícitas, `45c8da9`). La tarea 7 está en curso: el paso 1, la ejecución de confirmación, se hizo el
-2026-10-20 (§6). Roadmap:
+`a1446c0`), la 5 (concurrencia y reinicio, `af96cb1`), la 6 (`AudiodecCpu` trazada, con respuestas
+explícitas, `45c8da9`) y la 7 (ejecución de confirmación, 2026-10-20/21: la música suena; fixture
+dorado `8a0b6dd`; §6). Sigue la tarea 8 (voces y efectos `vse`). Roadmap:
 `docs/tsuki/ROADMAP.md`, sección "Spec 4".
 
 Marcas: **[V]** comprobado (con el comando, la ruta o el log); **[H]** hipótesis que se confirma en
@@ -128,8 +128,12 @@ Que `vse` sean efectos es **[H]**: se deduce del nombre.
   crea **`hevag decode thread`** y **`hevag waveout thread`** (prioridad 716).
 - **[H]** ATRAC9 (`InitLibrary(1)`, los hilos `at9`) va por `libSceAudiodec` y HEVAG (el hilo
   `hevag`) por `libSceAudiodecCpu`. Hasta el último `STOP:` de la fase 2A, el juego aún no había
-  llamado a `CreateDecoder` ni a ninguna función de `AudiodecCpu`.
-- **[H]** El juego descomprime él mismo el MZX de las voces antes de pasarlas a Audiodec.
+  llamado a `CreateDecoder` ni a ninguna función de `AudiodecCpu`. *(2026-10-21, tarea 7: **[V]**. Los
+  158 flujos ATRAC9 de la ejecución trazada usan 26 bloques de control, uno por hilo `at9`, y las
+  llamadas a `AudiodecCpu` son las del bloque HEVAG, `docs/audiodec.md` 1.10.)*
+- **[H]** El juego descomprime él mismo el MZX de las voces antes de pasarlas a Audiodec. *(2026-10-21,
+  tarea 7: es lo más probable. 104 flujos mono `fe700bf0` no son ninguna entrada de `bgm` ni de `vse`, y
+  LibAtrac9 los decodifica sin errores, así que llegan ya como ATRAC9. Lo confirma la tarea 8.)*
 
 ### 2.4 Decodificadores y referencias
 
@@ -364,7 +368,11 @@ Lista original:
      `src/runtime_ajm.c` **[D]**. El salto cae a mitad de supertrama en 93 de las 132 entradas de
      `bgm` y en 1 040 de las 1 327 de `vse`.
    - Queda para la ejecución: qué pistas hacen bucle, cuántos decodificadores hay vivos a la vez y el
-     desfase real.
+     desfase real. *Contestado el 2026-10-21 (`docs/audiodec.md` 1.10):*
+     - hacen bucle `bgm 34`, `vse 574` y `vse 885`, y sus 18 `ClearContext` caen a mitad de supertrama,
+       en la trama que predice 1.7;
+     - como mucho hay 9 decodificadores vivos;
+     - el desfase es 0 en las 303 323 tramas.
 3. **Orden de observación:** la música primero (lo primero que suene en la pantalla de título o en el
    prólogo), luego las voces y luego `vse`.
 4. **Fuentes:** el código de llamada del propio juego (desensamblado de `eboot.bin`) y el volcado del
@@ -493,6 +501,50 @@ Queda para el paso 2:
   con `GOW3_TRACE_AUDIODEC=2` y un log y un directorio de volcados por ejecución.
 - **Falta que el usuario diga cómo sonó** (paso 3).
 
+**Resultado (2026-10-21, tarea 7, pasos 2–5; fixture `8a0b6dd`).** La tarea queda cerrada: **la música
+suena bien** según el usuario, y el juego confirma el contrato de `docs/audiodec.md` 1.8.
+
+- **Paso 2: ejecución `a2`** (20:03:48 → 20:16:01), con `GOW3_TRACE_AUDIODEC=2`, un log y un directorio
+  de volcados propios. La partida actual va al menú de título, y el usuario jugó hasta el título del
+  capítulo 1. Resultado:
+  - 158 decodificadores y 303 323 tramas, con **0 errores**;
+  - desfase 0 en todas las tramas;
+  - ningún `STOP:` ni `Fault:`, ningún búfer rechazado y ningún `TermLibrary`.
+
+  `out/spec4-t7/analyze.py` identifica cada flujo y recorre lo consumido sobre los datos de su pista.
+  Los 54 flujos de `bgm`/`vse` coinciden byte a byte, también tras cada salto de bucle. Detalle en
+  `docs/audiodec.md` 1.10:
+  - **Secuencia por pista:** `Create` → `Decode`* → (`Clear` → `Decode`*)* → `Delete`. Siempre empieza
+    en la trama 1 con la supertrama entera, y la última trama consume el resto.
+  - **Bucles:** 5 decodificadores llamaron a `ClearContext`, 18 veces en total (`bgm 34`, `vse 574`,
+    `vse 885`). Todas caen a mitad de supertrama (tramas 1, 2 y 3), en la trama que predice la fórmula
+    de 1.7. Es la prueba en el juego del handle nuevo de la tarea 4.
+  - **Simultáneos:** como mucho 9 vivos a la vez, con 26 bloques de control, uno por hilo `at9`.
+  - **PCM y bsi:** s16, con `0x400` en estéreo y `0x200` en mono. bsi `+4` = canales y el resto a cero.
+  - **[H] Voces:** 104 flujos mono `fe700bf0` no son ninguna entrada de `bgm` ni de `vse`. Serían las
+    voces de `voice.mrg`, ya descomprimidas (2.3, tarea 8).
+  - **Primer flujo** con la partida actual: `bgm 2`, la música del menú de título. Después del prólogo
+    sigue sin verse con traza.
+- **Memoria del guest (riesgo de §11):** cerrado. No hay ninguna línea `is not mapped guest memory` en
+  las tres ejecuciones (277 decodificadores), y la dirección más baja es `0x1006e71348`, por encima de
+  `USER_MIN`.
+- **Paso 3: lo juzga el usuario.** La música suena bien, y los efectos (y las voces, en lo que llegó a
+  oír) también.
+  - No hizo falta separar Audiodec de AudioOut. Los puertos de la música (0 y 1) solo se quedaron sin
+    datos en la primera ventana de 5 s, al arrancar.
+  - Con `=2`, el puerto de HEVAG (2) se quedó sin datos en 19 de 146 ventanas: es el coste de trazar
+    cada trama de HEVAG, que todavía suena en silencio.
+- **Paso 4: fixture dorado** (`8a0b6dd`). Son `tests/data/audiodec_ctrl_stereo.bin` y
+  `audiodec_ctrl_mono.bin`, los bloques de control que trazó el juego, sin audio, y el test
+  `golden_blocks_from_the_game` (§8).
+- **Paso 5:** `docs/audiodec.md` 1.10.
+- **Aparte: el juego se cuelga al pasar al título del capítulo 1.** Lo vio el usuario en `a2` y se
+  reprodujo en `a3`. Es AvPlayer (Spec 5): `task_game` espera para siempre en un `join` dentro de
+  `sceAvPlayerStop` (`phasetitle_01_00_en.mp4`).
+  - Audiodec no interviene: todas sus llamadas volvieron y no quedaba ningún decodificador vivo.
+  - Por decisión del usuario se documenta en la spec 5, §2 (`1bff05e`) y no se arregla aquí.
+  - Hasta entonces, el juego no pasa de ese punto.
+
 ## 7. Requisitos
 
 - Cuando el juego envíe un bloque válido, el sistema debe devolver el PCM en el formato y tamaño que
@@ -546,6 +598,16 @@ Queda para el paso 2:
   y `cpu_errors_end_the_voice_in_silence`, que emula la preparación, la decodificación y el mezclador
   del juego (`+0x1155b0`, `+0x115880`, `+0x115f50`). Mutaciones: 13 de 13. Los dos tests de la
   respuesta de error se sustituyen en la tarea 12.)*
+- *(2026-10-21, tarea 7, `8a0b6dd`): `golden_blocks_from_the_game` usa los bloques de control que
+  construyó el juego, trazados en la ejecución `a2`: `tests/data/audiodec_ctrl_{stereo,mono}.bin`, sin
+  audio.*
+  - *Coloca cada bloque en memoria del guest y exige que `CreateDecoder` y el primer `Decode` lo dejen
+    igual que el juego.*
+  - *La excepción es `au.bytes` tras `Decode`, que depende del audio. Se compara con LibAtrac9 sobre el
+    clip de la misma configuración (`bgm_typ` y `vse_mono`), con `SKIP:` si falta el clip.*
+  - *Rompe la circularidad de los tests sintéticos: tres mutaciones que cambian a la vez el runtime y
+    `fill()` (punteros AU/PCM cambiados, palabra 0, bsi de `0x20`) pasan toda la suite sin este test y
+    fallan con él (`out/spec4-t7/mutate.py`).*
 - Para 4b, un test del decodificador HEVAG: tramas sintéticas con índices de tabla bajos (≤ `0x1c`,
   donde HEVAG se comporta como el VAG clásico) y altos, con el resultado calculado aparte. Además, si
   hay un fragmento local, se compara con `vgmstream-cli` cuando esté instalado; si no, se omite.
@@ -587,14 +649,17 @@ aceptar módulos de sistema nuevos, `src/runtime_content.c`.
 
 **4a**
 
-- [ ] `docs/audiodec.md` describe el ATRAC9 observado: estructuras, secuencia y errores. *(La parte
-  estática está hecha desde el 2026-10-19; falta lo observado en la ejecución de confirmación.)*
+- [x] `docs/audiodec.md` describe el ATRAC9 observado: estructuras, secuencia y errores. *(La parte
+  estática está hecha desde el 2026-10-19. Lo observado entra el 2026-10-21 en 1.10: 158 flujos sin
+  errores, desfase 0, secuencia por pista, bucles y simultáneos.)*
 - [x] `out/audiodec-test` decodifica el clip ATRAC9 de referencia igual que LibAtrac9. *(2026-10-20,
   tarea 4: los cinco clips, muestra a muestra y trama a trama, con los bytes consumidos;
   `out/spec4-t4-green.log`.)*
 - [ ] En el juego suena la música; después, las voces; después, los efectos `vse` (lo juzga el usuario).
   *(2026-10-20, tarea 7, paso 1: el juego decodifica 119 flujos ATRAC9 sin un error en dos ejecuciones;
-  falta el juicio del usuario.)*
+  falta el juicio del usuario.)* *(2026-10-21, tarea 7: **la música suena bien**, según el usuario.
+  También dice que los efectos y las voces suenan bien en lo que oyó, pero eso se confirma en la tarea
+  8.)*
 - [x] `--check-imports` no lista ninguna función de `libSceAudiodec`. *(2026-10-20, tarea 3: quedan 6,
   los 3 de `libSceAudiodecCpu` y las 3 trampas de la Spec 2; `out/spec4-t3-check-imports.log`. Ojo:
   `Decode` y `ClearContext` resuelven, pero con error provisional hasta la tarea 4.)*
@@ -633,7 +698,8 @@ aceptar módulos de sistema nuevos, `src/runtime_content.c`.
   rechaza, se decide con el usuario cómo ampliar la comprobación, con un test antes del arreglo.
   *(2026-10-20, tarea 7, paso 1: no aparece. Ninguna línea `is not mapped guest memory`, `errors=0` en
   los 119 decodificadores de las dos ejecuciones, y todas las direcciones trazadas por encima de
-  `USER_MIN`.)*
+  `USER_MIN`.)* *(2026-10-21: **cerrado**. Con la traza completa de `a2` son 277 decodificadores sin un
+  rechazo, y la dirección más baja es `0x1006e71348`.)*
 - **El bucle del mezclador de HEVAG solo acaba si la cuenta del flujo llega justo a 0** (2026-10-20,
   tarea 6). El juego resta lo consumido de lo que queda y solo para en 0 (o con la bandera 7). Si el
   tamaño de una voz no fuera `0x30` + un múltiplo de 16 × canales, la cuenta se daría la vuelta y el
@@ -642,7 +708,9 @@ aceptar módulos de sistema nuevos, `src/runtime_content.c`.
   en la tarea 10 (`docs/audiodec.md` 2.5).
 - **Un `ClearContext` que no reinicia LibAtrac9 pasa las pruebas con música** (los dos clips `bgm`
   vuelven en frontera de supertrama) y en el juego corta la pista en el primer bucle que acabe a
-  mitad. Se mitiga probando con los tres clips `vse` (`docs/audiodec.md` 1.7).
+  mitad. Se mitiga probando con los tres clips `vse` (`docs/audiodec.md` 1.7). *(2026-10-21: en el
+  juego, los 18 `ClearContext` de la ejecución `a2` caen a mitad de supertrama, y el `Decode` siguiente
+  da 0 en todos.)*
 
 ## 12. Historial
 
@@ -702,3 +770,11 @@ aceptar módulos de sistema nuevos, `src/runtime_content.c`.
 - 2026-10-21: el arranque ya no pasa por el prólogo. La partida guardó progreso en la primera ejecución
   de la tarea 7, y el juego va directo al menú de título. Una prueba ya no cuesta 6 min 29 s; la partida
   sin progreso queda en `out/savedata-sin-progreso/` (§6).
+- 2026-10-21 (después): tarea 7 cerrada (§6).
+  - **La música suena bien**, según el usuario.
+  - Hubo una ejecución con la traza completa: 158 decodificadores y 303 323 tramas, con 0 errores y
+    desfase 0. Los 18 `ClearContext` caen a mitad de supertrama, donde predice 1.7.
+  - Se añade el fixture dorado con los bloques de control reales (`8a0b6dd`).
+  - El riesgo de la memoria del guest queda cerrado.
+  - Se ve un cuelgue de AvPlayer al pasar al título del capítulo 1. Queda documentado en la spec 5
+    (`1bff05e`) y no es de esta spec.
