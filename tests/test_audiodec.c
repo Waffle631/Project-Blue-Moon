@@ -750,6 +750,192 @@ static void term_init_create_again_works(void) {
     for (uint32_t n=0;n<e->frames && n<64;++n) assert(game_decode(&s)==0 && s.b->au_desc.bytes==e->consumed[n] && !memcmp(s.pcm,e->pcm+(size_t)n*frame_bytes(c)/2,frame_bytes(c)));
     assert(api.remove(s.id)==0);
 }
+
+/* ---- libSceAudiodecCpu (task 6): explicit errors until HEVAG exists (tasks 10-12; docs/audiodec.md 2) ---- */
+typedef int32_t (ABI *CpuCall)(void *,void *,uint32_t);
+#define E_CPU_API_FAIL 0x80F70000u
+#define HEVAG 0x1008
+static struct { CpuCall query,init,decode; } cpu;
+/* The game's HEVAG control block (eboot +0x1155b0...+0x11577f), 0xe0 bytes from its allocator
+   (+0x1154ce): the library gets &params and &resource, the work memory descriptor. */
+typedef struct {
+    void *vtable;
+    void *params,*bsi,*au,*pcm;
+    GameBuffer au_desc,pcm_desc;
+    uint32_t params_size; uint8_t params_rest[0x3c];
+    uint32_t bsi_size; uint8_t bsi_rest[0x2c];
+    GameBuffer resource;
+} HevagBlock;
+_Static_assert(offsetof(HevagBlock,au_desc)==0x28 && offsetof(HevagBlock,pcm_desc)==0x40 && offsetof(HevagBlock,params_size)==0x58 &&
+               offsetof(HevagBlock,bsi_size)==0x98 && offsetof(HevagBlock,resource)==0xc8 && sizeof(HevagBlock)==0xe0,"docs/audiodec.md 2.2");
+/* As the game fills it before QueryMemSize: params +4 hold the VAGp header without its reserved bytes. */
+static void hevag_fill(HevagBlock *b, const uint8_t *vag) {
+    memset(b,0,sizeof *b);
+    b->params=&b->params_size; b->bsi=&b->bsi_size; b->au=&b->au_desc; b->pcm=&b->pcm_desc;
+    b->au_desc.size=b->pcm_desc.size=b->resource.size=0x18; b->params_size=0x40; b->bsi_size=0x30;
+    memcpy(b->params_rest,vag,8); memcpy(b->params_rest+0xc,vag+0xc,8); b->params_rest[0x1e]=vag[0x1e];
+    memcpy(b->params_rest+0x20,vag+0x20,0x10); b->params_rest[0x30]=1;
+}
+static HevagBlock *hevag_block(const uint8_t *vag) {
+    HevagBlock *b=(HevagBlock *)guest_next; guest_next+=0x100;
+    assert(guest_next<=edge); hevag_fill(b,vag); return b;
+}
+/* An effect as vag.mrg holds them (spec 2.2): VAGp 0x00020001 (HEVAG), 48 kHz, frames of 16 bytes
+   per channel; the data are not decoded yet. */
+static uint8_t *hevag_effect(uint32_t frames, uint8_t channels) {
+    uint8_t *v=guest_next; guest_next+=0x100; uint32_t size=frames*16*channels;
+    assert(guest_next<=edge && 0x30+size<=0x100);
+    memset(v,0,0x100); memcpy(v,"VAGp\0\2\0\1",8);
+    v[0xc]=(uint8_t)(size>>24); v[0xd]=(uint8_t)(size>>16); v[0xe]=(uint8_t)(size>>8); v[0xf]=(uint8_t)size;
+    v[0x12]=0xbb; v[0x13]=0x80; v[0x1e]=channels; memcpy(v+0x20,"moon_se_test",12);
+    for (uint32_t i=0;i<size;++i) v[0x30+i]=(uint8_t)(i%16==1 ? 0 : 0x11*(i%16));
+    return v;
+}
+static uint32_t effect_size(const uint8_t *vag) { return 0x30+((uint32_t)vag[0xc]<<24 | (uint32_t)vag[0xd]<<16 | (uint32_t)vag[0xe]<<8 | vag[0xf]); }
+static void cpu_resolves_all_three(void) {
+    cpu.query=GET(CpuCall,"ktD2w3D4G2U#libSceAudiodecCpu"); cpu.init=GET(CpuCall,"hdFsxo3MFu8#libSceAudiodecCpu");
+    cpu.decode=GET(CpuCall,"lSVTiWV5wLc#libSceAudiodecCpu");
+    assert(cpu.query && cpu.init && cpu.decode);
+}
+/* Logged like libSceAudiodec (spec 3): without GOW3_TRACE_AUDIODEC, the first call of each function
+   (its first error too); with it, a line with the structures before each call and one with its result.
+   Runs before any other AudiodecCpu call of this process. */
+static HevagBlock *cpu_log_block;
+static void cpu_each(void) {
+    HevagBlock *b=cpu_log_block;
+    cpu.query(&b->params,&b->resource,HEVAG); cpu.init(&b->params,&b->resource,HEVAG); cpu.decode(&b->params,&b->resource,HEVAG);
+}
+static void cpu_logs_first_call_only_unless_traced(void) {
+    uint8_t *vag=hevag_effect(1,1); HevagBlock *b=cpu_log_block=hevag_block(vag);
+    b->au_desc.data=vag; b->au_desc.bytes=0x40; b->pcm_desc.data=stream_pcm; b->pcm_desc.bytes=56;
+    unsetenv("GOW3_TRACE_AUDIODEC");
+    assert(printed_lines(cpu_each)==3 && strstr(captured,"sceAudiodecCpuQueryMemSize(") && strstr(captured,"sceAudiodecCpuInitDecoder(") &&
+           strstr(captured,"sceAudiodecCpuDecode(") && strstr(captured,"codec 0x1008) = 0x80f70000: ") && strstr(captured,"Spec 4b"));
+    assert(printed_lines(cpu_each)==0);
+    setenv("GOW3_TRACE_AUDIODEC","1",1);
+    assert(printed_lines(cpu_each)==6 && strstr(captured,"sceAudiodecCpuDecode(") && strstr(captured,"before:"));
+    char text[0x100]; hexof(text,&b->params_size,0x40); assert(strstr(captured,text)); /* params */
+    hexof(text,&b->bsi_size,0x30); assert(strstr(captured,text));
+    hexof(text,&b->resource,0x18); assert(strstr(captured,text));
+    hexof(text,&b->pcm_desc,0x18); assert(strstr(captured,text));
+    /* The first bytes of the AU, the VAGp header (params +4 hold most of it too). */
+    char au_data[0x120]="au.data "; hexof(au_data+8,vag,16); assert(strstr(captured,au_data));
+    unsetenv("GOW3_TRACE_AUDIODEC");
+}
+/* Its own 400-line cap: the hevag thread's errors do not use up libSceAudiodec's trace, nor the
+   other way round; =2 has no cap. */
+static void cpu_decode_250(void) { for (int n=0;n<250;++n) cpu.decode(&cpu_log_block->params,&cpu_log_block->resource,HEVAG); }
+static void cpu_trace_has_its_own_cap(void) {
+    unsetenv("GOW3_TRACE_AUDIODEC");
+    cpu.decode(&cpu_log_block->params,&cpu_log_block->resource,HEVAG); /* not the first Decode, logged apart from the cap */
+    setenv("GOW3_TRACE_AUDIODEC","1",1); trace_lines=TRACE_LINES+1;
+    int lines=printed_lines(cpu_decode_250);
+    assert(lines>300 && lines<=TRACE_LINES+1 && strstr(captured,"AudiodecCpu trace stops after 400 lines"));
+    assert(printed_lines(cpu_decode_250)==0);
+    setenv("GOW3_TRACE_AUDIODEC","2",1);
+    assert(printed_lines(cpu_decode_250)==500);
+    unsetenv("GOW3_TRACE_AUDIODEC"); trace_lines=0;
+}
+static void cpu_query_unknown(void) { HevagBlock *b=hevag_block(hevag_effect(1,1)); cpu.query(&b->params,&b->resource,0x1001); }
+static void cpu_init_unknown(void) { HevagBlock *b=hevag_block(hevag_effect(1,1)); cpu.init(&b->params,&b->resource,1); }
+static void cpu_decode_unknown(void) { HevagBlock *b=hevag_block(hevag_effect(1,1)); cpu.decode(&b->params,&b->resource,0); }
+/* Spec 3: the game passes only 0x1008 (+0x11565b, +0x115804, +0x115903); any other codec stops. */
+static void cpu_unknown_codec_stops(void) {
+    stops(cpu_query_unknown,"codec 4097 (0x1001)");
+    stops(cpu_init_unknown,"codec 1 (0x1)");
+    stops(cpu_decode_unknown,"codec 0 (0x0)");
+}
+/* The game ignores all three results (docs/audiodec.md 2.3), so the error says what it leaves: no work
+   memory (QueryMemSize writes size 0), and from Decode no PCM with the AU consumed as it came. */
+static void cpu_calls_answer_api_fail(void) {
+    uint8_t *vag=hevag_effect(2,1); HevagBlock *b=hevag_block(vag),expected;
+    b->resource.bytes=0xdeadbeef;
+    assert((uint32_t)cpu.query(&b->params,&b->resource,HEVAG)==E_CPU_API_FAIL && b->resource.bytes==0);
+    memcpy(&expected,b,sizeof expected);
+    assert((uint32_t)cpu.init(&b->params,&b->resource,HEVAG)==E_CPU_API_FAIL && !memcmp(b,&expected,sizeof expected));
+    memset(stream_pcm,0x5a,0x380);
+    b->au_desc.data=vag; b->au_desc.bytes=0x40; b->pcm_desc.data=stream_pcm; b->pcm_desc.bytes=56;
+    memcpy(&expected,b,sizeof expected); expected.pcm_desc.bytes=0;
+    assert((uint32_t)cpu.decode(&b->params,&b->resource,HEVAG)==E_CPU_API_FAIL && !memcmp(b,&expected,sizeof expected) && all(stream_pcm,0x5a,0x380));
+}
+/* Null or unmapped pointers, and descriptors that are not 0x18 bytes: the same error, nothing written. */
+static void cpu_bad_pointers_write_nothing(void) {
+    uint8_t *vag=hevag_effect(1,1); HevagBlock *b=hevag_block(vag);
+    for (int f=0;f<3;++f) {
+        CpuCall call=f==0 ? cpu.query : f==1 ? cpu.init : cpu.decode;
+        assert((uint32_t)call(NULL,NULL,HEVAG)==E_CPU_API_FAIL && (uint32_t)call(hole,hole,HEVAG)==E_CPU_API_FAIL);
+    }
+    /* A descriptor whose size field is mapped and whose bytes field is not. */
+    GameBuffer *tail=(GameBuffer *)(hole-8); tail->size=0x18;
+    assert((uint32_t)cpu.query(&b->params,tail,HEVAG)==E_CPU_API_FAIL);
+    b->pcm=tail; assert((uint32_t)cpu.decode(&b->params,&b->resource,HEVAG)==E_CPU_API_FAIL);
+    b->pcm=hole; assert((uint32_t)cpu.decode(&b->params,&b->resource,HEVAG)==E_CPU_API_FAIL);
+    b->pcm=&b->pcm_desc; b->resource.size=b->pcm_desc.size=0x20; b->resource.bytes=7; b->pcm_desc.bytes=56;
+    assert((uint32_t)cpu.query(&b->params,&b->resource,HEVAG)==E_CPU_API_FAIL && b->resource.bytes==7);
+    assert((uint32_t)cpu.decode(&b->params,&b->resource,HEVAG)==E_CPU_API_FAIL && b->pcm_desc.bytes==56);
+    /* Decode's answer needs only the PCM descriptor: no PCM, whatever params hold. */
+    b->params=hole; b->resource.size=b->pcm_desc.size=0x18;
+    assert((uint32_t)cpu.decode(&b->params,&b->resource,HEVAG)==E_CPU_API_FAIL && b->pcm_desc.bytes==0);
+}
+/* The game's HEVAG voice: prepare (+0x1155b0), decode (+0x115880) and the mixer loop that calls it
+   (+0x115f50). None of them looks at what the library returns. */
+typedef struct { HevagBlock *b; const uint8_t *vag; uint32_t remaining,offset,calls,channels; } Voice;
+static void voice_prepare(Voice *v, HevagBlock *b, const uint8_t *vag) {
+    memset(v,0,sizeof *v); v->b=b; v->vag=vag; v->remaining=effect_size(vag);
+    cpu.query(&b->params,&b->resource,HEVAG);
+    /* The game allocates resource.bytes when they exceed what it has (+0x115795): none so far. */
+    assert(!b->resource.bytes); b->resource.data=NULL;
+    cpu.init(&b->params,&b->resource,HEVAG);
+    v->channels=vag[0x1e] ? vag[0x1e] : 1;
+}
+/* *samples: the samples asked for (at least 28, one frame), then the samples made; *end: the voice is over. */
+static void voice_decode(Voice *v, int16_t *out, uint32_t *samples, int *end) {
+    HevagBlock *b=v->b;
+    if (!v->remaining) { *samples=0; *end=1; return; }
+    uint32_t want=*samples>28 ? *samples : 28, pcm=v->channels*want*2;
+    b->au_desc.data=(void *)(v->vag+v->offset); b->au_desc.bytes=v->channels*16+(v->calls ? 0 : 0x30);
+    b->pcm_desc.data=out; b->pcm_desc.bytes=pcm<0x380 ? pcm : 0x380;
+    cpu.decode(&b->params,&b->resource,HEVAG);
+    *samples=v->calls ? b->pcm_desc.bytes/(v->channels*2) : 0; /* the first call is the header's */
+    v->offset+=b->au_desc.bytes; v->remaining-=b->au_desc.bytes; *end=0;
+    if (b->bsi_rest[0x24]==7) *samples=0, *end=1; /* bsi +0x28, the frame's flags: 7 ends the voice */
+    ++v->calls;
+}
+/* Decodes until it has frames samples or the voice ends; returns the samples it mixed. */
+static uint32_t voice_mix(Voice *v, int16_t *out, uint32_t frames, int *end) {
+    uint32_t mixed=0,samples=0; int64_t need=frames; *end=0;
+    while (need>0) {
+        if (v->calls>10000) { fprintf(stderr,"the game's mixer loop never ends: %u Decode calls\n",v->calls); abort(); }
+        voice_decode(v,out+(size_t)mixed*v->channels,&samples,end); mixed+=samples;
+        if (*end) break;
+        need-=samples;
+    }
+    return mixed;
+}
+/* With the errors, an effect plays in silence to the end of its data and the voice stops: with
+   au.bytes 0 the loop would never end, and with pcm.bytes untouched it would mix 28 samples of
+   whatever its buffer holds on each call. */
+static void cpu_errors_end_the_voice_in_silence(void) {
+    for (uint8_t channels=1;channels<=2;++channels) {
+        uint8_t *vag=hevag_effect(6,channels); HevagBlock *b=hevag_block(vag); Voice v;
+        voice_prepare(&v,b,vag);
+        memset(stream_pcm,0x5a,0x380);
+        int end=0; uint32_t mixed=voice_mix(&v,(int16_t *)stream_pcm,256,&end);
+        assert(end && !mixed && v.calls==6 && v.offset==effect_size(vag) && all(stream_pcm,0x5a,0x380));
+    }
+}
+/* The AudiodecCpu line of runtime_report: nothing is created or decoded until tasks 10-12. */
+static Counts cpu_counts(void) {
+    Counts n={0,0,0}; printed_lines(report);
+    const char *at=strstr(captured,"Runtime: AudiodecCpu decoders=");
+    assert(at && sscanf(at,"Runtime: AudiodecCpu decoders=%zu, frames=%zu, errors=%zu",&n.decoders,&n.frames,&n.errors)==3);
+    return n;
+}
+static void cpu_report_counts(void) {
+    Counts before=cpu_counts(); cpu_each();
+    Counts after=cpu_counts();
+    assert(!after.decoders && !after.frames && after.errors==before.errors+3);
+}
 int main(int argc, char **argv) {
     setup();
     resolves_all_six();
@@ -786,6 +972,14 @@ int main(int argc, char **argv) {
     decode_taken_before_term_writes_nothing_after_it();
     delete_during_decode_does_not_free_under_it();
     term_init_create_again_works();
+    cpu_resolves_all_three();
+    cpu_logs_first_call_only_unless_traced();
+    cpu_trace_has_its_own_cap();
+    cpu_unknown_codec_stops();
+    cpu_calls_answer_api_fail();
+    cpu_bad_pointers_write_nothing();
+    cpu_errors_end_the_voice_in_silence();
+    cpu_report_counts();
     puts("PASS: Audiodec contracts");
     return 0;
 }

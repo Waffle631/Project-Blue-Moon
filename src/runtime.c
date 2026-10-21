@@ -97,6 +97,7 @@ void runtime_report(void) {
     runtime_memory_report();
     runtime_ajm_report();
     runtime_audiodec_report();
+    runtime_audiodec_cpu_report();
     runtime_services_report();
     runtime_audio_report();
     runtime_pad_report();
@@ -255,6 +256,8 @@ uintptr_t runtime_resolve(const char *name, int is_data) {
     if (eventflag) return eventflag;
     uintptr_t audiodec = runtime_audiodec_resolve(name);
     if (audiodec) return audiodec;
+    uintptr_t audiodec_cpu = runtime_audiodec_cpu_resolve(name);
+    if (audiodec_cpu) return audiodec_cpu;
     uintptr_t rwlock = runtime_rwlock_resolve(name);
     if (rwlock) return rwlock;
     uintptr_t memory = runtime_memory_resolve(name);

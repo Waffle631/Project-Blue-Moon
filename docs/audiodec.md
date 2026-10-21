@@ -1,7 +1,7 @@
 # Audiodec en Tsukihime (CUSA47999)
 
-Cómo usa el juego `libSceAudiodec` (ATRAC9) y, más adelante, `libSceAudiodecCpu` (HEVAG), y qué
-contrato tiene que cumplir el runtime (`src/runtime_audiodec.c`). La spec es
+Cómo usa el juego `libSceAudiodec` (ATRAC9) y `libSceAudiodecCpu` (HEVAG), y qué contrato tiene que
+cumplir el runtime (`src/runtime_audiodec.c` y `src/runtime_audiodec_cpu.c`). La spec es
 `docs/specs/2026-10-14-spec-4-audiodec.md`.
 
 No existe ninguna fuente pública de las estructuras de `libSceAudiodec` de PS4, y la biblioteca real
@@ -331,3 +331,112 @@ cada llamada y se traza cuando no se cumple.
   log no debe aparecer ningún `is not mapped guest memory`, y las direcciones de `ctrl`, `au.data` y
   `pcm.data` deben estar por encima de `USER_MIN`.
 - Qué suena primero después del prólogo.
+
+## 2. HEVAG (`libSceAudiodecCpu`) — desensamblado previo (2026-10-20, tarea 6)
+
+Solo lo que hace falta para fijar la respuesta de error de la tarea 6. La fase A de HEVAG (tarea 10)
+lo contrasta con el PR #5289 de shadPS4 y con una ejecución.
+
+### 2.1 Quién llama
+
+- **[V]** Las tres funciones están en dos rutinas de un objeto de flujo HEVAG (vtable `0x432430`, con
+  el bloque de control en `+0x30`):
+  - la preparación `+0x1155b0`, con `QueryMemSize` en `+0x115788` e `InitDecoder` en `+0x115811`;
+  - la decodificación `+0x115880`, con `Decode` en `+0x11590c`.
+
+  Sus ranuras de la GOT son `0x435850`, `0x435858` y `0x435860` (`tools/got_import.py`).
+- **[V]** La preparación la llama `+0x115d10` al empezar una voz (en `+0x115cc0`), que ignora lo que
+  devuelve. Si la cabecera no empieza por `VAGp` (`+0x1155c1`), devuelve "falso" sin llamar a la
+  biblioteca.
+- **[V]** La decodificación la llama el bucle del mezclador (`+0x115f50`, dentro de `+0x115e80`), que
+  pide muestras hasta tener las que necesita o hasta que la voz acaba.
+- **[V]** El códec es siempre `0x1008` (`mov edx,0x1008` en `+0x11565b`, `+0x115804` y `+0x115903`):
+  el `Hevag` del PR #5289.
+- **[V]** No hay `Delete` ni `Term`. La memoria de trabajo es del juego, que la libera él mismo
+  (`+0x11552c`, `+0x11557c`).
+
+### 2.2 Estructuras
+
+**Bloque de control**: `0xe0` bytes alineados a `0x40`, del asignador del juego (`+0x1154ce`; el
+`+0x00` es la vtable `0x432470`). Antes de `QueryMemSize` el juego pone a cero `+0x28`…`+0xdf`
+(`+0x1155f1`…`+0x115613`) y escribe:
+
+| Desplazamiento | Contenido | Lo que escribe el juego |
+|---|---|---|
+| `+0x08` | `ctrl`: puntero a los parámetros | → `+0x58` |
+| `+0x10` | puntero a la info del flujo (bsi) | → `+0x98` |
+| `+0x18` | puntero al AU | → `+0x28` |
+| `+0x20` | puntero al PCM | → `+0x40` |
+| `+0x28` | AU, el descriptor de `0x18` bytes de ATRAC9 (1.2) | tamaño `0x18` |
+| `+0x40` | PCM, igual | tamaño `0x18` |
+| `+0x58` | parámetros, `0x40` bytes | tamaño `0x40`; en `+4`…`+0x33`, la cabecera `VAGp` sin sus bytes reservados (marca, versión, tamaño de los datos, frecuencia, canales en `+0x22` y nombre en `+0x24`); `+0x34` = 1 |
+| `+0x98` | info del flujo, `0x30` bytes | tamaño `0x30` |
+| `+0xc8` | recurso: la memoria de trabajo, el mismo descriptor | tamaño `0x18`; los datos y el tamaño, después de `QueryMemSize` |
+
+Las tres funciones reciben `ctrl` (el bloque `+8`), el recurso (el bloque `+0xc8`) y el códec:
+`QueryMemSize(ctrl, recurso, 0x1008)`. **[V]** El descriptor, el `ctrl` y la firma coinciden con los
+del PR #5289 (2.4 de la spec), así que dejan de ser hipótesis. El `1` de los parámetros `+0x34` sigue
+**[H]** (¿PCM de 16 bits, como el `1` de ATRAC9?).
+
+### 2.3 Lo que hace el juego con cada resultado
+
+- **[V] `QueryMemSize`:** no mira el valor devuelto.
+  - Lee `recurso.bytes` (`+0x11578d`). Si es mayor que la memoria que ya tiene el flujo (`+0x1c`),
+    reserva ese tamaño de su asignador (`+0x1157af`) y lo apunta.
+  - Después pone `recurso.datos` (`+0x115809`) y llama a `InitDecoder`.
+  - **El campo nunca está sin inicializar**, porque el juego lo pone a 0 antes de la llamada
+    (`+0x1155f1`). Si sigue a 0, el juego no reserva nada y pasa en `recurso.datos` lo que tuviera:
+    `NULL` la primera vez.
+- **[V] `InitDecoder`:** tampoco mira el valor. La preparación devuelve "verdadero" (`+0x115834`) y
+  quien la llama no lo mira.
+- **[V] `Decode`:** tampoco mira el valor (`+0x115911` compara el contador de llamadas del flujo, no
+  `eax`). En cada llamada:
+  - **AU:** la primera vez, la cabecera de `0x30` bytes y una trama (16 bytes por canal); después,
+    una trama. `au.datos` = cabecera + bytes ya consumidos.
+  - **PCM:** capacidad = canales × máx(muestras pedidas, 28) × 2 bytes, como mucho `0x380`
+    (`+0x1158d4`…`+0x1158ec`). Son 16 bits: el mezclador extiende palabras con signo (`+0x116145`).
+  - **Después:** muestras = `pcm.bytes` / (canales × 2), salvo la primera llamada, que da 0 (es la de
+    la cabecera). Avanza `au.bytes` y lo resta de lo que queda del flujo (`+0x115944`…`+0x115951`).
+  - **bsi `+0x28`** (un byte): 7 acaba la voz y 6 apunta la posición (**[H]** inicio de bucle)
+    (`+0x11595b`…`+0x115970`). Son las banderas de trama del VAG clásico.
+  - Si no queda nada del flujo (`+0x115898`), acaba la voz sin llamar a la biblioteca.
+- **[V] El mezclador** (`+0x115f50`) vuelve a llamar hasta tener las muestras que necesita o hasta que
+  la voz acaba. Si `Decode` diera siempre 0 muestras y 0 bytes consumidos, el bucle no acabaría nunca.
+
+### 2.4 Respuesta de la tarea 6 [D]
+
+Hasta que exista el decodificador (tareas 10–12), las tres devuelven `API_FAIL` (`0x80F70000`) y lo
+registran como las de ATRAC9 (spec 3), con su propio tope de 400 líneas. Como el juego no mira el
+valor, lo que decide lo que hace después es lo que la respuesta deja en el bloque:
+
+| Función | Qué deja |
+|---|---|
+| `QueryMemSize` | `recurso.bytes` = 0, explícito aunque el juego ya lo puso a 0: no reserva nada |
+| `InitDecoder` | nada |
+| `Decode` | `pcm.bytes` = 0 (ninguna muestra) y `au.bytes` como llegó (el juego da el AU por consumido) |
+
+Así la voz avanza por sus datos sin producir nada y acaba cuando se terminan: silencio, sin bucle. Las
+otras opciones fallan:
+
+- con `pcm.bytes` como llegó, el juego mezclaría en cada llamada 28 muestras de lo que tuviera su
+  búfer (`0x3000` bytes, `+0x115c33`);
+- con `au.bytes` = 0, la voz no avanza y el bucle del mezclador no acaba.
+
+Solo se escribe en un descriptor mapeado y de `0x18` bytes. Un códec distinto de `0x1008` da `STOP:`.
+El test `cpu_errors_end_the_voice_in_silence` (`tests/test_audiodec.c`) emula las tres rutinas del
+juego.
+
+**[V]** Para que la voz acabe, lo que queda del flujo tiene que llegar justo a 0. El tamaño de la voz
+(la preparación lo recibe en `edx` y lo guarda en el flujo `+0x10`; **[H]** es el tamaño de la entrada
+del `.hed`) tiene que ser `0x30` + un múltiplo de 16 × canales. Lo cumplen las 19 entradas de
+`vag.mrg` (2026-10-20): todas son mono salvo `dummy`, que es estéreo (1 984 bytes = 62 × 32).
+
+### 2.5 Para la fase A de HEVAG (tarea 10)
+
+- Cuánta memoria de trabajo pide la biblioteca real y si guarda ahí el estado del decodificador (no
+  hay `Delete`, así que el plan lo quiere en esa memoria).
+- Qué consume la primera llamada (¿solo la cabecera, `0x30` bytes, o también la trama?) y qué escribe
+  en bsi, además de `+0x28`.
+- Qué son el `1` de los parámetros `+0x34` y el campo `+0x18` del flujo.
+- Cómo junta el juego las parejas `_L`/`_R`.
+- De dónde sale el tamaño de la voz (`+0x115d09`).

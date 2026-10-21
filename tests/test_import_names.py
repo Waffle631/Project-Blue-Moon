@@ -39,6 +39,10 @@ SPEC4=[
     ('sceAudiodecDeleteDecoder','libSceAudiodec','Tp+ZEy69mLk'),
     ('sceAudiodecDecode','libSceAudiodec','KHXHMDLkILw'),
     ('sceAudiodecClearContext','libSceAudiodec','6Vf9WTLDoss'),
+    # Spec 4b: the three libSceAudiodecCpu imports (HEVAG).
+    ('sceAudiodecCpuQueryMemSize','libSceAudiodecCpu','ktD2w3D4G2U'),
+    ('sceAudiodecCpuInitDecoder','libSceAudiodecCpu','hdFsxo3MFu8'),
+    ('sceAudiodecCpuDecode','libSceAudiodecCpu','lSVTiWV5wLc'),
 ]
 
 def import_names():
