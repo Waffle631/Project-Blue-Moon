@@ -47,6 +47,10 @@ espera, y que el juego continúe después.
     `STOP:` de `sceAudiodecCreateDecoder` (Spec 4, 2.5). No hay error de AvPlayer.
 - **[V]** El prólogo no se salta con Options, Cruz ni Círculo (pulsaciones de 0,3 s, Spec 2, sección
   4.1). Es un dato para el caso 3 del paso 2, que todavía no se puede valorar.
+- **[V] 2026-10-20: el prólogo solo sale con una partida sin progreso.** La primera vez que el juego
+  pasó del vídeo (Spec 4, tarea 7), la partida de `user/savedata/1/CUSA47999/` guardó progreso en la primera ejecución que pasó del prólogo (22:58:10), y desde entonces el arranque va directo al menú de título, sin el vídeo.
+  Para las pruebas de esta spec con el prólogo hay que restaurar antes la partida sin progreso
+  (`out/savedata-sin-progreso/`, copia de la de antes de esa ejecución) en `user/savedata/`.
 - **[H] El vídeo podría ir más rápido que el tiempo real.** Datos de `out/run-prologo.log`:
 
   | Dato | Valor |

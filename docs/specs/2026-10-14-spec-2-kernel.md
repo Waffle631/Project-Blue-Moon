@@ -364,6 +364,9 @@ Caller return offset: 0x113177; first argument: 0x1006eb2048
   todo el tiempo, pero el vídeo siguió. **[H]** Es obligatorio la primera vez, o hace falta otro
   botón o una pulsación más larga. Hasta saberlo, cada prueba de lo que va después del prólogo cuesta
   6 min 29 s.
+  *2026-10-20: la primera hipótesis es la que encaja. La primera vez que el juego pasó del vídeo (Spec 4,
+  tarea 7), la partida de `user/savedata/1/CUSA47999/` guardó progreso en la primera ejecución que pasó del prólogo (22:58:10), y desde entonces el arranque va directo al menú de título, sin el vídeo. Para ver el prólogo hay que restaurar la partida sin progreso
+  (`out/savedata-sin-progreso/`).*
 
 ### 4.2 Fase 2B: cierre (2026-10-17, commit `7244263`)
 

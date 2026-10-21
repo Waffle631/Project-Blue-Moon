@@ -193,6 +193,9 @@ El vídeo del prólogo también se ve bien. No hace falta una spec de renderizad
 Límite de lo visto: ventana de texto, fondos, sprites y fundidos de la novela llegan después del
 prólogo, y el juego para antes en `sceAudiodecCreateDecoder` (Spec 4a, fase A). Hasta entonces, la
 Spec 6 y las comparaciones de la Spec 1b solo pueden apoyarse en el aviso y en el vídeo.
+*2026-10-20: el juego ya pasa del prólogo (Spec 4a) y guardó progreso; desde entonces el arranque va
+directo al menú de título, sin el vídeo. Los fotogramas de vídeo de `out/baseline/` (del 720 en
+adelante) solo se repiten con la partida sin progreso, `out/savedata-sin-progreso/`.*
 
 Re-estimación (propuesta del autor, con lo visto en el hito):
 

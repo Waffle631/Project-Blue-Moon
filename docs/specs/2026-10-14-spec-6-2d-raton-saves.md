@@ -61,6 +61,10 @@ heredada causa el error, **se elimina**, no se desactiva.
 ### A4 — Recorrido repetible
 Grabar el recorrido del prólogo con `GOW3_PAD_RECORD` (F9) y reproducirlo con `GOW3_PAD_REPLAY`, para
 repetirlo tras cada cambio y comparar capturas en los mismos fotogramas.
+*2026-10-20: lo que muestra el arranque depende de la partida. Con progreso va directo al menú de
+título; sin progreso pasa antes por el vídeo del prólogo (Spec 5). Una grabación solo se repite si
+cada reproducción arranca con la misma partida, así que el recorrido debe fijar cuál
+(`out/savedata-sin-progreso/` es la de sin progreso) y restaurarla antes de reproducir.*
 
 ## 4. Bloque B — Ratón (trabajo nuevo)
 

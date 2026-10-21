@@ -311,6 +311,8 @@ Entregable: `docs/audiodec.md`, apartado ATRAC9. Sin él no se pasa a la fase B.
 
 **Orden de la fase A [D] (2026-10-19, aprobado con el plan).** Sustituye al punto 1 de abajo. Cada
 ejecución hasta `CreateDecoder` cuesta 6 min 29 s, y una respuesta de error corta la pista (2.5).
+*(2026-10-20: ya no cuesta eso. Con la partida actual el primer `CreateDecoder` llega en segundos,
+en el menú de título; §6, nota del resultado de 2026-10-17.)*
 Por eso el orden es:
 
 1. **Desensamblado estático** del código de llamada. *Hecho el 2026-10-19:* `docs/audiodec.md`
@@ -428,6 +430,12 @@ hasta el final del vídeo del prólogo (2.5), cuando el H1 del hito ya está cum
   siguiente) necesita al menos la respuesta de la fase A para `CreateDecoder`.
 - Cada prueba cuesta los 6 min 29 s del vídeo, porque el prólogo no se ha podido saltar (Spec 2,
   sección 4.1).
+- **[V] 2026-10-20, ya no:** la partida de `user/savedata/1/CUSA47999/` guardó progreso en la primera ejecución que pasó del prólogo (22:58:10), y desde entonces el arranque va directo al menú de título, sin el vídeo (lo vio el usuario; en la segunda ejecución de la tarea 7, el
+  primer `CreateDecoder` llega con menos de 10 s de audio). El prólogo, con su `CreateDecoder` a los
+  ~6 min 17 s, solo sale con una partida sin progreso: la copia de seguridad de antes de esa ejecución
+  (`user/savedata_backups/20261020-223738`) está copiada en `out/savedata-sin-progreso/`, sin versionar,
+  porque `run.py` solo guarda las 10 últimas (`scripts/save_backup.py`). Las tareas que siguen arrancan
+  con la partida actual salvo que pidan el prólogo.
 
 **Resultado (2026-10-20, tarea 3, `731f3b6`).** El juego ya no pararía en `CreateDecoder`: las seis
 funciones resuelven y `--check-imports` no lista ninguna de `libSceAudiodec`. Pero `Decode` responde
@@ -691,3 +699,6 @@ aceptar módulos de sistema nuevos, `src/runtime_content.c`.
   399 173 tramas, con 0 errores, sin `STOP:` ni `Fault:` y sin búferes rechazados (§6, §11). El log de
   la primera se perdió al relanzar con el mismo comando, y las trazas llegaron a su tope: el paso 2
   necesitará otra ejecución con `GOW3_TRACE_AUDIODEC=2`.
+- 2026-10-21: el arranque ya no pasa por el prólogo. La partida guardó progreso en la primera ejecución
+  de la tarea 7, y el juego va directo al menú de título. Una prueba ya no cuesta 6 min 29 s; la partida
+  sin progreso queda en `out/savedata-sin-progreso/` (§6).

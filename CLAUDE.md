@@ -44,11 +44,19 @@ with before/after captures; the `gow3` → `tsuki` rename is Spec 7, done last).
   Spec 2 is closed (2026-10-17): libkernel has only three deliberate traps left
   (`scePthreadCancel`, `sceKernelGetModuleInfoForUnwind`, `sceKernelInternalMemoryGetModuleSegmentInfo`);
   Spec 3 is closed (2026-10-19): its 23 platform APIs all have an explicit, logged behaviour (no
-  faked PSN or network). `--check-imports` lists 11: the 8 Audiodec imports (Spec 4) and those 3 traps.
+  faked PSN or network). Spec 4 is in progress (2026-10-20): `libSceAudiodec` decodes ATRAC9 and
+  `libSceAudiodecCpu` (HEVAG) answers an explicit, logged error, so `--check-imports` lists only those 3 traps.
   GnmDriver/VideoOut/AvPlayer NIDs all exist in the shadPS4 tables. Cutscenes are 134 `.mp4` in
   `image/movie/` played through **`sceAvPlayer`** (not `sceVideodec`). libSceMouse is used and
   already covered. Start bring-up with
   `out/gow3-probe out/boot-linked.bin --app0 Tsukihime/CUSA47999 --check-imports`.
+- What a run shows depends on the save in `user/savedata/1/CUSA47999/`. With no progress in it, the
+  boot plays the prologue video first (`prologue_en.mp4`, ~6 min 29 s, buttons do not skip it). The first run to get past the video (2026-10-20, once ATRAC9 decoded) saved progress, and
+  since then every launch **goes straight to the title menu** (music in < 10 s, no video). To see the
+  prologue again (AvPlayer work, the video frames of `out/baseline/`), restore the save from before
+  that run: `out/savedata-sin-progreso/` (untracked) holds a copy, because `run.py` backs up
+  `user/savedata` into `user/savedata_backups/` on every start and keeps only the last 10
+  (`scripts/save_backup.py`).
 - Target language: **English**. The game ships ja/en/zc/zt (`ft_*.mrg` fonts, `*_en.mp4` videos)
   and picks it from the system language (`sceSystemServiceParamGetInt`); `runtime_services.c`
   already reports 1 = English (US) unless `GOW3_LANGUAGE` overrides it. Japanese and the other
