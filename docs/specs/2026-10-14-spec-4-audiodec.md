@@ -6,7 +6,8 @@ el 2026-10-17). **En curso desde el 2026-10-19:** el plan de implementación est
 tarea 1 (clips de referencia, `07800f5`), la 2 (fase A estática, `docs/audiodec.md`, `084d16a`), la 3
 (las seis funciones y la tabla de decodificadores, `731f3b6`), la 4 (`Decode` y `ClearContext` reales,
 `a1446c0`), la 5 (concurrencia y reinicio, `af96cb1`) y la 6 (`AudiodecCpu` trazada, con respuestas
-explícitas, `45c8da9`). Roadmap:
+explícitas, `45c8da9`). La tarea 7 está en curso: el paso 1, la ejecución de confirmación, se hizo el
+2026-10-20 (§6). Roadmap:
 `docs/tsuki/ROADMAP.md`, sección "Spec 4".
 
 Marcas: **[V]** comprobado (con el comando, la ruta o el log); **[H]** hipótesis que se confirma en
@@ -221,6 +222,9 @@ desensamblado del sitio de llamada; el trazador de la fase A tiene que confirmar
   Es la misma forma que las estructuras de `AudiodecCpu` del PR #5289 (2.4): descriptor de 0x18 bytes
   con los datos en `+0x8` y el tamaño en `+0x10`, y un `ctrl` con parámetros, bsi, AU y PCM. Para
   `libSceAudiodec` ya no es una hipótesis: lo construye el propio juego.
+- *(2026-10-20, tarea 7, paso 1: en la ejecución, el primer `CreateDecoder` llega a los ~6 min 17 s del
+  arranque, al final del prólogo, con el mismo `ctrl` `0x1006eb2048` y configuración `fe740ff0`, y
+  devuelve el id 1.)*
 - **[V] La llamada** es `sceAudiodecCreateDecoder(ctrl, 1)`, con códec 1 = ATRAC9, el mismo valor que
   en `InitLibrary`. El valor devuelto se guarda como identificador en el objeto de flujo `+0x0`. La
   rutina **no lo comprueba** y devuelve "verdadero" de todas formas.
@@ -451,6 +455,36 @@ cada efecto HEVAG avanza en silencio hasta el final de sus datos y la voz acaba,
 ejecución de confirmación de la música (tarea 7) ya puede hacerse; los efectos de `vag.mrg` no sonarán
 hasta la tarea 12.
 
+**Resultado (2026-10-20, tarea 7, paso 1: la ejecución de confirmación).** Hubo dos ejecuciones con el
+comando del plan:
+
+- **La primera** (22:37 → ~23:01) pasa el prólogo. El primer `CreateDecoder` llega a los ~6 min 17 s y
+  después el juego sigue unos 15 min más: 106 decodificadores, 265 405 tramas y **0 errores** en
+  `Audiodec`. `AudiodecCpu` da 637 030 errores, todos la respuesta de la tarea 6.
+- **La segunda** la lanzó el usuario (23:02 → 23:11) tras cerrar la primera. Arranca sin prólogo, con
+  mando: 13 decodificadores, 133 768 tramas y **0 errores**.
+- En ninguna hay `STOP:`, `Fault:` ni búferes rechazados, y la línea `GPU:` da `unimplemented=0`.
+
+Lo que ya confirman, con la parte trazada (las ~200 primeras llamadas de cada módulo):
+
+- **Música:** el primer flujo es música estéreo `fe740ff0`. `CreateDecoder` escribe bsi `+4` = 2.
+- **Decode:** las 200 primeras tramas dan 0 y desfase 0. La primera recibe la supertrama entera
+  (`0x200`) y consume 131 bytes; el PCM vuelve con sus `0x400` bytes.
+- **Memoria del guest:** las direcciones de `ctrl`, `au.data`, `pcm.data` y del bloque HEVAG están por
+  encima de `USER_MIN`. Con `errors=0` no se rechazó ningún búfer (riesgo de §11).
+- **Bucles:** hay `ClearContext` (bucles `smpl`) con resultado 0.
+- **HEVAG:** el bloque coincide con `docs/audiodec.md` 2.2, y la respuesta de error no para el juego.
+
+Queda para el paso 2:
+
+- **El log de la primera ejecución se perdió.** El relanzamiento, con el mismo comando, lo truncó;
+  quedan su informe final y las primeras llamadas (`out/run-audiodec-a1-run1-*`) y sus volcados de AU
+  (`dec14`…`dec106`).
+- **Las dos trazas llegaron a su tope** en el primer flujo de cada módulo. Las secuencias por pista,
+  los ids simultáneos, las tramas de cada `ClearContext` y el desfase del resto necesitan otra ejecución
+  con `GOW3_TRACE_AUDIODEC=2` y un log y un directorio de volcados por ejecución.
+- **Falta que el usuario diga cómo sonó** (paso 3).
+
 ## 7. Requisitos
 
 - Cuando el juego envíe un bloque válido, el sistema debe devolver el PCM en el formato y tamaño que
@@ -551,6 +585,8 @@ aceptar módulos de sistema nuevos, `src/runtime_content.c`.
   tarea 4: los cinco clips, muestra a muestra y trama a trama, con los bytes consumidos;
   `out/spec4-t4-green.log`.)*
 - [ ] En el juego suena la música; después, las voces; después, los efectos `vse` (lo juzga el usuario).
+  *(2026-10-20, tarea 7, paso 1: el juego decodifica 119 flujos ATRAC9 sin un error en dos ejecuciones;
+  falta el juicio del usuario.)*
 - [x] `--check-imports` no lista ninguna función de `libSceAudiodec`. *(2026-10-20, tarea 3: quedan 6,
   los 3 de `libSceAudiodecCpu` y las 3 trampas de la Spec 2; `out/spec4-t3-check-imports.log`. Ojo:
   `Decode` y `ClearContext` resuelven, pero con error provisional hasta la tarea 4.)*
@@ -587,6 +623,9 @@ aceptar módulos de sistema nuevos, `src/runtime_content.c`.
   daría `INVALID_PTR` y la pista no sonaría. Por el desensamblado, todos salen de su asignador o del
   objeto del hilo (`docs/audiodec.md` 1.9). Se confirma en la ejecución de la tarea 7. Si alguno se
   rechaza, se decide con el usuario cómo ampliar la comprobación, con un test antes del arreglo.
+  *(2026-10-20, tarea 7, paso 1: no aparece. Ninguna línea `is not mapped guest memory`, `errors=0` en
+  los 119 decodificadores de las dos ejecuciones, y todas las direcciones trazadas por encima de
+  `USER_MIN`.)*
 - **El bucle del mezclador de HEVAG solo acaba si la cuenta del flujo llega justo a 0** (2026-10-20,
   tarea 6). El juego resta lo consumido de lo que queda y solo para en 0 (o con la bandera 7). Si el
   tamaño de una voz no fuera `0x30` + un múltiplo de 16 × canales, la cuenta se daría la vuelta y el
@@ -647,3 +686,8 @@ aceptar módulos de sistema nuevos, `src/runtime_content.c`.
     `Decode` no da muestras pero consume el AU. El efecto avanza en silencio y la voz acaba.
   - `--check-imports` baja a las 3 trampas de la Spec 2. `dummy` de `vag.mrg` es estéreo (2.2). Riesgo
     nuevo: la cuenta del flujo HEVAG (11).
+- 2026-10-20 (después): tarea 7, paso 1. Dos ejecuciones de confirmación: la primera pasa el prólogo y
+  sigue unos 15 min más, la segunda arranca sin él. Juntas suman 119 decodificadores ATRAC9 y
+  399 173 tramas, con 0 errores, sin `STOP:` ni `Fault:` y sin búferes rechazados (§6, §11). El log de
+  la primera se perdió al relanzar con el mismo comando, y las trazas llegaron a su tope: el paso 2
+  necesitará otra ejecución con `GOW3_TRACE_AUDIODEC=2`.
