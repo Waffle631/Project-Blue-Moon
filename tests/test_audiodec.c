@@ -7,6 +7,9 @@
 #undef NDEBUG /* the checks are asserts; release builds define NDEBUG */
 #include "../src/runtime_audiodec.c"
 #include <assert.h>
+#include <errno.h>
+#include <sched.h>
+#include <stdatomic.h>
 #include <stddef.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -50,9 +53,12 @@ static const struct { uint32_t config,channels; } configs[]={
 #define GUEST_BYTES 0x10000
 #define HOLE_BYTES 0x4000
 #define EDGE_BYTES 0x1000
+#define SLOT_BYTES 0x1000
+#define SLOTS 40
 /* hole: an unmapped page; edge: the bytes right before it, kept out of the block arena. stream_input
-   and stream_pcm stand for the game's "at9 input" buffer (0x800) and its PCM buffer (channels x 512). */
-static uint8_t *guest_base,*guest_next,*edge,*hole,*stream_input,*stream_pcm;
+   and stream_pcm stand for the game's "at9 input" buffer (0x800) and its PCM buffer (channels x 512).
+   slots: guest memory for the threads, SLOT_BYTES each (a block, an input and a PCM buffer). */
+static uint8_t *guest_base,*guest_next,*edge,*hole,*stream_input,*stream_pcm,*slots;
 
 static void fill(GameBlock *b,uint32_t config) {
     memset(b,0,sizeof *b);
@@ -76,7 +82,10 @@ static void setup(void) {
     int64_t physical=-1; void *address=NULL;
     assert(alloc && map && unmap && alloc(0,536870912,GUEST_BYTES,HOLE_BYTES,0,&physical)==0);
     assert(map(&address,GUEST_BYTES,3,0,physical,HOLE_BYTES)==0);
-    guest_base=address; stream_input=guest_base; stream_pcm=guest_base+0x800; guest_next=guest_base+0xC00;
+    guest_base=address; physical=-1; address=NULL;
+    /* Mapped before the hole is made, so that it cannot land there. */
+    assert(alloc(0,536870912,SLOT_BYTES*SLOTS,HOLE_BYTES,0,&physical)==0 && map(&address,SLOT_BYTES*SLOTS,3,0,physical,HOLE_BYTES)==0);
+    slots=address; stream_input=guest_base; stream_pcm=guest_base+0x800; guest_next=guest_base+0xC00;
     hole=guest_base+GUEST_BYTES-HOLE_BYTES; edge=hole-EDGE_BYTES;
     assert(unmap(hole,HOLE_BYTES)==0 && runtime_memory_is_mapped((uintptr_t)guest_base,8) && !runtime_memory_is_mapped((uintptr_t)hole,8));
 }
@@ -295,17 +304,20 @@ static void set_au(GameBlock *b, void *data, uint32_t bytes) { b->au_desc.data=d
 static void set_pcm(GameBlock *b, void *data, uint32_t bytes) { b->pcm_desc.data=data; b->pcm_desc.bytes=bytes; }
 /* The game's side of a stream (docs/audiodec.md 1.3): one superframe at a time in its input buffer,
    the AU at buffer + block - pending, pending minus what Decode says it consumed. */
-typedef struct { const Clip *clip; GameBlock *b; int32_t id; uint32_t next,pending; } Stream;
-static void open_stream(Stream *s, const Clip *c) {
-    s->clip=c; s->b=block(c->config); s->next=s->pending=0;
-    s->id=api.create(&s->b->params,1); assert(s->id>0);
+typedef struct { const Clip *clip; GameBlock *b; int32_t id; uint32_t next,pending; uint8_t *input,*pcm; } Stream;
+static void open_stream_at(Stream *s, const Clip *c, GameBlock *b, uint8_t *input, uint8_t *pcm) {
+    s->clip=c; s->b=b; s->input=input; s->pcm=pcm; s->next=s->pending=0;
+    s->id=api.create(&b->params,1); assert(s->id>0);
 }
+static void open_stream(Stream *s, const Clip *c) { open_stream_at(s,c,block(c->config),stream_input,stream_pcm); }
+static GameBlock *slot_block(int i, uint32_t config) { GameBlock *b=(GameBlock *)(slots+(size_t)i*SLOT_BYTES); fill(b,config); return b; }
+static void open_slot(Stream *s, const Clip *c, int i) { uint8_t *at=slots+(size_t)i*SLOT_BYTES; open_stream_at(s,c,slot_block(i,c->config),at+0x100,at+0x900); }
 /* The loop-back of +0x113553/+0x113579: reading resumes at a superframe with nothing pending. */
 static void seek_stream(Stream *s, uint32_t superframe) { s->next=superframe; s->pending=0; }
 static int32_t game_decode(Stream *s) {
     const Clip *c=s->clip; GameBlock *b=s->b;
-    if (!s->pending) { assert(s->next<superframes(c)); memcpy(stream_input,c->data+(size_t)s->next++*c->block,c->block); s->pending=c->block; }
-    set_au(b,stream_input+c->block-s->pending,s->pending); set_pcm(b,stream_pcm,c->channels*512);
+    if (!s->pending) { assert(s->next<superframes(c)); memcpy(s->input,c->data+(size_t)s->next++*c->block,c->block); s->pending=c->block; }
+    set_au(b,s->input+c->block-s->pending,s->pending); set_pcm(b,s->pcm,c->channels*512);
     int32_t r=api.decode(s->id,&b->params);
     if (!r) s->pending-=b->au_desc.bytes;
     return r;
@@ -547,6 +559,197 @@ static void au_dump_writes_the_consumed_stream(void) {
     assert(n==3*c->block && !memcmp(got,c->data,n));
     assert(!unlink(path) && !rmdir(dir));
 }
+/* ---- Counters (spec 3): the Audiodec line of runtime_report ---- */
+typedef struct { size_t decoders,frames,errors; } Counts;
+static void report(void) { runtime_report(); }
+static Counts counts(void) {
+    Counts n={0,0,0}; printed_lines(report);
+    const char *at=strstr(captured,"Runtime: Audiodec decoders=");
+    assert(at && sscanf(at,"Runtime: Audiodec decoders=%zu, frames=%zu, errors=%zu",&n.decoders,&n.frames,&n.errors)==3);
+    return n;
+}
+/* decoders: created; frames: decoded; errors: failed calls of any function. */
+static void report_counts(void) {
+    const Clip *c=need("vse_mono_small",__func__); if (!c) return;
+    Counts before=counts(); Stream s; open_stream(&s,c);
+    for (int n=0;n<6;++n) assert(game_decode(&s)==0);
+    assert(api.remove(s.id)==0 && (uint32_t)api.remove(s.id)==E_INVALID_HANDLE && (uint32_t)api.decode(s.id,&s.b->params)==E_INVALID_HANDLE);
+    Counts after=counts();
+    assert(after.decoders==before.decoders+1 && after.frames==before.frames+6 && after.errors==before.errors+2);
+}
+/* ---- Threads and restart (task 5): the game's 32 "at9 threads" (docs/audiodec.md 1.1) ---- */
+/* What LibAtrac9 straight gives for a whole clip: each frame's PCM and the AU bytes Decode reports. Made
+   before any thread starts: Atrac9InitDecoder rewrites the global tables outside the runtime's lock. */
+typedef struct { int16_t *pcm; uint32_t *consumed,frames; } Decoded;
+static Decoded decoded[CLIPS];
+static const Decoded *decoded_clip(size_t i) {
+    Decoded *e=&decoded[i]; const Clip *c=&clips[i];
+    if (e->pcm) return e;
+    Reference r; reference_open(&r,c,0); e->frames=superframes(c)*(uint32_t)r.frames;
+    assert((e->pcm=malloc((size_t)e->frames*frame_bytes(c))) && (e->consumed=malloc(e->frames*sizeof *e->consumed)));
+    for (uint32_t n=0,pending=c->block;n<e->frames;++n) {
+        int last=r.frame==r.frames-1; uint32_t used=reference_frame(&r,e->pcm+(size_t)n*frame_bytes(c)/2);
+        e->consumed[n]=last ? pending : used; pending=last ? c->block : pending-used;
+    }
+    Atrac9ReleaseHandle(r.handle); return e;
+}
+/* One "at9 thread": its clip from the start, every frame checked, once or (loop) round and round as the
+   game loops (ClearContext, docs/audiodec.md 1.7) until an error; after an error, three more calls. */
+typedef struct { Stream s; size_t clip; int loop; atomic_uint frames; uint32_t wrong; int32_t error; int errors_after; } Worker;
+static void *work(void *arg) {
+    Worker *w=arg; const Decoded *e=&decoded[w->clip]; uint32_t bytes=frame_bytes(w->s.clip);
+    for (uint32_t n=0;n<e->frames || w->loop;++n) {
+        if (n==e->frames) { if ((w->error=api.clear(w->s.id))) break; seek_stream(&w->s,0); n=0; }
+        int32_t r=game_decode(&w->s);
+        if (r) { w->error=r; break; }
+        if (w->s.b->au_desc.bytes!=e->consumed[n] || memcmp(w->s.pcm,e->pcm+(size_t)n*bytes/2,bytes)) ++w->wrong;
+        atomic_fetch_add(&w->frames,1);
+    }
+    if (w->error) for (int k=0;k<3;++k) w->errors_after+=game_decode(&w->s)==w->error;
+    return NULL;
+}
+#define AT9_THREADS 32
+static Worker workers[AT9_THREADS]; static pthread_t threads[AT9_THREADS];
+/* The i-th of the clips that loaded, round and round; CLIPS if none did. */
+static size_t clip_for(int i) {
+    size_t loaded[CLIPS],n=0;
+    for (size_t k=0;k<CLIPS;++k) if (clips[k].data) loaded[n++]=k;
+    return n ? loaded[(size_t)i%n] : CLIPS;
+}
+/* n workers in slots 0..n-1, each on clip_for(i), all opened before any starts. */
+static void start_workers(int n, int loop) {
+    for (int i=0;i<n;++i) {
+        Worker *w=&workers[i]; memset(w,0,sizeof *w); w->clip=clip_for(i); w->loop=loop;
+        decoded_clip(w->clip); open_slot(&w->s,&clips[w->clip],i);
+    }
+    for (int i=0;i<n;++i) assert(!pthread_create(&threads[i],NULL,work,&workers[i]));
+}
+static void join_workers(int n) { for (int i=0;i<n;++i) assert(!pthread_join(threads[i],NULL)); }
+/* Each worker decoded its whole clip right; then its decoder goes. */
+static void expect_whole_clips(int n) {
+    for (int i=0;i<n;++i) {
+        Worker *w=&workers[i];
+        if (w->error || w->wrong || w->frames!=decoded[w->clip].frames) {
+            fprintf(stderr,"thread %d (%s): error %#x, %u wrong of %u frames\n",i,clips[w->clip].name,(unsigned)w->error,w->wrong,(unsigned)w->frames); abort();
+        }
+        assert(api.remove(w->s.id)==0);
+    }
+}
+/* Spec 8: 32 threads, one decoder each, all at once: every frame as LibAtrac9 gives it alone, and the
+   counters add up. */
+static void many_threads_decode_independent_streams(void) {
+    if (clip_for(0)==CLIPS) { printf("SKIP: %s: no clip\n",__func__); return; }
+    Counts before=counts(); size_t total=0;
+    start_workers(AT9_THREADS,0); join_workers(AT9_THREADS);
+    for (int i=0;i<AT9_THREADS;++i) total+=workers[i].frames;
+    expect_whole_clips(AT9_THREADS);
+    Counts after=counts();
+    assert(after.decoders==before.decoders+AT9_THREADS && after.frames==before.frames+total && after.errors==before.errors);
+}
+static atomic_int busy; static unsigned rounds;
+/* Creates and clears decoders of every configuration, in a loop, until busy is 0. */
+static void *create_and_clear(void *arg) {
+    (void)arg;
+    for (unsigned n=0;atomic_load(&busy);rounds=++n) {
+        GameBlock *b=slot_block(AT9_THREADS,configs[n%(sizeof configs/sizeof *configs)].config); int32_t id=api.create(&b->params,1);
+        assert(id>0 && api.clear(id)==0 && api.clear(id)==0 && api.remove(id)==0);
+    }
+    return NULL;
+}
+/* CreateDecoder and ClearContext rewrite LibAtrac9's global tables (Atrac9InitDecoder) that every Decode
+   reads: with a thread doing them in a loop, 8 decoders of different configurations give the PCM they give
+   alone. The tables get the same values each time, so on x86 a missing lock leaves the PCM as it is; the
+   race is ThreadSanitizer's to see (spec 8). */
+static void create_and_clear_while_others_decode_is_bit_exact(void) {
+    if (clip_for(0)==CLIPS) { printf("SKIP: %s: no clip\n",__func__); return; }
+    start_workers(8,0); atomic_store(&busy,1); rounds=0;
+    pthread_t t; assert(!pthread_create(&t,NULL,create_and_clear,NULL));
+    join_workers(8); atomic_store(&busy,0); assert(!pthread_join(t,NULL));
+    expect_whole_clips(8);
+    assert(rounds>0);
+}
+static Stream inflight; static int32_t inflight_result,term_result; static atomic_int term_returned;
+static void *decode_inflight(void *arg) { (void)arg; inflight_result=game_decode(&inflight); return NULL; }
+static void *term_in_thread(void *arg) { (void)arg; term_result=api.term(1); atomic_store(&term_returned,1); return NULL; }
+/* Until a Decode in another thread holds the tables for reading: it is past acquire. */
+static void wait_for_reader(void) {
+    for (int r;(r=pthread_rwlock_trywrlock(&tables))!=EBUSY;) { assert(!r); pthread_rwlock_unlock(&tables); sched_yield(); }
+}
+static size_t live_objects(void) { pthread_mutex_lock(&lock); size_t n=objects; pthread_mutex_unlock(&lock); return n; }
+/* inflight on c in slot 0, its PCM buffer filled with 0xA5, and the frame it decodes first. */
+static Decoder *inflight_decoder(const Clip *c, int16_t *first) {
+    open_slot(&inflight,c,0); memset(inflight.pcm,0xA5,0x400);
+    Reference r; reference_open(&r,c,0); reference_frame(&r,first); Atrac9ReleaseHandle(r.handle);
+    Decoder *d=acquire(inflight.id); release(d); /* allocated while it is in the table */
+    return d;
+}
+/* docs/audiodec.md 1.8: TermLibrary waits for a Decode in flight, which ends as if TermLibrary came after
+   it; then everything is freed and the old id is an error. */
+static void term_waits_for_inflight_decode_and_later_calls_error(void) {
+    const Clip *c=need("vse_mono_small",__func__); if (!c) return;
+    int16_t first[256]; Decoder *d=inflight_decoder(c,first); size_t before=live_objects();
+    pthread_mutex_lock(&d->lock); /* the Decode waits for it, holding the tables */
+    pthread_t a,t; assert(!pthread_create(&a,NULL,decode_inflight,NULL)); wait_for_reader();
+    atomic_store(&term_returned,0); assert(!pthread_create(&t,NULL,term_in_thread,NULL));
+    usleep(100000); int early=atomic_load(&term_returned); size_t during=live_objects();
+    pthread_mutex_unlock(&d->lock); assert(!pthread_join(a,NULL) && !pthread_join(t,NULL));
+    if (early) { fprintf(stderr,"TermLibrary returned while a Decode was in flight\n"); abort(); }
+    assert(during==before && inflight_result==0 && !memcmp(inflight.pcm,first,frame_bytes(c)));
+    assert(term_result==0 && live_objects()==0);
+    GameBlock *b=inflight.b;
+    assert((uint32_t)api.decode(inflight.id,&b->params)==E_INVALID_HANDLE && (uint32_t)api.clear(inflight.id)==E_INVALID_HANDLE &&
+           (uint32_t)api.remove(inflight.id)==E_INVALID_HANDLE && (uint32_t)api.create(&b->params,1)==E_NOT_INITIALIZED);
+    assert(api.init(1)==0);
+}
+/* A Decode that took its decoder just before TermLibrary (acquire done, not its locks yet) gets the locks
+   after TermLibrary has returned: it errors and writes nothing, so nothing reaches the guest after it. */
+static void decode_taken_before_term_writes_nothing_after_it(void) {
+    const Clip *c=need("vse_mono_small",__func__); if (!c) return;
+    GameBlock *b; int32_t id=first_frame_ready(c,&b); Decoder *d=acquire(id);
+    assert(d && api.term(1)==0 && live_objects()==1);
+    GameBlock saved=*b; uint8_t pcm[0x400]; memcpy(pcm,stream_pcm,sizeof pcm);
+    uint32_t e=(uint32_t)decode_acquired(d,&b->params,"id taken before TermLibrary");
+    if (e!=E_INVALID_HANDLE) { fprintf(stderr,"Decode after TermLibrary: %#x\n",e); abort(); }
+    assert(!memcmp(b,&saved,sizeof saved) && !memcmp(pcm,stream_pcm,sizeof pcm) && live_objects()==0);
+    assert(api.init(1)==0);
+}
+/* DeleteDecoder while a Decode of the same id waits for the decoder's lock: the id is stale at once, the
+   decoder is freed only when that Decode lets it go, and the Decode errors without writing. */
+static void delete_during_decode_does_not_free_under_it(void) {
+    const Clip *c=need("vse_mono_small",__func__); if (!c) return;
+    int16_t first[256]; Decoder *d=inflight_decoder(c,first); size_t before=live_objects();
+    pthread_mutex_lock(&d->lock);
+    pthread_t a; assert(!pthread_create(&a,NULL,decode_inflight,NULL)); wait_for_reader();
+    int32_t removed=api.remove(inflight.id); size_t during=live_objects(); int handle=d->handle!=NULL;
+    pthread_mutex_unlock(&d->lock); assert(!pthread_join(a,NULL));
+    assert(removed==0 && during==before && handle && !acquire(inflight.id));
+    if ((uint32_t)inflight_result!=E_INVALID_HANDLE) { fprintf(stderr,"Decode after DeleteDecoder: %#x\n",(unsigned)inflight_result); abort(); }
+    assert(all(inflight.pcm,0xA5,0x400) && live_objects()==before-1);
+}
+/* docs/audiodec.md 1.8: TermLibrary while 8 threads decode in a loop. Each gets its frames right and then
+   only INVALID_HANDLE, none writes PCM after TermLibrary has returned, and InitLibrary and CreateDecoder
+   work again: the new decoder decodes from the start. */
+static void term_init_create_again_works(void) {
+    if (clip_for(0)==CLIPS) { printf("SKIP: %s: no clip\n",__func__); return; }
+    size_t clip=clip_for(0); const Clip *c=&clips[clip]; int32_t last=0;
+    start_workers(8,1);
+    for (int i=0;i<8;++i) { while (atomic_load(&workers[i].frames)<16) sched_yield(); if (workers[i].s.id>last) last=workers[i].s.id; }
+    assert(api.term(1)==0);
+    static uint8_t pcm[8][0x400]; for (int i=0;i<8;++i) memcpy(pcm[i],workers[i].s.pcm,sizeof pcm[i]);
+    join_workers(8);
+    for (int i=0;i<8;++i) {
+        Worker *w=&workers[i];
+        if (memcmp(pcm[i],w->s.pcm,sizeof pcm[i])) { fprintf(stderr,"thread %d wrote PCM after TermLibrary returned\n",i); abort(); }
+        if (w->wrong || (uint32_t)w->error!=E_INVALID_HANDLE || w->errors_after!=3) {
+            fprintf(stderr,"thread %d: %u wrong of %u frames, error %#x, then %d of 3 the same\n",i,w->wrong,(unsigned)w->frames,(unsigned)w->error,w->errors_after); abort();
+        }
+    }
+    assert(api.init(1)==0);
+    Stream s; open_slot(&s,c,0); assert(s.id>last);
+    const Decoded *e=&decoded[clip];
+    for (uint32_t n=0;n<e->frames && n<64;++n) assert(game_decode(&s)==0 && s.b->au_desc.bytes==e->consumed[n] && !memcmp(s.pcm,e->pcm+(size_t)n*frame_bytes(c)/2,frame_bytes(c)));
+    assert(api.remove(s.id)==0);
+}
 int main(int argc, char **argv) {
     setup();
     resolves_all_six();
@@ -576,6 +779,13 @@ int main(int argc, char **argv) {
     trace_dumps_structures_and_drift();
     trace_caps_at_400_lines_unless_level_2();
     au_dump_writes_the_consumed_stream();
+    report_counts();
+    many_threads_decode_independent_streams();
+    create_and_clear_while_others_decode_is_bit_exact();
+    term_waits_for_inflight_decode_and_later_calls_error();
+    decode_taken_before_term_writes_nothing_after_it();
+    delete_during_decode_does_not_free_under_it();
+    term_init_create_again_works();
     puts("PASS: Audiodec contracts");
     return 0;
 }

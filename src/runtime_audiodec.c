@@ -55,7 +55,8 @@ typedef struct Decoder {
 } Decoder;
 static pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER;
 /* Atrac9InitDecoder rewrites LibAtrac9's global tables (decinit.c:31-32) that every Atrac9Decode
-   reads: CreateDecoder and ClearContext take it for writing, Decode for reading. */
+   reads: CreateDecoder and ClearContext take it for writing, Decode for reading. TermLibrary takes it
+   for writing too, so that it returns with no Decode in flight. Order: tables, a decoder's lock, lock. */
 static pthread_rwlock_t tables=PTHREAD_RWLOCK_INITIALIZER;
 static Decoder *table[MAX_DECODERS];
 static int initialized;
@@ -163,10 +164,10 @@ static ABI int32_t init_library(uint32_t codec) {
 static ABI int32_t term_library(uint32_t codec) {
     check_codec(F_TERM,codec);
     Decoder *gone[MAX_DECODERS]; int n=0;
-    pthread_mutex_lock(&lock);
+    pthread_rwlock_wrlock(&tables); pthread_mutex_lock(&lock);
     int was=initialized; initialized=0;
     for (int i=0;i<MAX_DECODERS;++i) if (table[i] && (gone[n]=unlink_slot(i))) ++n;
-    pthread_mutex_unlock(&lock);
+    pthread_mutex_unlock(&lock); pthread_rwlock_unlock(&tables);
     for (int i=0;i<n;++i) destroy(gone[i]);
     char args[32]; snprintf(args,sizeof args,"codec %u",codec);
     return finish(F_TERM,was ? 0 : ERR_NOT_INITIALIZED,args,"not initialized");
@@ -302,20 +303,26 @@ static int32_t decode_frame(Decoder *d, void *control, char *why, size_t why_siz
     memset(d->au,0,au.bytes);
     return error;
 }
-static ABI int32_t decode(int32_t id, void *control) {
-    char args[64]; snprintf(args,sizeof args,"id %d, ctrl %p",id,control);
-    Decoder *d=acquire(id);
-    if (!d) return finish(F_DECODE,ERR_INVALID_HANDLE,args,"no live decoder with this id");
+/* Decode with a decoder taken by acquire; releases it. DeleteDecoder or TermLibrary may take it out of
+   the table before this gets its locks: then it errors and writes nothing, so no Decode reaches the
+   guest after TermLibrary has returned. */
+static int32_t decode_acquired(Decoder *d, void *control, const char *args) {
     int traced=tracing()!=0;
     if (traced) trace_before(F_DECODE,args,control);
     char why[160]; Line after={{0},0};
     pthread_rwlock_rdlock(&tables); pthread_mutex_lock(&d->lock);
-    int32_t result=decode_frame(d,control,why,sizeof why,traced ? &after : NULL);
+    pthread_mutex_lock(&lock); int live=d->live; pthread_mutex_unlock(&lock);
+    int32_t result=live ? decode_frame(d,control,why,sizeof why,traced ? &after : NULL) : ERR_INVALID_HANDLE;
     pthread_mutex_unlock(&d->lock); pthread_rwlock_unlock(&tables);
     release(d);
-    if (result) return finish(F_DECODE,result,args,why);
+    if (result) return finish(F_DECODE,result,args,live ? why : "decoder deleted or library terminated during the call");
     pthread_mutex_lock(&lock); ++frames_decoded; pthread_mutex_unlock(&lock);
     return logged(F_DECODE,0,args,traced ? after.text : NULL);
+}
+static ABI int32_t decode(int32_t id, void *control) {
+    char args[64]; snprintf(args,sizeof args,"id %d, ctrl %p",id,control);
+    Decoder *d=acquire(id);
+    return d ? decode_acquired(d,control,args) : finish(F_DECODE,ERR_INVALID_HANDLE,args,"no live decoder with this id");
 }
 /* At the end of a loop (+0x11353f, result ignored): back to a new decoder's state, with a new
    LibAtrac9 handle, since Atrac9InitDecoder on the same one leaves its frame index (docs/audiodec.md 1.7). */

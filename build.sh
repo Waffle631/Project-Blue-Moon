@@ -116,7 +116,7 @@ if [[ ${1:-} == --test ]]; then
     # test_audiodec.c includes runtime_audiodec.c (decoder table internals): link the other runtime files.
     others=(); for source in "${runtime[@]}"; do [[ $source == src/runtime_audiodec.c ]] || others+=("$source"); done
     "$CC" -std=c11 -O2 -g -Wall -Wextra -Werror -pthread "${includes[@]}" -I. -Isrc tests/test_audiodec.c "${others[@]}" out/libatrac9.a -lm "${gpu[@]}" "${libraries[@]}" -o out/audiodec-test
-    out/audiodec-test
+    timeout 60 out/audiodec-test
     "$CC" -std=c11 -O2 -g -Wall -Wextra -Werror -pthread "${includes[@]}" -I. -Isrc tests/test_videodec.c "${libraries[@]}" -o out/videodec-test
     out/videodec-test tests/data/tiny.h264
     "$CC" -std=c11 -O2 -g -Wall -Wextra -Werror -pthread -I. -Isrc tests/test_services.c -o out/services-test
