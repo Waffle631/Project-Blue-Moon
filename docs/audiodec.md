@@ -495,6 +495,7 @@ Lo que muestran los corpus:
 
 Solo lo que hace falta para fijar la respuesta de error de la tarea 6. La fase A de HEVAG (tarea 10)
 lo contrasta con el PR #5289 de shadPS4 y con una ejecución en 2.6, que responde las preguntas de 2.5.
+Lo que implementa la tarea 12 y lo que se vio en el juego con el decodificador está en 2.7.
 
 ### 2.1 Quién llama
 
@@ -563,6 +564,9 @@ del PR #5289 (2.4 de la spec), así que dejan de ser hipótesis. El `1` de los p
   la voz acaba. Si `Decode` diera siempre 0 muestras y 0 bytes consumidos, el bucle no acabaría nunca.
 
 ### 2.4 Respuesta de la tarea 6 [D]
+
+*Sustituida el 2026-10-21 por el decodificador de la tarea 12 (2.7). Un error de `Decode` sigue dejando
+`pcm.bytes` = 0 y el AU como llegó, y ahora también la bandera 7, para que la voz acabe en el acto.*
 
 Hasta que exista el decodificador (tareas 10–12), las tres devuelven `API_FAIL` (`0x80F70000`) y lo
 registran como las de ATRAC9 (spec 3), con su propio tope de 400 líneas. Como el juego no mira el
@@ -728,3 +732,60 @@ libera él (2.1).
 - Los códigos de error son los del PR, todos **[H]**. El juego no los distingue.
 - Concurrencia: no hay estado compartido. La tabla de vgmstream es constante y cada flujo tiene su
   memoria. Solo los contadores del informe van con el mutex.
+
+### 2.7 Implementación (tarea 12, 2026-10-21)
+
+`src/runtime_audiodec_cpu.c` cumple el contrato de 2.6 con el decodificador de
+`third_party/vgmstream_hevag/`. Commit `cba20ba`.
+
+**La memoria de trabajo** es una cabecera de `0x10` bytes seguida de un `HevagState` (4 muestras
+`int32_t`, 16 bytes) por canal: 32 bytes en mono y 48 en estéreo. La cabecera guarda una marca
+(`HVAG`), los canales y si la cabecera `VAGp` del flujo sigue pendiente. Todo se lee y se escribe con
+`memcpy`, porque la memoria es del juego y no tiene alineación garantizada.
+
+| Función | Qué hace |
+|---|---|
+| `QueryMemSize` | comprueba `ctrl`, los parámetros (`0x40`) y el recurso (`0x18`), y escribe en `recurso.bytes` `0x10 + 16 × canales` (los de los parámetros `+0x22`; 0 cuenta como 1) |
+| `InitDecoder` | comprueba además la bsi (`0x30`) y la memoria (no nula, `recurso.bytes` ≥ ese tamaño, mapeada). Desde ahí **borra la marca** y después mira los parámetros (`VAGp` en `+4` y `+0x34` = 1). Si todo cuadra, escribe la cabecera con la de `VAGp` pendiente y la historia a cero |
+| `Decode` | comprueba además el AU y el PCM, y que la memoria esté mapeada en los `recurso.bytes` que dice el juego, tenga la marca y mida lo que piden sus canales. Con la cabecera pendiente, exige `VAGp` y los mismos canales, consume `0x30` bytes y deja `pcm.bytes` = 0 y la bandera 0. Después, una trama por canal: `au.bytes` = 16 × canales, `pcm.bytes` = 56 × canales y la bandera de la trama |
+
+- **[D] El borrado de la marca en `InitDecoder`.** El juego reutiliza la memoria del flujo para la voz
+  siguiente (2.6). Si `InitDecoder` falla por los parámetros, la memoria todavía tendría el estado de
+  la voz anterior, y el primer `Decode` decodificaría la cabecera `VAGp` como si fuera una trama.
+- **[D] En estéreo, la bandera es 7 si algún canal acaba;** si no, la del primer canal. En las 19
+  entradas los dos canales acaban a la vez, así que solo cuenta con datos rotos.
+- **[D] Lo que deja un error de `Decode`:** `pcm.bytes` = 0, el AU como llegó y la bandera 7, cuando
+  el descriptor del PCM y la bsi son válidos. Así el juego, que no mira el resultado, no mezcla nada,
+  avanza lo que mandó y acaba la voz en el acto. Con la respuesta de la tarea 6 (sin la bandera), la
+  voz seguía en silencio hasta el final de sus datos. En `dummy` (estéreo) eso no llegaba nunca a 0.
+- **Errores** (los del PR, **[H]**), en el orden del despachador del PR:
+  - punteros: `ctrl` (8, `0x10` o `0x20` bytes según la función), parámetros, bsi, descriptores del AU
+    y del PCM, y recurso;
+  - tamaños: parámetros, bsi, descriptores y recurso;
+  - memoria de trabajo: `INVALID_WORK_MEM_POINTER` o `…_SIZE`;
+  - tamaños del AU y del PCM frente a la trama: `INVALID_AU_SIZE` e `INVALID_PCM_SIZE`;
+  - datos del AU y del PCM: `INVALID_AU_POINTER` e `INVALID_PCM_POINTER`.
+
+  Sin `VAGp` o con otros canales: `ARG`. Con `+0x34` ≠ 1: `INVALID_WORD_LENGTH`. Si la memoria no
+  tiene la marca: `API_FAIL`. Un puntero mapeado solo en parte cuenta como no mapeado. No se lee ni se
+  escribe fuera de lo comprobado.
+- **El registro** es el de libSceAudiodec: la primera llamada y el primer error de cada función, o
+  todas con `GOW3_TRACE_AUDIODEC`, con una línea `before:` y otra con el resultado y `after:` (bsi,
+  descriptores, recurso, memoria de trabajo y 16 bytes del PCM). Tiene su propio tope de 400 líneas.
+- **Contador:** `Runtime: AudiodecCpu decoders=…, frames=…, errors=…`. `decoders` son los
+  `InitDecoder` correctos (uno por voz) y `frames` los `Decode` que dan PCM; el de la cabecera no
+  cuenta.
+
+#### Lo que se vio en el juego (ejecución b2)
+
+`out/run-audiodec-b2.log` (sin versionar): partida actual, `GOW3_TRACE_AUDIODEC=1`, menú de título,
+unos 154 s (9 261 *flips*), ventana cerrada por el usuario.
+
+- **[V]** `QueryMemSize` da `0x20` y la memoria que pasa el juego es la del flujo (`0x1007…`).
+  `InitDecoder` deja `HVAG`, 1 canal y la cabecera pendiente. El primer `Decode` consume `0x30`, y los
+  siguientes 16 bytes y 56 bytes de PCM, como en 2.6.
+- **[V]** Al cerrar: `AudiodecCpu decoders=240, frames=319494, errors=0` y `Audiodec decoders=35,
+  frames=44342, errors=0`. Ningún `STOP:` ni `Fault`, y `unimplemented=0`.
+- **[V] Los efectos de `vag.mrg` suenan bien**, según el usuario («Se escucha todo bien»).
+- **[H]** El redondeo es el de vgmstream, no se sabe si es el de Sony (spec §11). De oído no se nota.
+
