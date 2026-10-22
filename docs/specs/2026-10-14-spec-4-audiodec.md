@@ -9,8 +9,9 @@ tarea 1 (clips de referencia, `07800f5`), la 2 (fase A estática, `docs/audiodec
 explícitas, `45c8da9`) y la 7 (ejecución de confirmación, 2026-10-20/21: la música suena; fixture
 dorado `8a0b6dd`; §6) y la 8 (voces y efectos `vse`: el juego entrega las voces ya descomprimidas;
 reproducción offline de los flujos de una partida, `fa059fa`; §6) y la 9 (2026-10-21: suites verdes,
-`--check-imports` sin Audiodec y un arranque de 60 s limpio; §6). **La parte 4a queda cerrada.** Sigue
-la 4b (HEVAG), desde la tarea 10. Roadmap:
+`--check-imports` sin Audiodec y un arranque de 60 s limpio; §6). **La parte 4a queda cerrada.** En la
+4b (HEVAG), hecha la tarea 10 (fase A: el PR #5289 sigue abierto, el contrato sale del juego y de una
+ejecución trazada, `e6d01e7`; §6). Sigue la tarea 11. Roadmap:
 `docs/tsuki/ROADMAP.md`, sección "Spec 4".
 
 Marcas: **[V]** comprobado (con el comando, la ruta o el log); **[H]** hipótesis que se confirma en
@@ -151,7 +152,9 @@ Que `vse` sean efectos es **[H]**: se deduce del nombre.
   `Atrac9GetCodecInfo`. `src/runtime_ajm.c` ya lo usa con la API AJM de GoW3: es la plantilla para
   guardar el estado del decodificador, medir tramas y devolver PCM.
 - **[V]** **HEVAG:** vgmstream (`src/coding/psv_decoder.c`, `decode_hevag`, revisado en el commit
-  `db77f98` del 2026-10-16). Usa tramas de 16 bytes con 28 muestras por canal y dos bytes de
+  `db77f98` del 2026-10-16). *(2026-10-21, tarea 10: en ese commit la tabla de 128×4 es de coeficientes
+  `float`, no enteros, y la historia son 4 `int32_t`. Con la bandera 7 las muestras son 0, y en estéreo
+  el entrelazado es de `0x10` bytes.)* Usa tramas de 16 bytes con 28 muestras por canal y dos bytes de
   cabecera: un índice de tabla de 7 bits repartido entre los dos, el desplazamiento y unas banderas
   compatibles con el VAG clásico. Tiene una tabla de 128×4 coeficientes y 4 muestras de historia, y
   decodifica cada canal por separado. El propio código avisa de
@@ -181,6 +184,10 @@ Que `vse` sean efectos es **[H]**: se deduce del nombre.
   `ctrl`, la firma y el id de HEVAG pasan a **[V]**. Los parámetros miden 0x40 bytes y llevan la
   cabecera `VAGp` en `+4`; el bsi mide 0x30. Los errores siguen **[H]**: el juego no mira el valor
   devuelto de ninguna de las tres. Detalle en `docs/audiodec.md` 2.)*
+  *(2026-10-21, tarea 10: el PR sigue abierto y sin fusionar (último cambio, el 2026-10-08), y no hay
+  ningún PR con el decodificador HEVAG en HLE. El diff confirma los 22 errores y añade el orden de las
+  comprobaciones de su despachador. No trae nada propio de HEVAG: reenvía a `libSceAudiodecCpuHevag.sprx`
+  del firmware. Los errores siguen **[H]**. `docs/audiodec.md` 2.6.)*
 - **[V]** No hay ninguna fuente pública de las estructuras ni de los errores de `libSceAudiodec` de PS4.
   La respuesta provisional usa `0x807F0001` (`INVALID_TYPE` del `libSceAudiodec` de Vita, vitasdk), que
   para PS4 es **[H]**.
@@ -423,6 +430,12 @@ Entregable: `docs/audiodec.md`, apartado HEVAG.
 3. Ver cómo junta el juego las parejas `_L`/`_R`. **[H]**: decodifica cada mono por separado y las
    mezcla él.
 
+*(2026-10-21, tarea 10, `e6d01e7`: hechos el 2 y el 3, en `docs/audiodec.md` 2.6. Las estructuras, el
+id y la firma del PR coinciden con el juego, y los errores siguen **[H]**. La memoria de trabajo la
+fija el runtime ([D]: guarda ahí el estado). `Decode` recibe la cabecera y una trama, y después una trama
+cada vez; el PCM es de 16 bits, entrelazado en estéreo. Las parejas `_L`/`_R` son dos voces mono que el
+juego mezcla con el panorama de cada voz (**[V]**).)*
+
 ### 5.2 Fase B — Implementación
 
 - El decodificador HEVAG se toma de vgmstream (`decode_hevag` y su tabla) y se adapta al estilo del
@@ -615,6 +628,43 @@ criterios de 4a de §10.
   texto en inglés (2400–3500). Esa ejecución dio `Audiodec decoders=9, frames=16160, errors=0`. Estas
   pantallas ya se pueden capturar para las specs 1b y 6.
 
+**Resultado (2026-10-21, tarea 10: fase A de HEVAG, `e6d01e7`).** El detalle, con direcciones, está en
+`docs/audiodec.md` 2.6.
+
+- **PR #5289:** sigue abierto y sin fusionar, con un solo commit (`27bd9b5`) y sin cambios desde el
+  2026-10-08. No hay ningún PR con el decodificador HEVAG en HLE. Su id, su descriptor, sus `ctrl` y su
+  firma coinciden con el juego (**[V]**). Sus 22 errores y el orden de sus comprobaciones son la única
+  referencia, **[H]**. No dice nada de HEVAG en sí: reenvía al módulo del firmware, que no está en el
+  dump.
+- **Ejecución `b1`** (`out/run-audiodec-b1.log`): `GOW3_TRACE_AUDIODEC=2`, partida actual, menú de
+  título, cerrada con `SIGTERM` 60 s después de abrirse la ventana. Análisis en
+  `out/spec4-t10/b1-analysis.txt`.
+  - **En el menú de título ya suenan efectos HEVAG**: 38 voces en 60 s. La primera es la pareja
+    `moon_se00001_L`/`_R`, que suena 13 veces; después `moon_se00002` (4), `00003` y `00004`.
+  - Todas son mono, a 48 kHz, versión `0x00020001` y parámetros `+0x34` = 1. Hay dos bloques de control,
+    uno para `_L` y otro para `_R`, y cada voz llama a `QueryMemSize` + `InitDecoder` sobre la misma
+    memoria de trabajo.
+  - AU: la cabecera y una trama (`0x40` bytes) en la primera llamada, y después 16 bytes cada vez. PCM:
+    56 bytes de capacidad (28 muestras).
+  - Ningún búfer fuera de la memoria del guest. `Audiodec errors=0`; los `errors=67034` de `AudiodecCpu`
+    son las respuestas de la tarea 6.
+- **Hallazgo:** el tamaño de la voz es el de la entrada del `.hed`, redondeado a sectores (20 480 bytes
+  frente a los 18 800 del `VAGp`). Las 19 entradas acaban con una trama de bandera 1 y otra de bandera 7,
+  sin bucles. Así que **la voz acaba por la bandera 7 que la biblioteca deja en bsi `+0x28`**, el único
+  campo de la bsi que lee el juego.
+- **Mezcla:** el juego divide entre 32 767 y mezcla cada voz mono con su panorama. Las parejas `_L`/`_R`
+  son dos voces mono que la biblioteca decodifica por separado (**[V]**). Qué panorama lleva cada una
+  es **[H]**.
+- **vgmstream `db77f98`:** historia de 4 `int32_t`, tabla de 128×4 en `float` y entrelazado estéreo de
+  `0x10` bytes. Las 19 entradas usan índices hasta `0x7f`, así que hace falta la tabla extendida.
+- **Decisiones [D] para la tarea 12:**
+  - el estado (canales, historia, cabecera pendiente) va en la memoria de trabajo del guest, y
+    `QueryMemSize` pide su tamaño según los canales;
+  - la primera llamada consume solo la cabecera, sin PCM; el juego no lo distingue de consumir también
+    la primera trama, que en las 19 entradas es de ceros;
+  - cada llamada decodifica una trama por canal y escribe su bandera en bsi `+0x28`;
+  - los parámetros `+0x34` ≠ 1 dan `INVALID_WORD_LENGTH`.
+
 ## 7. Requisitos
 
 - Cuando el juego envíe un bloque válido, el sistema debe devolver el PCM en el formato y tamaño que
@@ -747,7 +797,8 @@ aceptar módulos de sistema nuevos, `src/runtime_content.c`.
 
 **4b**
 
-- [ ] `docs/audiodec.md` describe el HEVAG observado, contrastado con el PR #5289.
+- [x] `docs/audiodec.md` describe el HEVAG observado, contrastado con el PR #5289. *(2026-10-21, tarea
+  10, `e6d01e7`: apartado 2.6, con la ejecución trazada `b1`, 38 voces en el menú de título.)*
 - [ ] El test del decodificador HEVAG pasa.
 - [ ] En el juego suenan los efectos de `vag.mrg` (lo juzga el usuario).
 - [x] `--check-imports` no lista ninguna función de `libSceAudiodecCpu`. *(2026-10-20, tarea 6: quedan
@@ -787,6 +838,12 @@ aceptar módulos de sistema nuevos, `src/runtime_content.c`.
   bucle no acabaría, con la respuesta de error y con un decodificador que consuma lo mismo. Las 19
   entradas de `vag.mrg` lo cumplen. Que ese tamaño sea el de la entrada del `.hed` es **[H]**: se mira
   en la tarea 10 (`docs/audiodec.md` 2.5).
+  *(2026-10-21, tarea 10: **es el tamaño de la entrada del `.hed` en sectores de `0x800`**, no el del
+  `VAGp`. Detrás del `VAGp` hay tramas de silencio de relleno. Con la respuesta de error, las voces mono
+  llegan a 0 porque `0x800 × n − 0x30` es múltiplo de 16. `dummy` no llegaría (estéreo, `2000` no es
+  múltiplo de 32), pero no se oyó en ninguna ejecución. Con el decodificador, la voz acaba por la
+  **bandera 7** que la biblioteca deja en bsi `+0x28`, que llevan las 19 entradas. Así que el riesgo
+  pasa a ser no dejar esa bandera, y lo cubre un test de la tarea 12.)*
 - **Un `ClearContext` que no reinicia LibAtrac9 pasa las pruebas con música** (los dos clips `bgm`
   vuelven en frontera de supertrama) y en el juego corta la pista en el primer bucle que acabe a
   mitad. Se mitiga probando con los tres clips `vse` (`docs/audiodec.md` 1.7). *(2026-10-21: en el
@@ -875,3 +932,10 @@ aceptar módulos de sistema nuevos, `src/runtime_content.c`.
   - Las capturas muestran lo que sale después del prólogo: el aviso, la advertencia legal, el menú de
     título y escenas de la novela.
   - Sigue la parte 4b (HEVAG), desde la tarea 10.
+- 2026-10-21 (después): tarea 10, fase A de HEVAG (§6, `e6d01e7`).
+  - El PR #5289 sigue abierto y solo reenvía al firmware, así que el contrato sale del juego.
+  - En el menú de título suenan efectos de `vag.mrg` (38 voces en 60 s), por parejas `_L`/`_R` mono.
+  - El tamaño de una voz es el de su entrada del `.hed` redondeado a sectores. Por eso la voz tiene que
+    acabar por la bandera 7 de la bsi.
+  - Decisiones para la tarea 12: el estado va en la memoria de trabajo del guest, la primera llamada
+    consume solo la cabecera y hay una trama por llamada.
