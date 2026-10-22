@@ -44,8 +44,9 @@ with before/after captures; the `gow3` → `tsuki` rename is Spec 7, done last).
   Spec 2 is closed (2026-10-17): libkernel has only three deliberate traps left
   (`scePthreadCancel`, `sceKernelGetModuleInfoForUnwind`, `sceKernelInternalMemoryGetModuleSegmentInfo`);
   Spec 3 is closed (2026-10-19): its 23 platform APIs all have an explicit, logged behaviour (no
-  faked PSN or network). Spec 4 is in progress (2026-10-20): `libSceAudiodec` decodes ATRAC9 and
-  `libSceAudiodecCpu` (HEVAG) answers an explicit, logged error, so `--check-imports` lists only those 3 traps.
+  faked PSN or network). Spec 4 is closed (2026-10-21; its adversarial review, plan task 13, is pending): `libSceAudiodec`
+  decodes ATRAC9 (LibAtrac9) and `libSceAudiodecCpu` decodes HEVAG (`third_party/vgmstream_hevag`, state in
+  the guest's work memory; `docs/audiodec.md`), so `--check-imports` lists only those 3 traps.
   GnmDriver/VideoOut/AvPlayer NIDs all exist in the shadPS4 tables. Cutscenes are 134 `.mp4` in
   `image/movie/` played through **`sceAvPlayer`** (not `sceVideodec`). libSceMouse is used and
   already covered. Start bring-up with
