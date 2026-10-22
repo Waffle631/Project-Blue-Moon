@@ -494,7 +494,7 @@ Lo que muestran los corpus:
 ## 2. HEVAG (`libSceAudiodecCpu`) — desensamblado previo (2026-10-20, tarea 6)
 
 Solo lo que hace falta para fijar la respuesta de error de la tarea 6. La fase A de HEVAG (tarea 10)
-lo contrasta con el PR #5289 de shadPS4 y con una ejecución.
+lo contrasta con el PR #5289 de shadPS4 y con una ejecución en 2.6, que responde las preguntas de 2.5.
 
 ### 2.1 Quién llama
 
@@ -592,6 +592,8 @@ del `.hed`) tiene que ser `0x30` + un múltiplo de 16 × canales. Lo cumplen las
 
 ### 2.5 Para la fase A de HEVAG (tarea 10)
 
+*Respondidas el 2026-10-21 en 2.6.*
+
 - Cuánta memoria de trabajo pide la biblioteca real y si guarda ahí el estado del decodificador (no
   hay `Delete`, así que el plan lo quiere en esa memoria).
 - Qué consume la primera llamada (¿solo la cabecera, `0x30` bytes, o también la trama?) y qué escribe
@@ -599,3 +601,130 @@ del `.hed`) tiene que ser `0x30` + un múltiplo de 16 × canales. Lo cumplen las
 - Qué son el `1` de los parámetros `+0x34` y el campo `+0x18` del flujo.
 - Cómo junta el juego las parejas `_L`/`_R`.
 - De dónde sale el tamaño de la voz (`+0x115d09`).
+
+### 2.6 Fase A de HEVAG (tarea 10, 2026-10-21)
+
+Fuentes:
+
+- el PR #5289 tal como está el 2026-10-21;
+- el desensamblado de la preparación (`+0x1155b0`), la decodificación (`+0x115880`), el arranque de la
+  voz (`+0x115cc0`) y el mezclador (`+0x115e80`);
+- las 19 entradas de `vag.mrg`;
+- una ejecución trazada, `out/run-audiodec-b1.log` (`GOW3_TRACE_AUDIODEC=2`, partida actual, menú de
+  título, cerrada con `SIGTERM` 60 s después de abrirse la ventana). El análisis es
+  `out/spec4-t10/analyze.py` → `out/spec4-t10/b1-analysis.txt` (sin versionar).
+
+#### El PR #5289
+
+- **[V]** Sigue abierto y sin fusionar: un solo commit (`27bd9b5`) y la última actividad el 2026-10-08.
+  Su autor dice que escribe un decodificador HEVAG en HLE, pero no hay PR de eso (búsqueda en GitHub
+  del 2026-10-21).
+- El PR no decodifica. Reenvía cada llamada a la tabla de funciones que exporta
+  `libSceAudiodecCpuHevag.sprx` del firmware (NID `lYA31T9O1KU`), que no está en el dump. Por eso no
+  dice nada del tamaño de la memoria de trabajo, de la bsi ni del formato del PCM.
+
+| Dato del PR | En el juego | Estado |
+|---|---|---|
+| `Hevag = 0x1008` | `mov edx,0x1008` en las tres llamadas (2.1) | [V] |
+| descriptor `{this_size; reserved; data /*+8*/; data_size /*+0x10*/; reserved2}` de `0x18` bytes | AU, PCM y recurso del bloque (2.2) | [V] |
+| `QueryCtrl {param}`, `InitCtrl {param, bsi_info}`, `DecodeCtrl {param, bsi_info, au_info, pcm_item}` | el juego pasa siempre el mismo `ctrl` de `0x20` bytes (bloque `+8`) | [V] |
+| firma `(ctrl, recurso, códec)` | las tres llamadas | [V] |
+| `QueryMemSize` escribe el tamaño en `data_size`; `Decode` cambia las capacidades del AU y del PCM por los bytes consumidos y producidos | el juego lee `recurso.bytes` (`+0x11578d`), `au.bytes` y `pcm.bytes` (`+0x115917`…`+0x115951`) | [V] |
+| errores `0x80F70000`…`0x80F70015` | el juego no mira el valor devuelto (2.3) | [H] |
+| `ClearContext` | el juego no la importa | — |
+
+Los errores del PR, para la tarea 12 (todos **[H]**: salen del PR, no de la biblioteca real):
+`API_FAIL` `0x80F70000`, `INVALID_TYPE` `…01`, `ARG` `…02`, `INVALID_SIZE` `…03`, `INVALID_PARAM_SIZE`
+`…04`, `INVALID_BSI_INFO_SIZE` `…05`, `INVALID_AU_INFO_SIZE` `…06`, `INVALID_PCM_ITEM_SIZE` `…07`,
+`INVALID_RESOURCE_SIZE` `…08`, `INVALID_CTRL_POINTER` `…09`, `INVALID_PARAM_POINTER` `…0A`,
+`INVALID_BSI_INFO_POINTER` `…0B`, `INVALID_AU_INFO_POINTER` `…0C`, `INVALID_PCM_ITEM_POINTER` `…0D`,
+`INVALID_RESOURCE_POINTER` `…0E`, `INVALID_AU_POINTER` `…0F`, `INVALID_PCM_POINTER` `…10`,
+`INVALID_WORK_MEM_POINTER` `…11`, `INVALID_WORD_LENGTH` `…12`, `INVALID_AU_SIZE` `…13`,
+`INVALID_PCM_SIZE` `…14` e `INVALID_WORK_MEM_SIZE` `…15`.
+
+El despachador del PR comprueba, en este orden:
+
+1. los punteros nulos: `ctrl`, parámetros, bsi, el descriptor del AU y sus datos, y el descriptor del
+   PCM y sus datos;
+2. que el AU y el PCM no midan 0;
+3. que el AU, el PCM y el recurso tengan `this_size` = `0x18`;
+4. que el recurso no sea nulo y, en `InitDecoder` y `Decode`, que la memoria de trabajo tampoco.
+
+#### Lo que manda el juego (ejecución b1)
+
+- **[V]** En el menú de título, 38 voces en 60 s: `moon_se00001` 13 parejas, `moon_se00002` 4 y
+  `moon_se00003` y `moon_se00004` una. La primera es la pareja `moon_se00001_L`/`_R`.
+- **[V]** Todas son mono, a 48 000 Hz, versión `0x00020001`, parámetros `+0x34` = 1 y códec `0x1008`.
+  Los parámetros son `{u32 tamaño = 0x40; "VAGp"; versión; 0; tamaño de los datos y frecuencia, en
+  big-endian; …; canales en +0x22; nombre en +0x24; 1 en +0x34}`.
+- **[V] Solo hay dos bloques de control:** `_L` va siempre en uno y `_R` en el otro. Cada voz nueva
+  llama una vez a `QueryMemSize` y a `InitDecoder` sobre el mismo bloque y la misma memoria de trabajo
+  (la del flujo, `+0x40`, que solo crece). Así que `InitDecoder` tiene que dejar el estado como nuevo.
+- **[V] AU:** la primera llamada manda `0x40` bytes desde la cabecera (`au.datos` empieza por `VAGp`);
+  después, 16 bytes cada vez, seguidos.
+- **[V] PCM:** capacidad de 56 bytes, 28 muestras mono. Es `canales × máx(muestras de la llamada
+  anterior, 28) × 2`, con tope `0x380` (2.3). Un `Decode` que da una trama por llamada recibe siempre
+  `56 × canales`.
+- **[V] El tamaño de la voz es el de la entrada del `.hed`, en sectores de `0x800`**, no `0x30` más el
+  tamaño de los datos. En `moon_se00001_L` el juego avanzó 20 480 bytes, y el `VAGp` mide 18 800. Lo lee
+  del campo `+0x10` del objeto de datos del sonido (`+0x115d09`). Detrás del `VAGp`, hasta el final del
+  sector, hay tramas `0c 00 …` (desplazamiento 12 y códigos a cero): silencio.
+- **[V] Las 19 entradas terminan en una trama con bandera 1 seguida de otra con bandera 7** (en
+  `dummy`, una pareja de cada). No hay banderas de bucle: solo 0, 1 y 7.
+- **Por eso, con un decodificador de verdad, la voz tiene que acabar por la bandera 7** de bsi `+0x28`.
+  Si no, las voces mono reproducirían el relleno. En `dummy` (estéreo, 16 bytes de relleno y tramas de
+  32) lo que queda del flujo no llegaría nunca a 0 y daría la vuelta.
+- **[V]** De la bsi, el juego solo lee el byte `+0x28` (`+0x11595b`). El resto del código solo la pone
+  a cero y escribe su tamaño (`+0x115603`…`+0x115647`).
+- **[V]** Todos los búferes están en memoria del guest por encima de `USER_MIN`. El bloque y el búfer
+  de PCM de la voz (`0x3000` bytes, `+0x115c33`) salen del asignador del juego, y `au.datos` apunta a
+  los datos de `vag.mrg` cargados. No hay ninguna línea con `unmapped` ni `null`.
+- **[V] El mezclador** (`+0x1160b4`…`+0x11624e`) divide cada muestra entre 32 767 y la suma a la salida
+  estéreo en coma flotante. Una voz mono va con el panorama de la voz (la rampa `+0xc8`, que empieza en
+  0,5): izquierda = mín(2(1 − p), 1) y derecha = mín(2p, 1). Una estéreo va por parejas entrelazadas.
+- **[V] Las parejas `_L`/`_R` son dos voces mono que mezcla el juego.** La biblioteca decodifica cada
+  una por separado y no junta nada. **[H]** Que `_L` vaya a la izquierda y `_R` a la derecha lo decide
+  quien pone el panorama de la voz, y eso no se ve aquí.
+- **[H]** El campo `+0x18` del flujo guarda los bytes consumidos en cada llamada y, con la bandera 6,
+  la posición de esa trama (el inicio del bucle). La decodificación no lo lee y ninguna entrada tiene
+  bandera 6, así que no pesa.
+- **[H]** El `1` de los parámetros `+0x34` sería el tamaño de muestra (16 bits), como el `1` de ATRAC9
+  (1.5). El PR tiene un `INVALID_WORD_LENGTH`.
+
+#### El decodificador (vgmstream `db77f98`)
+
+- **[V]** `decode_hevag` (`src/coding/psv_decoder.c`) decodifica tramas de 16 bytes con 28 muestras:
+  - índice de la tabla = `(byte 1 & 0xf0) | (byte 0 >> 4)`, desplazamiento = `byte 0 & 0xf` y
+    bandera = `byte 1 & 0xf`;
+  - **4 muestras de historia `int32_t`** y una tabla de **128 × 4 coeficientes `float`**, no enteros;
+  - con la bandera 7, las muestras son 0.
+- **[V]** En estéreo, el entrelazado es de `0x10` bytes, con los canales en la cabecera `+0x1e`
+  (`src/meta/vag.c`, versiones `0x00020001` y `0x00030000`). La licencia es tipo ISC (`COPYING`).
+- **[V]** Las 19 entradas usan índices hasta `0x7f` (el nibble alto del byte 1 va de 0 a 7), así que
+  hace falta la tabla extendida.
+
+#### Contrato que se deduce
+
+**[D] El estado vive en la memoria de trabajo del guest.** `AudiodecCpu` no tiene `Delete`, así que
+una tabla del runtime crecería sin liberarse nunca. El juego reutiliza la memoria de cada flujo y la
+libera él (2.1).
+
+| Función | Qué tiene que hacer el runtime |
+|---|---|
+| `QueryMemSize(ctrl, recurso, 0x1008)` | validar `ctrl`, los parámetros (`tamaño = 0x40`) y el recurso (`0x18`); escribir en `recurso.bytes` el tamaño del estado para los canales de los parámetros `+0x22` (0 cuenta como 1, como hacen el juego y vgmstream) |
+| `InitDecoder(ctrl, recurso, 0x1008)` | validar además la bsi (`0x30`), la memoria (no nula, mapeada y con `recurso.bytes` ≥ ese tamaño) y los parámetros (`VAGp` y `+0x34` = 1); escribir en la memoria el estado inicial: canales, historia a 0 y la cabecera todavía pendiente |
+| `Decode(ctrl, recurso, 0x1008)` | la primera llamada tras `InitDecoder` comprueba la cabecera `VAGp` y consume solo sus `0x30` bytes, sin PCM (`pcm.bytes` = 0, bsi `+0x28` = 0); las siguientes decodifican una trama por canal, `16 × canales` bytes, en `28 × canales` muestras de 16 bits entrelazadas, con `au.bytes` = `16 × canales`, `pcm.bytes` = `56 × canales` y bsi `+0x28` = la bandera de la trama |
+
+- **[D] La primera llamada solo consume la cabecera.** El juego tira las muestras de la primera llamada
+  (2.3) y avanza lo que diga `au.bytes`. Así que la biblioteca real puede haber consumido la cabecera
+  sola o con la primera trama, y el juego no lo distingue. Consumiendo solo la cabecera no se pierde
+  ninguna trama. En las 19 entradas la primera trama es de ceros, así que las dos opciones suenan igual.
+- **[D] Una trama por llamada,** aunque el AU o el PCM tengan sitio para más. Es lo que manda el juego,
+  y así la bandera de la bsi corresponde a una sola trama.
+- Con más de 16 canales, una trama no cabe en el tope de PCM del juego (`0x380` = 16 × 28 × 2): error
+  de tamaño de PCM.
+- Un AU con menos de una trama por canal, o un PCM con menos de `56 × canales` bytes, da error sin leer
+  ni escribir fuera.
+- Los códigos de error son los del PR, todos **[H]**. El juego no los distingue.
+- Concurrencia: no hay estado compartido. La tabla de vgmstream es constante y cada flujo tiene su
+  memoria. Solo los contadores del informe van con el mutex.
