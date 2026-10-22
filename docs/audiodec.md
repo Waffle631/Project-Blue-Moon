@@ -401,7 +401,9 @@ bucle (1.7).
 - **[H] Voces.** Hay 104 flujos mono `fe700bf0` (83 576 tramas, ~446 s) que no son ninguna entrada de
   `bgm` ni de `vse`: solo comparten con los `vse` mono 775–783 la primera supertrama, de silencio. Son
   103 flujos distintos, y LibAtrac9 los decodifica sin errores. Lo más probable es que sean las voces de
-  `voice.mrg`, que el juego ya entrega descomprimidas (sin `MZX`). Lo confirma la tarea 8.
+  `voice.mrg`, que el juego ya entrega descomprimidas (sin `MZX`). Lo confirma la tarea 8. *(Tarea 8:
+  **[V]**, son voces de `voice.mrg` descomprimidas, 1.11. Y son 102 flujos distintos, no 103: dos
+  entradas se decodificaron dos veces.)*
 - **Fixture dorado** (paso 4): `tests/data/audiodec_ctrl_stereo.bin` (`bgm 2`, decodificador 1) y
   `audiodec_ctrl_mono.bin` (el primer flujo mono, decodificador 11). Son el bloque de control tal como
   lo trazó el juego, antes y después de `CreateDecoder` y de su primer `Decode`: `ctrl`, AU, PCM,
@@ -411,6 +413,83 @@ bucle (1.7).
   (puerto 2, 256 tramas) se quedó sin datos en 19 de 146 ventanas de 5 s; con `=1` le pasó en 1 de 112.
   Hoy no se oye, porque HEVAG suena en silencio hasta la tarea 12. Los puertos de la música (0 y 1) solo
   se quedaron sin datos en la primera ventana, al arrancar, igual que sin traza.
+
+### 1.11 Las voces y la reproducción offline (tarea 8, 2026-10-21)
+
+**[V] De dónde salen las voces.** `voice.hed` ya está descifrado:
+- Cada entrada ocupa 4 bytes: `{u16 sector bajo; u16 (bits 16–19 del sector << 12) | sectores}`, con
+  sectores de `0x800`. Hay 16 468 entradas, encadenadas sin huecos; las 4 últimas son centinelas con
+  `0xFFFF` en las dos mitades.
+- `voice.nam` lleva un nombre de 8 bytes por entrada (`A00_`, `B80_`…), 16 464 en total, y 2 bytes
+  más al final.
+
+Cada entrada de `voice.mrg` empieza con una cabecera `LV` de 7 bytes. Después vienen `MZX0`, un `u32`
+con el tamaño descomprimido y los datos MZX.
+- MZX trabaja con palabras de 16 bits. Los 2 bits bajos de cada byte de control eligen una orden:
+  repetir la última palabra, copiar desde atrás, tomar una palabra de un anillo de 64 o copiar
+  literales; los 6 bits altos dan la cuenta.
+- En las voces, las palabras van tal cual, sin invertir los bits (`xor 0xFF`).
+- Una copia desde atrás también cambia la palabra que repite la orden siguiente.
+
+Dentro hay un RIFF ATRAC9 como los de 2.2 de la spec: 16 460 entradas `fe700bf0` (mono, bloque 384) y
+dos de cada una de `fe7004f0` y `fe740bf0`. El descompresor provisional es `out/spec4-t8/mzx_match.c`,
+sin versionar, porque el runtime no necesita MZX.
+
+- **[V] El juego descomprime él mismo.** Los 104 flujos mono de `a2` coinciden byte a byte con el
+  principio del `data` de 102 entradas, de la 15490 a la 15615 (nombres `B80_`), en el orden de la
+  escena. El AU que llega a `Decode` es ATRAC9 normal, nunca `LV`/`MZX0`.
+  - Dos entradas se decodificaron dos veces. La 15585 lo hizo con dos decodificadores a la vez: son los
+    ids 11 y 12, los primeros flujos mono. La 15490 lo hizo dos veces seguidas, con los ids 13 y 14.
+  - En la ejecución `a4` (abajo) hay 31 flujos de voz, de 29 entradas entre la 15487 y la 15592.
+- **Ninguna voz llega al final de su `data`.** A cada una le faltan entre 345 y 6 045 bytes.
+  - 40 acaban a menos de una supertrama (384 bytes) del final.
+  - Las otras 64 las cortó el jugador al avanzar el texto.
+  - El corte no sale exacto de las muestras y el retardo del bloque `fact`: se desvía una trama arriba
+    o abajo según la voz.
+  - **[H]** Es el corte propio del juego, como en los efectos (1.6). No hay ningún error.
+- **Ejecuciones de la tarea 8,** las dos con `GOW3_TRACE_AUDIODEC=1` y `GOW3_AUDIODEC_AU_DUMP`. Ninguna
+  tiene `STOP:`, `Fault:`, búferes rechazados ni desfase distinto de 0.
+
+  | Ejecución | Quién y cuánto | Log | Volcados | Decodificadores | Tramas | Errores |
+  |---|---|---|---|---|---|---|
+  | `a4` | el usuario, escenas con voces, unos 3 min | `out/run-audiodec-a4.log` | `out/audiodec-au-a4/` | 62 | 59 453 | 0 |
+  | `a5` | menú de título, cerrada con `SIGTERM` tras la música | `out/run-audiodec-a5.log` | `out/audiodec-replay/` | 10 | 14 405 | 0 |
+
+**Reproducción offline.** Desde la tarea 8, `GOW3_AUDIODEC_AU_DUMP=<dir>` escribe dos archivos por
+decodificador:
+- `dec<id>.au`, lo consumido;
+- `dec<id>.txt`, con una línea `config <hex>` y una línea `clear <n>` por cada `ClearContext`, donde
+  `n` son los bytes volcados antes de él.
+
+El test `voice_stream_replay_matches_libatrac9` (`tests/test_audiodec.c`) toma el directorio de
+`argv[2]`, o `out/audiodec-replay` por defecto.
+- Pasa cada flujo por la API, tal como lo entregó el juego, y por LibAtrac9 directamente.
+- En cada `ClearContext` empieza de nuevo con un estado limpio.
+- Exige el mismo PCM en cada trama y que lo consumido sume exactamente los bytes volcados.
+- Si no hay volcados, imprime `SKIP:`, porque los volcados son contenido del juego y no se versionan.
+
+| Corpus | Flujos | Tramas | `ClearContext` |
+|---|---|---|---|
+| `a2`: `.txt` reconstruidos de la traza con `out/spec4-t8/make_notes.py`, en `out/spec4-t8/replay-a2` | 158 | 303 323 | 18 |
+| `a4` sin `dec38` | 61 | 50 650 | 0 |
+| `a5` (`out/audiodec-replay`, el que usa `build.sh --test`) | 10 | 14 405 | 0 |
+
+Lo que muestran los corpus:
+- En los tres, las tramas reproducidas son exactamente las que contó el runtime.
+- Ocho mutantes caen dentro de la reproducción (`out/spec4-t8/mutate.py`):
+  - del runtime, la última trama sin el relleno, `ClearContext` sobre el mismo handle o sin reiniciar
+    la trama, y el PCM con una muestra de menos;
+  - del test, la reproducción sin `ClearContext`;
+  - del corpus, un `clear` corrido, uno perdido y una configuración cambiada.
+
+**[V] Volcados al cerrar.** Al cerrar la ventana, el juego termina en `runtime_report` y `_Exit(0)`
+(`gpu/shim/gow3gpu.cpp`) sin cerrar archivos. SDL convierte `SIGTERM` en el mismo cierre.
+- En `a4`, la música seguía viva al cerrar y perdió su `.txt` y el final de su `.au`, que estaban en
+  el búfer de stdio.
+- Desde la tarea 8, `runtime_audiodec_report` escribe a disco los volcados de los decodificadores vivos.
+- En `a5`, la música (`dec3`) estaba viva al cerrar: se escribió en el último segundo del log y se
+  reproduce entera.
+- El volcado de pilas por `SIGALRM` no pasa por el informe, así que ahí se siguen perdiendo los finales.
 
 ## 2. HEVAG (`libSceAudiodecCpu`) — desensamblado previo (2026-10-20, tarea 6)
 
