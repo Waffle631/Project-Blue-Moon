@@ -2,11 +2,13 @@
  * through runtime_resolve, with the control block laid out as the game builds it (docs/audiodec.md
  * 1.2) in guest direct memory. Includes the module to reach its decoder table (acquire/release).
  * Decoding uses the reference clips of tools/extract_audio_clips.py (game content, not versioned):
- * argv[1] or out/audiodec-clips; a missing clip prints SKIP: and its tests do not run. */
+ * argv[1] or out/audiodec-clips; a missing clip prints SKIP: and its tests do not run. argv[2] (or
+ * out/audiodec-replay) holds the dumps of a game run to replay, also game content. */
 #define _GNU_SOURCE
 #undef NDEBUG /* the checks are asserts; release builds define NDEBUG */
 #include "../src/runtime_audiodec.c"
 #include <assert.h>
+#include <dirent.h>
 #include <errno.h>
 #include <sched.h>
 #include <stdatomic.h>
@@ -337,17 +339,23 @@ static uint32_t reference_frame(Reference *r, int16_t *pcm) {
     return (uint32_t)used;
 }
 static int all(const uint8_t *p, uint8_t value, size_t n) { for (size_t i=0;i<n;++i) if (p[i]!=value) return 0; return 1; }
+/* The next frame through the API, as the game feeds it, and through LibAtrac9 straight: NULL when the
+   PCM is the same and the API consumed what the frame used, or after a superframe's last frame what
+   was left of it. */
+static const char *frame_differs(Stream *s, Reference *r) {
+    const Clip *c=s->clip; int16_t expected[256*2];
+    uint32_t pending=s->pending ? s->pending : c->block,last=r->frame==r->frames-1,used=reference_frame(r,expected);
+    if (game_decode(s)) return "Decode fails";
+    if (s->b->channels!=c->channels) return "bsi channels";
+    if (s->b->pcm_desc.bytes!=frame_bytes(c) || memcmp(s->pcm,expected,frame_bytes(c))) return "PCM is not LibAtrac9's";
+    if (s->b->au_desc.bytes!=(last ? pending : used)) return "consumed bytes";
+    return NULL;
+}
 static void decode_matches_libatrac9_sample_by_sample(void) {
     for (size_t i=0;i<CLIPS;++i) {
         const Clip *c=&clips[i]; if (!c->data) continue;
         Stream s; open_stream(&s,c); Reference r; reference_open(&r,c,0);
-        int16_t expected[256*2];
-        for (uint32_t n=0;n<superframes(c)*(uint32_t)r.frames;++n) {
-            uint32_t pending=s.pending ? s.pending : c->block,last=r.frame==r.frames-1,used=reference_frame(&r,expected);
-            assert(game_decode(&s)==0 && s.b->channels==c->channels);
-            assert(s.b->pcm_desc.bytes==frame_bytes(c) && !memcmp(stream_pcm,expected,frame_bytes(c)));
-            assert(s.b->au_desc.bytes==(last ? pending : used));
-        }
+        for (uint32_t n=0;n<superframes(c)*(uint32_t)r.frames;++n) assert(!frame_differs(&s,&r));
         assert(api.remove(s.id)==0); Atrac9ReleaseHandle(r.handle);
     }
 }
@@ -601,7 +609,76 @@ static void au_dump_writes_the_consumed_stream(void) {
     FILE *f=fopen(path,"rb"); assert(f);
     uint8_t got[0x1000]; size_t n=fread(got,1,sizeof got,f); fclose(f);
     assert(n==3*c->block && !memcmp(got,c->data,n));
-    assert(!unlink(path) && !rmdir(dir));
+    assert(!unlink(path)); snprintf(path,sizeof path,"%s/dec%d.txt",dir,s.id); assert(!unlink(path) && !rmdir(dir));
+}
+/* Next to it, <dir>/dec<id>.txt: the configuration and, for each ClearContext, how many bytes of the
+   dump came before it. With them an offline replay restarts where the game did (task 8). */
+static void au_dump_notes_config_and_clears(void) {
+    const Clip *c=need("vse_mono_small",__func__); if (!c) return;
+    char dir[]="/tmp/audiodec-au-XXXXXX"; assert(mkdtemp(dir));
+    setenv("GOW3_AUDIODEC_AU_DUMP",dir,1);
+    Stream s; open_stream(&s,c); uint32_t dumped=0;
+    for (int n=0;n<6;++n) { assert(game_decode(&s)==0); dumped+=s.b->au_desc.bytes; }
+    assert(api.clear(s.id)==0); seek_stream(&s,0);
+    for (int n=0;n<4;++n) assert(game_decode(&s)==0);
+    assert(api.clear(s.id)==0);
+    assert(api.remove(s.id)==0); unsetenv("GOW3_AUDIODEC_AU_DUMP");
+    char path[64],expected[64],got[64]={0}; snprintf(path,sizeof path,"%s/dec%d.txt",dir,s.id);
+    snprintf(expected,sizeof expected,"config fe7004f0\nclear %u\nclear %u\n",dumped,dumped+c->block);
+    FILE *f=fopen(path,"rb"); assert(f); size_t n=fread(got,1,sizeof got-1,f); fclose(f);
+    assert(n && !strcmp(got,expected));
+    assert(!unlink(path)); snprintf(path,sizeof path,"%s/dec%d.au",dir,s.id); assert(!unlink(path) && !rmdir(dir));
+}
+/* ---- Replay (task 8): the streams of a game run, from GOW3_AUDIODEC_AU_DUMP ---- */
+/* Every dec<id>.au with its dec<id>.txt in dir (argv[2] or out/audiodec-replay): voices, vse and bgm go
+   through the API as the game fed them and through LibAtrac9 straight, both back to a new decoder at
+   each ClearContext. Same PCM on every frame, and the API consumes exactly the dumped bytes. The dumps
+   are game content, never versioned: without them, SKIP:. */
+static void replay_fails(const char *dump, size_t frame, const char *why) {
+    fprintf(stderr,"voice_stream_replay_matches_libatrac9: %s, frame %zu: %s\n",dump,frame,why); abort();
+}
+static void voice_stream_replay_matches_libatrac9(const char *dir) {
+    DIR *listing=opendir(dir);
+    if (!listing) { printf("SKIP: %s: no %s (a game run with GOW3_AUDIODEC_AU_DUMP=%s makes it)\n",__func__,dir,dir); return; }
+    GameBlock *b=block(0); size_t streams=0,frames=0,clears=0; struct dirent *e;
+    while ((e=readdir(listing))) {
+        int id,end=0; char path[1024],name[32];
+        if (sscanf(e->d_name,"dec%d.txt%n",&id,&end)!=1 || !end || e->d_name[end]) continue;
+        snprintf(name,sizeof name,"dec%d.au",id);
+        snprintf(path,sizeof path,"%s/%s",dir,e->d_name); FILE *f=fopen(path,"r"); assert(f);
+        unsigned config; long at[1024]; size_t cuts=1,frame=0; at[0]=0;
+        if (fscanf(f,"config %8x\n",&config)!=1) replay_fails(name,0,"its .txt has no config line");
+        while (cuts<1023 && fscanf(f,"clear %ld\n",&at[cuts])==1) ++cuts;
+        if (fgetc(f)!=EOF) replay_fails(name,0,"its .txt has more than 1022 clears or a line that is not one");
+        fclose(f);
+        snprintf(path,sizeof path,"%s/%s",dir,name); f=fopen(path,"rb"); assert(f);
+        fseek(f,0,SEEK_END); long size=ftell(f); fseek(f,0,SEEK_SET); at[cuts]=size;
+        /* The config where a clip has it (+0x40, for reference_open), the stream after it. */
+        uint8_t *file=calloc(1,0x48+(size_t)size+CLIP_SLACK); assert(file && fread(file+0x48,1,(size_t)size,f)==(size_t)size); fclose(f);
+        for (int i=0;i<4;++i) file[0x40+i]=(uint8_t)(config>>(24-8*i));
+        Atrac9CodecInfo info; void *h=Atrac9GetHandle();
+        assert(h && !Atrac9InitDecoder(h,file+0x40) && !Atrac9GetCodecInfo(h,&info)); Atrac9ReleaseHandle(h);
+        Clip c={name,config,(uint32_t)info.channels,file,NULL,0,(uint32_t)info.superframeSize};
+        fill(b,config); Stream s; open_stream_at(&s,&c,b,stream_input,stream_pcm);
+        for (size_t k=0;k<cuts;++k) {
+            if (at[k+1]<at[k]) replay_fails(name,frame,"a clear past the end of the dump");
+            uint32_t bytes=(uint32_t)(at[k+1]-at[k]),consumed=0;
+            /* Whole superframes, the last one cut where the game stopped feeding it. */
+            c.data=file+0x48+at[k]; c.data_size=(bytes+c.block-1)/c.block*c.block;
+            if (k) { assert(api.clear(s.id)==0); ++clears; }
+            seek_stream(&s,0); Reference r; reference_open(&r,&c,0);
+            while (consumed<bytes) {
+                const char *why=frame_differs(&s,&r); if (why) replay_fails(name,frame,why);
+                consumed+=s.b->au_desc.bytes; ++frame;
+            }
+            if (consumed!=bytes) replay_fails(name,frame,"consumed past the dumped bytes");
+            Atrac9ReleaseHandle(r.handle);
+        }
+        assert(api.remove(s.id)==0); free(file); ++streams; frames+=frame;
+    }
+    closedir(listing);
+    if (!streams) printf("SKIP: %s: no dec<id>.txt in %s (dumps from before task 8 have none)\n",__func__,dir);
+    else printf("%s: %zu streams, %zu frames, %zu clears from %s\n",__func__,streams,frames,clears,dir);
 }
 /* ---- Counters (spec 3): the Audiodec line of runtime_report ---- */
 typedef struct { size_t decoders,frames,errors; } Counts;
@@ -620,6 +697,27 @@ static void report_counts(void) {
     assert(api.remove(s.id)==0 && (uint32_t)api.remove(s.id)==E_INVALID_HANDLE && (uint32_t)api.decode(s.id,&s.b->params)==E_INVALID_HANDLE);
     Counts after=counts();
     assert(after.decoders==before.decoders+1 && after.frames==before.frames+6 && after.errors==before.errors+2);
+}
+/* Every way out of the game goes through runtime_report and then exits without closing files (closing
+   the window: _Exit in gpu/shim/gow3gpu.cpp), so a decoder still alive then, the music at least, has
+   its dump and notes on disk after the report (task 8, run a4). */
+static void au_dump_is_on_disk_after_the_report(void) {
+    const Clip *c=need("vse_mono_small",__func__); if (!c) return;
+    char dir[]="/tmp/audiodec-au-XXXXXX"; assert(mkdtemp(dir));
+    setenv("GOW3_AUDIODEC_AU_DUMP",dir,1);
+    Stream s; open_stream(&s,c);
+    for (int n=0;n<4;++n) assert(game_decode(&s)==0);
+    assert(api.clear(s.id)==0); seek_stream(&s,0); assert(game_decode(&s)==0);
+    unsetenv("GOW3_AUDIODEC_AU_DUMP"); printed_lines(report);
+    char path[64],notes[64]={0},expected[64]; uint8_t got[0x1000];
+    snprintf(path,sizeof path,"%s/dec%d.au",dir,s.id); FILE *f=fopen(path,"rb"); assert(f);
+    size_t n=fread(got,1,sizeof got,f); fclose(f);
+    assert(n==c->block+s.b->au_desc.bytes && !memcmp(got,c->data,c->block) && !memcmp(got+c->block,c->data,n-c->block));
+    snprintf(path,sizeof path,"%s/dec%d.txt",dir,s.id); f=fopen(path,"rb"); assert(f);
+    n=fread(notes,1,sizeof notes-1,f); fclose(f);
+    snprintf(expected,sizeof expected,"config fe7004f0\nclear %u\n",c->block); assert(n && !strcmp(notes,expected));
+    assert(api.remove(s.id)==0);
+    assert(!unlink(path)); snprintf(path,sizeof path,"%s/dec%d.au",dir,s.id); assert(!unlink(path) && !rmdir(dir));
 }
 /* ---- Threads and restart (task 5): the game's 32 "at9 threads" (docs/audiodec.md 1.1) ---- */
 /* What LibAtrac9 straight gives for a whole clip: each frame's PCM and the AU bytes Decode reports. Made
@@ -1010,7 +1108,10 @@ int main(int argc, char **argv) {
     trace_dumps_structures_and_drift();
     trace_caps_at_400_lines_unless_level_2();
     au_dump_writes_the_consumed_stream();
+    au_dump_notes_config_and_clears();
+    voice_stream_replay_matches_libatrac9(argc>2 ? argv[2] : "out/audiodec-replay");
     report_counts();
+    au_dump_is_on_disk_after_the_report();
     many_threads_decode_independent_streams();
     create_and_clear_while_others_decode_is_bit_exact();
     term_waits_for_inflight_decode_and_later_calls_error();

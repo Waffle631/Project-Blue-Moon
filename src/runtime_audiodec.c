@@ -5,7 +5,8 @@
  * (shadPS4 PR 5289). Any error stops the game's track without a message (docs/audiodec.md 1.6), so
  * each one is logged with its cause: the first call and the first error of each function, or every
  * call with GOW3_TRACE_AUDIODEC=1 (400 lines; =2 has no cap), with the structures before and after.
- * GOW3_AUDIODEC_AU_DUMP=<dir> writes what each decoder consumed to <dir>/dec<id>.au. */
+ * GOW3_AUDIODEC_AU_DUMP=<dir> writes what each decoder consumed to <dir>/dec<id>.au and, for an offline
+ * replay (tests/test_audiodec.c), its config and where each ClearContext fell to <dir>/dec<id>.txt. */
 #define _GNU_SOURCE
 #include "runtime.h"
 #include <pthread.h>
@@ -46,10 +47,10 @@ typedef struct Decoder {
     int32_t id; int refs, live;
     void *handle; uint8_t config[4]; Atrac9CodecInfo info;
     /* The frame within the superframe and the bytes LibAtrac9 has left of it: LibAtrac9 does not
-       keep them (docs/audiodec.md 1.3). The lock covers them, the handle, au, pcm and dump. */
+       keep them (docs/audiodec.md 1.3). The lock covers them, the handle, au, pcm, dump and notes. */
     uint32_t frames, superframe_remain;
     pthread_mutex_t lock;
-    FILE *dump; int dump_opened;
+    FILE *dump,*notes; int dump_opened;
     uint8_t au[AU_MAX+AU_ZEROS]; /* all zeros between calls */
     int16_t pcm[256*8];
 } Decoder;
@@ -137,6 +138,7 @@ static int slot_of(int32_t id) { /* lock held */
 static void dispose(Decoder *d) {
     if (d->handle) Atrac9ReleaseHandle(d->handle);
     if (d->dump) fclose(d->dump);
+    if (d->notes) fclose(d->notes);
     pthread_mutex_destroy(&d->lock); free(d);
 }
 static void destroy(Decoder *d) { dispose(d); pthread_mutex_lock(&lock); --objects; pthread_mutex_unlock(&lock); }
@@ -255,6 +257,12 @@ static const char *read_decode(const void *control, const Decoder *d, uint32_t p
     if (!guest(pcm->data,produced)) return "PCM data is not mapped guest memory";
     return NULL;
 }
+static FILE *dump_file(const char *dir, int32_t id, const char *kind) {
+    char path[1024]; snprintf(path,sizeof path,"%s/dec%d.%s",dir,id,kind);
+    FILE *f=fopen(path,"wb");
+    if (!f) printf("Runtime: GOW3_AUDIODEC_AU_DUMP: cannot write %s\n",path);
+    return f;
+}
 /* One frame (d->lock held). Writes nothing to the guest unless it succeeds; after a LibAtrac9 error
    the decoder is out of step until ClearContext, and the game deletes it anyway (docs/audiodec.md 1.6). */
 static int32_t decode_frame(Decoder *d, void *control, char *why, size_t why_size, Line *trace) {
@@ -284,10 +292,8 @@ static int32_t decode_frame(Decoder *d, void *control, char *why, size_t why_siz
         else d->frames=frame;
         if (!d->dump_opened) {
             const char *dir=getenv("GOW3_AUDIODEC_AU_DUMP"); d->dump_opened=1;
-            if (dir && *dir) {
-                char path[1024]; snprintf(path,sizeof path,"%s/dec%d.au",dir,d->id);
-                if (!(d->dump=fopen(path,"wb"))) printf("Runtime: GOW3_AUDIODEC_AU_DUMP: cannot write %s\n",path);
-            }
+            if (dir && *dir && (d->dump=dump_file(dir,d->id,"au")) && (d->notes=dump_file(dir,d->id,"txt")))
+                fprintf(d->notes,"config %02x%02x%02x%02x\n",d->config[0],d->config[1],d->config[2],d->config[3]);
         }
         if (d->dump) fwrite(d->au,1,consumed,d->dump);
         memcpy(pcm.data,d->pcm,produced);
@@ -337,6 +343,7 @@ static ABI int32_t clear_context(int32_t id) {
     if (!failed) {
         Atrac9ReleaseHandle(d->handle); d->handle=fresh; fresh=NULL;
         d->frames=0; d->superframe_remain=(uint32_t)d->info.superframeSize;
+        if (d->notes) fprintf(d->notes,"clear %ld\n",ftell(d->dump));
     }
     pthread_mutex_unlock(&d->lock); pthread_rwlock_unlock(&tables);
     if (fresh) Atrac9ReleaseHandle(fresh);
@@ -349,8 +356,15 @@ static const RuntimeExport exports[]={
     {"sceAudiodecDecode",decode}, {"sceAudiodecClearContext",clear_context},
 };
 uintptr_t runtime_audiodec_resolve(const char *name) { return RUNTIME_LOOKUP(exports,name); }
+/* Every way out of the game goes through runtime_report and then exits without closing files (closing
+   the window: _Exit in gpu/shim/gow3gpu.cpp): the dumps of the decoders still alive go to disk here,
+   with tables taken for writing so that no Decode or ClearContext is halfway through writing them. */
 void runtime_audiodec_report(void) {
-    pthread_mutex_lock(&lock);
+    pthread_rwlock_wrlock(&tables); pthread_mutex_lock(&lock);
+    for (int i=0;i<MAX_DECODERS;++i) if (table[i] && table[i]->dump) {
+        fflush(table[i]->dump);
+        if (table[i]->notes) fflush(table[i]->notes);
+    }
     printf("Runtime: Audiodec decoders=%zu, frames=%zu, errors=%zu\n",created,frames_decoded,errors);
-    pthread_mutex_unlock(&lock);
+    pthread_mutex_unlock(&lock); pthread_rwlock_unlock(&tables);
 }
