@@ -8,7 +8,9 @@ tarea 1 (clips de referencia, `07800f5`), la 2 (fase A estática, `docs/audiodec
 `a1446c0`), la 5 (concurrencia y reinicio, `af96cb1`), la 6 (`AudiodecCpu` trazada, con respuestas
 explícitas, `45c8da9`) y la 7 (ejecución de confirmación, 2026-10-20/21: la música suena; fixture
 dorado `8a0b6dd`; §6) y la 8 (voces y efectos `vse`: el juego entrega las voces ya descomprimidas;
-reproducción offline de los flujos de una partida, `fa059fa`; §6). Sigue la tarea 9 (cierre de 4a). Roadmap:
+reproducción offline de los flujos de una partida, `fa059fa`; §6) y la 9 (2026-10-21: suites verdes,
+`--check-imports` sin Audiodec y un arranque de 60 s limpio; §6). **La parte 4a queda cerrada.** Sigue
+la 4b (HEVAG), desde la tarea 10. Roadmap:
 `docs/tsuki/ROADMAP.md`, sección "Spec 4".
 
 Marcas: **[V]** comprobado (con el comando, la ruta o el log); **[H]** hipótesis que se confirma en
@@ -585,6 +587,34 @@ ya descomprimidas: el runtime no necesita MZX. Detalle en `docs/audiodec.md` 1.1
 - **Pruebas:** `build.sh --test` con `PASS: Audiodec contracts` y 0 `SKIP:` (`out/spec4-t8-done.log`).
   Suite Python `Ran 267`, `OK (skipped=35, expected failures=4)`.
 
+**Resultado (2026-10-21, tarea 9: cierre de 4a).** **La parte 4a queda cerrada:** se cumplen los cuatro
+criterios de 4a de §10.
+
+- **Pruebas.**
+  - `build.sh --test`: `PASS: Audiodec contracts` y ningún `SKIP:` (`out/spec4-t9-test.log`). La
+    reproducción offline recorre el corpus `a5`: 10 flujos y 14 405 tramas.
+  - Python: `Ran 267`, `OK (skipped=35, expected failures=4)` (`out/spec4-t9-py.log`). Son los 258 de
+    antes de esta spec más los 9 de `test_extract_audio_clips`.
+  - Los 35 omitidos son los de siempre y ninguno es de audio (`out/spec4-t9-py-v.log`): 17 piden
+    `iced-x86`, 16 Windows y Tk, y 2 las fuentes GDI.
+- **`--check-imports`:** quedan 3, las trampas de la Spec 2. No sale ninguna función de Audiodec ni de
+  AudiodecCpu (`out/spec4-t9-check-imports.log`).
+- **Arranque de 60 s** (`out/spec4-t9-boot60.log`):
+  - Partida actual, sin variables de traza, cerrado con `SIGTERM` 60 s después de abrirse la ventana.
+  - Sin `STOP:` ni `Fault:`, con `GPU: … unimplemented=0` y `Audiodec decoders=3, frames=10666,
+    errors=0`.
+  - Los `errors=48098` de `AudiodecCpu` son las respuestas explícitas de HEVAG de la tarea 6, que siguen
+    hasta la tarea 12 (en `a5` fueron 36 844).
+- **Qué se ve después del prólogo** (`out/spec4-t9-shots/`, otra ejecución de 60 s con capturas):
+  1. el aviso de autoguardado (fotogramas 30–420);
+  2. un fundido claro (fotograma 600), que es **[H]** el logo de TYPE-MOON (`TM_CI.mp4`);
+  3. la advertencia legal (900);
+  4. el menú de título, hacia los 20 s (1200).
+
+  Después hubo entrada del usuario: el menú de carga (1800) y escenas de la novela con fondo, sprites y
+  texto en inglés (2400–3500). Esa ejecución dio `Audiodec decoders=9, frames=16160, errors=0`. Estas
+  pantallas ya se pueden capturar para las specs 1b y 6.
+
 ## 7. Requisitos
 
 - Cuando el juego envíe un bloque válido, el sistema debe devolver el PCM en el formato y tamaño que
@@ -837,3 +867,11 @@ aceptar módulos de sistema nuevos, `src/runtime_content.c`.
   - Hay un test que reproduce los flujos volcados de una partida contra LibAtrac9. Para él,
     `GOW3_AUDIODEC_AU_DUMP` escribe ahora un `.txt` por flujo.
   - Se arregla la pérdida del final de los volcados de los decodificadores vivos al cerrar la ventana.
+- 2026-10-21 (después): tarea 9, **cierre de la parte 4a** (§6).
+  - Las suites están verdes, sin `SKIP:` de audio.
+  - `--check-imports` solo da las 3 trampas de la Spec 2.
+  - Un arranque de 60 s llega al menú de título sin `STOP:` ni `Fault:`, con `unimplemented=0` y sin
+    errores de Audiodec.
+  - Las capturas muestran lo que sale después del prólogo: el aviso, la advertencia legal, el menú de
+    título y escenas de la novela.
+  - Sigue la parte 4b (HEVAG), desde la tarea 10.

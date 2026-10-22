@@ -12,7 +12,7 @@ gow3_pc (God of War III Remastered), que a su vez viene de
 | Plataforma | Linux primero (máquina de desarrollo), Windows 10/11 después; Vulkan 1.3 |
 | Máquina de pruebas | Bazzite 44 (KDE Plasma 6.7, Wayland), AMD Ryzen 5 7600, 16 GB, **AMD Radeon RX 6650 XT** |
 | Dump | `Tsukihime/CUSA47999/` (sin versionar, ~45 GB) |
-| Última actualización | 2026-10-21 (después). **Las voces y los efectos `vse` también suenan bien**, sin cortes ni sonidos metálicos, según el usuario (tarea 8 de la Spec 4 cerrada). Las voces son entradas de `voice.mrg` que el juego ya entrega descomprimidas: el MZX lo quita el propio juego, así que el runtime no lo necesita. Hay un test que reproduce contra LibAtrac9 los flujos que volcó una partida. Sigue el cierre de 4a (tarea 9). Antes, 2026-10-21. **La música suena bien** (lo confirma el usuario; tarea 7 de la Spec 4 cerrada). Una ejecución con la traza completa de Audiodec dio 158 decodificadores ATRAC9 sin errores y con desfase 0. Los bucles caen donde predice `docs/audiodec.md` y hay un fixture dorado con los bloques de control reales. **El juego se cuelga al pasar al título del capítulo 1** (`phasetitle_01_00_en.mp4`), en `sceAvPlayerStop`. Es de la Spec 5, no de Audiodec; la evidencia está en la spec 5, §2. Antes, 2026-10-20: **El arranque va directo al menú de título, sin el vídeo del prólogo.** Con las tareas 3–6 de la Spec 4 el juego decodifica ATRAC9 sin errores (falta que el usuario confirme de oído cómo suena, tarea 7), pasa del prólogo y guarda progreso en su partida (`user/savedata/1/CUSA47999/`). Desde entonces cada arranque llega al menú de título en segundos. El prólogo solo sale con una partida sin progreso: hay una copia en `out/savedata-sin-progreso/`, sin versionar, porque `run.py` solo guarda las 10 últimas copias de seguridad. Una prueba de lo que viene después del prólogo ya no cuesta 6 min 29 s, pero el vídeo (Spec 5) y los fotogramas de vídeo de `out/baseline/` (del 720 en adelante) piden restaurar esa partida. `--check-imports` da 3, las trampas de la Spec 2. Antes, 2026-10-19: **la Spec 3 queda cerrada.** Las 23 APIs de plataforma tienen un comportamiento explícito: 15 se adelantaron en la Spec 2 y 8 se cierran ahora. Son tres "sin efecto" con su línea de log, el color del usuario 1, las dos consultas de copia de seguridad (`NOT_FOUND`), un error explícito para la información de desenrollado y la línea que le faltaba a `sceMsgDialogGetResult`. `--check-imports` baja de 19 a 11: los 8 de Audiodec (Spec 4) y las 3 trampas decididas de la Spec 2. En un arranque de 60 s salen las ocho líneas "sin efecto" de siempre y ningún `STOP:` nuevo. Las APIs nuevas no se llaman, porque solo se usan en casos concretos (cierre del juego, partida rota, excepciones de C++). Esfuerzo real: 1 día, frente a los 2–3 previstos. Antes, 2026-10-19: **la Spec 1a queda cerrada.** Están fuera del árbol los hooks, el perfil y el XML de parches, la semántica del touchpad, los tests de GoW3 y los textos de identidad, y el cargador solo arranca CUSA47999 (código 30 para cualquier otro juego). El log de arranque pierde las diez líneas "code not found" y para en el mismo punto. Las capturas no cambian: el fotograma 300 sale idéntico, y lo demás es el icono que gira o el vídeo. Fallan 4 tests del launcher, marcados como fallo esperado hasta que se limpie después de la Alpha. La elección de parches de resolución y de frame rate por nombre de GoW3, que sin perfil no hace nada, se deja para después de la Alpha, con el launcher (decisión del usuario, 2026-10-19). Antes, 2026-10-18: **el hito de primer fotograma queda cerrado:** hay imagen correcta, así que se sigue el orden previsto. El aviso de autoguardado, primer 2D del propio juego, sale nítido y con los colores bien, y el vídeo del prólogo también. En los logs no hay ningún `Unimplemented` (línea `GPU:` al final). Hay herramienta de captura PNG (`GOW3_SCREENSHOT_AT`, F12) y de comparación exacta (`tools/compare_captures.sh`), con la línea base en `out/baseline/`. Esfuerzos re-estimados en la sección 4. Antes, 2026-10-17 (noche): **la Spec 2 queda cerrada** con la fase 2B: en libkernel solo quedan las tres trampas decididas (`scePthreadCancel` y las dos de información de módulo), ya con nombre; `--check-imports` baja de 28 a 19, todo de las specs 3 y 4. Antes, 2026-10-17 (tarde): sin watchdog, el juego reproduce entero el vídeo del prólogo (se ve y se oye bien) y después para en `sceAudiodecCreateDecoder`, el primer decodificador ATRAC9 (Spec 4a). Su sitio de llamada da la estructura de control de Audiodec (Spec 4, 2.5). Por decisión del usuario solo se documenta. Antes, 2026-10-17: la fase 2A de la Spec 2 (guiada por los `STOP:`) termina tras 10 iteraciones: el juego abre `VideoOut`, presenta ~60 fotogramas por segundo y reproduce el vídeo del prólogo, sin ningún `STOP:` de libkernel. Falta ver qué pinta (hito). La Spec 4 se replantea en dos partes: **4a ATRAC9** (música, voces y efectos `vse`) y **4b HEVAG** (19 efectos de `vag.mrg`). 2026-10-14: revisión del orden tras un análisis adversarial (el kernel va primero, hay un hito de "primer fotograma", el borrado se parte en dos y el renombrado pasa al final; lo específico de GoW3 se elimina, no se desactiva) |
+| Última actualización | 2026-10-21 (cierre de 4a). **La Spec 4a (ATRAC9) queda cerrada.** Las suites están verdes, sin `SKIP:` de audio. `--check-imports` solo da las 3 trampas de la Spec 2, y un arranque de 60 s llega al menú de título sin `STOP:` ni `Fault:`, con `unimplemented=0` y sin errores de Audiodec. Las capturas de ese arranque muestran lo que sale ahora después del prólogo: el aviso de autoguardado, la advertencia legal, el menú de título y, con entrada, escenas de la novela con texto y sprites. Con eso, las specs 1b y 6 ya pueden capturar el 2D posterior al prólogo, y la casilla de la Spec 2 «pasa del arranque a los logos» queda cumplida. Sigue la Spec 4b (HEVAG). Antes, 2026-10-21 (después). **Las voces y los efectos `vse` también suenan bien**, sin cortes ni sonidos metálicos, según el usuario (tarea 8 de la Spec 4 cerrada). Las voces son entradas de `voice.mrg` que el juego ya entrega descomprimidas: el MZX lo quita el propio juego, así que el runtime no lo necesita. Hay un test que reproduce contra LibAtrac9 los flujos que volcó una partida. Sigue el cierre de 4a (tarea 9). Antes, 2026-10-21. **La música suena bien** (lo confirma el usuario; tarea 7 de la Spec 4 cerrada). Una ejecución con la traza completa de Audiodec dio 158 decodificadores ATRAC9 sin errores y con desfase 0. Los bucles caen donde predice `docs/audiodec.md` y hay un fixture dorado con los bloques de control reales. **El juego se cuelga al pasar al título del capítulo 1** (`phasetitle_01_00_en.mp4`), en `sceAvPlayerStop`. Es de la Spec 5, no de Audiodec; la evidencia está en la spec 5, §2. Antes, 2026-10-20: **El arranque va directo al menú de título, sin el vídeo del prólogo.** Con las tareas 3–6 de la Spec 4 el juego decodifica ATRAC9 sin errores (falta que el usuario confirme de oído cómo suena, tarea 7), pasa del prólogo y guarda progreso en su partida (`user/savedata/1/CUSA47999/`). Desde entonces cada arranque llega al menú de título en segundos. El prólogo solo sale con una partida sin progreso: hay una copia en `out/savedata-sin-progreso/`, sin versionar, porque `run.py` solo guarda las 10 últimas copias de seguridad. Una prueba de lo que viene después del prólogo ya no cuesta 6 min 29 s, pero el vídeo (Spec 5) y los fotogramas de vídeo de `out/baseline/` (del 720 en adelante) piden restaurar esa partida. `--check-imports` da 3, las trampas de la Spec 2. Antes, 2026-10-19: **la Spec 3 queda cerrada.** Las 23 APIs de plataforma tienen un comportamiento explícito: 15 se adelantaron en la Spec 2 y 8 se cierran ahora. Son tres "sin efecto" con su línea de log, el color del usuario 1, las dos consultas de copia de seguridad (`NOT_FOUND`), un error explícito para la información de desenrollado y la línea que le faltaba a `sceMsgDialogGetResult`. `--check-imports` baja de 19 a 11: los 8 de Audiodec (Spec 4) y las 3 trampas decididas de la Spec 2. En un arranque de 60 s salen las ocho líneas "sin efecto" de siempre y ningún `STOP:` nuevo. Las APIs nuevas no se llaman, porque solo se usan en casos concretos (cierre del juego, partida rota, excepciones de C++). Esfuerzo real: 1 día, frente a los 2–3 previstos. Antes, 2026-10-19: **la Spec 1a queda cerrada.** Están fuera del árbol los hooks, el perfil y el XML de parches, la semántica del touchpad, los tests de GoW3 y los textos de identidad, y el cargador solo arranca CUSA47999 (código 30 para cualquier otro juego). El log de arranque pierde las diez líneas "code not found" y para en el mismo punto. Las capturas no cambian: el fotograma 300 sale idéntico, y lo demás es el icono que gira o el vídeo. Fallan 4 tests del launcher, marcados como fallo esperado hasta que se limpie después de la Alpha. La elección de parches de resolución y de frame rate por nombre de GoW3, que sin perfil no hace nada, se deja para después de la Alpha, con el launcher (decisión del usuario, 2026-10-19). Antes, 2026-10-18: **el hito de primer fotograma queda cerrado:** hay imagen correcta, así que se sigue el orden previsto. El aviso de autoguardado, primer 2D del propio juego, sale nítido y con los colores bien, y el vídeo del prólogo también. En los logs no hay ningún `Unimplemented` (línea `GPU:` al final). Hay herramienta de captura PNG (`GOW3_SCREENSHOT_AT`, F12) y de comparación exacta (`tools/compare_captures.sh`), con la línea base en `out/baseline/`. Esfuerzos re-estimados en la sección 4. Antes, 2026-10-17 (noche): **la Spec 2 queda cerrada** con la fase 2B: en libkernel solo quedan las tres trampas decididas (`scePthreadCancel` y las dos de información de módulo), ya con nombre; `--check-imports` baja de 28 a 19, todo de las specs 3 y 4. Antes, 2026-10-17 (tarde): sin watchdog, el juego reproduce entero el vídeo del prólogo (se ve y se oye bien) y después para en `sceAudiodecCreateDecoder`, el primer decodificador ATRAC9 (Spec 4a). Su sitio de llamada da la estructura de control de Audiodec (Spec 4, 2.5). Por decisión del usuario solo se documenta. Antes, 2026-10-17: la fase 2A de la Spec 2 (guiada por los `STOP:`) termina tras 10 iteraciones: el juego abre `VideoOut`, presenta ~60 fotogramas por segundo y reproduce el vídeo del prólogo, sin ningún `STOP:` de libkernel. Falta ver qué pinta (hito). La Spec 4 se replantea en dos partes: **4a ATRAC9** (música, voces y efectos `vse`) y **4b HEVAG** (19 efectos de `vag.mrg`). 2026-10-14: revisión del orden tras un análisis adversarial (el kernel va primero, hay un hito de "primer fotograma", el borrado se parte en dos y el renombrado pasa al final; lo específico de GoW3 se elimina, no se desactiva) |
 
 ---
 
@@ -179,7 +179,7 @@ motivos están en la sección "Hito".
 | 4 | **Hito: primer fotograma** | Hito | Spec 2 | 1 día (real: ~1 día) | ✅ Concluido el 2026-10-18 (imagen correcta: el aviso de autoguardado y el vídeo del prólogo se ven bien; `unimplemented=0`; capturas PNG y `compare_captures.sh` con línea base en `out/baseline/`; se sigue el orden previsto) |
 | 5 | Borrar las heurísticas de GPU de GoW3 | **Spec 1b** | Spec 1a, hito | 1–2 días (antes 2–3) | ⬜ Pendiente (se puede empezar: la Spec 1a y el hito están cerrados) |
 | 6 | Servicios del sistema que faltan | **Spec 3** | Spec 2 | 2–3 días (real: 1 día, más las 15 adelantadas en la Spec 2) | ✅ Concluida el 2026-10-19 (23 de 23: 15 adelantadas en la Spec 2 y 8 en la Spec 3; `--check-imports` da 11, todos de las Specs 2 y 4) |
-| 7a | Audio ATRAC9 (`libSceAudiodec`): música → voces → efectos `vse`, con investigación previa | **Spec 4a** | Spec 2 | 1–2 semanas, sin tope | 🟨 En curso (tareas 1–8 del plan hechas: las seis funciones sobre LibAtrac9; el juego pasa del prólogo sin errores de Audiodec; desde el 2026-10-21 **suenan bien la música, las voces y los efectos `vse`**; sigue el cierre de 4a, tarea 9) |
+| 7a | Audio ATRAC9 (`libSceAudiodec`): música → voces → efectos `vse`, con investigación previa | **Spec 4a** | Spec 2 | 1–2 semanas, sin tope (real: 3 días de plan, del 19 al 21 de octubre, más el estudio del sitio de llamada del 17) | ✅ Concluida el 2026-10-21 (las seis funciones sobre LibAtrac9, bit-exactas contra LibAtrac9; **suenan bien la música, las voces y los efectos `vse`**; `--check-imports` sin Audiodec; arranque de 60 s sin `STOP:` ni errores de Audiodec) |
 | 7b | Audio HEVAG (`libSceAudiodecCpu`): efectos de `vag.mrg`, con investigación previa | **Spec 4b** | Spec 4a (música y voces) | sin estimar, sin tope | ⬜ Pendiente |
 | 8 | Vídeo (AvPlayer) | **Spec 5** | Specs 2 y 3 | 2–3 días (antes 2–4) | ⬜ Pendiente (el prólogo se ve y se oye entero; no se salta con botones; posible reproducción más rápida que el tiempo real; desde el 2026-10-20 solo sale con una partida sin progreso; **2026-10-21: se cuelga en `sceAvPlayerStop` al pasar al título del capítulo 1**, sección Spec 5) |
 | 9 | 2D correcto, ratón y saves | **Spec 6** | Hito (empieza), Specs 1b, 3, 4 y 5 (cierra) | 1–3 semanas | ⬜ Pendiente (se puede empezar: el hito está cerrado) |
@@ -223,6 +223,7 @@ flowchart LR
 | 3 | Spec 1a cerrada. Fuera del árbol: los hooks de GoW3 y sus backends, la pestaña "Game" del menú, el XML y el perfil de parches, el touchpad en dos mitades, los tests de GoW3 y los textos de identidad. El cargador solo arranca CUSA47999 (código 30 para cualquier otro). Los 4 tests del launcher que rompe quedan como fallo esperado. | `9f86fc1`…`4832164` |
 | 4 | Hito de primer fotograma cerrado: línea `GPU:` al final del log, capturas PNG del fotograma presentado (`GOW3_SCREENSHOT_AT`, F12), `tools/compare_captures.sh`, línea base en `out/baseline/` y decisión: seguir el orden previsto. | `8c40e39`…`5acfafe` y `0e6bf51` (cierre) |
 | 6 | Spec 3 cerrada: las 23 APIs de plataforma con comportamiento explícito y probado. `tests/test_import_names.py` fija NID y nombre de cada una, y no se finge ninguna conexión a PSN ni a la red. | `f4a5d0a`…`5fcc578` |
+| 7a | Spec 4a cerrada. `libSceAudiodec` decodifica ATRAC9 sobre LibAtrac9: música, voces y efectos `vse`, con el uso de la biblioteca documentado en `docs/audiodec.md`. Hay tests bit-exactos con los cinco clips de referencia, un fixture con los bloques de control reales y la reproducción de los flujos que vuelca una partida. `libSceAudiodecCpu` (HEVAG) responde con un error explícito hasta la Spec 4b. | `07800f5`…`6d82110` y el cierre (`docs(spec4): cierre de la parte 4a`) |
 
 ### Flujo de cada spec
 
@@ -445,11 +446,20 @@ abierto: las ramas Windows nuevas no se han compilado, y `tm_isdst` sale siempre
 **Criterios de aceptación**
 
 - [x] Test C de event flags: AND, OR, CLEAR_ALL, CLEAR_PAT, timeout, cancel, varios hilos.
-- [ ] El juego pasa del arranque a los logos sin `STOP:` de libkernel. *Sin logos todavía: el
+- [x] El juego pasa del arranque a los logos sin `STOP:` de libkernel. *Sin logos todavía: el
   arranque llega sin `STOP:` de libkernel al aviso de autoguardado y al vídeo del prólogo, y lo
   siguiente para en `sceAudiodecCreateDecoder` (Spec 4a). Se comprueba cuando la 4a deje pasar del
   prólogo. No depende de más trabajo de esta spec. 2026-10-20: ya pasa y llega al menú de título; la
-  casilla se revisa en la tarea 9 del plan de la Spec 4.*
+  casilla se revisa en la tarea 9 del plan de la Spec 4.* *2026-10-21 (cierre de la 4a): **cumplida.**
+  En un arranque de 60 s con la partida actual no hay ningún `STOP:`, de libkernel ni de otra
+  biblioteca (`out/spec4-t9-boot60.log`). Las capturas (`out/spec4-t9-shots/`) muestran:*
+  1. *el aviso de autoguardado;*
+  2. *un fundido claro, que es **[H]** el logo de TYPE-MOON (`TM_CI.mp4`), sin confirmar porque el log
+     no nombra los vídeos que abre AvPlayer;*
+  3. *la advertencia legal;*
+  4. *el menú de título, hacia los 20 s.*
+
+  *Con la partida sin progreso sale el prólogo en lugar del menú.*
 - [x] Se llega al hito de primer fotograma (ver abajo): el juego presenta fotogramas (2026-10-17). La
   captura y la decisión son del hito.
 
@@ -601,6 +611,13 @@ cómo dibuja este juego en el traductor de GPU, y es la mayor incógnita del pro
   pasar del prólogo, la Spec 6 y la Spec 1b solo pueden comparar el aviso y el vídeo.
   *2026-10-20: ya pasa. Con la partida actual, que tiene progreso, el arranque llega al menú de título
   en segundos y sin el vídeo; con la partida sin progreso (`out/savedata-sin-progreso/`) sale el vídeo.*
+  *2026-10-21 (cierre de la Spec 4a): el 2D de después del prólogo ya se ve y se puede capturar
+  (`out/spec4-t9-shots/`, ventana sin pantalla completa):*
+  - *Sin entrada, salen el aviso de autoguardado (fotogramas 30–420), un fundido claro (600), la
+    advertencia legal (900) y el menú de título (1200).*
+  - *Con entrada, salen el menú de carga y escenas de la novela con fondo, sprites y texto en inglés.*
+
+  *A ojo se ven bien. Aprobarlas como línea base es de la Spec 6.*
 - **Re-estimación.** El hito costó ~1 día, como se preveía.
   - Spec 1b: de 2–3 a 1–2 días. La captura y la comparación ya existen y hay una escena repetible.
   - Spec 5: de 2–4 a 2–3 días. El vídeo ya se ve bien; quedan la sincronía, saltarlo con botones y la
@@ -639,6 +656,13 @@ tiene forma de comprobarse. Por eso esta spec va después del hito.
      vídeo (si el aviso de autoguardado sigue saliendo antes no se ha comprobado con capturas). Los fotogramas de `out/baseline/` del 720 en adelante (vídeo) ya no corresponden a
      ese arranque: o se restaura la partida sin progreso (`out/savedata-sin-progreso/`), o se toma una
      línea base nueva con la partida actual. Una comparación debe arrancar siempre con la misma partida.*
+   - *2026-10-21 (cierre de la Spec 4a): con la partida actual, **el aviso de autoguardado sigue
+     saliendo** (fotogramas 30–420), y le siguen un fundido claro (600), la advertencia legal (900) y el
+     menú de título (1200) (`out/spec4-t9-shots/`). La advertencia legal es 2D estático y sirve para
+     una línea base nueva. Que salga idéntica entre ejecuciones no se ha comprobado. El menú de título
+     sale sin entrada, pero su fondo es **[H]** un vídeo (`titlebg*.mp4`, AvPlayer se llama ahí). Las
+     escenas de la novela piden entrada del jugador: para repetirlas hace falta
+     `GOW3_PAD_RECORD`/`GOW3_PAD_REPLAY`.*
 2. Borrar una heurística, compilar, pasar tests y recapturar.
 3. Comparar las capturas (diferencia de píxeles). Si cambian, entender por qué antes de seguir; si el
    cambio es el esperado (la heurística actuaba sobre algo de GoW3), anotarlo y actualizar la línea base.
@@ -778,13 +802,25 @@ En las dos: códec no soportado → `STOP:` con el número, nunca silencio.
 - Si el stream no es válido, el sistema debe devolver el código de error de la PS4 sin cerrar el
   juego.
 
+**Estado (2026-10-21): la parte 4a está cerrada; sigue la 4b.**
+
+- `libSceAudiodec` decodifica ATRAC9 sobre LibAtrac9, bit-exacto en los tests.
+- La música, las voces y los efectos `vse` suenan bien, según el usuario.
+- En las ejecuciones de la spec hubo 0 errores de Audiodec y desfase 0.
+- `libSceAudiodecCpu` (HEVAG, 19 efectos de `vag.mrg`) responde con un error explícito hasta la
+  tarea 12 de su plan.
+- Detalle y logs en la spec, §6.
+
 **Criterios de aceptación**
 
 - [ ] `docs/audiodec.md` describe el ATRAC9 (4a) y el HEVAG (4b) observados, con estructuras y errores.
+  *(4a hecho el 2026-10-21; falta el HEVAG.)*
 - [ ] Un test decodifica un clip ATRAC9 igual que LibAtrac9, y otro prueba el decodificador HEVAG.
+  *(El de ATRAC9 pasa desde el 2026-10-20; falta el de HEVAG.)*
 - [ ] En el juego suenan, por este orden, la música, las voces y los efectos, sin chirridos ni cortes
-  (lo juzga el usuario).
-- [ ] `--check-imports` no lista ninguna función de Audiodec ni de AudiodecCpu.
+  (lo juzga el usuario). *(Música, voces y `vse` confirmados el 2026-10-21; faltan los de `vag.mrg`.)*
+- [ ] `--check-imports` no lista ninguna función de Audiodec ni de AudiodecCpu. *(Ninguna desde el
+  2026-10-20, pero las tres de AudiodecCpu solo responden con error hasta la 4b.)*
 
 ---
 
@@ -848,6 +884,9 @@ defectos típicos son otros: texto ilegible o con bordes rotos, transiciones (fu
 incorrectas, alfa premultiplicado mal, pantalla negra entre escenas. Además el juego usa ratón y
 saves con su propia interfaz. **Empieza en cuanto existe el hito de primer fotograma**, sin esperar
 a audio y vídeo: los logos ya son 2D. Se cierra cuando están hechas las specs 3, 4 y 5.
+*2026-10-21 (cierre de la Spec 4a): ya se pueden capturar el menú de título y las escenas de la
+novela. Las primeras capturas están en `out/spec4-t9-shots/` (sección "Hito", "Límite de lo visto").
+Llegar más allá del título del capítulo 1 sigue colgando el juego (Spec 5).*
 
 **Solución, en orden**
 
@@ -961,10 +1000,10 @@ Las configuraciones y saves antiguos no se migran (no hay usuarios de los nombre
 |---|---|---|
 | Event flags mal sincronizados → cuelgues aleatorios | Alto | Test C con varios hilos; watchdog `--timeout` para volcar las pilas |
 | Los 61 imports se resuelven y el juego igual se cuelga, por la semántica de sincronización y no por APIs que faltan | Alto | Hito de primer fotograma y recorrido grabado; `--timeout` con volcado de pilas; no dar por buena una spec solo porque `--check-imports` llegue a cero |
-| `libSceAudiodec` no tiene implementación HLE de referencia: ABI, estructuras y errores se deducen del juego | Alto | Spec 4a con fase de investigación y `docs/audiodec.md` antes de implementar; sin tope de tiempo. Para `libSceAudiodecCpu` hay estructuras en el PR #5289 de shadPS4 (sin fusionar) |
+| `libSceAudiodec` no tiene implementación HLE de referencia: ABI, estructuras y errores se deducen del juego | Alto (ahora solo para `libSceAudiodecCpu`) | Spec 4a con fase de investigación y `docs/audiodec.md` antes de implementar; sin tope de tiempo. **Superado para ATRAC9 el 2026-10-21** (Spec 4a cerrada: estructuras deducidas del desensamblado y confirmadas con trazas, sin errores en el juego). Para `libSceAudiodecCpu` hay estructuras en el PR #5289 de shadPS4 (sin fusionar) |
 | HEVAG no lo decodifica ni LibAtrac9 ni FFmpeg | Bajo (solo 19 efectos) | Adaptar `decode_hevag` de vgmstream (licencia tipo ISC, compatible con la GPL-2.0), Spec 4b |
 | Audiodec se llama antes del primer draw y podría bloquear el hito | Medio | Respuesta provisional con error explícito, que el juego ignora. Visto el 2026-10-17: `CreateDecoder` no llega hasta el final del prólogo, así que no bloquea el hito, pero sí pasar del prólogo (fase A de 4a). Superado el 2026-10-20 (tareas 3–6 de la Spec 4) |
-| El traductor de GPU no dibuja bien una novela visual | Medio (antes Alto) | Hito cerrado el 2026-10-18: el aviso de autoguardado (2D del juego) y el vídeo salen bien y no hay ningún `Unimplemented`. Queda el resto del 2D de la novela, que no se verá hasta pasar del prólogo (Spec 4a; ya se pasa desde el 2026-10-20, y el arranque llega al menú de título); la Spec 6 lo revisa con capturas aprobadas |
+| El traductor de GPU no dibuja bien una novela visual | Medio (antes Alto) | Hito cerrado el 2026-10-18: el aviso de autoguardado (2D del juego) y el vídeo salen bien y no hay ningún `Unimplemented`. Queda el resto del 2D de la novela, que no se verá hasta pasar del prólogo (Spec 4a; ya se pasa desde el 2026-10-20, y el arranque llega al menú de título); la Spec 6 lo revisa con capturas aprobadas. 2026-10-21: el menú de título, el menú de carga y escenas de la novela con texto y sprites se ven bien a ojo (`out/spec4-t9-shots/`) |
 | "Cubierta" se confunde con "funciona" (Mouse parecía cubierta y es un stub) | Medio | Cubierta solo si tiene test o el juego la llamó en un recorrido real; ratón pasa a la Spec 6 como trabajo nuevo |
 | SDK 11.008, mucho más nuevo que el de GoW3: comportamientos del kernel no vistos | Medio | Seguir la semántica de shadPS4; registrar todo lo nuevo en el log |
 | AvPlayer de shadPS4 inmaduro (sincronía, eventos) | Medio | Probar opening y títulos de capítulo pronto; seguir upstream |
