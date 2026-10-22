@@ -7,7 +7,8 @@ tarea 1 (clips de referencia, `07800f5`), la 2 (fase A estática, `docs/audiodec
 (las seis funciones y la tabla de decodificadores, `731f3b6`), la 4 (`Decode` y `ClearContext` reales,
 `a1446c0`), la 5 (concurrencia y reinicio, `af96cb1`), la 6 (`AudiodecCpu` trazada, con respuestas
 explícitas, `45c8da9`) y la 7 (ejecución de confirmación, 2026-10-20/21: la música suena; fixture
-dorado `8a0b6dd`; §6). Sigue la tarea 8 (voces y efectos `vse`). Roadmap:
+dorado `8a0b6dd`; §6) y la 8 (voces y efectos `vse`: el juego entrega las voces ya descomprimidas;
+reproducción offline de los flujos de una partida, `fa059fa`; §6). Sigue la tarea 9 (cierre de 4a). Roadmap:
 `docs/tsuki/ROADMAP.md`, sección "Spec 4".
 
 Marcas: **[V]** comprobado (con el comando, la ruta o el log); **[H]** hipótesis que se confirma en
@@ -73,6 +74,9 @@ Todo el ATRAC9 pasa por una sola rutina de preparación (2.5) y una sola de deco
 `{u32 sector; u16 sectores; u16 tamaño & 0xffff}`, con sectores de 0x800 bytes. Los 4 bits altos de
 `sector` son los bits 16–19 del número de sector: por ejemplo, la entrada 31 de `bgm.hed` acaba en el
 sector `0x10581` y la 32 vale `0x1_0000581`. `voice.hed` tiene otra forma, todavía sin descifrar.
+*(2026-10-21, tarea 8: descifrado. Usa entradas de 4 bytes, `{u16 sector bajo; u16 (bits 16–19 del
+sector << 12) | sectores}`; son 16 464 voces y 4 centinelas `0xFFFF`. Cada entrada es `LV` + `MZX0` con
+un RIFF ATRAC9 dentro (`docs/audiodec.md` 1.11).)*
 
 **[V]** (2026-10-19, `tools/extract_audio_clips.py`) Más detalles del formato:
 - El tercer campo son los 16 bits bajos del tamaño real: `riff_size + 8` en los RIFF y
@@ -92,7 +96,7 @@ sector `0x10581` y la 32 vale `0x1_0000581`. `voice.hed` tiene otra forma, todav
 | Audio | Archivo | Formato | Entradas | Parte |
 |---|---|---|---|---|
 | Música | `bgm.mrg` (536 MB) | RIFF ATRAC9, estéreo, 48 kHz | 132 de 132 | 4a |
-| Voces | `voice.mrg` (1,3 GB) | RIFF ATRAC9, mono, 48 kHz, comprimido con MZX (`LV`…`MZX0`) | 3242 en la muestra | 4a |
+| Voces | `voice.mrg` (1,3 GB) | RIFF ATRAC9, mono, 48 kHz, comprimido con MZX (`LV`…`MZX0`) | 3242 en la muestra; 16 464 en total (tarea 8) | 4a |
 | Efectos | `vse.mrg` (138 MB) | RIFF ATRAC9: 1316 estéreo y 11 mono, 48 kHz | 1327 de 1327 | 4a |
 | Efectos | `vag.mrg` (1,8 MB) | `VAGp` versión `0x00020001` = **HEVAG**, 48 kHz, mono, en parejas `moon_seNNNNN_L`/`_R` (más una entrada `dummy`) | 19 cabeceras | 4b |
 
@@ -134,6 +138,9 @@ Que `vse` sean efectos es **[H]**: se deduce del nombre.
 - **[H]** El juego descomprime él mismo el MZX de las voces antes de pasarlas a Audiodec. *(2026-10-21,
   tarea 7: es lo más probable. 104 flujos mono `fe700bf0` no son ninguna entrada de `bgm` ni de `vse`, y
   LibAtrac9 los decodifica sin errores, así que llegan ya como ATRAC9. Lo confirma la tarea 8.)*
+  *(2026-10-21, tarea 8: **[V]**. Los 104 flujos son, byte a byte, el principio de los datos de 102
+  entradas de `voice.mrg` descomprimidas (`docs/audiodec.md` 1.11). El AU que llega a `Decode` es
+  ATRAC9, nunca `LV`/`MZX0`.)*
 
 ### 2.4 Decodificadores y referencias
 
@@ -545,6 +552,39 @@ suena bien** según el usuario, y el juego confirma el contrato de `docs/audiode
   - Por decisión del usuario se documenta en la spec 5, §2 (`1bff05e`) y no se arregla aquí.
   - Hasta entonces, el juego no pasa de ese punto.
 
+**Resultado (2026-10-21, tarea 8; `fa059fa`).** Las voces salen de `voice.mrg` y el juego las entrega
+ya descomprimidas: el runtime no necesita MZX. Detalle en `docs/audiodec.md` 1.11.
+
+- **Paso 1: de dónde salen las voces.**
+  - `voice.hed` queda descifrado (2.2), y con un descompresor MZX provisional
+    (`out/spec4-t8/mzx_match.c`) se abren las 16 464 entradas.
+  - Los 104 flujos mono de `a2` son, byte a byte, el principio del `data` de 102 entradas (15490–15615).
+    Dos entradas se decodificaron dos veces, y no hay ningún flujo `LV`/`MZX0`.
+  - Ninguna voz llega al final de sus datos: a cada una le faltan entre 345 y 6 045 bytes, y 64 las
+    cortó el jugador. Es **[H]** el corte propio del juego, como en los efectos, y no hay ningún error.
+  - Ejecuciones con `GOW3_TRACE_AUDIODEC=1`:
+    - `a4`, del usuario, con escenas con voces: 62 decodificadores, 59 453 tramas, 31 flujos de voz;
+    - `a5`, menú de título cerrado con `SIGTERM`: 10 decodificadores, 14 405 tramas.
+
+    Las dos con 0 errores, sin `STOP:`, `Fault:` ni búferes rechazados.
+- **Paso 2: test de reproducción offline** `voice_stream_replay_matches_libatrac9` (§8).
+  - Para poder hacerlo sin una traza completa, `GOW3_AUDIODEC_AU_DUMP` escribe ahora también
+    `dec<id>.txt`: la configuración y los bytes volcados antes de cada `ClearContext`.
+  - Corpus `a2`, con los `.txt` reconstruidos de su traza: 158 flujos, 303 323 tramas y 18
+    `ClearContext`, las mismas cifras que la traza.
+  - Corpus `a5` (`out/audiodec-replay`, el de `build.sh --test`): 10 flujos y 14 405 tramas.
+  - Mutaciones: 8 de 8 caen en la reproducción (`out/spec4-t8/mutate.py`).
+- **Fallo encontrado y arreglado: volcados al cerrar.**
+  - Al cerrar la ventana, el juego acaba en `runtime_report` y `_Exit(0)` sin cerrar archivos.
+  - En `a4`, la música viva perdió su `.txt` y el final de su `.au`.
+  - Ahora `runtime_audiodec_report` escribe a disco los volcados vivos (test
+    `au_dump_is_on_disk_after_the_report`). En `a5`, la música viva al cerrar se reproduce entera.
+- **Paso 3: lo juzga el usuario.** En `a4` todo se oye bien: las voces, los efectos `vse` y la música, sin
+  cortes y sin sonidos metálicos. Los puertos de AudioOut solo se quedaron sin datos en la ventana del
+  arranque.
+- **Pruebas:** `build.sh --test` con `PASS: Audiodec contracts` y 0 `SKIP:` (`out/spec4-t8-done.log`).
+  Suite Python `Ran 267`, `OK (skipped=35, expected failures=4)`.
+
 ## 7. Requisitos
 
 - Cuando el juego envíe un bloque válido, el sistema debe devolver el PCM en el formato y tamaño que
@@ -608,6 +648,15 @@ suena bien** según el usuario, y el juego confirma el contrato de `docs/audiode
   - *Rompe la circularidad de los tests sintéticos: tres mutaciones que cambian a la vez el runtime y
     `fill()` (punteros AU/PCM cambiados, palabra 0, bsi de `0x20`) pasan toda la suite sin este test y
     fallan con él (`out/spec4-t7/mutate.py`).*
+- *(2026-10-21, tarea 8, `fa059fa`): `voice_stream_replay_matches_libatrac9` reproduce los flujos de
+  una partida volcados con `GOW3_AUDIODEC_AU_DUMP`, en el directorio `argv[2]` o
+  `out/audiodec-replay`: voces, `vse` y `bgm`.*
+  - *Cada flujo pasa por la API, tal como lo entregó el juego, y por LibAtrac9 directamente, con un
+    estado nuevo en cada `ClearContext` (`dec<id>.txt`).*
+  - *Exige el mismo PCM en cada trama y que lo consumido sume exactamente los bytes volcados.*
+  - *Sin volcados imprime `SKIP:`, porque son contenido del juego.*
+  - *`au_dump_notes_config_and_clears` y `au_dump_is_on_disk_after_the_report` cubren el `.txt` y que
+    los volcados de los decodificadores vivos estén en disco tras `runtime_report`.*
 - Para 4b, un test del decodificador HEVAG: tramas sintéticas con índices de tabla bajos (≤ `0x1c`,
   donde HEVAG se comporta como el VAG clásico) y altos, con el resultado calculado aparte. Además, si
   hay un fragmento local, se compara con `vgmstream-cli` cuando esté instalado; si no, se omite.
@@ -655,11 +704,13 @@ aceptar módulos de sistema nuevos, `src/runtime_content.c`.
 - [x] `out/audiodec-test` decodifica el clip ATRAC9 de referencia igual que LibAtrac9. *(2026-10-20,
   tarea 4: los cinco clips, muestra a muestra y trama a trama, con los bytes consumidos;
   `out/spec4-t4-green.log`.)*
-- [ ] En el juego suena la música; después, las voces; después, los efectos `vse` (lo juzga el usuario).
+- [x] En el juego suena la música; después, las voces; después, los efectos `vse` (lo juzga el usuario).
   *(2026-10-20, tarea 7, paso 1: el juego decodifica 119 flujos ATRAC9 sin un error en dos ejecuciones;
   falta el juicio del usuario.)* *(2026-10-21, tarea 7: **la música suena bien**, según el usuario.
   También dice que los efectos y las voces suenan bien en lo que oyó, pero eso se confirma en la tarea
-  8.)*
+  8.)* *(2026-10-21, tarea 8: **hecho**. En la ejecución `a4`, con escenas con voces, el usuario oye bien
+  las voces, los efectos `vse` y la música, sin cortes ni sonidos metálicos. Las voces son ATRAC9 de
+  `voice.mrg` que el juego ya entrega descomprimido.)*
 - [x] `--check-imports` no lista ninguna función de `libSceAudiodec`. *(2026-10-20, tarea 3: quedan 6,
   los 3 de `libSceAudiodecCpu` y las 3 trampas de la Spec 2; `out/spec4-t3-check-imports.log`. Ojo:
   `Decode` y `ClearContext` resuelven, pero con error provisional hasta la tarea 4.)*
@@ -778,3 +829,11 @@ aceptar módulos de sistema nuevos, `src/runtime_content.c`.
   - El riesgo de la memoria del guest queda cerrado.
   - Se ve un cuelgue de AvPlayer al pasar al título del capítulo 1. Queda documentado en la spec 5
     (`1bff05e`) y no es de esta spec.
+- 2026-10-21 (después): tarea 8 cerrada (§6, `fa059fa`).
+  - **Las voces y los efectos `vse` suenan bien**, según el usuario; con eso se cumple el criterio de
+    sonido de 4a (§10).
+  - `voice.hed` queda descifrado, y las voces que decodifica el juego son entradas de `voice.mrg` ya
+    descomprimidas: el MZX lo quita el juego (2.2, 2.3).
+  - Hay un test que reproduce los flujos volcados de una partida contra LibAtrac9. Para él,
+    `GOW3_AUDIODEC_AU_DUMP` escribe ahora un `.txt` por flujo.
+  - Se arregla la pérdida del final de los volcados de los decodificadores vivos al cerrar la ventana.
