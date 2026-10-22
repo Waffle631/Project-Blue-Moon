@@ -1,0 +1,12 @@
+Adapted from https://github.com/vgmstream/vgmstream commit db77f98f405a45ad08df98aa444cae3848f95e6c
+(2026-10-16), under vgmstream's ISC-style license (LICENSE is its COPYING, unchanged).
+From src/coding/psv_decoder.c: the codec description and the hevag_coefs_f table, copied unchanged, and
+decode_hevag, adapted (hevag.c, hevag_decode_frame):
+  - one 16-byte frame of one channel per call, with no STREAMFILE, first_sample or channelspacing: the
+    caller keeps one HevagState per channel and interleaves the channels;
+  - returns the frame's flag (the runtime reports it to the game, docs/audiodec.md 2.6);
+  - nibble_to_int (src/util/reader_get_nibbles.h) and clamp16 (src/util.h) written inline;
+  - (code << 12) >> shift written code * 4096 >> shift: the same value without left-shifting a
+    negative int.
+Checked sample by sample against vgmstream-cli built from the same commit (tests/test_hevag.c,
+matches_vgmstream_cli; how to build it: docs/ENTORNO.md).

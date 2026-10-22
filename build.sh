@@ -117,6 +117,9 @@ if [[ ${1:-} == --test ]]; then
     others=(); for source in "${runtime[@]}"; do [[ $source == src/runtime_audiodec.c ]] || others+=("$source"); done
     "$CC" -std=c11 -O2 -g -Wall -Wextra -Werror -pthread "${includes[@]}" -I. -Isrc tests/test_audiodec.c "${others[@]}" out/libatrac9.a -lm "${gpu[@]}" "${libraries[@]}" -o out/audiodec-test
     timeout 60 out/audiodec-test
+    # Bounds traps: a table row past 127 (guest frames carry an 8-bit index) fails instead of reading zeros.
+    "$CC" -std=c11 -O2 -g -Wall -Wextra -Werror -fsanitize=bounds -fsanitize-trap=bounds -I. tests/test_hevag.c third_party/vgmstream_hevag/hevag.c -lm -o out/hevag-test
+    out/hevag-test out/audiodec-clips/vag0.vagp
     "$CC" -std=c11 -O2 -g -Wall -Wextra -Werror -pthread "${includes[@]}" -I. -Isrc tests/test_videodec.c "${libraries[@]}" -o out/videodec-test
     out/videodec-test tests/data/tiny.h264
     "$CC" -std=c11 -O2 -g -Wall -Wextra -Werror -pthread -I. -Isrc tests/test_services.c -o out/services-test

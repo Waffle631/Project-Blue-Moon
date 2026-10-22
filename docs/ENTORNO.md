@@ -115,6 +115,24 @@ ninja -C out/gpu frame-capture-test && out/gpu/frame-capture-test   # un test C+
 Línea base (2026-10-14): 10/10 tests en C pasan; Python 238 tests OK con 37 saltados (17 piden
 `pip install iced-x86`, 16 son solo de Windows/Tk, 2 piden el dump de GoW3, 2 son de fuentes GDI).
 
+Tests que usan contenido del juego (sin versionar) escriben `SKIP: <motivo>` cuando les falta algo:
+los clips de `python3 tools/extract_audio_clips.py --image Tsukihime/CUSA47999/image --out
+out/audiodec-clips` (Audiodec y HEVAG) y, para `matches_vgmstream_cli` de `out/hevag-test`, un
+`vgmstream-cli`, que Fedora no empaqueta. Se compila del mismo commit del que sale
+`third_party/vgmstream_hevag` (`VENDOR.txt`), sin códecs opcionales, y el test lo busca en
+`$VGMSTREAM_CLI`, `out/vgmstream-cli` y el `PATH`:
+
+```bash
+mkdir -p out/vgmstream-src && cd out/vgmstream-src
+curl -L -o vgmstream.tar.gz https://codeload.github.com/vgmstream/vgmstream/tar.gz/db77f98f405a45ad08df98aa444cae3848f95e6c
+tar xzf vgmstream.tar.gz
+cmake -S vgmstream-db77f98f405a45ad08df98aa444cae3848f95e6c -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+    -DUSE_MPEG=OFF -DUSE_VORBIS=OFF -DUSE_FFMPEG=OFF -DUSE_G7221=OFF -DUSE_G719=OFF -DUSE_ATRAC9=OFF \
+    -DUSE_CELT=OFF -DUSE_SPEEX=OFF -DBUILD_V123=OFF -DBUILD_AUDACIOUS=OFF
+ninja -C build vgmstream_cli
+cd ../.. && ln -sf vgmstream-src/build/cli/vgmstream-cli out/vgmstream-cli
+```
+
 ## 4. Loader y juego
 
 ```bash
