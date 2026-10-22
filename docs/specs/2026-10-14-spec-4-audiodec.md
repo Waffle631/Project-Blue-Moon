@@ -11,7 +11,8 @@ dorado `8a0b6dd`; §6) y la 8 (voces y efectos `vse`: el juego entrega las voces
 reproducción offline de los flujos de una partida, `fa059fa`; §6) y la 9 (2026-10-21: suites verdes,
 `--check-imports` sin Audiodec y un arranque de 60 s limpio; §6). **La parte 4a queda cerrada.** En la
 4b (HEVAG), hecha la tarea 10 (fase A: el PR #5289 sigue abierto, el contrato sale del juego y de una
-ejecución trazada, `e6d01e7`; §6). Sigue la tarea 11. Roadmap:
+ejecución trazada, `e6d01e7`; §6) y la 11 (decodificador HEVAG adaptado de vgmstream, igual muestra a
+muestra que `vgmstream-cli` en las 19 entradas de `vag.mrg`, `0e76e5d`; §6). Sigue la tarea 12. Roadmap:
 `docs/tsuki/ROADMAP.md`, sección "Spec 4".
 
 Marcas: **[V]** comprobado (con el comando, la ruta o el log); **[H]** hipótesis que se confirma en
@@ -441,6 +442,10 @@ juego mezcla con el panorama de cada voz (**[V]**).)*
 - El decodificador HEVAG se toma de vgmstream (`decode_hevag` y su tabla) y se adapta al estilo del
   repo, **conservando su aviso de copyright y su licencia** en el archivo copiado. Dónde va (por
   ejemplo, `third_party/` o un archivo propio en `src/`) lo decide el implementador.
+  *(2026-10-21, tarea 11, `0e76e5d`: va en `third_party/vgmstream_hevag/` (`hevag.c`, `hevag.h`,
+  `LICENSE` con el `COPYING` de vgmstream y `VENDOR.txt` con el commit `db77f98` y los cambios). La tabla
+  se copia tal cual; la función decodifica una trama de un canal y devuelve su bandera. Se compila con
+  las opciones del proyecto.)*
 - El estado del decodificador (las 4 muestras de historia) va en la memoria de trabajo que entrega el
   guest o en una tabla del runtime indexada por ella, según lo que muestre la fase A.
 - `InitDecoder` y `Decode` sobre ese decodificador; otro códec → `STOP:`.
@@ -665,6 +670,33 @@ criterios de 4a de §10.
   - cada llamada decodifica una trama por canal y escribe su bandera en bsi `+0x28`;
   - los parámetros `+0x34` ≠ 1 dan `INVALID_WORD_LENGTH`.
 
+**Resultado (2026-10-21, tarea 11: decodificador HEVAG, `0e76e5d`).**
+
+- **Código:** `third_party/vgmstream_hevag/`, adaptado de `src/coding/psv_decoder.c` de vgmstream
+  (commit `db77f98`). Lleva el aviso de copyright y la licencia tipo ISC en `hevag.c` y en `LICENSE`,
+  y los cambios en `VENDOR.txt`.
+  - La tabla de 128×4 en `float` y la descripción del códec se copian tal cual.
+  - `hevag_decode_frame(estado, trama, salida)` decodifica una trama de 16 bytes de un canal en 28
+    muestras de 16 bits. Guarda la historia sin recortar y **devuelve la bandera de la trama**, que el
+    runtime tiene que pasar al juego (bsi `+0x28`). Es la interfaz del plan, salvo que el plan pedía
+    devolver un tamaño.
+- **Tests:** `tests/test_hevag.c` (`out/hevag-test`, en `build.sh --test`): seis casos calculados a mano
+  y `matches_vgmstream_cli` sobre `vag0.vagp` (`moon_se00001_L`).
+  - Los dos últimos casos a mano (recorte e índice mayor que 127) no estaban en el plan. Se añadieron
+    porque sin ellos sobrevivían dos mutaciones.
+  - El de índice fuera de tabla solo falla con `-fsanitize=bounds -fsanitize-trap=bounds`, porque la
+    fila de más allá lee ceros. Esas opciones van en la línea del test de `build.sh`.
+- **Referencia independiente:** `vgmstream-cli` no está empaquetado en Fedora. Se compiló del mismo
+  commit, sin códecs opcionales, en `out/vgmstream-src` (receta en `docs/ENTORNO.md`). Las **19 entradas
+  de `vag.mrg`** salen idénticas muestra a muestra, también `dummy`, que es estéreo
+  (`out/spec4-t11/all19.log`). Valida la adaptación, no el redondeo de Sony (§11).
+- **Pruebas:**
+  - RED: sin `hevag.c` no enlaza; con un stub, fallan 5 de 5.
+  - GREEN: 7 de 7.
+  - Mutaciones: 10 de 10 (`out/spec4-t11/mutate.log`).
+  - `build.sh --test`: `PASS: HEVAG decoder` y `PASS: Audiodec contracts` (`out/spec4-t11-test.log`).
+  - Python: `Ran 267`, `OK (skipped=35, expected failures=4)`.
+
 ## 7. Requisitos
 
 - Cuando el juego envíe un bloque válido, el sistema debe devolver el PCM en el formato y tamaño que
@@ -740,6 +772,13 @@ criterios de 4a de §10.
 - Para 4b, un test del decodificador HEVAG: tramas sintéticas con índices de tabla bajos (≤ `0x1c`,
   donde HEVAG se comporta como el VAG clásico) y altos, con el resultado calculado aparte. Además, si
   hay un fragmento local, se compara con `vgmstream-cli` cuando esté instalado; si no, se omite.
+  *(2026-10-21, tarea 11, `0e76e5d`: hecho en `tests/test_hevag.c`, `out/hevag-test`. Hay seis casos
+  calculados a mano: índice clásico, tabla extendida, silencio y bandera 7, historia entre tramas,
+  recorte de la salida sin recortar la historia e índice mayor que 127. A ellos se suma
+  `matches_vgmstream_cli` sobre `vag0.vagp`. Fedora no empaqueta `vgmstream-cli`: se compila del mismo
+  commit con la receta de `docs/ENTORNO.md`, y sin él el test escribe `SKIP:`. El test se compila con
+  trampas de límites, para que un índice fuera de la tabla falle en vez de leer ceros. Mutaciones: 10
+  de 10.)*
 - **Clips de referencia:** no hay ATRAC9 ni HEVAG pequeños en el repo, y el contenido del juego tiene
   derechos. Se extraen en local del dump con el formato de la sección 2.2, **sin versionarlos**: una
   pista de `bgm.mrg` (estéreo), una de las 11 entradas mono de `vse.mrg` (mono, sin MZX: las voces
@@ -768,7 +807,8 @@ criterios de 4a de §10.
 
 ## 9. Archivos
 
-Nuevos: `src/runtime_audiodec_cpu.c`, el decodificador HEVAG (adaptado de vgmstream),
+Nuevos: `src/runtime_audiodec_cpu.c`, el decodificador HEVAG (adaptado de vgmstream;
+`third_party/vgmstream_hevag/`, con `tests/test_hevag.c`),
 `docs/audiodec.md`, `tests/test_audiodec.c`, `tests/test_audiodec.py` y la herramienta que extrae los
 clips de referencia. Modificados: `src/runtime_audiodec.c`, `src/runtime.h` y `src/runtime.c`
 (resolver y `runtime_report`), `src/import_names.inc` (las 9 entradas), `build.sh` y, si hace falta
@@ -799,7 +839,8 @@ aceptar módulos de sistema nuevos, `src/runtime_content.c`.
 
 - [x] `docs/audiodec.md` describe el HEVAG observado, contrastado con el PR #5289. *(2026-10-21, tarea
   10, `e6d01e7`: apartado 2.6, con la ejecución trazada `b1`, 38 voces en el menú de título.)*
-- [ ] El test del decodificador HEVAG pasa.
+- [x] El test del decodificador HEVAG pasa. *(2026-10-21, tarea 11, `0e76e5d`: `PASS: HEVAG decoder`
+  en `build.sh --test`, con `vgmstream-cli`; `out/spec4-t11-test.log`.)*
 - [ ] En el juego suenan los efectos de `vag.mrg` (lo juzga el usuario).
 - [x] `--check-imports` no lista ninguna función de `libSceAudiodecCpu`. *(2026-10-20, tarea 6: quedan
   3, las trampas de la Spec 2; `out/spec4-t6-check-imports.log`. Ojo: las tres responden con error
@@ -813,6 +854,9 @@ aceptar módulos de sistema nuevos, `src/runtime_content.c`.
   roadmap, ahora solo para 4a). La fase A existe para convertir la incertidumbre en datos.
 - El decodificador HEVAG de vgmstream salió de ingeniería inversa y puede redondear distinto que el de
   Sony. El impacto es bajo: son 19 efectos cortos.
+  *(2026-10-21, tarea 11: la comparación con `vgmstream-cli` comprueba la adaptación, no el redondeo
+  de Sony, porque es el mismo algoritmo. Sigue sin haber referencia de Sony; lo juzga el oído del
+  usuario en la tarea 12.)*
 - 32 hilos `at9` decodificando a la vez: una tabla mal protegida da fallos aleatorios. Se mitiga con
   el mutex de la sección 3 y un caso de varios hilos en el test. *(2026-10-20, tarea 5: hecho, con el
   rwlock y siete tests con hilos. Pero una regresión del cerrojo de las tablas solo la ve
@@ -939,3 +983,7 @@ aceptar módulos de sistema nuevos, `src/runtime_content.c`.
     acabar por la bandera 7 de la bsi.
   - Decisiones para la tarea 12: el estado va en la memoria de trabajo del guest, la primera llamada
     consume solo la cabecera y hay una trama por llamada.
+- 2026-10-21 (después): tarea 11, decodificador HEVAG (§6, `0e76e5d`).
+  - Se adapta `decode_hevag` de vgmstream en `third_party/vgmstream_hevag/`, con su aviso ISC.
+  - Las 19 entradas de `vag.mrg`, también la estéreo, salen igual muestra a muestra que con un
+    `vgmstream-cli` compilado del mismo commit.
