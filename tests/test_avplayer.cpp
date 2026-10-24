@@ -24,6 +24,8 @@
 //      -flags:a +bitexact tiny_av.mp4
 //
 // Usage: avplayer-test <data dir> [case ...]   (ninja -C out/gpu avplayer-test)
+//        avplayer-test --movie-dir <dir> [--seconds N] [file.mp4 ...]   plays each video of <dir>
+//        (Tsukihime/CUSA47999/image/movie) for N s, 3 by default, each in its own child (Sweep).
 // AVPLAYER_TEST_GDB=1 adds gdb's stacks of a hung child to the report; AVPLAYER_TEST_KEEP=<dir> keeps
 // each case's stderr in <dir>/<case>.stderr (run with GOW3_TRACE_AVPLAYER=1 to see every call).
 #include <algorithm>
@@ -87,13 +89,18 @@ constexpr double kFrameMs = 1001.0 / 30;          // the fixtures run at 29.97 f
 
 std::string g_data;
 
-// Shared with the parent: the step the child is in, and how many steps it has taken.
+// Shared with the parent: the step the child is in, and how many steps it has taken. The sweep's
+// child also leaves its counts and the message of a failed check, which its parent's line reports.
 struct Progress {
     std::atomic<unsigned> steps;
     char step[256];
+    char failure[256];
+    std::atomic<int> frames, blocks;
+    std::atomic<long long> end_ms, late_ms;
 };
 Progress* g_progress = nullptr;
 constexpr long long kStallMs = 15000;
+bool g_sweep = false; // --movie-dir: one line per video, so a failed check is not printed apart
 
 long long MsSince(Clock::time_point start) {
     return std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - start).count();
@@ -118,10 +125,9 @@ std::string Data(const char* name) {
 [[noreturn, gnu::format(printf, 1, 2)]] void Fail(const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    std::printf("  failed: ");
-    std::vprintf(fmt, args);
-    std::printf("\n");
+    std::vsnprintf(g_progress->failure, sizeof(g_progress->failure), fmt, args);
     va_end(args);
+    if (!g_sweep) std::printf("  failed: %s\n", g_progress->failure);
     std::fflush(stdout);
     std::_Exit(1);
 }
@@ -299,7 +305,8 @@ struct Session {
     s32 start_result = 0;
     Clock::time_point start_time;
     bool has_audio = false;
-    u64 duration_ms = 0;
+    u64 duration_ms = 0;       // of the longest stream
+    u64 video_duration_ms = 0; // of the video stream
 };
 
 void PS4_SYSV_ABI OnEvent(void* object, AvPlayerEvents id, s32, void* data) {
@@ -315,12 +322,13 @@ void PS4_SYSV_ABI OnEvent(void* object, AvPlayerEvents id, s32, void* data) {
         // then Start and SetLooping (docs/avplayer.md §1).
         const s32 count = sceAvPlayerStreamCount(s->handle);
         bool has_audio = false;
-        u64 duration = 0;
+        u64 duration = 0, video_duration = 0;
         for (s32 index = 0; index < count; ++index) {
             AvPlayerStreamInfo info{};
             if (sceAvPlayerGetStreamInfo(s->handle, u32(index), &info) != 0) continue;
             has_audio |= info.type == AvPlayerStreamType::Audio;
             duration = std::max(duration, info.duration);
+            if (info.type == AvPlayerStreamType::Video) video_duration = info.duration;
             sceAvPlayerEnableStream(s->handle, u32(index));
         }
         const auto start_time = Clock::now();
@@ -330,6 +338,7 @@ void PS4_SYSV_ABI OnEvent(void* object, AvPlayerEvents id, s32, void* data) {
             std::lock_guard lock(s->mutex);
             s->has_audio = has_audio;
             s->duration_ms = duration;
+            s->video_duration_ms = video_duration;
             s->start_time = start_time;
             s->start_result = result;
             s->started = true;
@@ -1121,23 +1130,38 @@ int Count(const std::string& text, const char* needle) {
     return count;
 }
 
-bool RunIsolated(const Case& test) {
+// What became of one forked child; an empty reason means it passed.
+struct Outcome {
+    std::string reason;
+    long long ms = 0;
+    bool hung = false;
+    std::string threads, stacks; // of a hung child, before it was killed
+    std::string errors;          // its stderr
+};
+
+Outcome RunChild(const std::string& name, int deadline_s, const std::function<void()>& run,
+                 bool broken_input) {
+    Outcome outcome;
     char path[] = "/tmp/avplayer-test-stderr-XXXXXX";
     const int err = mkstemp(path);
     if (err < 0) {
-        std::printf("FAIL: %s (mkstemp)\n", test.name);
-        return false;
+        outcome.reason = "mkstemp";
+        return outcome;
     }
     unlink(path);
     std::snprintf(g_progress->step, sizeof(g_progress->step), "start");
-    std::printf("-- %s\n", test.name);
+    g_progress->failure[0] = '\0';
+    g_progress->frames = 0;
+    g_progress->blocks = 0;
+    g_progress->end_ms = -1;
+    g_progress->late_ms = 0;
     std::fflush(stdout);
     const pid_t pid = fork();
     if (pid == 0) {
         dup2(err, 2);
         close(err);
         setvbuf(stdout, nullptr, _IOLBF, 0);
-        test.run();
+        run();
         std::fflush(stdout);
         std::_Exit(0);
     }
@@ -1145,38 +1169,39 @@ bool RunIsolated(const Case& test) {
     auto last_step = begin;
     unsigned steps = g_progress->steps;
     int status = 0;
-    std::string hung, stacks, step;
+    std::string step;
     long long stalled_ms = 0;
     while (waitpid(pid, &status, WNOHANG) == 0) {
         if (g_progress->steps != steps) {
             steps = g_progress->steps;
             last_step = Clock::now();
         }
-        if (MsSince(last_step) > kStallMs || MsSince(begin) > test.deadline_s * 1000LL) {
+        if (MsSince(last_step) > kStallMs || MsSince(begin) > deadline_s * 1000LL) {
             step = g_progress->step;
             stalled_ms = MsSince(last_step);
-            hung = Threads(pid);
+            outcome.hung = true;
+            outcome.threads = Threads(pid);
             const char* gdb = std::getenv("AVPLAYER_TEST_GDB");
-            if (gdb != nullptr && gdb[0] == '1') stacks = Stacks(pid);
+            if (gdb != nullptr && gdb[0] == '1') outcome.stacks = Stacks(pid);
             kill(pid, SIGKILL);
             waitpid(pid, &status, 0);
             break;
         }
         SleepMs(20);
     }
-    const long long ms = MsSince(begin);
-    const std::string errors = ReadAll(err);
+    outcome.ms = MsSince(begin);
+    outcome.errors = ReadAll(err);
     close(err);
     if (const char* keep = std::getenv("AVPLAYER_TEST_KEEP")) {
-        if (FILE* file = std::fopen((std::string(keep) + "/" + test.name + ".stderr").c_str(), "w")) {
-            std::fwrite(errors.data(), 1, errors.size(), file);
+        if (FILE* file = std::fopen((std::string(keep) + "/" + name + ".stderr").c_str(), "w")) {
+            std::fwrite(outcome.errors.data(), 1, outcome.errors.size(), file);
             std::fclose(file);
         }
     }
-    const int join_failed = Count(errors, "join failed");
-    const int decoder_errors = test.broken_input ? 0 : Count(errors, "[h264 @");
+    const int join_failed = Count(outcome.errors, "join failed");
+    const int decoder_errors = broken_input ? 0 : Count(outcome.errors, "[h264 @");
     char reason[512] = "";
-    if (!hung.empty()) {
+    if (outcome.hung) {
         std::snprintf(reason, sizeof(reason), "hung: no progress for %lld s in \"%s\"",
                       stalled_ms / 1000, step.c_str());
     } else if (WIFSIGNALED(status)) {
@@ -1189,13 +1214,15 @@ bool RunIsolated(const Case& test) {
     } else if (decoder_errors > 0) {
         std::snprintf(reason, sizeof(reason), "%d H.264 decoder errors on stderr", decoder_errors);
     }
-    if (reason[0] == '\0') {
-        std::printf("PASS: %s (%lld ms)\n", test.name, ms);
-        return true;
-    }
-    std::printf("FAIL: %s: %s (%lld ms)\n", test.name, reason, ms);
-    if (!hung.empty()) std::printf("  threads: %s\n%s", hung.c_str(), stacks.c_str());
-    // The tail of the child's stderr: AvPlayer's own warnings and errors.
+    outcome.reason = reason;
+    return outcome;
+}
+
+// A failed child's threads, if it hung, and the tail of its stderr: AvPlayer's own warnings and
+// errors.
+void PrintDetails(const Outcome& outcome) {
+    if (outcome.hung) std::printf("  threads: %s\n%s", outcome.threads.c_str(), outcome.stacks.c_str());
+    const std::string& errors = outcome.errors;
     std::vector<std::string> lines;
     for (size_t at = 0; at < errors.size();) {
         const size_t end = errors.find('\n', at);
@@ -1205,20 +1232,145 @@ bool RunIsolated(const Case& test) {
     for (size_t index = lines.size() > 12 ? lines.size() - 12 : 0; index < lines.size(); ++index) {
         std::printf("  stderr: %s\n", lines[index].c_str());
     }
+}
+
+bool RunIsolated(const Case& test) {
+    std::printf("-- %s\n", test.name);
+    const Outcome outcome = RunChild(test.name, test.deadline_s, test.run, test.broken_input);
+    if (outcome.reason.empty()) {
+        std::printf("PASS: %s (%lld ms)\n", test.name, outcome.ms);
+        return true;
+    }
+    std::printf("FAIL: %s: %s (%lld ms)\n", test.name, outcome.reason.c_str(), outcome.ms);
+    PrintDetails(outcome);
     return false;
+}
+
+// ---- Sweep of the game's videos (--movie-dir, plan task 5) ----
+
+// One video played the way the game plays it, for at most `seconds`: every stream enabled and
+// started from StateReady, the video drained here and the audio by an "av audio" thread, then Stop
+// and Close. It needs a frame, an audio block if there is an audio stream, timestamps that never
+// go back and, if the video ended in time, its last frame: 75 of the 134 videos have B-frames,
+// which the fixtures do not, and the decoder holds those frames back. The counts go to the parent
+// through g_progress.
+void PlayMovie(const std::string& path, int seconds) {
+    Session s;
+    Step("AddSource");
+    const s32 added = Open(s, path);
+    CHECK(added == 0, "AddSource %#x", added);
+    CHECK(s.WaitStarted(5000) && s.start_result == 0, "no Start within 5 s (events %s)",
+          s.EventList().c_str());
+    std::optional<AudioConsumer> audio;
+    if (s.has_audio) audio.emplace(s.handle);
+    Video video;
+    bool ended = false;
+    // In one-second slices, so that a long window is not taken for a stall.
+    for (int second = 0; second < seconds && !ended; ++second) {
+        Step("playing, second %d", second);
+        ended = Drain(s, video, 1000, audio ? &*audio : nullptr);
+    }
+    g_progress->frames = video.frames;
+    g_progress->late_ms = video.frames > 0 ? video.max_late : 0;
+    g_progress->end_ms = ended ? video.inactive_ms : -1;
+    long long stop_ms = 0, close_ms = 0;
+    Step("Stop");
+    const s32 stop = Timed(stop_ms, [&] { return sceAvPlayerStop(s.handle); });
+    if (audio) {
+        audio->Join();
+        g_progress->blocks = audio->Blocks();
+    }
+    Step("Close");
+    Timed(close_ms, [&] { return sceAvPlayerClose(s.handle); });
+    CHECK(video.frames >= 1, "no video frame in %d s", seconds);
+    CHECK(!s.has_audio || g_progress->blocks >= 1, "no audio block in %d s", seconds);
+    CHECK(video.backwards == 0, "%d frames went back in time", video.backwards);
+    // The last frame starts one frame before the end: 50 ms is one frame at 30 fps, not two.
+    CHECK(!ended || video.last_ts + 50 >= s.video_duration_ms,
+          "ended with the frame at %llu ms of a %llu ms video", (unsigned long long)video.last_ts,
+          (unsigned long long)s.video_duration_ms);
+    CHECK(ended || stop == 0, "Stop during playback returned %#x", stop);
+    CHECK(stop_ms < 2000 && close_ms < 2000, "Stop %lld ms, Close %lld ms", stop_ms, close_ms);
+}
+
+// PlayMovie on every .mp4 of dir (or on the ones named), each in its own child: one line per
+// video, "OK|FAIL <file> v=<frames> a=<audio blocks> ms=<run> [end=<ms after Start>] late=<ms>",
+// where late is how far the latest frame came behind its timestamp. A failure does not stop the
+// rest.
+int Sweep(const std::string& dir, int seconds, const std::vector<std::string>& only) {
+    std::vector<std::string> movies;
+    if (DIR* listing = opendir(dir.c_str())) {
+        while (const dirent* entry = readdir(listing)) {
+            const std::string name = entry->d_name;
+            const bool mp4 = name.size() > 4 && name.compare(name.size() - 4, 4, ".mp4") == 0;
+            if (mp4 && (only.empty() || std::find(only.begin(), only.end(), name) != only.end())) {
+                movies.push_back(name);
+            }
+        }
+        closedir(listing);
+    }
+    std::sort(movies.begin(), movies.end());
+    if (movies.empty()) {
+        std::fprintf(stderr, "no .mp4 to play in %s\n", dir.c_str());
+        return 2;
+    }
+    g_sweep = true;
+    std::string failed;
+    int failures = 0;
+    for (const auto& name : movies) {
+        const std::string path = dir + "/" + name;
+        const Outcome outcome =
+            RunChild(name, seconds + 30, [&path, seconds] { PlayMovie(path, seconds); }, false);
+        const bool ok = outcome.reason.empty();
+        std::printf("%s %s v=%d a=%d ms=%lld", ok ? "OK" : "FAIL", name.c_str(),
+                    g_progress->frames.load(), g_progress->blocks.load(), outcome.ms);
+        if (g_progress->end_ms >= 0) std::printf(" end=%lld", g_progress->end_ms.load());
+        std::printf(" late=%lld", g_progress->late_ms.load());
+        if (!ok) {
+            std::printf(": %s", outcome.reason.c_str());
+            if (g_progress->failure[0] != '\0') std::printf(": %s", g_progress->failure);
+        }
+        std::printf("\n");
+        std::fflush(stdout);
+        if (!ok) {
+            PrintDetails(outcome);
+            failed += " " + name;
+            ++failures;
+        }
+    }
+    std::printf("%d of %zu videos failed%s\n", failures, movies.size(), failed.c_str());
+    return failures == 0 ? 0 : 1;
 }
 
 } // namespace
 
 int main(int argc, char** argv) {
-    if (argc < 2) {
-        std::fprintf(stderr, "usage: %s <data dir> [case ...]\n", argv[0]);
+    const auto usage = [argv] {
+        std::fprintf(stderr,
+                     "usage: %s <data dir> [case ...]\n"
+                     "       %s --movie-dir <dir> [--seconds N] [file.mp4 ...]\n",
+                     argv[0], argv[0]);
         return 2;
-    }
-    g_data = argv[1];
-    if (access(Data("tiny_v150.mp4").c_str(), R_OK) != 0) {
-        std::fprintf(stderr, "missing fixture %s\n", Data("tiny_v150.mp4").c_str());
-        return 2;
+    };
+    std::string movie_dir;
+    int seconds = 3, first = 2;
+    if (argc >= 2 && std::strcmp(argv[1], "--movie-dir") == 0) {
+        if (argc < 3) return usage();
+        movie_dir = argv[2];
+        first = 3;
+        if (argc >= 5 && std::strcmp(argv[3], "--seconds") == 0) {
+            seconds = std::atoi(argv[4]);
+            first = 5;
+        }
+        if (seconds < 1) return usage();
+    } else if (argc < 2) {
+        return usage();
+    } else {
+        g_data = argv[1];
+        if (access(Data("tiny_v150.mp4").c_str(), R_OK) != 0) {
+            std::fprintf(stderr, "missing fixture %s\n", Data("tiny_v150.mp4").c_str());
+            return 2;
+        }
     }
     void* shared = mmap(nullptr, sizeof(Progress), PROT_READ | PROT_WRITE,
                         MAP_SHARED | MAP_ANONYMOUS, -1, 0);
@@ -1227,6 +1379,8 @@ int main(int argc, char** argv) {
     if (ThreadCount() != 1) {
         std::printf("warning: %d threads before fork\n", ThreadCount());
     }
+    const std::vector<std::string> only(argv + first, argv + argc);
+    if (!movie_dir.empty()) return Sweep(movie_dir, seconds, only);
     const Case cases[] = {
         {"plays_to_end_video_only", 20, PlaysToEndVideoOnly},
         {"plays_to_end_with_audio", 20, PlaysToEndWithAudio},
@@ -1243,7 +1397,6 @@ int main(int argc, char** argv) {
         {"jump_then_stop_like_the_game", 60, JumpThenStopLikeTheGame},
         {"jump_past_the_end_and_when_stopped", 20, JumpPastTheEndAndWhenStopped},
     };
-    const std::vector<std::string> only(argv + 2, argv + argc);
     int ran = 0, failed = 0;
     for (const auto& test : cases) {
         if (!only.empty() && std::find(only.begin(), only.end(), test.name) == only.end()) continue;
