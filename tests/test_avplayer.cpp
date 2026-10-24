@@ -12,12 +12,14 @@
 // (gpu/shim/core/libraries/kernel/threads.h) also fails it, and so does a complaint of FFmpeg's H.264
 // decoder ("[h264 @"): the fixtures are valid, so it was fed bytes that are not the stream.
 //
-// Fixtures (tests/data, FFmpeg 8.1). They are H.264 Main without B-frames at 29.97 fps with the moov
-// first, like image/movie/. tiny_v150 replicates phasetitle_01_00_en.mp4 (video only, 150 frames,
-// 5.005 s).
+// Fixtures (tests/data, FFmpeg 8.1). They are H.264 Main at 29.97 fps with the moov first, like
+// image/movie/, and without B-frames but for tiny_b150. tiny_v150 replicates
+// phasetitle_01_00_en.mp4 (video only, 150 frames, 5.005 s); tiny_b150 is the same with up to two
+// B-frames in a row, like 75 of the 134 videos (has_b_frames 1 or 2).
 //   V="-c:v libx264 -profile:v main -bf 0 -pix_fmt yuv420p -crf 42 -preset veryslow -map_metadata -1
 //      -fflags +bitexact -flags:v +bitexact -movflags +faststart"
 //   ffmpeg -f lavfi -i testsrc2=size=320x180:rate=30000/1001 -frames:v 150 $V -an tiny_v150.mp4
+//   ffmpeg -f lavfi -i testsrc2=size=320x180:rate=30000/1001 -frames:v 150 $V -bf 2 -an tiny_b150.mp4
 //   ffmpeg -f lavfi -i testsrc2=size=320x180:rate=30000/1001 -frames:v 20 $V -an tiny_v20.mp4
 //   ffmpeg -f lavfi -i testsrc2=size=320x180:rate=30000/1001 -f lavfi -i
 //      sine=frequency=440:sample_rate=48000 -t 2 $V -c:a aac -ac 2 -ar 48000 -b:a 48k
@@ -475,10 +477,10 @@ std::string Describe(const Video& video) {
 
 // ---- Cases ----
 
-void PlaysToEndVideoOnly() {
+void PlaysToEndVideoOnly(const char* fixture) {
     Session s;
-    Step("AddSource tiny_v150");
-    CHECK(Open(s, Data("tiny_v150.mp4")) == 0, "AddSource failed");
+    Step("AddSource %s", fixture);
+    CHECK(Open(s, Data(fixture)) == 0, "AddSource failed");
     CHECK(s.WaitStarted(2000) && s.start_result == 0, "no Start within 2 s (events %s)",
           s.EventList().c_str());
     Video video;
@@ -496,10 +498,20 @@ void PlaysToEndVideoOnly() {
                 video.inactive_ms, (unsigned long long)s.duration_ms, s.EventList().c_str());
     std::printf("  Stop %#x in %lld ms, Close %#x in %lld ms\n", stop, stop_ms, closed, close_ms);
     CHECK(ended, "IsActive() still true after 10 s");
-    CHECK(video.frames == 150, "%d of 150 frames", video.frames); // no B-frames: none held back
+    CHECK(video.frames == 150, "%d of 150 frames", video.frames);
     CHECK(video.max_early <= 150, "a frame came %lld ms before its timestamp", video.max_early);
     CHECK(stop_event, "no StateStop within 1 s of the end, before Stop");
     CHECK(stop_ms < 2000 && close_ms < 2000, "Stop %lld ms, Close %lld ms", stop_ms, close_ms);
+}
+
+void PlaysToEndVideoOnly() {
+    PlaysToEndVideoOnly("tiny_v150.mp4");
+}
+
+// 75 of the game's 134 videos have B-frames (tools/probe_movies.sh), up to two in a row. The
+// decoder holds back as many frames as it reorders, and the last ones still have to come out.
+void PlaysToEndWithBFrames() {
+    PlaysToEndVideoOnly("tiny_b150.mp4");
 }
 
 void PlaysToEndWithAudio() {
@@ -1383,6 +1395,7 @@ int main(int argc, char** argv) {
     if (!movie_dir.empty()) return Sweep(movie_dir, seconds, only);
     const Case cases[] = {
         {"plays_to_end_video_only", 20, PlaysToEndVideoOnly},
+        {"plays_to_end_with_b_frames", 20, PlaysToEndWithBFrames},
         {"plays_to_end_with_audio", 20, PlaysToEndWithAudio},
         {"eof_then_stop_trigger", 300, EofThenStopTrigger},
         {"eof_with_undrained_buffers_then_stop", 60, EofWithUndrainedBuffersThenStop},

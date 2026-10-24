@@ -791,7 +791,12 @@ void AvPlayerSource::VideoDecoderThread(std::stop_token stop) {
 
     LOG_INFO(Lib_AvPlayer, "Video Decoder Thread started");
     s64 skipped = std::numeric_limits<s64>::min(); // gow3: SkipBeforeJumpTarget
-    while ((!m_is_eof || m_video_packets.Size() != 0) && !stop.stop_requested()) {
+    // gow3: at EOF the decoder is drained with a null packet. It holds back as many frames as the
+    // stream reorders (has_b_frames: 1 or 2 in 75 of the game's 134 videos), and without the drain
+    // a video with B-frames ended without its last frames (avplayer-test,
+    // plays_to_end_with_b_frames; 148 of 150).
+    bool draining = false;
+    while ((!m_is_eof || m_video_packets.Size() != 0 || !draining) && !stop.stop_requested()) {
         // gow3: also wake at EOF, which the demuxer notifies; otherwise a decoder that has drained
         // its packets sleeps on, the demuxer never gets past joining it and OnEOF (the StateStop of
         // a natural end) never comes. The audio decoder of a video-only clip always slept there.
@@ -800,12 +805,17 @@ void AvPlayerSource::VideoDecoderThread(std::stop_token stop) {
             })) {
             continue;
         }
+        // gow3: EOF read before Pop: the demuxer pushes nothing after it sets m_is_eof, so an
+        // empty queue then means that the last packet has been sent.
+        const bool eof = m_is_eof;
         const auto packet = m_video_packets.Pop();
-        if (!packet.has_value()) {
+        if (!packet.has_value() && !eof) {
             continue;
         }
+        draining = !packet.has_value();
 
-        auto res = avcodec_send_packet(m_video_codec_context.get(), packet->get());
+        auto res =
+            avcodec_send_packet(m_video_codec_context.get(), draining ? nullptr : packet->get());
         if (res < 0 && res != AVERROR(EAGAIN)) {
             m_state.OnError();
             LOG_ERROR(Lib_AvPlayer, "Could not send packet to the video codec. Error = {}",
