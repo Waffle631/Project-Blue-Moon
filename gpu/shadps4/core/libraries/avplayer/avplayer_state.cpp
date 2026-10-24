@@ -6,6 +6,7 @@
 #include "common/thread.h"
 #include "core/libraries/avplayer/avplayer_error.h"
 #include "core/libraries/avplayer/avplayer_state.h"
+#include "core/libraries/avplayer/avplayer_trace.h"
 #include "core/libraries/kernel/process.h"
 
 #include <magic_enum/magic_enum.hpp>
@@ -429,6 +430,21 @@ std::optional<bool> AvPlayerState::OnBufferingCheckEvent(u32 num_frames) {
 // Called inside CONTROLLER thread
 void AvPlayerState::EmitEvent(AvPlayerEvents event_id, void* event_data) {
     LOG_INFO(Lib_AvPlayer, "Sending event to the game: id = {}", magic_enum::enum_name(event_id));
+    // gow3: GOW3_TRACE_AVPLAYER (avplayer_trace.h). game_obj is the event object the game passed to
+    // Init/InitEx, which ties the event to its player. With auto_start, StateReady stays here.
+    if (AvTraceEnabled()) {
+        const auto name = magic_enum::enum_name(event_id);
+        const bool to_game = m_event_replacement.event_callback != nullptr &&
+                             !(m_auto_start && event_id == AvPlayerEvents::StateReady);
+        if (event_id == AvPlayerEvents::WarningId && event_data != nullptr) {
+            AvTrace("Event %.*s %#x game_obj=%p to_game=%d", int(name.size()), name.data(),
+                    *static_cast<const u32*>(event_data), m_event_replacement.object_ptr,
+                    int(to_game));
+        } else {
+            AvTrace("Event %.*s game_obj=%p to_game=%d", int(name.size()), name.data(),
+                    m_event_replacement.object_ptr, int(to_game));
+        }
+    }
     const auto callback = m_init_data.event_replacement.event_callback;
     if (callback) {
         const auto ptr = m_init_data.event_replacement.object_ptr;
