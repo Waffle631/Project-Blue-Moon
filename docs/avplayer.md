@@ -69,7 +69,7 @@ Medido desde `Start` en `out/run-t1-prologo.log`. Es la [H] "el vídeo va más r
 | `Start` → `StateStop` | 388 637 ms de pared |
 | Último fotograma | marca 388 600, entregado a los 388 590 ms |
 | Último bloque de audio | marca 388 651, entregado a los 388 635 ms |
-| Entregados | 11 659 fotogramas y 18 219 bloques (18 219 × 21,33 ms = 388,67 s) |
+| Entregados | 11 659 fotogramas (de 11 660; el último lo retenía el decodificador, §6) y 18 219 bloques (18 219 × 21,33 ms = 388,67 s) |
 | Pared − marca | vídeo de −15 a +19 ms (media −12); audio de −16 a 0 ms (media −15,7) |
 | EOF | sí: `EOF reached in demuxer`, los tres hilos salen normalmente y llega `StateStop` |
 | Lo que hace el juego al acabar | `IsActive` → falso, `Stop` (→ `0x806a0002`), guarda la partida y sigue |
@@ -180,3 +180,58 @@ demultiplexor hacía `avio_seek(pb, 0)` antes de `avformat_seek_file`.
 queda en la duración y cada fotograma de las vueltas siguientes sale en cuanto se pide: 5 480
 fotogramas en 2 s de `tiny_v20.mp4`, en vez de unos 60. En el juego, `titlebg1.mp4` iría al ritmo al
 que el juego llama a `GetVideoData` (unas 3 llamadas por fotograma, §1) a partir de los 120 s.
+
+## 6. Los 134 vídeos (tarea 5, 2026-10-24)
+
+**Qué hay** (`tools/probe_movies.sh` → `out/movies-probe.csv`, sin versionar, más un resumen de valores
+distintos):
+
+- Todos son H.264 1920×1080 `yuv420p` con una sola pista de vídeo: 82 Main, 48 High y 4 Constrained
+  Baseline (los `op1_arc`/`op2_ciel` en `_en` y `_zc`).
+- 82 van a 29,97 fps (30000/1001) y 52 a 30 fps. `r_frame_rate` es igual a `avg_frame_rate` en todos: no hay
+  fps variable, así que la duración por `avg_frame_rate` del salto (§4) es exacta.
+- 91 son solo vídeo. Los otros 43 llevan una pista AAC LC estéreo a 48 kHz, y en 37 de ellos el audio es la
+  primera pista (en `tiny_av.mp4` es la segunda). No hay audio que no sea estéreo, subtítulos ni otras pistas.
+- Fotogramas B (`has_b_frames`): ninguno en 59, 1 en 71 y 2 en 4 (`titlebg1`–`3` y `prologue.mp4`).
+- Duran 10 s o menos 117 vídeos: títulos de capítulo, créditos, `phaseout` y `TM_CI`. Los largos son los
+  openings (106–107 s), los finales (148–316 s), los prólogos (384–389 s) y los fondos del título (120 s).
+- Idiomas: 30 `_en`, 30 `_zc`, 28 `_zt` y 46 sin sufijo. Un juego en inglés usa los 30 `_en` y los 16
+  vídeos que no tienen variantes (créditos, finales, `phaseout`, `titlebg1`–`4`, `TM_CI`). De esos 46, 17
+  tienen fotogramas B.
+
+**Barrido** (`avplayer-test --movie-dir Tsukihime/CUSA47999/image/movie [--seconds N] [file.mp4 …]`). Cada
+vídeo se reproduce como en el juego, en su propio hijo: `FileReplacement`, todas las pistas, `Start` desde
+`StateReady`, vídeo y audio drenados, y después `Stop` y `Close`. Sale una línea por vídeo, `OK|FAIL
+<archivo> v=<fotogramas> a=<bloques> ms=<ejecución> [end=<ms tras Start>] late=<ms>`. Para pasar hacen falta:
+un fotograma; un bloque de audio si hay pista de audio; marcas que no retroceden; `Stop` = 0 si el vídeo
+seguía en marcha; `Stop` y `Close` en menos de 2 s; y, si el vídeo acaba dentro de la ventana, su último
+fotograma.
+
+| Pasada | Antes del arreglo | Después |
+|---|---|---|
+| 3 s, los 134 (`out/avplayer-sweep.log`) | 134 OK: 90–91 fotogramas, 140 bloques en los 43 con audio, `late` ≤ 37 ms | 134 OK, igual |
+| 12 s, los 117 de ≤ 10 s, hasta el final | **64 FAIL**: justo los 64 con `has_b_frames=1`, cada uno sin su último fotograma. Los 53 sin B, completos | 117 OK, todos con `nb_frames` fotogramas; `late` ≤ 70 ms |
+| 115 s, `op1_arc_en.mp4` (`out/avplayer-sweep-op1.log`) | — | OK: 3 211 de 3 211 fotogramas y 5 023 bloques; `late` 835 ms |
+
+`ffmpeg` también decodifica 5 023 tramas de los 5 024 paquetes AAC del opening (y 94 de 95 en `tiny_av`): la
+que falta no la pierde AvPlayer. **[H]** Los 835 ms de `late` son deriva del consumidor de audio del arnés.
+Despierta ~0,17 ms tarde por bloque, porque sondea cada 200 µs, y el reloj con audio sigue al audio:
+5 023 × 0,17 ≈ 835 ms.
+
+El único mensaje de stderr en los 134 es `Stop: Could not stop playback: already stopped.`: lo emite
+`Close` después del `Stop` del juego, y también sale en los fixtures.
+
+**[V] Con fotogramas B se perdían los últimos fotogramas** (arreglado en la tarea 5). El decodificador de
+vídeo terminaba al ver EOF con la cola de paquetes vacía, sin mandar el paquete nulo que vacía el
+decodificador, y H.264 retiene tantos fotogramas como reordena. `tiny_b150.mp4` (`has_b_frames=2`) daba 148
+de 150 fotogramas y terminaba 100 ms antes. Ahora el decodificador recibe el paquete nulo con EOF y la cola
+vacía; el caso fijo es `plays_to_end_with_b_frames`. En inglés afectaba a los créditos, los finales,
+`phaseout`, `phasetitle_05_01_en` y `prologue_en`. Los fondos del título hacen bucle y no llegan a EOF.
+En el juego ya se veía: la tarea 1 contó 11 659 fotogramas del prólogo (§2), y `prologue_en.mp4` tiene
+11 660.
+
+**Deuda anotada.** `IsActive()` no cuenta el paquete que tiene entre manos el decodificador ni los
+fotogramas que retiene. Mientras el decodificador va por delante del reloj, la cola de fotogramas no se
+vacía (hay 3 búferes de salida). Si fuera por detrás, el juego podría ver `IsActive()` falso antes del
+último fotograma; antes del arreglo ya pasaba lo mismo con el último paquete. El decodificador de audio no
+se vacía: AAC no retiene tramas.

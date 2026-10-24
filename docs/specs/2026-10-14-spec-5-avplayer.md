@@ -1,9 +1,9 @@
 # Spec 5 — Vídeo: AvPlayer
 
 Fecha: 2026-10-14. Estado: **en curso**: las tareas 1 (trazador y contrato), 2 (arnés), 3 (carrera de
-`Kernel::Thread` y otras causas) y 4 (`JumpToTime` real y bucle) del plan están cerradas desde el
-2026-10-24 (§9). Fuera del juego, el arnés pasa entero. La siguiente es la 5, el barrido de los 134
-vídeos; la confirmación en el juego es la 6.
+`Kernel::Thread` y otras causas), 4 (`JumpToTime` real y bucle) y 5 (barrido de los 134 vídeos) del plan
+están cerradas desde el 2026-10-24 (§9). Fuera del juego, el arnés pasa entero y los 134 vídeos se
+reproducen. La siguiente es la 6, la confirmación en el juego.
 Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 5".
 Depende de: Specs 2 y 3 (el juego tiene que llegar a pedir un vídeo).
 
@@ -169,10 +169,11 @@ espera, y que el juego continúe después.
     tras la primera vuelta. Las vueltas siguientes salen sin ritmo: 5 480 fotogramas en 2 s de
     `tiny_v20.mp4`, en vez de unos 60.
 - **[V] 2026-10-24: el vídeo NO va más rápido que el tiempo real (la [H] era falsa; §9).** El prólogo
-  dura 388 637 ms de pared desde `Start`, con 388 667 de archivo. Llegan todos los fotogramas y bloques,
-  sin deriva (±20 ms), y llegan EOF y `StateStop`. El `STOP:` de 2026-10-17 llegó a los ~364 s del
-  vídeo: el juego crea su primer decodificador ATRAC9 a los 365,4 s, 23 s antes del final. Datos
-  originales de la [H], de `out/run-prologo.log`:
+  dura 388 637 ms de pared desde `Start`, con 388 667 de archivo. Llegan todos los fotogramas (menos
+  el último, que el decodificador retenía: tarea 5) y bloques, sin deriva (±20 ms), y llegan EOF y
+  `StateStop`. El `STOP:` de 2026-10-17 llegó a los ~364 s del vídeo: el juego crea su primer
+  decodificador ATRAC9 a los 365,4 s, 23 s antes del final. Datos originales de la [H], de
+  `out/run-prologo.log`:
 
   | Dato | Valor |
   |---|---|
@@ -192,6 +193,14 @@ espera, y que el juego continúe después.
   - O el juego dejó el vídeo antes de su final, o decide el final por su cuenta. Hay que medirlo
     en el paso 2: tiempo de pared contra la marca de tiempo de los fotogramas y del audio entregados.
     Es la fila "Se corta o se desincroniza" del paso 3.
+- **[V] 2026-10-24: los 134 vídeos** (`tools/probe_movies.sh`, `docs/avplayer.md` §6). Son todos H.264
+  1920×1080 `yuv420p` a 30 o 29,97 fps fijos. 91 son solo vídeo y 43 llevan AAC LC estéreo a 48 kHz;
+  en 37 de ellos el audio es la primera pista. 75 tienen fotogramas B (`has_b_frames` 1 o 2), que los
+  fixtures no tenían.
+- **[V] 2026-10-24: con fotogramas B se perdían los últimos fotogramas** (arreglado, `a0b2c86`). El
+  decodificador de vídeo salía en EOF sin el paquete nulo que lo vacía, y H.264 retiene tantos
+  fotogramas como reordena. Les faltaba el último a los 64 vídeos de ≤ 10 s con `has_b_frames=1`, y
+  también al prólogo de la tarea 1 (11 659 de 11 660).
 
 ## 3. Diseño: validar antes de corregir
 
@@ -257,6 +266,7 @@ por adjuntar). Nuevos: `tests/test_avplayer.cpp` (opcional).
 
 - AvPlayer de shadPS4 es la parte menos madura que se reutiliza (riesgo "Medio" del roadmap).
 - 4,5 GB de vídeo: el recorrido de la Alpha solo exige dos; el resto se valida por muestreo, no uno a uno.
+  *2026-10-24:* el barrido de la tarea 5 los reproduce todos fuera del juego (§9).
 - Puede que el juego pase una ruta en lugar de callbacks para algunos vídeos; el paso 1 lo aclara.
 
 ## 9. Resultados
@@ -467,3 +477,56 @@ por adjuntar). Nuevos: `tests/test_avplayer.cpp` (opcional).
   - **T7, paso 4:** el reloj del bucle sin audio (§2). Hay que verlo con `titlebg1.mp4` pasados
     120 s en el menú de título, con la traza.
 
+
+### Tarea 5 — barrido de los 134 vídeos (2026-10-24, `bd61943`, `a0b2c86`)
+
+- **Qué hay** (paso 1, `tools/probe_movies.sh` → `out/movies-probe.csv`; detalle en `docs/avplayer.md`
+  §6). Valores distintos de los fixtures:
+  - todos son 1920×1080 (los fixtures, 320×180), en H.264 High (48) y Constrained Baseline (4),
+    además de Main;
+  - 52 van a 30 fps justos;
+  - en 37 de los 43 con audio, el audio es la primera pista;
+  - 75 tienen fotogramas B: `has_b_frames` 1 en 71 y 2 en 4.
+
+  Lo que no hay: fps variable, audio que no sea AAC LC estéreo a 48 kHz, ni subtítulos u otras pistas.
+- **Modo barrido** (paso 2, `bd61943`): `avplayer-test --movie-dir <dir> [--seconds N] [file.mp4 …]`, un
+  hijo por vídeo, una línea `OK|FAIL <archivo> v= a= ms= [end=] late=` y un resumen final. Además de lo
+  que pedía el plan (un fotograma y un bloque si hay audio), comprueba marcas que no retroceden, `Stop` = 0
+  con el vídeo en marcha, `Stop`/`Close` < 2 s y, si el vídeo acaba en la ventana, su último fotograma.
+- **Ejecuciones** (paso 3; logs sin versionar en `out/`):
+
+  | Pasada | Antes del arreglo | Después |
+  |---|---|---|
+  | `--seconds 3`, los 134 (`avplayer-sweep.log`, el de antes en `avplayer-sweep-before.log`) | 134 OK; 90–91 fotogramas, 140 bloques con audio, `late` ≤ 37 ms | 134 OK |
+  | `--seconds 12`, los 117 de ≤ 10 s, que llegan al final (`avplayer-sweep-end*.log`) | **64 FAIL**: los 64 con `has_b_frames=1`, sin su último fotograma | 117 OK, cada uno con sus `nb_frames` |
+
+  Ningún `FAIL` en la pasada de 3 s del plan: con 3 s ningún vídeo llega a su final. La segunda pasada
+  no estaba en el plan y es la que encontró el defecto.
+- **Arreglo** (`a0b2c86`, §2): con EOF y la cola vacía, el decodificador de vídeo recibe el paquete nulo y
+  entrega lo que retiene. Caso fijo `plays_to_end_with_b_frames` con `tests/data/tiny_b150.mp4`
+  (`has_b_frames=2`): **rojo** 148 de 150 fotogramas (3 de 3), **verde** 150 de 150 (3 de 3).
+- **Deuda anotada, sin rojo:**
+  - `IsActive()` no cuenta lo que el decodificador tiene entre manos. Solo importaría si decodificara
+    por detrás del reloj; ya pasaba con el último paquete.
+  - El decodificador de audio no se vacía. AAC no retiene tramas.
+  - El bucle de un vídeo con fotogramas B (`titlebg1`–`3`, `has_b_frames=2`) no tiene caso propio. En
+    la vuelta no hay EOF, así que este cambio no lo toca.
+- **Los dos vídeos de §7, enteros fuera del juego:**
+  - `phasetitle_01_00_en.mp4`: 150 de 150 fotogramas, en la pasada de 12 s.
+  - `op1_arc_en.mp4`, con `--seconds 115` (`out/avplayer-sweep-op1.log`): 3 211 de 3 211 fotogramas y
+    5 023 bloques de audio; de sus 5 024 paquetes AAC, el propio `ffmpeg` también decodifica 5 023.
+  - `late` llega a 835 ms en el opening. **[H]** Es la deriva del consumidor de audio del arnés, no
+    de AvPlayer: el consumidor despierta ~0,17 ms tarde por bloque (sondeo de 200 µs), y el reloj con
+    audio sigue al audio, así que 5 023 × 0,17 ≈ 835 ms. La sincronía real se juzga en el juego (T7,
+    paso 1).
+- **§7:** la tarea no cierra ninguna casilla, pero los criterios 1 y 2 ya solo dependen del juego.
+- **Verde** (`out/t5-*.log`):
+  - `avplayer-test`: 15 de 15 en tres ejecuciones completas;
+  - `kernel-thread-test`: 4 de 4, tres veces;
+  - `bash build.sh --test`: rc 0, con las mismas 17 líneas `PASS`/`ok` que en la tarea 4;
+  - Python: 267 ejecutados, OK (35 omitidos, 4 fallos esperados).
+- **Para las tareas siguientes:**
+  - **T6/T7:** la traza del juego cuenta fotogramas en `Close`. Con el arreglo, el prólogo debería dar
+    11 660.
+  - **T7, paso 4:** el bucle de `titlebg1` tiene `has_b_frames=2`; mirar también que la vuelta no
+    pierda ni repita fotogramas.
