@@ -181,7 +181,7 @@ motivos están en la sección "Hito".
 | 6 | Servicios del sistema que faltan | **Spec 3** | Spec 2 | 2–3 días (real: 1 día, más las 15 adelantadas en la Spec 2) | ✅ Concluida el 2026-10-19 (23 de 23: 15 adelantadas en la Spec 2 y 8 en la Spec 3; `--check-imports` da 11, todos de las Specs 2 y 4) |
 | 7a | Audio ATRAC9 (`libSceAudiodec`): música → voces → efectos `vse`, con investigación previa | **Spec 4a** | Spec 2 | 1–2 semanas, sin tope (real: 3 días de plan, del 19 al 21 de octubre, más el estudio del sitio de llamada del 17) | ✅ Concluida el 2026-10-21 (las seis funciones sobre LibAtrac9, bit-exactas contra LibAtrac9; **suenan bien la música, las voces y los efectos `vse`**; `--check-imports` sin Audiodec; arranque de 60 s sin `STOP:` ni errores de Audiodec) |
 | 7b | Audio HEVAG (`libSceAudiodecCpu`): efectos de `vag.mrg`, con investigación previa | **Spec 4b** | Spec 4a (música y voces) | sin estimar, sin tope (real: 1 día, el 21 de octubre) | ✅ Concluida el 2026-10-21 (`QueryMemSize`, `InitDecoder` y `Decode` sobre el HEVAG de vgmstream, con el estado en la memoria de trabajo del guest; **los efectos de `vag.mrg` suenan bien**; 240 voces sin errores en el menú de título; queda la revisión adversarial de la tarea 13 del plan) |
-| 8 | Vídeo (AvPlayer) | **Spec 5** | Specs 2 y 3 | 2–3 días (antes 2–4) | ⬜ Pendiente (el prólogo se ve y se oye entero; no se salta con botones; posible reproducción más rápida que el tiempo real; desde el 2026-10-20 solo sale con una partida sin progreso; **2026-10-21: se cuelga en `sceAvPlayerStop` al pasar al título del capítulo 1**, sección Spec 5) |
+| 8 | Vídeo (AvPlayer) | **Spec 5** | Specs 2 y 3 | 2–3 días (antes 2–4) | 🟨 En curso (tareas 1–6 del plan cerradas el 2026-10-24: **arreglado el cuelgue en `sceAvPlayerStop` del título del capítulo 1**, confirmado en el juego tres de tres veces; los 134 vídeos se reproducen fuera del juego; el prólogo va a tiempo real; quedan opening, salto y bucle en el juego, tarea 7; sección Spec 5) |
 | 9 | 2D correcto, ratón y saves | **Spec 6** | Hito (empieza), Specs 1b, 3, 4 y 5 (cierra) | 1–3 semanas | ⬜ Pendiente (se puede empezar: el hito está cerrado) |
 | 10 | Renombrar `gow3` → `tsuki` | **Spec 7** | Spec 6 | 2–3 días | ⬜ Pendiente |
 
@@ -851,10 +851,31 @@ a través de `runtime_file.c`.
 **Criterios de aceptación**
 
 - [ ] El opening en inglés (`op1_arc_en.mp4`) se reproduce completo, sincronizado.
-- [ ] El título del capítulo 1 en inglés (`phasetitle_01_00_en.mp4`) se reproduce y el juego continúa después.
+- [x] El título del capítulo 1 en inglés (`phasetitle_01_00_en.mp4`) se reproduce y el juego continúa después.
+  *2026-10-24, tres de tres ejecuciones (spec 5, tarea 6).*
 - [ ] Saltar un vídeo no cuelga el juego.
 
-**Estado (2026-10-17):** sin cambios en el código.
+**Estado (2026-10-24):** tareas 1–6 del plan cerradas. Detalle en la spec, §2 y §9.
+
+- **Contrato del juego** (`docs/avplayer.md`): `Init` con `FileReplacement`, `AddSource` con
+  `/app0/image/movie/…`, `GetVideoData`/`GetAudioData`. Arranca desde su callback de `StateReady`. Sale
+  de los vídeos con `JumpToTime(CurrentTime() + ~1 s)` y `Stop`, y hace bucle solo en `titlebg1.mp4`.
+- **Arreglos en el AvPlayer de shadPS4**, cada uno con su caso rojo en el arnés `avplayer-test`
+  (`tests/test_avplayer.cpp`):
+  - la carrera de `Kernel::Thread`, que colgaba `Stop` (con su propio test, `kernel-thread-test`);
+  - el `StateStop` de los vídeos sin audio;
+  - `Start` con la reproducción en curso;
+  - `Stop`, que rebobinaba el lector bajo el demultiplexor;
+  - `JumpToTime`, que era un stub;
+  - el bucle, que se congelaba en la primera vuelta;
+  - los últimos fotogramas de los vídeos con fotogramas B.
+- **Fuera del juego** se reproducen los 134 vídeos, y los dos de los criterios, enteros.
+- **En el juego**, el título del capítulo 1 termina y el juego sigue, tres de tres veces, con una ruta
+  grabada desde el menú de título. El prólogo va a tiempo real: la [H] "más rápido" era falsa.
+- **Queda** (tarea 7): el opening completo y sincronizado, saltar un vídeo y el bucle del menú de título
+  pasados unos minutos. Después, el cierre (tarea 8).
+
+*Estado anterior (2026-10-17):* sin cambios en el código.
 
 - El prólogo (`prologue_en.mp4`) se abre con `FileReplacement`, se ve bien (capturas del escritorio,
   subtítulos en inglés dentro del MP4) y se oye bien (lo confirma el usuario). Según el usuario, se ve
@@ -890,7 +911,8 @@ saves con su propia interfaz. **Empieza en cuanto existe el hito de primer fotog
 a audio y vídeo: los logos ya son 2D. Se cierra cuando están hechas las specs 3, 4 y 5.
 *2026-10-21 (cierre de la Spec 4a): ya se pueden capturar el menú de título y las escenas de la
 novela. Las primeras capturas están en `out/spec4-t9-shots/` (sección "Hito", "Límite de lo visto").
-Llegar más allá del título del capítulo 1 sigue colgando el juego (Spec 5).*
+Llegar más allá del título del capítulo 1 colgaba el juego (Spec 5). Desde el 2026-10-24 ya no:
+tarea 6 de la Spec 5.*
 
 **Solución, en orden**
 

@@ -1,9 +1,10 @@
 # Spec 5 — Vídeo: AvPlayer
 
 Fecha: 2026-10-14. Estado: **en curso**: las tareas 1 (trazador y contrato), 2 (arnés), 3 (carrera de
-`Kernel::Thread` y otras causas), 4 (`JumpToTime` real y bucle) y 5 (barrido de los 134 vídeos) del plan
-están cerradas desde el 2026-10-24 (§9). Fuera del juego, el arnés pasa entero y los 134 vídeos se
-reproducen. La siguiente es la 6, la confirmación en el juego.
+`Kernel::Thread` y otras causas), 4 (`JumpToTime` real y bucle), 5 (barrido de los 134 vídeos) y 6 (título
+del capítulo 1 en el juego) del plan están cerradas desde el 2026-10-24 (§9). Fuera del juego, el arnés
+pasa entero y los 134 vídeos se reproducen. En el juego, el título del capítulo 1 termina y el juego
+sigue, tres de tres veces. La siguiente es la 7: opening, prólogo, salto y bucle en el juego.
 Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 5".
 Depende de: Specs 2 y 3 (el juego tiene que llegar a pedir un vídeo).
 
@@ -114,7 +115,14 @@ espera, y que el juego continúe después.
     - Ahora un solo llamador saca el `std::thread` de `Kernel::Thread`, bajo un mutex, y lo une. Los
       demás esperan a que la función vuelva.
     - `kernel-thread-test` y los tres casos del arnés que se colgaban pasan.
-    - Falta confirmarlo en el juego (tarea 6).
+    - *Confirmado en el juego en la tarea 6 (siguiente punto).*
+  - **[V] 2026-10-24: confirmado en el juego** (tarea 6, §9). Con una ruta grabada desde el menú de
+    título, tres de tres ejecuciones:
+    - se entregan los 150 fotogramas;
+    - en el milisegundo en que `IsActive()` pasa a falso, el `Stop` del juego devuelve `0x806A0002` en
+      0 ms, y `StateStop` llega 2–4 ms después;
+    - la escena siguiente sale en pantalla;
+    - no hay `STOP:`, `Fault:` ni `join failed`.
 - **[V] 2026-10-24: en un vídeo sin audio, el fin no llega como evento** (tarea 2).
   - El decodificador de audio arranca aunque no haya pista de audio, y espera paquetes para siempre
     (`avplayer_source.cpp:829-831`). Por eso el demultiplexor se queda en su `join` (`:603`) y nunca
@@ -193,6 +201,16 @@ espera, y que el juego continúe después.
   - O el juego dejó el vídeo antes de su final, o decide el final por su cuenta. Hay que medirlo
     en el paso 2: tiempo de pared contra la marca de tiempo de los fotogramas y del audio entregados.
     Es la fila "Se corta o se desincroniza" del paso 3.
+- **[V] 2026-10-24: orden de arranque sin entrada** (tarea 6, cinco ejecuciones con la partida actual).
+  - `titlebg1` sale sola a los 1,1 s: el propio juego llama a `JumpToTime` y a `Stop`.
+  - `TM_CI` (con audio) llega a su final: `StateStop` a los 6 s, antes del `Stop` del juego, que
+    devuelve `0x806A0002`.
+  - Siguen la advertencia legal y `titlebg1` en bucle con el menú de título, ~18 s después del primer
+    vídeo.
+  - *Corrige la tarea 1:* allí `TM_CI` duró 2,5 s porque se saltó con una pulsación. La salida de
+    `titlebg1` a los 1,1 s no responde a ninguna pulsación.
+- **[V] 2026-10-24: en el juego, a 1920×1088, `JumpToTime` tarda 0–5 ms** (11 llamadas de la tarea 6). El
+  `Stop` que lo sigue tarda 0 o 15 ms.
 - **[V] 2026-10-24: los 134 vídeos** (`tools/probe_movies.sh`, `docs/avplayer.md` §6). Son todos H.264
   1920×1080 `yuv420p` a 30 o 29,97 fps fijos. 91 son solo vídeo y 43 llevan AAC LC estéreo a 48 kHz;
   en 37 de ellos el audio es la primera pista. 75 tienen fotogramas B (`has_b_frames` 1 o 2), que los
@@ -226,7 +244,7 @@ juego.
 | Se cierra al abrir | Tamaño de las estructuras de `Init/InitEx` del SDK 11.008 frente a las de shadPS4 (la versión de AvPlayer puede haber cambiado) |
 | Se queda negro | `GetVideoDataEx`: formato de píxel, dimensiones, alineación del búfer; textura creada por el juego |
 | Se corta o se desincroniza | Reloj de AvPlayer (`avplayer_source.cpp`), `SetAvSyncMode`, tiempo de `AudioOut` |
-| Cuelgue al terminar o saltar | Evento de fin de flujo (`AvPlayerEvent`), cierre y `Close` desde el guest, hilos de decodificación. *2026-10-21: visto con `phasetitle_01_00_en.mp4`, en `sceAvPlayerStop`, con un `join` sobre un hilo que ya no existe (§2). 2026-10-24: arreglado fuera del juego (tarea 3, §9)* |
+| Cuelgue al terminar o saltar | Evento de fin de flujo (`AvPlayerEvent`), cierre y `Close` desde el guest, hilos de decodificación. *2026-10-21: visto con `phasetitle_01_00_en.mp4`, en `sceAvPlayerStop`, con un `join` sobre un hilo que ya no existe (§2). 2026-10-24: arreglado fuera del juego (tarea 3, §9) y confirmado en el juego, tres de tres (tarea 6)* |
 | No encuentra el archivo | Los callbacks del juego pasan por su FIOS → `runtime_file.c` (`/app0/image/movie/…`); mirar `open(...) -> not found` en el log |
 | Cuelga el hilo del host al llamar al guest | Falta de `runtime_thread_attach_host` en un hilo nuevo de AvPlayer |
 
@@ -256,7 +274,9 @@ por adjuntar). Nuevos: `tests/test_avplayer.cpp` (opcional).
 ## 7. Criterios de aceptación
 
 - [ ] El opening en inglés (`op1_arc_en.mp4`) se reproduce completo, sincronizado.
-- [ ] El título del capítulo 1 en inglés (`phasetitle_01_00_en.mp4`) se reproduce y el juego continúa.
+- [x] El título del capítulo 1 en inglés (`phasetitle_01_00_en.mp4`) se reproduce y el juego continúa.
+  *2026-10-24:* tres de tres ejecuciones con la ruta grabada (`out/run-t6-{1,2,3}.log`), con 150 de 150
+  fotogramas, `StateStop` y la escena siguiente en las capturas (tarea 6, §9).
 - [ ] Saltar un vídeo no cuelga el juego.
 - [ ] El log del recorrido no contiene `STOP:` ni `Fault:` relacionados con AvPlayer.
 - [x] Hay una nota con el contrato real del juego con AvPlayer (paso 1). *2026-10-24:* `docs/avplayer.md`,
@@ -530,3 +550,59 @@ por adjuntar). Nuevos: `tests/test_avplayer.cpp` (opcional).
     11 660.
   - **T7, paso 4:** el bucle de `titlebg1` tiene `has_b_frames=2`; mirar también que la vuelta no
     pierda ni repita fotogramas.
+
+### Tarea 6 — título del capítulo 1 en el juego (2026-10-24)
+
+- **Ruta** (paso 1). Antes de nada, la partida se copió en `out/savedata-pre-ruta/`; es la misma que
+  `out/savedata-con-progreso/`. El plan pedía que el usuario grabara la ruta con F9. En su lugar, la
+  saqué de dos ejecuciones de exploración (`out/spec5-t6/explore*.log`) que pulsaban por
+  `GOW3_PAD_FILE`, mirando las capturas para decidir:
+  - **NEW GAME** empieza el texto del prólogo, y 60 pulsaciones de Cruz no llegaron al capítulo 1.
+  - **CONTINUE**, la opción marcada, carga la última partida (2026/10/21 20:15, cerca del final del
+    prólogo). La decimosexta Cruz, a los 28,6 s, pide `phasetitle_01_00_en.mp4`. Es el camino de la
+    tarea 1.
+  - Una pulsación de 0,3 s en el menú baja dos opciones, porque el cursor se repite. Las de la ruta son
+    de 120 ms.
+
+  Con esos tiempos se escribió `out/spec5-route.txt`, en el formato de `GOW3_PAD_RECORD`: 17
+  pulsaciones de Cruz. `out/spec5-t6/run-t6.sh <n>` hace cada ejecución:
+  1. restaura la partida y arranca el juego con la traza;
+  2. 3 s después del segundo `titlebg1` (el menú de título), escribe `replay` en el archivo de mando;
+  3. cierra con SIGTERM 10 s después del `Stop` del juego. Si `Stop` no vuelve en 10 s, guarda
+     `/proc/<pid>/task/*/comm`, `fd` y `maps` y manda SIGALRM (paso 4).
+
+  La ruta, el guion y las capturas no se versionan.
+- **Tres ejecuciones** (paso 2, `out/run-t6-{1,2,3}.log`):
+
+  | Ejecución | `phasetitle`, desde el primer vídeo | Fotogramas | `IsActive()` falso | `Stop` del juego | `StateStop` |
+  |---|---|---|---|---|---|
+  | 1 | 50,5 s | 150/150, el último en 4 972 | `play` 4 988 | `0x806A0002`, 0 ms | 4 ms después |
+  | 2 | 50,9 s | 150/150 | `play` 4 988 | `0x806A0002`, 0 ms | 3 ms después |
+  | 3 | 39,1 s | 150/150 | `play` 4 975 | `0x806A0002`, 0 ms | 2 ms después |
+
+  La 3 llega antes porque `TM_CI` se saltó a los 1,6 s sin entrada del guion. El log solo registra el
+  archivo de mando, así que fue entrada del host, un clic o una tecla en la ventana. Ese salto de un
+  vídeo con audio (`JumpToTime` + `Stop`) tampoco cuelga.
+- **Criterio** (paso 3):
+  - `grep -E 'STOP:|Fault:|join failed' out/run-t6-*.log` no da nada.
+  - Tampoco hay `<Error>` de AvPlayer, líneas `[h264 @` ni "duplicated MOOV". El único aviso es `Stop:
+    Could not stop playback: already stopped`, 4 o 5 por ejecución: el `Close` y el segundo `Stop` de
+    cada salida.
+  - Capturas con `GOW3_SCREENSHOT_AT` cada 60 fotogramas, resumidas en `out/spec5-t6/t6-capturas.png`.
+    A mitad del vídeo sale "DAY 1 — Homecoming I". 7 s después del final, la escena del metro entra en
+    fundido. En la exploración, con la misma ruta, esa escena llega a mostrar su texto ("The tracks
+    take a sudden dive…", `out/spec5-t6/explore2/frame_005040_1781x1002.png`).
+  - El marco blanco que rodea el vídeo en algunas capturas es del propio vídeo (lo confirma el
+    usuario).
+  - Como decía el plan, tres de tres confirman, pero no demuestran: la carrera es probabilística, y la
+    prueba son las tareas 2 y 3.
+- **Paso 4:** no hizo falta, porque todos los `Stop` volvieron.
+- **Lo que se mide de paso** (§2):
+  - el orden de arranque sin entrada, que corrige lo que se dedujo en la tarea 1;
+  - lo que tarda `JumpToTime` a 1920×1088, pendiente desde la tarea 4: 0–5 ms en 11 llamadas.
+- **§7:** casilla 2 marcada. Las salidas del menú de título y el salto de `TM_CI` de la ejecución 3 son
+  indicio para la casilla 3, que sigue en la tarea 7, paso 3.
+- **Sin cambios de código:** `bash build.sh` no reenlazó nada, así que las suites no se repiten. Siguen
+  como en la tarea 5.
+- **Para la tarea 7:** la ruta llega al capítulo 1 en ~30 s desde el menú, pero en ella no sale el
+  opening `op1_arc_en.mp4`.

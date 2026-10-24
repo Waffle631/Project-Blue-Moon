@@ -45,19 +45,28 @@ Ejecuciones: `out/run-t1-trace.log` (partida actual, menú de título y título 
   llama a `Stop` en el mismo milisegundo. AvPlayer emite `StateStop` al vaciar las colas tras el EOF.
   Hasta la tarea 3 de la spec, eso solo pasaba si el vídeo tenía audio: sin audio, como en
   `phasetitle`, `StateStop` llegaba después del `Stop` del juego (§3). En el prólogo, `Stop` devuelve
-  `0x806a0002` porque ya estaba parado. En `phasetitle_01_00_en.mp4` se bloquea (§3; arreglado fuera
-  del juego en la tarea 3). En esos dos vídeos el juego no llama a `CurrentTime` ni a `JumpToTime`.
+  `0x806a0002` porque ya estaba parado. En `phasetitle_01_00_en.mp4` se bloqueaba (§3). Desde la tarea 3
+  devuelve también `0x806a0002`, y el controlador emite `StateStop` 2–4 ms después, en su siguiente
+  vuelta (confirmado en el juego en la tarea 6). En esos dos vídeos el juego no llama a `CurrentTime`
+  ni a `JumpToTime`.
 - **[V] Salida anticipada** (`titlebg1.mp4` y `TM_CI.mp4`): el juego sondea `CurrentTime` unas 3 veces por
   fotograma y luego llama a `JumpToTime(CurrentTime() + ~1 000)`: 2 087 con el tiempo en 1 054, 3 509 con
   2 495 y 6 513 con 5 514. En el mismo milisegundo llama a `Stop`, sin `GetVideoData` entre medias. Ese
   `Stop` devuelve 0 en 1–2 ms. Cuando `IsActive()` pasa a falso, llama a `Stop` otra vez, que devuelve
   `0x806a0002`. `Close` llega enseguida o más tarde (0 s, 3,2 s y 17 s), siempre justo antes del
   siguiente `Init`. `JumpToTime` era un stub que
-  devolvía 0; desde la tarea 4 salta de verdad (§4). **[V]** Estas salidas responden a pulsaciones: el usuario confirma (2026-10-24)
-  que pulsó botones en esa ejecución para llegar al capítulo 1.
-- **[V] Orden de arranque con la partida actual:** `titlebg1` (1,1 s) → `TM_CI` (2,5 s de 6 s) → `titlebg1`
-  (5,5 s) → 17 s sin vídeo → `phasetitle_01_00_en`. Cada vídeo va con un `Init`/`Close` propio, y la
-  dirección del reproductor se reutiliza.
+  devolvía 0; desde la tarea 4 salta de verdad (§4).
+  - **[V]** Las dos últimas responden a pulsaciones: el usuario confirma (2026-10-24) que pulsó botones
+    en esa ejecución para llegar al capítulo 1.
+  - **[V]** La primera no: en la tarea 6, sin ninguna entrada, `titlebg1` sale igual a los 1,1 s en las
+    cinco ejecuciones.
+- **[V] Orden de arranque con la partida actual** (tarea 6):
+  - `titlebg1` (1,1 s, la deja el propio juego) → `TM_CI` (6 s, entero; `StateStop` antes del `Stop` del
+    juego) → advertencia legal → `titlebg1` en bucle con el menú de título, ~18 s después del primer
+    vídeo.
+  - En la tarea 1, `TM_CI` duró 2,5 s porque se saltó con una pulsación.
+  - Con CONTINUE, la última partida y 16 pulsaciones de Cruz, el juego llega a `phasetitle_01_00_en`.
+  - Cada vídeo va con un `Init`/`Close` propio, y la dirección del reproductor se reutiliza.
 
 ## 2. Prólogo: tiempo de pared contra marcas de tiempo
 
@@ -107,7 +116,8 @@ cosas:
   - el hilo de audio arranca igual y espera paquetes que no llegan;
   - el demultiplexor se queda esperándolo y no marca el fin hasta que `Stop` despierta a ese hilo.
 
-**Arreglo** (tarea 3, 2026-10-24; falta confirmarlo en el juego, tarea 6):
+**Arreglo** (tarea 3, 2026-10-24; confirmado en el juego tres de tres veces en la tarea 6, con `Stop` →
+`0x806a0002` en 0 ms y `StateStop` 2–4 ms después):
 
 - **`Kernel::Thread`:** un solo llamador saca el hilo, bajo un mutex, y lo une. Los demás esperan a
   que la función termine, y el propio hilo lo suelta sin esperar.
@@ -149,7 +159,7 @@ valor; un salto de verdad le da lo mismo que antes, ahora cierto.
   `WAR_LOOPING_BACK` del bucle. **[H]** Que el AvPlayer real lo emita: el código está en la lista de
   errores del SDK, pero no lo hemos visto en una consola.
 - Mientras dura, el salto tiene en exclusiva el mutex del origen: las llamadas del juego esperan. En
-  el arnés (320×180) tarda 3–4 ms. En el juego (1920×1088) falta medirlo (tarea 6).
+  el arnés (320×180) tarda 3–4 ms. En el juego (1920×1088), 0–5 ms en 11 llamadas (tarea 6).
 
 **Tests** (`tests/test_avplayer.cpp`):
 
