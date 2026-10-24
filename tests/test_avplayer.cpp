@@ -9,7 +9,8 @@
 // Each case runs in a forked child whose fd 2 goes to a temporary file. A child whose step does not
 // change for 15 s, or that outlives its deadline, is killed and the case fails; the report names the
 // step it was in and its threads. A "join failed" line from Kernel::Thread
-// (gpu/shim/core/libraries/kernel/threads.h) also fails it.
+// (gpu/shim/core/libraries/kernel/threads.h) also fails it, and so does a complaint of FFmpeg's H.264
+// decoder ("[h264 @"): the fixtures are valid, so it was fed bytes that are not the stream.
 //
 // Fixtures (tests/data, FFmpeg 8.1). They are H.264 Main without B-frames at 29.97 fps with the moov
 // first, like image/movie/. tiny_v150 replicates phasetitle_01_00_en.mp4 (video only, 150 frames,
@@ -789,6 +790,7 @@ struct Case {
     const char* name;
     int deadline_s;
     void (*run)();
+    bool broken_input = false; // the decoder may complain about the stream
 };
 
 std::string ReadAll(int fd) {
@@ -903,6 +905,7 @@ bool RunIsolated(const Case& test) {
         }
     }
     const int join_failed = Count(errors, "join failed");
+    const int decoder_errors = test.broken_input ? 0 : Count(errors, "[h264 @");
     char reason[512] = "";
     if (!hung.empty()) {
         std::snprintf(reason, sizeof(reason), "hung: no progress for %lld s in \"%s\"",
@@ -914,6 +917,8 @@ bool RunIsolated(const Case& test) {
         std::snprintf(reason, sizeof(reason), "check failed");
     } else if (join_failed > 0) {
         std::snprintf(reason, sizeof(reason), "%d \"join failed\" on stderr", join_failed);
+    } else if (decoder_errors > 0) {
+        std::snprintf(reason, sizeof(reason), "%d H.264 decoder errors on stderr", decoder_errors);
     }
     if (reason[0] == '\0') {
         std::printf("PASS: %s (%lld ms)\n", test.name, ms);
@@ -963,7 +968,7 @@ int main(int argc, char** argv) {
         {"start_while_playing", 15, StartWhilePlaying},
         {"close_from_event_callback", 20, CloseFromEventCallback},
         {"repeated_open_close", 120, RepeatedOpenClose},
-        {"missing_garbage_and_truncated_stream", 30, MissingGarbageAndTruncatedStream},
+        {"missing_garbage_and_truncated_stream", 30, MissingGarbageAndTruncatedStream, true},
     };
     const std::vector<std::string> only(argv + 2, argv + argc);
     int ran = 0, failed = 0;

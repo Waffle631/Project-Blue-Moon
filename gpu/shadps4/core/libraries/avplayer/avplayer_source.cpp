@@ -309,10 +309,11 @@ bool AvPlayerSource::Stop() {
         return false;
     }
 
-    if (m_up_data_streamer) {
-        m_up_data_streamer->Reset();
-    }
-
+    // gow3: no m_up_data_streamer->Reset() here. It rewound the FileReplacement position under
+    // FFmpeg's AVIOContext while the demuxer was still reading, so the decoders got the start of the
+    // file as stream data ("Invalid NAL unit size"; avplayer-test, stop_right_after_start_and_twice),
+    // and the AVIOContext kept believing it was elsewhere. A later Start seeks through
+    // avformat_seek_file, which moves the position through the AVIOContext's seek callback.
     m_video_decoder_thread.Stop();
     m_audio_decoder_thread.Stop();
     m_demuxer_thread.Stop();
