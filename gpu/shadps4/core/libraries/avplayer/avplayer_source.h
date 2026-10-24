@@ -166,6 +166,7 @@ public:
     bool GetVideoData(AvPlayerFrameInfoEx& video_info);
     u64 CurrentTime();
     bool IsActive();
+    bool JumpToTime(u64 time); // gow3: Spec 5, task 4
 
 private:
     u64 DurationMillis() const;
@@ -213,6 +214,9 @@ private:
     std::atomic_bool m_is_looping = false;
     std::atomic_bool m_is_paused = false;
     std::atomic_bool m_is_eof = false;
+    // gow3: ms the decoders skip up to after JumpToTime, 0 once they are there.
+    std::atomic<u64> m_video_jump_target = 0;
+    std::atomic<u64> m_audio_jump_target = 0;
 
     std::unique_ptr<IDataStreamer> m_up_data_streamer;
 

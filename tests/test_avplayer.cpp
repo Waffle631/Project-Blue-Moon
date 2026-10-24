@@ -30,6 +30,7 @@
 #include <atomic>
 #include <chrono>
 #include <climits>
+#include <cmath>
 #include <condition_variable>
 #include <cstdarg>
 #include <cstdio>
@@ -38,6 +39,7 @@
 #include <functional>
 #include <mutex>
 #include <new>
+#include <optional>
 #include <string>
 #include <thread>
 #include <vector>
@@ -56,6 +58,7 @@ namespace Libraries::AvPlayer {
 // Exported by libgow3gpu.so (avplayer.cpp); avplayer.h only declares RegisterLib.
 s32 PS4_SYSV_ABI sceAvPlayerAddSource(AvPlayerHandle handle, const char* filename);
 s32 PS4_SYSV_ABI sceAvPlayerClose(AvPlayerHandle handle);
+u64 PS4_SYSV_ABI sceAvPlayerCurrentTime(AvPlayerHandle handle);
 s32 PS4_SYSV_ABI sceAvPlayerEnableStream(AvPlayerHandle handle, u32 stream_id);
 bool PS4_SYSV_ABI sceAvPlayerGetAudioData(AvPlayerHandle handle, AvPlayerFrameInfo* p_info);
 s32 PS4_SYSV_ABI sceAvPlayerGetStreamInfo(AvPlayerHandle handle, u32 stream_id,
@@ -63,6 +66,7 @@ s32 PS4_SYSV_ABI sceAvPlayerGetStreamInfo(AvPlayerHandle handle, u32 stream_id,
 bool PS4_SYSV_ABI sceAvPlayerGetVideoData(AvPlayerHandle handle, AvPlayerFrameInfo* video_info);
 AvPlayerHandle PS4_SYSV_ABI sceAvPlayerInit(AvPlayerInitData* data);
 bool PS4_SYSV_ABI sceAvPlayerIsActive(AvPlayerHandle handle);
+s32 PS4_SYSV_ABI sceAvPlayerJumpToTime(AvPlayerHandle handle, uint64_t time);
 s32 PS4_SYSV_ABI sceAvPlayerPostInit(AvPlayerHandle handle, AvPlayerPostInitData* data);
 s32 PS4_SYSV_ABI sceAvPlayerSetAvSyncMode(AvPlayerHandle handle, AvPlayerAvSyncMode sync_mode);
 s32 PS4_SYSV_ABI sceAvPlayerSetLooping(AvPlayerHandle handle, bool loop_flag);
@@ -77,6 +81,8 @@ using Clock = std::chrono::steady_clock;
 namespace {
 
 constexpr s32 kOperationFailed = s32(0x806A0002); // what the game's second Stop gets (docs §1)
+constexpr s32 kJumpComplete = s32(0x806A00A3);    // WarningId of a finished JumpToTime
+constexpr double kFrameMs = 1001.0 / 30;          // the fixtures run at 29.97 fps
 
 std::string g_data;
 
@@ -197,12 +203,14 @@ struct Options {
     AvPlayerAvSyncMode sync = AvPlayerAvSyncMode::Default;
     s64 read_fail_from = -1;
     bool start_on_ready = true;
+    bool looping = false; // the game loops titlebg1.mp4 only
     std::function<void(AvPlayerEvents)> on_event; // on the controller thread, after the start
 };
 
 struct Event {
     AvPlayerEvents id;
-    long long ms; // since Open
+    long long ms;    // since Open
+    s32 warning = 0; // the code a WarningId carries
 };
 
 const char* EventName(AvPlayerEvents id) {
@@ -245,6 +253,14 @@ struct Session {
         });
     }
 
+    bool WaitWarning(s32 code, int ms) {
+        return WaitFor(ms, [this, code] {
+            return std::any_of(events.begin(), events.end(), [code](const Event& e) {
+                return e.id == AvPlayerEvents::WarningId && e.warning == code;
+            });
+        });
+    }
+
     Clock::time_point StartTime() {
         std::lock_guard lock(mutex);
         return start_time;
@@ -254,7 +270,11 @@ struct Session {
         std::lock_guard lock(mutex);
         std::string list;
         for (const auto& event : events) {
-            list += (list.empty() ? "" : " ") + std::string(EventName(event.id)) + "@" +
+            char code[16] = "";
+            if (event.id == AvPlayerEvents::WarningId) {
+                std::snprintf(code, sizeof(code), ":%#x", unsigned(event.warning));
+            }
+            list += (list.empty() ? "" : " ") + std::string(EventName(event.id)) + code + "@" +
                     std::to_string(event.ms);
         }
         return list.empty() ? "none" : list;
@@ -274,11 +294,12 @@ struct Session {
     u64 duration_ms = 0;
 };
 
-void PS4_SYSV_ABI OnEvent(void* object, AvPlayerEvents id, s32, void*) {
+void PS4_SYSV_ABI OnEvent(void* object, AvPlayerEvents id, s32, void* data) {
     auto* s = static_cast<Session*>(object);
     {
         std::lock_guard lock(s->mutex);
-        s->events.push_back({id, MsSince(s->opened)});
+        const bool warning = id == AvPlayerEvents::WarningId && data != nullptr;
+        s->events.push_back({id, MsSince(s->opened), warning ? *static_cast<const s32*>(data) : 0});
     }
     s->cv.notify_all();
     if (id == AvPlayerEvents::StateReady && s->options.start_on_ready) {
@@ -296,7 +317,7 @@ void PS4_SYSV_ABI OnEvent(void* object, AvPlayerEvents id, s32, void*) {
         }
         const auto start_time = Clock::now();
         const s32 result = sceAvPlayerStart(s->handle);
-        sceAvPlayerSetLooping(s->handle, false);
+        sceAvPlayerSetLooping(s->handle, s->options.looping);
         {
             std::lock_guard lock(s->mutex);
             s->has_audio = has_audio;
@@ -388,6 +409,7 @@ struct Video {
     long long av_min = LLONG_MAX, av_max = LLONG_MIN, av_sum = 0; // video ts - last audio ts
     int av_count = 0;
     long long inactive_ms = -1; // since Start, when IsActive() turned false
+    int backwards = 0;          // frames with a timestamp below the one before
 };
 
 // The game's task_game loop: GetVideoData, IsActive, and nothing else until IsActive() is false.
@@ -400,6 +422,7 @@ bool Drain(Session& s, Video& video, int budget_ms, const AudioConsumer* audio =
             const long long early = (long long)info.timestamp - MsSince(s.StartTime());
             video.max_early = std::max(video.max_early, early);
             video.max_late = std::max(video.max_late, -early);
+            video.backwards += video.frames > 0 && info.timestamp < video.last_ts;
             video.last_ts = info.timestamp;
             ++video.frames;
             if (audio != nullptr && audio->Blocks() > 0) {
@@ -784,6 +807,204 @@ void MissingGarbageAndTruncatedStream() {
     }
 }
 
+// ---- JumpToTime (the game jumps to CurrentTime() + ~1 s and stops, docs/avplayer.md §1) ----
+
+// The first frame GetVideoData hands out within budget_ms, polled like Drain.
+bool NextFrame(Session& s, AvPlayerFrameInfo& frame, int budget_ms, long long& waited_ms) {
+    const auto begin = Clock::now();
+    bool got = false;
+    while (!(got = sceAvPlayerGetVideoData(s.handle, &frame)) && MsSince(begin) < budget_ms) {
+        std::this_thread::sleep_for(std::chrono::microseconds(200));
+    }
+    waited_ms = MsSince(begin);
+    return got;
+}
+
+// Whether a frame with this timestamp is the one on screen at `target` (it starts at most one frame
+// before). Timestamps are rounded to the millisecond.
+bool OnScreenAt(u64 timestamp, u64 target) {
+    return timestamp <= target && double(timestamp) + kFrameMs + 1 >= double(target);
+}
+
+// A jump in the middle of tiny_v150, then the rest of the clip. Frames resume at the one on screen
+// at the target although FFmpeg decodes from the keyframe before it (0: one GOP), none is lost after
+// it, the clock follows the jump and the game is told the jump is complete.
+void JumpThenStop() {
+    constexpr u64 kTarget = 1000;
+    Session s;
+    Step("AddSource tiny_v150");
+    CHECK(Open(s, Data("tiny_v150.mp4")) == 0, "AddSource failed");
+    CHECK(s.WaitStarted(2000) && s.start_result == 0, "no Start within 2 s (events %s)",
+          s.EventList().c_str());
+    Video before;
+    Step("playing 300 ms");
+    Drain(s, before, 300);
+    long long jump_ms = 0, first_ms = 0;
+    Step("JumpToTime(%llu)", (unsigned long long)kTarget);
+    const s32 jump = Timed(jump_ms, [&] { return sceAvPlayerJumpToTime(s.handle, kTarget); });
+    const u64 time = sceAvPlayerCurrentTime(s.handle);
+    AvPlayerFrameInfo first{};
+    Step("first frame after the jump");
+    const bool got = NextFrame(s, first, 1000, first_ms);
+    Video rest;
+    Step("playing to the end");
+    const bool ended = Drain(s, rest, 8000);
+    Step("waiting for StateStop before Stop");
+    const bool stop_event = s.WaitEvent(AvPlayerEvents::StateStop, 1000);
+    long long stop_ms = 0, close_ms = 0;
+    Step("Stop");
+    const s32 stop = Timed(stop_ms, [&] { return sceAvPlayerStop(s.handle); });
+    Step("Close");
+    const s32 closed = Timed(close_ms, [&] { return sceAvPlayerClose(s.handle); });
+    const int expected = 150 - int(std::lround(double(first.timestamp) / kFrameMs));
+    std::printf("  %d frames before (last ts %llu); JumpToTime %#x in %lld ms, then CurrentTime %llu; "
+                "first frame ts %llu after %lld ms; then %s\n",
+                before.frames, (unsigned long long)before.last_ts, jump, jump_ms,
+                (unsigned long long)time, (unsigned long long)first.timestamp, first_ms,
+                Describe(rest).c_str());
+    std::printf("  events %s; Stop %#x in %lld ms, Close %#x in %lld ms\n", s.EventList().c_str(),
+                stop, stop_ms, closed, close_ms);
+    CHECK(jump == 0, "JumpToTime returned %#x", jump);
+    CHECK(jump_ms < 500, "JumpToTime took %lld ms", jump_ms);
+    CHECK(time >= kTarget && time < kTarget + 100, "CurrentTime() %llu right after the jump",
+          (unsigned long long)time);
+    CHECK(got && first_ms < 300, "no frame within 300 ms of the jump");
+    CHECK(OnScreenAt(first.timestamp, kTarget), "first frame after the jump has ts %llu",
+          (unsigned long long)first.timestamp);
+    CHECK(ended, "IsActive() still true 8 s after the jump");
+    CHECK(1 + rest.frames == expected && rest.backwards == 0,
+          "%d frames from ts %llu to the end (%d backwards), expected %d", 1 + rest.frames,
+          (unsigned long long)first.timestamp, rest.backwards, expected);
+    CHECK(s.WaitWarning(kJumpComplete, 0), "no WarningId %#x (jump complete)", kJumpComplete);
+    CHECK(stop_event, "no StateStop within 1 s of the end, before Stop");
+    CHECK(stop_ms < 2000 && close_ms < 2000, "Stop %lld ms, Close %lld ms", stop_ms, close_ms);
+}
+
+// How the game leaves titlebg1.mp4 and TM_CI.mp4 early: CurrentTime, JumpToTime(+1 s) and Stop in
+// the same millisecond, a second Stop once IsActive() is false, Close. Video only and with audio, at
+// varying points of the clip.
+void JumpThenStopLikeTheGame() {
+    long long max_jump = 0, max_stop = 0, max_cycle = 0;
+    for (int cycle = 0; cycle < 20; ++cycle) {
+        const bool with_audio = cycle % 2 == 1;
+        Session s;
+        const auto begin = Clock::now();
+        Step("cycle %d: AddSource", cycle);
+        CHECK(Open(s, Data(with_audio ? "tiny_av.mp4" : "tiny_v150.mp4")) == 0,
+              "cycle %d: AddSource failed", cycle);
+        CHECK(s.WaitStarted(2000) && s.start_result == 0, "cycle %d: no Start within 2 s", cycle);
+        std::optional<AudioConsumer> audio;
+        if (with_audio) audio.emplace(s.handle);
+        Video video;
+        Step("cycle %d: playing", cycle);
+        Drain(s, video, 200 + cycle * 37 % 400);
+        long long jump_ms = 0, stop_ms = 0;
+        Step("cycle %d: JumpToTime and Stop", cycle);
+        const u64 target = sceAvPlayerCurrentTime(s.handle) + 1000;
+        const s32 jump = Timed(jump_ms, [&] { return sceAvPlayerJumpToTime(s.handle, target); });
+        const s32 stop = Timed(stop_ms, [&] { return sceAvPlayerStop(s.handle); });
+        const bool active = sceAvPlayerIsActive(s.handle);
+        Step("cycle %d: second Stop", cycle);
+        const s32 second = sceAvPlayerStop(s.handle);
+        if (audio) audio->Join();
+        Step("cycle %d: Close", cycle);
+        sceAvPlayerClose(s.handle);
+        const long long cycle_ms = MsSince(begin);
+        CHECK(jump == 0, "cycle %d: JumpToTime(%llu) returned %#x", cycle,
+              (unsigned long long)target, jump);
+        CHECK(stop == 0 && !active && second == kOperationFailed,
+              "cycle %d: Stop %#x, then IsActive %d, second Stop %#x", cycle, stop, int(active),
+              second);
+        CHECK(cycle_ms < 2000, "cycle %d took %lld ms (JumpToTime %lld, Stop %lld)", cycle,
+              cycle_ms, jump_ms, stop_ms);
+        max_jump = std::max(max_jump, jump_ms);
+        max_stop = std::max(max_stop, stop_ms);
+        max_cycle = std::max(max_cycle, cycle_ms);
+    }
+    std::printf("  20 cycles; JumpToTime <= %lld ms, Stop <= %lld ms, cycle <= %lld ms\n", max_jump,
+                max_stop, max_cycle);
+}
+
+// Edges of JumpToTime: (a) past the end of a clip, which then ends with its StateStop; (b) past the
+// end of a looping clip, where the time wraps around (titlebg1.mp4 loops, and the game jumps +1 s
+// from wherever it is); (c) with nothing playing, before Start or after Stop, which must fail.
+void JumpPastTheEndAndWhenStopped() {
+    {
+        Session s;
+        Step("(a) AddSource tiny_v150");
+        CHECK(Open(s, Data("tiny_v150.mp4")) == 0, "(a) AddSource failed");
+        CHECK(s.WaitStarted(2000) && s.start_result == 0, "(a) no Start within 2 s");
+        Video before;
+        Drain(s, before, 300);
+        Step("(a) JumpToTime past the end");
+        const s32 jump = sceAvPlayerJumpToTime(s.handle, 60000);
+        const auto jumped = Clock::now();
+        Video rest;
+        const bool ended = Drain(s, rest, 1000);
+        const long long ended_ms = MsSince(jumped);
+        const bool stop_event = s.WaitEvent(AvPlayerEvents::StateStop, 1000);
+        long long stop_ms = 0, close_ms = 0;
+        Step("(a) Stop");
+        const s32 stop = Timed(stop_ms, [&] { return sceAvPlayerStop(s.handle); });
+        const s32 again = sceAvPlayerJumpToTime(s.handle, 1000);
+        Step("(a) Close");
+        Timed(close_ms, [&] { return sceAvPlayerClose(s.handle); });
+        std::printf("  (a) past the end: JumpToTime %#x; then %s, inactive after %lld ms; events %s; "
+                    "Stop %#x in %lld ms; JumpToTime after Stop %#x\n",
+                    jump, Describe(rest).c_str(), ended_ms, s.EventList().c_str(), stop, stop_ms,
+                    again);
+        CHECK(jump == 0, "(a) JumpToTime past the end returned %#x", jump);
+        CHECK(ended, "(a) IsActive() still true 1 s after jumping past the end");
+        CHECK(stop_event, "(a) no StateStop within 1 s of the end, before Stop");
+        CHECK(again == kOperationFailed, "(a) JumpToTime after Stop returned %#x", again);
+        CHECK(stop_ms < 2000 && close_ms < 2000, "(a) Stop %lld ms, Close %lld ms", stop_ms,
+              close_ms);
+    }
+    {
+        Options options;
+        options.looping = true;
+        Session s(options);
+        Step("(b) AddSource tiny_v150, looping");
+        CHECK(Open(s, Data("tiny_v150.mp4")) == 0, "(b) AddSource failed");
+        CHECK(s.WaitStarted(2000) && s.start_result == 0, "(b) no Start within 2 s");
+        Video before;
+        Drain(s, before, 300);
+        const u64 target = s.duration_ms * 3 + 1000;
+        Step("(b) JumpToTime past the end of a looping clip");
+        const s32 jump = sceAvPlayerJumpToTime(s.handle, target);
+        AvPlayerFrameInfo first{};
+        long long first_ms = 0, stop_ms = 0, close_ms = 0;
+        const bool got = NextFrame(s, first, 1000, first_ms);
+        Step("(b) Stop");
+        Timed(stop_ms, [&] { return sceAvPlayerStop(s.handle); });
+        Step("(b) Close");
+        Timed(close_ms, [&] { return sceAvPlayerClose(s.handle); });
+        std::printf("  (b) looping, %llu ms long: JumpToTime(%llu) %#x; first frame ts %llu after "
+                    "%lld ms\n",
+                    (unsigned long long)s.duration_ms, (unsigned long long)target, jump,
+                    (unsigned long long)first.timestamp, first_ms);
+        CHECK(jump == 0, "(b) JumpToTime returned %#x", jump);
+        CHECK(got && OnScreenAt(first.timestamp, 1000),
+              "(b) first frame after the jump: %s, ts %llu (expected the one on screen at 1000)",
+              got ? "got" : "none", (unsigned long long)first.timestamp);
+        CHECK(stop_ms < 2000 && close_ms < 2000, "(b) Stop %lld ms, Close %lld ms", stop_ms,
+              close_ms);
+    }
+    {
+        Options options;
+        options.start_on_ready = false;
+        Session s(options);
+        Step("(c) AddSource tiny_v20, no Start");
+        CHECK(Open(s, Data("tiny_v20.mp4")) == 0, "(c) AddSource failed");
+        CHECK(s.WaitEvent(AvPlayerEvents::StateReady, 2000), "(c) no StateReady within 2 s");
+        const s32 jump = sceAvPlayerJumpToTime(s.handle, 300);
+        Step("(c) Close");
+        sceAvPlayerClose(s.handle);
+        std::printf("  (c) before Start: JumpToTime %#x\n", jump);
+        CHECK(jump == kOperationFailed, "(c) JumpToTime before Start returned %#x", jump);
+    }
+}
+
 // ---- Runner ----
 
 struct Case {
@@ -969,6 +1190,9 @@ int main(int argc, char** argv) {
         {"close_from_event_callback", 20, CloseFromEventCallback},
         {"repeated_open_close", 120, RepeatedOpenClose},
         {"missing_garbage_and_truncated_stream", 30, MissingGarbageAndTruncatedStream, true},
+        {"jump_then_stop", 20, JumpThenStop},
+        {"jump_then_stop_like_the_game", 60, JumpThenStopLikeTheGame},
+        {"jump_past_the_end_and_when_stopped", 20, JumpPastTheEndAndWhenStopped},
     };
     const std::vector<std::string> only(argv + 2, argv + argc);
     int ran = 0, failed = 0;

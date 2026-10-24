@@ -40,6 +40,7 @@ public:
     bool IsActive();
     u64 CurrentTime();
     bool SetLooping(bool is_looping);
+    bool JumpToTime(u64 time); // gow3: Spec 5, task 4
 
 private:
     // Event Replacement

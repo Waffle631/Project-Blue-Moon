@@ -52,8 +52,8 @@ Ejecuciones: `out/run-t1-trace.log` (partida actual, menú de título y título 
   2 495 y 6 513 con 5 514. En el mismo milisegundo llama a `Stop`, sin `GetVideoData` entre medias. Ese
   `Stop` devuelve 0 en 1–2 ms. Cuando `IsActive()` pasa a falso, llama a `Stop` otra vez, que devuelve
   `0x806a0002`. `Close` llega enseguida o más tarde (0 s, 3,2 s y 17 s), siempre justo antes del
-  siguiente `Init`. `JumpToTime` es un stub que
-  devuelve 0 (tarea 4). **[V]** Estas salidas responden a pulsaciones: el usuario confirma (2026-10-24)
+  siguiente `Init`. `JumpToTime` era un stub que
+  devolvía 0; desde la tarea 4 salta de verdad (§4). **[V]** Estas salidas responden a pulsaciones: el usuario confirma (2026-10-24)
   que pulsó botones en esa ejecución para llegar al capítulo 1.
 - **[V] Orden de arranque con la partida actual:** `titlebg1` (1,1 s) → `TM_CI` (2,5 s de 6 s) → `titlebg1`
   (5,5 s) → 17 s sin vídeo → `phasetitle_01_00_en`. Cada vídeo va con un `Init`/`Close` propio, y la
@@ -116,3 +116,46 @@ cosas:
   devuelve `0x806a0002`, como en el prólogo, o 0 si llega antes de que el demultiplexor termine.
 
 Detalle en la spec, §2 y §9.
+
+## 4. `JumpToTime` (tarea 4, 2026-10-24)
+
+**Uso real.** Hay 20 llamadas en los 10 logs que lo tienen (del 2026-10-17 al 2026-10-24). Solo
+`out/run-t1-trace.log` tiene la traza; los demás, el log de AvPlayer.
+
+- **[V]** El juego solo salta con el vídeo en marcha, a `CurrentTime()` + 999–1 033 ms.
+- **[V]** En los 20 casos, la siguiente llamada a AvPlayer es `Stop`. En la traza llega en el mismo
+  milisegundo, sin ningún fotograma ni bloque de audio entregado entre medias.
+- **[V]** `DisableStream`, `SetTrickSpeed` y `ChangeStream` no salen en ningún log: siguen como
+  estaban.
+
+**Decisión: implementarlo.** El juego no puede recibir `ORBIS_OK` de algo que no se hizo, y lo que
+recibía era 0. Devolver un error explícito habría cambiado lo que ve el juego sin saber si mira el
+valor; un salto de verdad le da lo mismo que antes, ahora cierto.
+
+**Comportamiento** (`AvPlayerSource::JumpToTime`, `AvPlayerState::JumpToTime`):
+
+- Solo salta una reproducción en marcha (`Play`, `Pause` o `Buffering`). Antes de `Start`, después de
+  `Stop` o al final del vídeo devuelve `0x806a0002` y lo registra.
+- Para los tres hilos como `Stop` y busca el fotograma clave anterior al destino
+  (`avformat_seek_file`). Vacía las colas de paquetes y los códecs (`avcodec_flush_buffers`), devuelve
+  a su reserva los búferes de los fotogramas en cola, pone el reloj en el destino y vuelve a arrancar
+  los hilos.
+- Los decodificadores descartan lo que acaba antes del destino. El primer fotograma entregado es el
+  que está en pantalla en ese instante: 968 para un salto a 1 000. El fotograma que tiene el juego se
+  conserva hasta su siguiente `GetVideoData`.
+- Más allá del final: en un vídeo en bucle, el tiempo da la vuelta (módulo de la duración). Si no hay
+  bucle, va al final y llegan EOF y `StateStop`.
+- Al acabar, el juego recibe `WarningId` con `0x806a00a3` (`WAR_JUMP_COMPLETE`), como el
+  `WAR_LOOPING_BACK` del bucle. **[H]** Que el AvPlayer real lo emita: el código está en la lista de
+  errores del SDK, pero no lo hemos visto en una consola.
+- Mientras dura, el salto tiene en exclusiva el mutex del origen: las llamadas del juego esperan. En
+  el arnés (320×180) tarda 3–4 ms. En el juego (1920×1088) falta medirlo (tarea 6).
+
+**Tests** (`tests/test_avplayer.cpp`):
+
+- `jump_then_stop`: salto a mitad de reproducción. Comprueba el fotograma, el reloj, que no se pierde
+  ninguno hasta el final y que llega el aviso.
+- `jump_then_stop_like_the_game`: el patrón del juego, 20 veces. Es `CurrentTime`, `JumpToTime(+1 s)`,
+  `Stop`, otro `Stop` y `Close`, con y sin audio.
+- `jump_past_the_end_and_when_stopped`: los bordes anteriores.
+

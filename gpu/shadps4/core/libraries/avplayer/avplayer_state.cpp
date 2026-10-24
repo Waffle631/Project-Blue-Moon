@@ -354,6 +354,35 @@ bool AvPlayerState::SetLooping(bool is_looping) {
     return true;
 }
 
+// gow3: Spec 5, task 4 (AvPlayerSource::JumpToTime). Only a started playback jumps, in a state the
+// state machine lets jump; m_source_mutex is held exclusively throughout. A demuxer stopped for the
+// jump at its EOF sets EndOfFile on its way out (OnEOF), which no longer holds once the source has
+// moved, so the state from before the jump comes back without SetState's checks. The game is told
+// with WAR_JUMP_COMPLETE, as with WAR_LOOPING_BACK.
+// Called inside GAME thread
+bool AvPlayerState::JumpToTime(u64 time) {
+    std::unique_lock lock(m_source_mutex);
+    const auto state = m_current_state.load();
+    const auto previous = m_previous_state.load();
+    if (m_up_source == nullptr ||
+        (state != AvState::Play && state != AvState::Pause && state != AvState::Buffering) ||
+        !SetState(AvState::Jump)) {
+        LOG_ERROR(Lib_AvPlayer, "Could not jump to {} ms in state {}.", time,
+                  magic_enum::enum_name(state));
+        return false;
+    }
+    const bool jumped = m_up_source->JumpToTime(time);
+    {
+        std::lock_guard guard(m_state_machine_mutex);
+        m_current_state.store(jumped ? state : AvState::Error);
+        m_previous_state.store(jumped ? previous : AvState::Jump);
+    }
+    if (jumped) {
+        OnWarning(ORBIS_AVPLAYER_ERROR_WAR_JUMP_COMPLETE);
+    }
+    return jumped;
+}
+
 // May be called from different threads
 void AvPlayerState::OnWarning(u32 id) {
     // Forward to CONTROLLER thread

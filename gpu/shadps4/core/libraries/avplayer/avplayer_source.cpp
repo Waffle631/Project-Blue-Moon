@@ -10,6 +10,8 @@
 #include "core/libraries/videodec/video_utils.h"
 #include "core/memory.h"
 
+#include <limits>
+
 #include <magic_enum/magic_enum.hpp>
 
 extern "C" {
@@ -498,6 +500,86 @@ bool AvPlayerSource::IsActive() {
            m_video_frames.Size() != 0 || m_audio_frames.Size() != 0;
 }
 
+// gow3: sceAvPlayerJumpToTime was a stub that returned OK without moving (Spec 5, task 4); the game
+// jumps to CurrentTime() + ~1 s right before it stops a video early (docs/avplayer.md §1). The
+// threads stop as in Stop, the file seeks to the keyframe at or before `time`, packets and codecs
+// are flushed, queued frames give their buffers back, the clock moves to `time` and the threads
+// start again; the decoders skip what ends before `time` (SkipBeforeJumpTarget). Past the end, the
+// time wraps around in a looping clip and stays at the end otherwise. The frame the game holds is
+// kept until its next GetVideoData. AvPlayerState::JumpToTime holds m_source_mutex exclusively, so
+// no GetVideoData, GetAudioData, IsActive or CurrentTime runs meanwhile.
+bool AvPlayerSource::JumpToTime(u64 time) {
+    std::unique_lock lock(m_state_mutex);
+
+    if (m_duration != 0 && time >= m_duration) {
+        time = m_is_looping ? time % m_duration : m_duration;
+    }
+    m_video_decoder_thread.Stop();
+    m_audio_decoder_thread.Stop();
+    m_demuxer_thread.Stop();
+
+    const s64 timestamp = s64(time) * (AV_TIME_BASE / 1000);
+    const auto res =
+        avformat_seek_file(m_avformat_context.get(), -1, INT64_MIN, timestamp, timestamp, 0);
+    if (res < 0) {
+        LOG_ERROR(Lib_AvPlayer, "Could not seek to {} ms: {}", time, av_err2str(res));
+        return false;
+    }
+
+    m_video_packets.Clear();
+    m_audio_packets.Clear();
+    while (auto frame = m_video_frames.Pop()) {
+        m_video_buffers.Push(std::move(frame->buffer));
+    }
+    while (auto frame = m_audio_frames.Pop()) {
+        m_audio_buffers.Push(std::move(frame->buffer));
+    }
+    if (m_video_codec_context != nullptr) {
+        avcodec_flush_buffers(m_video_codec_context.get());
+    }
+    if (m_audio_codec_context != nullptr) {
+        avcodec_flush_buffers(m_audio_codec_context.get());
+    }
+    m_video_jump_target = time;
+    m_audio_jump_target = time;
+
+    const auto now = std::chrono::high_resolution_clock::now();
+    m_start_time = now - std::chrono::milliseconds(time);
+    m_last_audio_ts = time;
+    m_last_data_time.reset();
+    m_pause_duration = {};
+    if (m_is_paused) {
+        m_pause_time = now;
+    }
+    m_is_eof = false;
+
+    m_demuxer_thread.Run([this](std::stop_token stop) { this->DemuxerThread(stop); });
+    m_video_decoder_thread.Run([this](std::stop_token stop) { this->VideoDecoderThread(stop); });
+    m_audio_decoder_thread.Run([this](std::stop_token stop) { this->AudioDecoderThread(stop); });
+    LOG_INFO(Lib_AvPlayer, "Jumped to {} ms", time);
+    return true;
+}
+
+// gow3: JumpToTime seeks to the keyframe at or before its target, so each decoder skips the frames
+// that end by the target, up to the first one that does not. A timestamp that goes back means the
+// source looped before getting there (a stream shorter than the clip): the target is over too.
+// `duration` is a frame's, in `time_base` (0 if unknown); `last` is the decoder's last skipped one.
+static bool SkipBeforeJumpTarget(std::atomic<u64>& target_ms, s64& last, const AVFrame& frame,
+                                 AVRational time_base, s64 duration) {
+    auto timestamp = frame.best_effort_timestamp;
+    if (timestamp == AV_NOPTS_VALUE) {
+        timestamp = frame.pts;
+    }
+    const auto target = av_rescale_q(s64(target_ms.load()), AVRational{1, 1000}, time_base);
+    if (timestamp != AV_NOPTS_VALUE && timestamp >= last &&
+        timestamp + std::max<s64>(duration, 1) <= target) {
+        last = timestamp;
+        return true;
+    }
+    target_ms = 0;
+    return false;
+}
+
 void AvPlayerSource::ReleaseAVPacket(AVPacket* packet) {
     if (packet != nullptr) {
         av_packet_free(&packet);
@@ -704,6 +786,7 @@ void AvPlayerSource::VideoDecoderThread(std::stop_token stop) {
     Common::SetCurrentThreadName("shadPS4:AvVideoDecoder");
 
     LOG_INFO(Lib_AvPlayer, "Video Decoder Thread started");
+    s64 skipped = std::numeric_limits<s64>::min(); // gow3: SkipBeforeJumpTarget
     while ((!m_is_eof || m_video_packets.Size() != 0) && !stop.stop_requested()) {
         // gow3: also wake at EOF, which the demuxer notifies; otherwise a decoder that has drained
         // its packets sleeps on, the demuxer never gets past joining it and OnEOF (the StateStop of
@@ -744,6 +827,19 @@ void AvPlayerSource::VideoDecoderThread(std::stop_token stop) {
                     return;
                 }
             } else {
+                // gow3: after JumpToTime, what ends before the target is decoded but not shown.
+                if (m_video_jump_target != 0) {
+                    const auto index = m_streams[m_video_stream_index.value()].ffmpeg_index;
+                    const auto& stream = *m_avformat_context->streams[index];
+                    const auto rate = stream.avg_frame_rate;
+                    const s64 duration = rate.num > 0 && rate.den > 0
+                                             ? av_rescale_q(1, av_inv_q(rate), stream.time_base)
+                                             : 0;
+                    if (SkipBeforeJumpTarget(m_video_jump_target, skipped, *up_frame,
+                                             stream.time_base, duration)) {
+                        continue;
+                    }
+                }
                 auto buffer = m_video_buffers.Pop();
                 if (!buffer.has_value()) {
                     // Video buffers queue was cleared. This means that player was stopped.
@@ -831,6 +927,7 @@ void AvPlayerSource::AudioDecoderThread(std::stop_token stop) {
     Common::SetCurrentThreadName("shadPS4:AvAudioDecoder");
 
     LOG_INFO(Lib_AvPlayer, "Audio Decoder Thread started");
+    s64 skipped = std::numeric_limits<s64>::min(); // gow3: SkipBeforeJumpTarget
     while ((!m_is_eof || m_audio_packets.Size() != 0) && !stop.stop_requested()) {
         // gow3: also wake at EOF (see VideoDecoderThread).
         if (m_audio_packets.Size() == 0 && !m_audio_packets_cv.Wait(stop, [this] {
@@ -869,6 +966,20 @@ void AvPlayerSource::AudioDecoderThread(std::stop_token stop) {
                     return;
                 }
             } else {
+                // gow3: after JumpToTime (see the video decoder).
+                if (m_audio_jump_target != 0) {
+                    const auto index = m_streams[m_audio_stream_index.value()].ffmpeg_index;
+                    const auto& stream = *m_avformat_context->streams[index];
+                    const s64 duration =
+                        up_frame->sample_rate > 0
+                            ? av_rescale_q(up_frame->nb_samples, AVRational{1, up_frame->sample_rate},
+                                           stream.time_base)
+                            : 0;
+                    if (SkipBeforeJumpTarget(m_audio_jump_target, skipped, *up_frame,
+                                             stream.time_base, duration)) {
+                        continue;
+                    }
+                }
                 auto buffer = m_audio_buffers.Pop();
                 if (!buffer.has_value()) {
                     // Audio buffers queue was cleared. This means that player was stopped.

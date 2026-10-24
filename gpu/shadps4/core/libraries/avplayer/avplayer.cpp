@@ -331,12 +331,24 @@ bool PS4_SYSV_ABI sceAvPlayerIsActive(AvPlayerHandle handle) {
 }
 
 s32 PS4_SYSV_ABI sceAvPlayerJumpToTime(AvPlayerHandle handle, uint64_t time) {
-    LOG_ERROR(Lib_AvPlayer, "(STUBBED) called, time (msec) = {}", time);
+    LOG_TRACE(Lib_AvPlayer, "called, time (msec) = {}", time);
     if (handle == nullptr) {
         return Invalid("JumpToTime", handle);
     }
-    AvTrace("JumpToTime h=%p time=%llu (stub) -> 0", handle, (unsigned long long)time);
-    return ORBIS_OK;
+    // gow3: no longer a stub that returned OK without moving (Spec 5, task 4;
+    // AvPlayerSource::JumpToTime). It stops and restarts the decoding threads like Stop, so it
+    // guards against exceptions the same way.
+    const long long begin = AvTraceEnabled() ? AvTraceMs() : 0;
+    s32 result;
+    try {
+        result = handle->JumpToTime(time);
+    } catch (const std::exception& error) {
+        LOG_ERROR(Lib_AvPlayer, "JumpToTime failed: {}", error.what());
+        result = ORBIS_AVPLAYER_ERROR_OPERATION_FAILED;
+    }
+    AvTrace("JumpToTime h=%p time=%llu -> %#x (%lld ms)", handle, (unsigned long long)time, result,
+            AvTraceEnabled() ? AvTraceMs() - begin : 0);
+    return result;
 }
 
 s32 PS4_SYSV_ABI sceAvPlayerPause(AvPlayerHandle handle) {
