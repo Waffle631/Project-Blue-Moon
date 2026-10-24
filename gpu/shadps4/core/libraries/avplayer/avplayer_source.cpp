@@ -705,8 +705,12 @@ void AvPlayerSource::VideoDecoderThread(std::stop_token stop) {
 
     LOG_INFO(Lib_AvPlayer, "Video Decoder Thread started");
     while ((!m_is_eof || m_video_packets.Size() != 0) && !stop.stop_requested()) {
-        if (m_video_packets.Size() == 0 &&
-            !m_video_packets_cv.Wait(stop, [this] { return m_video_packets.Size() != 0; })) {
+        // gow3: also wake at EOF, which the demuxer notifies; otherwise a decoder that has drained
+        // its packets sleeps on, the demuxer never gets past joining it and OnEOF (the StateStop of
+        // a natural end) never comes. The audio decoder of a video-only clip always slept there.
+        if (m_video_packets.Size() == 0 && !m_video_packets_cv.Wait(stop, [this] {
+                return m_video_packets.Size() != 0 || m_is_eof;
+            })) {
             continue;
         }
         const auto packet = m_video_packets.Pop();
@@ -828,8 +832,10 @@ void AvPlayerSource::AudioDecoderThread(std::stop_token stop) {
 
     LOG_INFO(Lib_AvPlayer, "Audio Decoder Thread started");
     while ((!m_is_eof || m_audio_packets.Size() != 0) && !stop.stop_requested()) {
-        if (m_audio_packets.Size() == 0 &&
-            !m_audio_packets_cv.Wait(stop, [this] { return m_audio_packets.Size() != 0; })) {
+        // gow3: also wake at EOF (see VideoDecoderThread).
+        if (m_audio_packets.Size() == 0 && !m_audio_packets_cv.Wait(stop, [this] {
+                return m_audio_packets.Size() != 0 || m_is_eof;
+            })) {
             continue;
         }
         const auto packet = m_audio_packets.Pop();
