@@ -1,7 +1,8 @@
 # Spec 5 — Vídeo: AvPlayer
 
-Fecha: 2026-10-14. Estado: **en curso**: la tarea 1 del plan (trazador y contrato) está cerrada desde el
-2026-10-24 (§9); la siguiente es el arnés de la tarea 2. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 5".
+Fecha: 2026-10-14. Estado: **en curso**: las tareas 1 (trazador y contrato) y 2 (arnés, en rojo) del
+plan están cerradas desde el 2026-10-24 (§9); la siguiente es la 3, la carrera de `Kernel::Thread`.
+Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 5".
 Depende de: Specs 2 y 3 (el juego tiene que llegar a pedir un vídeo).
 
 Marcas: **[V]** comprobado; **[H]** hipótesis a confirmar con el primer vídeo.
@@ -95,6 +96,37 @@ espera, y que el juego continúe después.
     las pilas. Pila de `task_game`: la misma que en `a3`, con `rdi=0x7f7887447ce8` (mismo
     desplazamiento `…ce8`). Es el disparador "EOF y `Stop` inmediato" del plan. El prólogo hace lo
     mismo sin colgarse, porque su `Stop` sale por "already stopped" sin llegar a `join`.
+  - **[V] 2026-10-24: reproducido fuera del juego** con `avplayer-test` (tarea 2, §9), sin juego ni
+    watchdog. Confirma la [H] y la precisa:
+    - A un mismo hilo de AvPlayer se le hace `join` desde dos sitios: el demultiplexor al llegar a EOF
+      (`avplayer_source.cpp:602-603`) y `AvPlayerSource::Stop` desde el hilo del juego (`:316-318`).
+      El hilo unido, al terminar, se desvincula a sí mismo.
+    - El segundo `pthread_join` (glibc 2.43) a veces devuelve `EINVAL`, el `join failed (Invalid
+      argument)` de `a1`. Otras veces espera para siempre. No hace falta que otro hilo reutilice el
+      bloque de control: en el cuelgue solo viven el hilo del test y el controlador, como en `a3`.
+    - `gdb` sitúa a `Stop` en el `join` del hilo de audio (`:317`) o del de vídeo (`:316`).
+    - La espera solo se rompe si algo la interrumpe: el volcado del watchdog en el juego, el `attach`
+      de `gdb` en el test.
+- **[V] 2026-10-24: en un vídeo sin audio, el fin no llega como evento** (tarea 2).
+  - El decodificador de audio arranca aunque no haya pista de audio, y espera paquetes para siempre
+    (`avplayer_source.cpp:829-831`). Por eso el demultiplexor se queda en su `join` (`:603`) y nunca
+    llama a `OnEOF`.
+  - `IsActive()` pasa a falso, pero `StateStop` solo llega después del `Stop` del juego: en
+    `phasetitle`, 3 ms después.
+  - Con audio (`tiny_av.mp4`), `StateStop` sí llega al final por sí solo.
+- **[V] 2026-10-24: `Start` con la reproducción en curso aborta el proceso** ("Resource deadlock
+  avoided", tarea 2). `AvPlayerState::Start` toma el mutex del origen en exclusiva y llama a `Stop`,
+  que lo pide compartido (`avplayer_state.cpp:178-179, 282`). El juego no lo hace (tarea 1).
+- **[H] `Stop` rebobina el lector antes de parar los hilos** (`m_up_data_streamer->Reset()`,
+  `avplayer_source.cpp:313`). Si el demultiplexor está leyendo, sigue desde el byte 0 y el decodificador
+  recibe basura: unas 25 líneas `[h264] Invalid NAL unit size` por cada `Stop` justo después de
+  `Start`, y ninguna si la cola está llena y el demultiplexor duerme.
+- **[V] 2026-10-24: archivos que fallan** (tarea 2).
+  - Un archivo inexistente y 1 KB de basura hacen que `AddSource` devuelva `0x806A0002`.
+  - Con una lectura que falla a mitad, el demultiplexor registra `Could not read AV frame: error = -1` y
+    pasa a `Error`; `IsActive()` pasa a falso a los 1,4 s.
+  - No cuelga, pero el juego no recibe ningún evento de error, solo `Ready` y `Play`. El requisito 3
+    de §4 ("se informa con el error") se cumple solo en el log.
 - **[V] 2026-10-24: el vídeo NO va más rápido que el tiempo real (la [H] era falsa; §9).** El prólogo
   dura 388 637 ms de pared desde `Start`, con 388 667 de archivo. Llegan todos los fotogramas y bloques,
   sin deriva (±20 ms), y llegan EOF y `StateStop`. El `STOP:` de 2026-10-17 llegó a los ~364 s del
@@ -160,7 +192,8 @@ juego.
   -f lavfi`) a través de los mismos callbacks de `FileReplacement` y comprueba que se obtienen N
   fotogramas y que el evento de fin llega. Si se hace, `tests/test_avplayer.cpp` (nuevo, linkado
   contra la biblioteca de GPU). Si resulta demasiado costoso por el arrastre de dependencias de
-  shadPS4, se documenta y se confía en las ejecuciones reales.
+  shadPS4, se documenta y se confía en las ejecuciones reales. *2026-10-24:* hecho
+  (`tests/test_avplayer.cpp`, tarea 2, §9).
 - Reales (las juzga el usuario): los tres casos del paso 2, con el recorrido grabado
   (`GOW3_PAD_REPLAY`) para repetir el salto de vídeo.
 
@@ -230,3 +263,55 @@ por adjuntar). Nuevos: `tests/test_avplayer.cpp` (opcional).
     en que `IsActive()` pasa a falso.
   - Tarea 7, paso 2: la medición del prólogo ya está hecha y da el caso (a), la [H] es falsa.
   - Tarea 7, paso 4: el bucle sí se usa (`titlebg1.mp4`).
+
+### Tarea 2 — arnés de AvPlayer, en rojo (2026-10-24, `4d9dfb6`)
+
+- **Qué es.** `tests/test_avplayer.cpp`, destino `avplayer-test` (solo Linux):
+  `ninja -C out/gpu avplayer-test && timeout 600 out/gpu/avplayer-test tests/data [caso …]`.
+  - Usa el AvPlayer de `libgow3gpu.so` como el juego (`docs/avplayer.md` §1): `Init` (no `InitEx`),
+    asignadores del host, `FileReplacement` sobre un archivo, `PostInit` con sus valores y `AddSource`.
+  - El callback de eventos arranca en `StateReady`, en el hilo del controlador: `StreamCount`,
+    `GetStreamInfo`, `EnableStream` por pista, `Start` y `SetLooping`.
+  - El hilo del test sondea `GetVideoData`/`IsActive`. Un hilo "av audio" consume el audio al ritmo de
+    una salida real, 21,3 ms por bloque.
+  - Cada caso corre en un hijo con `fork`. Si su paso no avanza en 15 s, se mata y el caso falla, con
+    el paso y los hilos vivos en el informe. Una línea `join failed` en su stderr también lo hace
+    fallar.
+  - Opciones: `AVPLAYER_TEST_GDB=1` añade las pilas; `AVPLAYER_TEST_KEEP=<dir>` guarda el stderr de
+    cada caso.
+- **Fixtures** (`tests/data/`, ≤ 42 KB, la orden de `ffmpeg` está en la cabecera del test). Son H.264
+  Main sin B-frames a 29,97 fps, con el `moov` delante como los vídeos reales:
+  - `tiny_v150.mp4`: réplica de `phasetitle_01_00_en.mp4` (solo vídeo, 150 fotogramas, 5,005 s);
+  - `tiny_v20.mp4`: 20 fotogramas;
+  - `tiny_av.mp4`: 2 s con AAC estéreo a 48 kHz.
+- **De paso:** `3648a99` añade el stub de `runtime_report` a `tests/test_gpu_runtime_stubs.cpp`. Sin
+  él, desde `80d5fb0` no enlazaba ningún test que use `libgow3gpu.so` con esos stubs.
+- **En rojo sobre el código actual.** Logs sin versionar:
+  - tres ejecuciones completas, con 5 o 6 de 10 casos en rojo cada vez; se conservan las dos últimas
+    (`out/t2-red.log`, `out/t2-red-2.log`);
+  - tres parciales (`out/t2-smoke.log`, `out/t2-diag1.log` con la traza, `out/t2-red-gdb.log` con
+    `gdb`).
+
+  | Caso | Resultado |
+  |---|---|
+  | `plays_to_end_video_only` | **Rojo.** 150/150 fotogramas y ningún adelanto, pero no llega `StateStop` en 1 s tras el fin (§2). Después `Stop` se cuelga en el `join` del hilo de audio en 4 de 5 ejecuciones |
+  | `plays_to_end_with_audio` | Verde. 60/60 fotogramas, 94 bloques, `StateStop` a los 2 009 ms; vídeo − audio entre 0 y 21 ms (media 10) |
+  | `eof_then_stop_trigger` | **Rojo.** `join failed (Invalid argument)` en el ciclo 0 y `Stop` colgado en el ciclo 1, en las cuatro ejecuciones |
+  | `eof_with_undrained_buffers_then_stop` | **Rojo.** `Stop` colgado en el ciclo 0 (`join` del hilo de vídeo), con el demultiplexor en el `join` del hilo de audio, 4 de 4 |
+  | `stop_during_playback_without_draining` | Verde (10 ciclos) |
+  | `stop_right_after_start_and_twice` | **Rojo** solo por un `join failed`, 3 de 3. El primer `Stop` da 0, `IsActive()` falso y el segundo `Stop` da `0x806A0002`, como en el juego |
+  | `start_while_playing` | **Rojo.** El proceso aborta con "Resource deadlock avoided" (§2), 3 de 3 |
+  | `close_from_event_callback` | Verde. `Close` dentro de `StateReady` y dentro del `StateStop` de un fin natural |
+  | `repeated_open_close` | Verde en 2 de 3 (un `join failed` en la otra). 200 ciclos; hilos 1 → 1 y asignaciones vivas 0 → 0 |
+  | `missing_garbage_and_truncated_stream` | Verde. Archivo inexistente y basura → `0x806A0002`. Lectura cortada → `IsActive()` falso a los 1,4 s, sin evento de error (§2) |
+- **Lo que esto decide para la tarea 3:**
+  - La causa del cuelgue es la del contrato nuevo de `Kernel::Thread`: dos `join` sobre el mismo
+    hilo más el `detach` del propio hilo (§2). La regla 3 (retirar el `std::thread` bajo el mutex y
+    que los demás esperen a `done`) cubre los tres cuelgues.
+  - Del paso 5 ("otras causas") ya hay tres concretas:
+    1. el decodificador de audio de un vídeo sin audio, que nunca termina y retiene el `StateStop`;
+    2. `Start` con la reproducción en curso;
+    3. el `Reset()` del lector en `Stop`, que es [H].
+
+    La lectura que falla a mitad no cuelga, pero no avisa al juego: se decide en la tarea 3 si basta
+    con el log.

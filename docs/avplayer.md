@@ -41,8 +41,10 @@ Ejecuciones: `out/run-t1-trace.log` (partida actual, menú de título y título 
 - **[V] Nunca llamadas:** `InitEx`, `AddSourceEx`, `GetVideoDataEx`, `SetAvSyncMode` (sincronía por
   defecto), `Pause`, `Resume`, `SetTrickSpeed`, `DisableStream`, `ChangeStream`, `SetLogCallback` y
   `Vprintf`.
-- **[V] Fin natural** (`prologue_en.mp4`, `phasetitle_01_00_en.mp4`): AvPlayer emite `StateStop` al vaciar las colas tras el EOF. El
-  juego ve `IsActive()` falso y llama a `Stop` en el mismo milisegundo. En el prólogo, `Stop` devuelve
+- **[V] Fin natural** (`prologue_en.mp4`, `phasetitle_01_00_en.mp4`): el juego ve `IsActive()` falso y
+  llama a `Stop` en el mismo milisegundo. AvPlayer emite `StateStop` al vaciar las colas tras el EOF
+  solo si el vídeo tiene audio. Sin audio, como en `phasetitle`, lo emite después del `Stop` del juego
+  (§3). En el prólogo, `Stop` devuelve
   `0x806a0002` porque ya estaba parado. En `phasetitle_01_00_en.mp4` se bloquea (§3). En esos dos
   vídeos el juego no llama a `CurrentTime` ni a `JumpToTime`.
 - **[V] Salida anticipada** (`titlebg1.mp4` y `TM_CI.mp4`): el juego sondea `CurrentTime` unas 3 veces por
@@ -92,3 +94,17 @@ La pila de `task_game` en el volcado es la misma que en `a3` (spec §2): eboot `
 Es el disparador que plantea el plan: EOF con las colas vacías y `Stop` inmediato. El prólogo hace lo
 mismo y no se cuelga: cuando el juego llama a `Stop`, ningún hilo de AvPlayer es ya unible y `Stop`
 sale por "already stopped" sin llegar a `join`. Es la tercera reproducción de tres.
+
+**Fuera del juego** (tarea 2, `tests/test_avplayer.cpp`). El arnés reproduce el cuelgue con
+`tests/data/tiny_v150.mp4`, una réplica de este vídeo, y con un clip de 20 fotogramas. Muestra dos
+cosas:
+
+- **Por qué se cuelga:**
+  - a un mismo hilo de AvPlayer se le hace `join` desde el demultiplexor y desde el `Stop` del juego,
+    y ese hilo, al terminar, se desvincula a sí mismo;
+  - el segundo `pthread_join` devuelve `EINVAL` (`join failed`) o espera para siempre.
+- **Por qué `StateStop` llega tarde en un vídeo sin audio:**
+  - el hilo de audio arranca igual y espera paquetes que no llegan;
+  - el demultiplexor se queda esperándolo y no marca el fin hasta que `Stop` despierta a ese hilo.
+
+Detalle en la spec, §2 y §9.
