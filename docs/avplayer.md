@@ -51,8 +51,8 @@ Ejecuciones: `out/run-t1-trace.log` (partida actual, menú de título y título 
   `Stop` devuelve 0 en 1–2 ms. Cuando `IsActive()` pasa a falso, llama a `Stop` otra vez, que devuelve
   `0x806a0002`. `Close` llega enseguida o más tarde (0 s, 3,2 s y 17 s), siempre justo antes del
   siguiente `Init`. `JumpToTime` es un stub que
-  devuelve 0 (tarea 4). **[H]** Estas salidas son saltos con botón: en la ejecución el usuario tenía la
-  ventana delante, y pasar al capítulo 1 exige elegir en el menú.
+  devuelve 0 (tarea 4). **[V]** Estas salidas responden a pulsaciones: el usuario confirma (2026-10-24)
+  que pulsó botones en esa ejecución para llegar al capítulo 1.
 - **[V] Orden de arranque con la partida actual:** `titlebg1` (1,1 s) → `TM_CI` (2,5 s de 6 s) → `titlebg1`
   (5,5 s) → 17 s sin vídeo → `phasetitle_01_00_en`. Cada vídeo va con un `Init`/`Close` propio, y la
   dirección del reproductor se reutiliza.

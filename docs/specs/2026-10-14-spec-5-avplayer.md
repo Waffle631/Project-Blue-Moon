@@ -208,8 +208,8 @@ por adjuntar). Nuevos: `tests/test_avplayer.cpp` (opcional).
   El trazador no tiene test propio: lo verifican las ejecuciones reales, y el arnés de la tarea 2 lo
   ejercitará.
 - **Ejecución a** (`out/run-t1-trace.log`): partida actual, `GOW3_TIMEOUT=60`.
-  - Vídeos, en orden: `titlebg1` → `TM_CI` → `titlebg1` → `phasetitle_01_00_en`. Pasar al capítulo 1
-    exige elegir en el menú: el usuario tenía la ventana delante.
+  - Vídeos, en orden: `titlebg1` → `TM_CI` → `titlebg1` → `phasetitle_01_00_en`. El usuario confirma
+    que pulsó botones para llegar al capítulo 1.
   - Los tres primeros salen con `JumpToTime` + `Stop`.
   - El cuarto acaba de forma natural y **cuelga `Stop` 17 s**, hasta el watchdog (§2).
 - **Ejecución b** (`out/run-t1-prologo.log`): partida sin progreso restaurada, el prólogo entero,
