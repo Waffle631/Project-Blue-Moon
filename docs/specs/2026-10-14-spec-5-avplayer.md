@@ -580,9 +580,10 @@ por adjuntar). Nuevos: `tests/test_avplayer.cpp` (opcional).
   | 2 | 50,9 s | 150/150 | `play` 4 988 | `0x806A0002`, 0 ms | 3 ms después |
   | 3 | 39,1 s | 150/150 | `play` 4 975 | `0x806A0002`, 0 ms | 2 ms después |
 
-  La 3 llega antes porque `TM_CI` se saltó a los 1,6 s sin entrada del guion. El log solo registra el
-  archivo de mando, así que fue entrada del host, un clic o una tecla en la ventana. Ese salto de un
-  vídeo con audio (`JumpToTime` + `Stop`) tampoco cuelga.
+  La 3 llega antes porque `TM_CI` se saltó a los 1,6 s: el usuario pulsó Cruz (lo confirma; el log solo
+  registra el archivo de mando, no la entrada del host). Así, `TM_CI` se salta con Cruz, y ese salto de
+  un vídeo con audio (`JumpToTime` + `Stop`) tampoco cuelga. Que `titlebg1` saliera a los 1,1 s también
+  en esa ejecución no lo cambia: en las cinco sale a los 1 108–1 113 ms, lo que no es una pulsación.
 - **Criterio** (paso 3):
   - `grep -E 'STOP:|Fault:|join failed' out/run-t6-*.log` no da nada.
   - Tampoco hay `<Error>` de AvPlayer, líneas `[h264 @` ni "duplicated MOOV". El único aviso es `Stop:
