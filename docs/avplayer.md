@@ -42,11 +42,11 @@ Ejecuciones: `out/run-t1-trace.log` (partida actual, menú de título y título 
   defecto), `Pause`, `Resume`, `SetTrickSpeed`, `DisableStream`, `ChangeStream`, `SetLogCallback` y
   `Vprintf`.
 - **[V] Fin natural** (`prologue_en.mp4`, `phasetitle_01_00_en.mp4`): el juego ve `IsActive()` falso y
-  llama a `Stop` en el mismo milisegundo. AvPlayer emite `StateStop` al vaciar las colas tras el EOF
-  solo si el vídeo tiene audio. Sin audio, como en `phasetitle`, lo emite después del `Stop` del juego
-  (§3). En el prólogo, `Stop` devuelve
-  `0x806a0002` porque ya estaba parado. En `phasetitle_01_00_en.mp4` se bloquea (§3). En esos dos
-  vídeos el juego no llama a `CurrentTime` ni a `JumpToTime`.
+  llama a `Stop` en el mismo milisegundo. AvPlayer emite `StateStop` al vaciar las colas tras el EOF.
+  Hasta la tarea 3 de la spec, eso solo pasaba si el vídeo tenía audio: sin audio, como en
+  `phasetitle`, `StateStop` llegaba después del `Stop` del juego (§3). En el prólogo, `Stop` devuelve
+  `0x806a0002` porque ya estaba parado. En `phasetitle_01_00_en.mp4` se bloquea (§3; arreglado fuera
+  del juego en la tarea 3). En esos dos vídeos el juego no llama a `CurrentTime` ni a `JumpToTime`.
 - **[V] Salida anticipada** (`titlebg1.mp4` y `TM_CI.mp4`): el juego sondea `CurrentTime` unas 3 veces por
   fotograma y luego llama a `JumpToTime(CurrentTime() + ~1 000)`: 2 087 con el tiempo en 1 054, 3 509 con
   2 495 y 6 513 con 5 514. En el mismo milisegundo llama a `Stop`, sin `GetVideoData` entre medias. Ese
@@ -106,5 +106,13 @@ cosas:
 - **Por qué `StateStop` llega tarde en un vídeo sin audio:**
   - el hilo de audio arranca igual y espera paquetes que no llegan;
   - el demultiplexor se queda esperándolo y no marca el fin hasta que `Stop` despierta a ese hilo.
+
+**Arreglo** (tarea 3, 2026-10-24; falta confirmarlo en el juego, tarea 6):
+
+- **`Kernel::Thread`:** un solo llamador saca el hilo, bajo un mutex, y lo une. Los demás esperan a
+  que la función termine, y el propio hilo lo suelta sin esperar.
+- **Decodificadores:** se despiertan con el aviso de EOF del demultiplexor, así que el `StateStop` de
+  un vídeo sin audio llega 7–12 ms después del último fotograma. El `Stop` del juego que viene detrás
+  devuelve `0x806a0002`, como en el prólogo, o 0 si llega antes de que el demultiplexor termine.
 
 Detalle en la spec, §2 y §9.

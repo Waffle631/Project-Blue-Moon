@@ -1,7 +1,8 @@
 # Spec 5 — Vídeo: AvPlayer
 
-Fecha: 2026-10-14. Estado: **en curso**: las tareas 1 (trazador y contrato) y 2 (arnés, en rojo) del
-plan están cerradas desde el 2026-10-24 (§9); la siguiente es la 3, la carrera de `Kernel::Thread`.
+Fecha: 2026-10-14. Estado: **en curso**: las tareas 1 (trazador y contrato), 2 (arnés) y 3 (carrera de
+`Kernel::Thread` y otras causas) del plan están cerradas desde el 2026-10-24 (§9). Fuera del juego, el
+arnés pasa entero. La siguiente es la 4, `JumpToTime`; la confirmación en el juego es la 6.
 Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 5".
 Depende de: Specs 2 y 3 (el juego tiene que llegar a pedir un vídeo).
 
@@ -107,6 +108,11 @@ espera, y que el juego continúe después.
     - `gdb` sitúa a `Stop` en el `join` del hilo de audio (`:317`) o del de vídeo (`:316`).
     - La espera solo se rompe si algo la interrumpe: el volcado del watchdog en el juego, el `attach`
       de `gdb` en el test.
+  - **[V] 2026-10-24: arreglado fuera del juego** (tarea 3, `1442f25`, §9).
+    - Ahora un solo llamador saca el `std::thread` de `Kernel::Thread`, bajo un mutex, y lo une. Los
+      demás esperan a que la función vuelva.
+    - `kernel-thread-test` y los tres casos del arnés que se colgaban pasan.
+    - Falta confirmarlo en el juego (tarea 6).
 - **[V] 2026-10-24: en un vídeo sin audio, el fin no llega como evento** (tarea 2).
   - El decodificador de audio arranca aunque no haya pista de audio, y espera paquetes para siempre
     (`avplayer_source.cpp:829-831`). Por eso el demultiplexor se queda en su `join` (`:603`) y nunca
@@ -114,19 +120,38 @@ espera, y que el juego continúe después.
   - `IsActive()` pasa a falso, pero `StateStop` solo llega después del `Stop` del juego: en
     `phasetitle`, 3 ms después.
   - Con audio (`tiny_av.mp4`), `StateStop` sí llega al final por sí solo.
+  - **Causa precisa y arreglo** (tarea 3, `3d33791`):
+    - el demultiplexor avisa a los decodificadores al llegar a EOF, pero su espera de paquetes solo
+      miraba si había paquetes;
+    - ahora también mira `m_is_eof`, y `StateStop` llega 7–12 ms después del último fotograma;
+    - el `Stop` del juego que viene después devuelve `0x806A0002`, como en el prólogo.
 - **[V] 2026-10-24: `Start` con la reproducción en curso aborta el proceso** ("Resource deadlock
   avoided", tarea 2). `AvPlayerState::Start` toma el mutex del origen en exclusiva y llama a `Stop`,
   que lo pide compartido (`avplayer_state.cpp:178-179, 282`). El juego no lo hace (tarea 1).
-- **[H] `Stop` rebobina el lector antes de parar los hilos** (`m_up_data_streamer->Reset()`,
-  `avplayer_source.cpp:313`). Si el demultiplexor está leyendo, sigue desde el byte 0 y el decodificador
-  recibe basura: unas 25 líneas `[h264] Invalid NAL unit size` por cada `Stop` justo después de
-  `Start`, y ninguna si la cola está llena y el demultiplexor duerme.
+  - *Arreglado en la tarea 3* (`aeaf4ee`): `Start` llama a `StopLocked`, que no toma el mutex.
+  - Ahora el segundo `Start` devuelve 0 y la reproducción vuelve a empezar desde 0.
+- **[V] 2026-10-24: `Stop` rebobinaba el lector antes de parar los hilos**
+  (`m_up_data_streamer->Reset()`, `avplayer_source.cpp:313`). Era [H] en la tarea 2.
+  - Si el demultiplexor estaba leyendo, seguía desde el byte 0, y el decodificador recibía la cabecera
+    del archivo como datos: `[h264] Invalid NAL unit size (-618261609 > 243)`, unas 20 líneas por
+    cada `Stop` justo después de `Start`.
+  - Si la cola estaba llena y el demultiplexor dormía, no salía ninguna.
+  - *Confirmado y arreglado en la tarea 3* (`e20fc9c`), con un oráculo nuevo del arnés: una queja del
+    decodificador H.264 hace fallar el caso.
+    - Con el `Reset()`: 450 errores en `stop_right_after_start_and_twice` y 5 352 en
+      `repeated_open_close`. Sin él, 0.
+    - No hace falta rebobinar: un `Start` posterior busca con `avformat_seek_file`, que mueve la
+      posición a través del `AVIOContext`.
 - **[V] 2026-10-24: archivos que fallan** (tarea 2).
   - Un archivo inexistente y 1 KB de basura hacen que `AddSource` devuelva `0x806A0002`.
   - Con una lectura que falla a mitad, el demultiplexor registra `Could not read AV frame: error = -1` y
     pasa a `Error`; `IsActive()` pasa a falso a los 1,4 s.
   - No cuelga, pero el juego no recibe ningún evento de error, solo `Ready` y `Play`. El requisito 3
     de §4 ("se informa con el error") se cumple solo en el log.
+  - *Decisión (tarea 3): se deja así.*
+    - El juego ve `IsActive()` falso, su `Stop` devuelve 0 y recibe `StateStop`: sigue por su camino de
+      siempre.
+    - No se añade un evento de error, porque no sabemos si el AvPlayer real lo emite.
 - **[V] 2026-10-24: el vídeo NO va más rápido que el tiempo real (la [H] era falsa; §9).** El prólogo
   dura 388 637 ms de pared desde `Start`, con 388 667 de archivo. Llegan todos los fotogramas y bloques,
   sin deriva (±20 ms), y llegan EOF y `StateStop`. El `STOP:` de 2026-10-17 llegó a los ~364 s del
@@ -176,7 +201,7 @@ juego.
 | Se cierra al abrir | Tamaño de las estructuras de `Init/InitEx` del SDK 11.008 frente a las de shadPS4 (la versión de AvPlayer puede haber cambiado) |
 | Se queda negro | `GetVideoDataEx`: formato de píxel, dimensiones, alineación del búfer; textura creada por el juego |
 | Se corta o se desincroniza | Reloj de AvPlayer (`avplayer_source.cpp`), `SetAvSyncMode`, tiempo de `AudioOut` |
-| Cuelgue al terminar o saltar | Evento de fin de flujo (`AvPlayerEvent`), cierre y `Close` desde el guest, hilos de decodificación. *2026-10-21: visto con `phasetitle_01_00_en.mp4`, en `sceAvPlayerStop`, con un `join` sobre un hilo que ya no existe (§2)* |
+| Cuelgue al terminar o saltar | Evento de fin de flujo (`AvPlayerEvent`), cierre y `Close` desde el guest, hilos de decodificación. *2026-10-21: visto con `phasetitle_01_00_en.mp4`, en `sceAvPlayerStop`, con un `join` sobre un hilo que ya no existe (§2). 2026-10-24: arreglado fuera del juego (tarea 3, §9)* |
 | No encuentra el archivo | Los callbacks del juego pasan por su FIOS → `runtime_file.c` (`/app0/image/movie/…`); mirar `open(...) -> not found` en el log |
 | Cuelga el hilo del host al llamar al guest | Falta de `runtime_thread_attach_host` en un hilo nuevo de AvPlayer |
 
@@ -315,3 +340,62 @@ por adjuntar). Nuevos: `tests/test_avplayer.cpp` (opcional).
 
     La lectura que falla a mitad no cuelga, pero no avisa al juego: se decide en la tarea 3 si basta
     con el log.
+
+### Tarea 3 — carrera de `Kernel::Thread` y otras causas (2026-10-24, `1442f25`, `e20fc9c`, `3d33791`, `aeaf4ee`)
+
+- **`Kernel::Thread` nuevo** (`gpu/shim/core/libraries/kernel/threads.h`, `1442f25`). Sigue las cinco
+  reglas del plan:
+  - estado compartido (`shared_ptr`) con mutex, `done`, `stop_source`, el `std::thread` y el id del
+    hilo vivo, que se borra al volver la función porque los id se reutilizan;
+  - `Stop()` pide siempre la parada y después une;
+  - `Join()` desde el propio hilo suelta el `std::thread` y sigue sin esperar. Desde otro hilo, el
+    primero que lo saca lo une fuera del mutex, y todos esperan a `done`;
+  - `Joinable()` significa "nadie lo ha sacado aún", lo que mantiene el "already stopped" de AvPlayer;
+  - `Run()` detiene el anterior y asigna el estado bajo su mutex: el hilo nuevo no lo lee antes de
+    tiempo.
+- **`tests/test_kernel_thread.cpp`** (destino `kernel-thread-test`; sin juego ni FFmpeg, con vigilante
+  por caso). Viejo: 3 de 3 ejecuciones, caso a caso (`out/t3-red.log`). Nuevo: 3 de 3
+  (`out/t3-green.log`).
+
+  | Caso | Código viejo | Nuevo |
+  |---|---|---|
+  | `self_join_vs_immediate_stop` (5 000 iteraciones) | **Rojo.** `Stop` vuelve con la función aún en marcha (iteración 3–5), con `join failed (Invalid argument)` | Verde, ~0,85 s |
+  | `stop_wakes_a_thread_being_joined_by_another` | **Rojo.** El segundo `join` no vuelve, sin `join failed`: lo corta el vigilante a los 5 s | Verde |
+  | `two_joiners_both_wait_for_the_function` | **Rojo.** Igual | Verde |
+  | `restart_and_destructor` | Verde. Con TSan, rojo: un hilo que se une a sí mismo antes de que `Run` asigne el `jthread` se queda "joinable" | Verde |
+
+  Con ThreadSanitizer (`libtsan` instalado en el contenedor con permiso del usuario):
+  - el código viejo da `data race` en `Thread::Join` (salida 66);
+  - el nuevo no da ninguno en 3 de 3 (`out/t3-tsan.log`).
+- **Otras causas, un commit por cada una.** Cada una tenía antes su caso del arnés en rojo:
+  1. `e20fc9c`: `Stop` ya no rebobina el lector bajo el demultiplexor (§2).
+     - Es el [H] de la tarea 2, ahora confirmado.
+     - Oráculo nuevo del arnés: una línea `[h264 @` hace fallar el caso, salvo en el de entrada rota.
+  2. `3d33791`: los decodificadores despiertan al llegar a EOF (§2). Con eso llega el `StateStop`
+     natural de un vídeo sin audio.
+  3. `aeaf4ee`: `Start` con la reproducción en curso ya no aborta (§2).
+  4. La lectura que falla a mitad no cambia (decisión en §2).
+- **Verde** (`out/t3-final-*.log`, sin versionar):
+  - `bash build.sh` y `bash build.sh --test`, con rc 0 y los 17 PASS/ok de la línea base;
+  - `python3 -m unittest discover -s tests`: 267 ejecutados, OK (35 omitidos, 4 fallos esperados);
+  - `kernel-thread-test`: 3 de 3;
+  - `avplayer-test`: 10 de 10 en dos ejecuciones completas.
+
+  | Caso | Tarea 2 | Ahora |
+  |---|---|---|
+  | `plays_to_end_video_only` | Sin `StateStop` natural; `Stop` colgado en 4 de 5 | 150/150; `StateStop` a 4 979 ms, último fotograma a 4 972; `Stop` → `0x806A0002` en 0 ms |
+  | `plays_to_end_with_audio` | Verde | Igual: 60/60, 94 bloques, `StateStop` a 2 009 ms |
+  | `eof_then_stop_trigger` | `join failed` y cuelgue en el ciclo 1 | 500 ciclos de 20/20 fotogramas; ciclo ≤ 643 ms, `Stop` ≤ 0 ms, `Close` ≤ 5 ms |
+  | `eof_with_undrained_buffers_then_stop` | Cuelgue en el ciclo 0 | 20 ciclos, `Stop` = 0 |
+  | `stop_right_after_start_and_twice` | `join failed`; con el oráculo nuevo, 450 errores H.264 | 20 ciclos sin errores |
+  | `start_while_playing` | Aborto | `Start` = 0 en 3 ms, y vuelve a empezar desde 0 |
+  | `repeated_open_close` | `join failed` en 1 de 3; con el oráculo nuevo, 5 352 errores H.264 | 200 ciclos; hilos 1 → 1, asignaciones vivas 0 → 0 |
+  | `stop_during_playback_without_draining`, `close_from_event_callback`, `missing_garbage_and_truncated_stream` | Verde | Verde |
+- **Para las tareas siguientes:**
+  - **T6:** el cuelgue de `phasetitle` debería desaparecer. Con el `StateStop` natural ya arreglado, el
+    `Stop` del juego devolverá `0x806A0002` o 0, según llegue antes o después de que el demultiplexor
+    suelte su hilo. Los dos valores son los del prólogo.
+  - **T5, [H]:** al llegar a EOF, los decodificadores no vacían el códec
+    (`avcodec_send_packet(nullptr)`). Un vídeo con B-frames perdería sus últimos fotogramas; los
+    fixtures no tienen B-frames. El barrido debe comparar los fotogramas entregados con los del
+    archivo.
