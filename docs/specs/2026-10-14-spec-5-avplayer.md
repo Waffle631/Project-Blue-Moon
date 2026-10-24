@@ -1,6 +1,7 @@
 # Spec 5 — Vídeo: AvPlayer
 
-Fecha: 2026-10-14. Estado: **borrador para aprobación**. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 5".
+Fecha: 2026-10-14. Estado: **en curso**: la tarea 1 del plan (trazador y contrato) está cerrada desde el
+2026-10-24 (§9); la siguiente es el arnés de la tarea 2. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 5".
 Depende de: Specs 2 y 3 (el juego tiene que llegar a pedir un vídeo).
 
 Marcas: **[V]** comprobado; **[H]** hipótesis a confirmar con el primer vídeo.
@@ -31,7 +32,14 @@ espera, y que el juego continúe después.
   archivo, eventos). Un hilo del host que ejecuta código del guest necesita su TCB: el shim lo hace con
   `runtime_thread_attach_host` (`gpu/shim/core/libraries/kernel/threads.h:14-24`).
 - **[V]** El audio de los vídeos lo entrega AvPlayer al juego con `GetAudioData`; el juego lo envía a
-  `AudioOut`. El vídeo lo entrega con `GetVideoDataEx` y el juego lo sube a una textura.
+  `AudioOut`. El vídeo lo entrega con `GetVideoData` y el juego lo sube a una textura. *Corregido el
+  2026-10-24 con la traza:* el juego llama a `GetVideoData`, no a `GetVideoDataEx` (§9).
+- **[V] 2026-10-24: contrato real del juego** (tarea 1, `docs/avplayer.md`). Usa `Init`, no `InitEx`, con
+  `FileReplacement` y su callback de eventos. Usa `AddSource` con la ruta `/app0/image/movie/…`. Arranca
+  desde su callback de `StateReady`, que corre en el hilo del controlador de AvPlayer. `SetLooping(1)`
+  solo en `titlebg1.mp4`. Nunca llama a `SetAvSyncMode`, `Pause`, `Resume`, `SetTrickSpeed`,
+  `DisableStream` ni a las variantes `Ex`. Sí llama a `JumpToTime`: siempre con
+  `CurrentTime() + ~1 000` y seguido de `Stop` en el mismo milisegundo.
 - **[V]** ffmpeg completo de RPM Fusion instalado en el contenedor `ps4dev` (`ffmpeg-free` no decodifica H.264).
 - **[V]** Primer vídeo real (2026-10-17, fin de la fase 2A de la Spec 2, `out/run-2a-10b.log`): tras
   la init y la política de captura, el juego abre `image/movie/prologue_en.mp4` **con
@@ -80,7 +88,18 @@ espera, y que el juego continúe después.
       `task_game`. El `pthread_t` que espera el `join` es la dirección del bloque de control del hilo,
       y el volcado da `rdi` = `0x7f9bf7446ce8`, el campo `tid` de ese bloque. Hay que ver de qué hilo
       vivo es.
-- **[H] El vídeo podría ir más rápido que el tiempo real.** Datos de `out/run-prologo.log`:
+  - **[V] 2026-10-24, tercera reproducción de tres, con la traza** (`out/run-t1-trace.log`). En
+    `phasetitle_01_00_en.mp4` (solo vídeo, 5 005 ms) se entregan los 150 fotogramas. En el
+    milisegundo del último, `IsActive()` pasa a falso y el juego llama a `Stop`. El controlador emite
+    `StateStop` 3 ms después, y `Stop` tarda 17 135 ms: vuelve solo cuando el watchdog de 60 s vuelca
+    las pilas. Pila de `task_game`: la misma que en `a3`, con `rdi=0x7f7887447ce8` (mismo
+    desplazamiento `…ce8`). Es el disparador "EOF y `Stop` inmediato" del plan. El prólogo hace lo
+    mismo sin colgarse, porque su `Stop` sale por "already stopped" sin llegar a `join`.
+- **[V] 2026-10-24: el vídeo NO va más rápido que el tiempo real (la [H] era falsa; §9).** El prólogo
+  dura 388 637 ms de pared desde `Start`, con 388 667 de archivo. Llegan todos los fotogramas y bloques,
+  sin deriva (±20 ms), y llegan EOF y `StateStop`. El `STOP:` de 2026-10-17 llegó a los ~364 s del
+  vídeo: el juego crea su primer decodificador ATRAC9 a los 365,4 s, 23 s antes del final. Datos
+  originales de la [H], de `out/run-prologo.log`:
 
   | Dato | Valor |
   |---|---|
@@ -157,10 +176,57 @@ por adjuntar). Nuevos: `tests/test_avplayer.cpp` (opcional).
 - [ ] El título del capítulo 1 en inglés (`phasetitle_01_00_en.mp4`) se reproduce y el juego continúa.
 - [ ] Saltar un vídeo no cuelga el juego.
 - [ ] El log del recorrido no contiene `STOP:` ni `Fault:` relacionados con AvPlayer.
-- [ ] Hay una nota con el contrato real del juego con AvPlayer (paso 1).
+- [x] Hay una nota con el contrato real del juego con AvPlayer (paso 1). *2026-10-24:* `docs/avplayer.md`,
+  con la traza de `out/run-t1-trace.log` y `out/run-t1-prologo.log` (tarea 1, §9).
 
 ## 8. Riesgos
 
 - AvPlayer de shadPS4 es la parte menos madura que se reutiliza (riesgo "Medio" del roadmap).
 - 4,5 GB de vídeo: el recorrido de la Alpha solo exige dos; el resto se valida por muestreo, no uno a uno.
 - Puede que el juego pase una ruta en lugar de callbacks para algunos vídeos; el paso 1 lo aclara.
+
+## 9. Resultados
+
+### Tarea 1 — trazador y contrato del juego (2026-10-24, `c06b6a1`)
+
+- **Trazador `GOW3_TRACE_AVPLAYER=1`** (`avplayer_trace.h`, `avplayer.cpp`, `EmitEvent` en
+  `avplayer_state.cpp`). Escribe en stderr una línea `AvTrace +<ms> t<tid>: …` por llamada exportada, con
+  sus argumentos y su resultado, y otra por evento. Las cuatro llamadas que el juego sondea cada
+  fotograma se cuentan por reproductor, y `Close` da los totales. De ellas solo se trazan:
+  - los fotogramas y bloques entregados, con `play=` (ms desde `Start`);
+  - los cambios de `IsActive`;
+  - un `CurrentTime` por segundo.
+
+  `Stop` y `Close` trazan el inicio y la duración. Sin la variable, cada llamada cuesta la lectura de
+  un `bool` estático.
+- **Suites, iguales antes y después:**
+  - `build.sh --test`: rc 0, con las 17 líneas `PASS`/`ok` de siempre (`out/t1-baseline-build.log`,
+    `out/t1-after-build.log`);
+  - Python: `Ran 267`, `OK (skipped=35, expected failures=4)`. El plan citaba 255 ejecutados; la cifra
+    había crecido con las Specs 3 y 4.
+
+  El trazador no tiene test propio: lo verifican las ejecuciones reales, y el arnés de la tarea 2 lo
+  ejercitará.
+- **Ejecución a** (`out/run-t1-trace.log`): partida actual, `GOW3_TIMEOUT=60`.
+  - Vídeos, en orden: `titlebg1` → `TM_CI` → `titlebg1` → `phasetitle_01_00_en`. Pasar al capítulo 1
+    exige elegir en el menú: el usuario tenía la ventana delante.
+  - Los tres primeros salen con `JumpToTime` + `Stop`.
+  - El cuarto acaba de forma natural y **cuelga `Stop` 17 s**, hasta el watchdog (§2).
+- **Ejecución b** (`out/run-t1-prologo.log`): partida sin progreso restaurada, el prólogo entero,
+  cierre con SIGTERM a los 440 s. Después se devolvió a `user/savedata` la partida con progreso, que
+  queda copiada en `out/savedata-con-progreso/`.
+  - Pared contra marcas: la tabla de `docs/avplayer.md` §2.
+  - Tras el `Stop` final (`0x806a0002`, ya parado), el juego guarda la partida y sigue. En los 40 s
+    siguientes no llama a `Close`.
+- **Hilos** (`out/run-t1-prologo-threads.txt`):
+  - `1: task_game`: `Init`, `AddSource`, `GetVideoData`, `Stop`, `Close`;
+  - `shadPS4:AvContr`: el callback de eventos del juego, que arranca la reproducción;
+  - `av audio`: `IsActive` y `GetAudioData` sin pausa.
+- **Lo que esto decide para el plan:**
+  - Tarea 4: solo `JumpToTime` está en uso, y siempre justo antes de `Stop`, sin pedir datos entre
+    medias. `DisableStream`, `SetTrickSpeed` y `ChangeStream` no se llaman y quedan fuera.
+  - Tarea 6: el cuelgue se reproduce sin ruta grabada larga, en ~30 s desde el menú de título. El
+    disparador es el del plan: fin natural de un vídeo solo vídeo y `Stop` en el mismo milisegundo
+    en que `IsActive()` pasa a falso.
+  - Tarea 7, paso 2: la medición del prólogo ya está hecha y da el caso (a), la [H] es falsa.
+  - Tarea 7, paso 4: el bucle sí se usa (`titlebg1.mp4`).
