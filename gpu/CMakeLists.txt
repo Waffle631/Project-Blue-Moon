@@ -341,6 +341,13 @@ add_executable(frame-capture-test EXCLUDE_FROM_ALL ../tests/test_frame_capture.c
 target_compile_options(frame-capture-test PRIVATE -UNDEBUG)
 target_include_directories(frame-capture-test PRIVATE shim shadps4 third_party/gcn/include)
 target_link_libraries(frame-capture-test PRIVATE Vulkan::Headers fmt::fmt Boost::headers magic_enum::magic_enum)
+# Spec 5: Kernel::Thread joined from several threads at once (AvPlayer's demuxer and Stop).
+find_package(Threads REQUIRED)
+add_executable(kernel-thread-test EXCLUDE_FROM_ALL ../tests/test_kernel_thread.cpp
+    ../tests/test_gpu_runtime_stubs.cpp)
+target_compile_options(kernel-thread-test PRIVATE -UNDEBUG -Wall -Wextra -Werror)
+target_include_directories(kernel-thread-test PRIVATE shim shadps4)
+target_link_libraries(kernel-thread-test PRIVATE Threads::Threads)
 add_executable(lighting-test-knob-test EXCLUDE_FROM_ALL ../tests/test_lighting_test.cpp)
 target_compile_options(lighting-test-knob-test PRIVATE -UNDEBUG -Wall -Wextra -Werror)
 target_include_directories(lighting-test-knob-test PRIVATE shadps4)
