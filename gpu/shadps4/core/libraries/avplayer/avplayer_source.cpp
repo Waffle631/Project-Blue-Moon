@@ -639,7 +639,11 @@ void AvPlayerSource::DemuxerThread(std::stop_token stop) {
                 if (m_is_looping) {
                     LOG_INFO(Lib_AvPlayer, "EOF reached in demuxer. Looping the source...");
                     m_state.OnWarning(ORBIS_AVPLAYER_ERROR_WAR_LOOPING_BACK);
-                    avio_seek(m_avformat_context->pb, 0, SEEK_SET);
+                    // gow3: no avio_seek(pb, 0) first. Through the FileReplacement AVIOContext it
+                    // made the MOV demuxer read the moov again ("Found duplicated MOOV Atom"),
+                    // after which every read was EOF and every seek failed: the demuxer spun here,
+                    // one WAR_LOOPING_BACK per turn, and the clip froze after its first loop
+                    // (avplayer-test, loops_back). avformat_seek_file moves the AVIOContext itself.
                     if (m_video_stream_index.has_value()) {
                         const auto index = m_streams[m_video_stream_index.value()].ffmpeg_index;
                         const auto stream = m_avformat_context->streams[index];

@@ -159,3 +159,23 @@ valor; un salto de verdad le da lo mismo que antes, ahora cierto.
   `Stop`, otro `Stop` y `Close`, con y sin audio.
 - `jump_past_the_end_and_when_stopped`: los bordes anteriores.
 
+
+## 5. Bucle (`titlebg1.mp4`, 2026-10-24)
+
+**[V] El bucle heredado de shadPS4 se rompía en la primera vuelta.** Al llegar a EOF, el
+demultiplexor hacía `avio_seek(pb, 0)` antes de `avformat_seek_file`.
+
+- Con el `AVIOContext` de `FileReplacement`, eso hacía releer el `moov` al demultiplexor MOV ("Found
+  duplicated MOOV Atom"). Desde ahí cada lectura daba EOF y cada búsqueda fallaba con -1
+  (`out/t4-exp/loop2.c`; con una ruta de archivo no pasa).
+- El vídeo se congelaba al acabar la primera vuelta. El demultiplexor giraba sin pausa y emitía un
+  `WAR_LOOPING_BACK` por giro: 12,7 millones en 2 s con `tiny_v20.mp4`, todos al callback del juego.
+  En el juego habría pasado a los 120 s del menú de título.
+- *Arreglado en la tarea 4:* sin el `avio_seek`. Ahora hay un aviso por vuelta (274 en 2 s), y un
+  `JumpToTime` después de varias vueltas cae donde se pide (`loops_back`).
+
+**[V] Queda para la tarea 7, paso 4: el ritmo a partir de la segunda vuelta.** En un vídeo sin audio,
+`CurrentTime()` es el tiempo de pared desde `Start` limitado a la duración. Tras la primera vuelta se
+queda en la duración y cada fotograma de las vueltas siguientes sale en cuanto se pide: 5 480
+fotogramas en 2 s de `tiny_v20.mp4`, en vez de unos 60. En el juego, `titlebg1.mp4` iría al ritmo al
+que el juego llama a `GetVideoData` (unas 3 llamadas por fotograma, §1) a partir de los 120 s.

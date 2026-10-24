@@ -81,6 +81,7 @@ using Clock = std::chrono::steady_clock;
 namespace {
 
 constexpr s32 kOperationFailed = s32(0x806A0002); // what the game's second Stop gets (docs §1)
+constexpr s32 kLoopingBack = s32(0x806A00A1);     // WarningId of a looping clip at its end
 constexpr s32 kJumpComplete = s32(0x806A00A3);    // WarningId of a finished JumpToTime
 constexpr double kFrameMs = 1001.0 / 30;          // the fixtures run at 29.97 fps
 
@@ -251,6 +252,13 @@ struct Session {
             return std::any_of(events.begin(), events.end(),
                                [id](const Event& e) { return e.id == id; });
         });
+    }
+
+    int CountWarning(s32 code) {
+        std::lock_guard lock(mutex);
+        return int(std::count_if(events.begin(), events.end(), [code](const Event& e) {
+            return e.id == AvPlayerEvents::WarningId && e.warning == code;
+        }));
     }
 
     bool WaitWarning(s32 code, int ms) {
@@ -826,6 +834,46 @@ bool OnScreenAt(u64 timestamp, u64 target) {
     return timestamp <= target && double(timestamp) + kFrameMs + 1 >= double(target);
 }
 
+// A looping clip plays again after its end (the game loops titlebg1.mp4): frames keep coming with
+// their timestamps wrapping around, and WAR_LOOPING_BACK comes once per loop of the demuxer, which
+// runs at most 30 packets (1.5 loops of tiny_v20) ahead of what is shown. A jump after many loops
+// still lands where asked.
+void LoopsBack() {
+    Options options;
+    options.looping = true;
+    Session s(options);
+    Step("AddSource tiny_v20, looping");
+    CHECK(Open(s, Data("tiny_v20.mp4")) == 0, "AddSource failed");
+    CHECK(s.WaitStarted(2000) && s.start_result == 0, "no Start within 2 s");
+    Video video;
+    Step("playing 2 s");
+    const bool ended = Drain(s, video, 2000);
+    const int loops = s.CountWarning(kLoopingBack);
+    Step("JumpToTime after the loops");
+    const s32 jump = sceAvPlayerJumpToTime(s.handle, s.duration_ms * 5 + 500);
+    AvPlayerFrameInfo first{};
+    long long first_ms = 0, stop_ms = 0, close_ms = 0;
+    const bool got = NextFrame(s, first, 1000, first_ms);
+    Step("Stop");
+    const s32 stop = Timed(stop_ms, [&] { return sceAvPlayerStop(s.handle); });
+    Step("Close");
+    Timed(close_ms, [&] { return sceAvPlayerClose(s.handle); });
+    std::printf("  %s; %d wraps, %d WAR_LOOPING_BACK in 2 s of a %llu ms clip\n",
+                Describe(video).c_str(), video.backwards, loops, (unsigned long long)s.duration_ms);
+    std::printf("  then JumpToTime(+5 loops + 500) %#x, first frame ts %llu after %lld ms; Stop %#x "
+                "in %lld ms, Close in %lld ms\n",
+                jump, (unsigned long long)first.timestamp, first_ms, stop, stop_ms, close_ms);
+    CHECK(!ended, "IsActive() turned false in a looping clip");
+    CHECK(video.backwards >= 2, "%d frames and %d wraps in 2 s", video.frames, video.backwards);
+    CHECK(loops <= video.backwards + 3, "%d WAR_LOOPING_BACK for %d wraps", loops,
+          video.backwards);
+    CHECK(jump == 0, "JumpToTime after the loops returned %#x", jump);
+    CHECK(got && OnScreenAt(first.timestamp, 500),
+          "first frame after the jump: %s, ts %llu (expected the one on screen at 500)",
+          got ? "got" : "none", (unsigned long long)first.timestamp);
+    CHECK(stop_ms < 2000 && close_ms < 2000, "Stop %lld ms, Close %lld ms", stop_ms, close_ms);
+}
+
 // A jump in the middle of tiny_v150, then the rest of the clip. Frames resume at the one on screen
 // at the target although FFmpeg decodes from the keyframe before it (0: one GOP), none is lost after
 // it, the clock follows the jump and the game is told the jump is complete.
@@ -1190,6 +1238,7 @@ int main(int argc, char** argv) {
         {"close_from_event_callback", 20, CloseFromEventCallback},
         {"repeated_open_close", 120, RepeatedOpenClose},
         {"missing_garbage_and_truncated_stream", 30, MissingGarbageAndTruncatedStream, true},
+        {"loops_back", 20, LoopsBack},
         {"jump_then_stop", 20, JumpThenStop},
         {"jump_then_stop_like_the_game", 60, JumpThenStopLikeTheGame},
         {"jump_past_the_end_and_when_stopped", 20, JumpPastTheEndAndWhenStopped},
