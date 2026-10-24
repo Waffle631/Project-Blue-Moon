@@ -4,6 +4,7 @@ user/
 # Game dump, .pkg/.rar and extraction tools (tens of GB, never versioned)
 Tsukihime/
 *.mp4
+!tests/data/*.mp4
 gow3.ini
 fsr4_shaders/
 pgo/

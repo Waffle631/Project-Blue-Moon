@@ -290,6 +290,15 @@ if (WIN32)
         -include ${CMAKE_CURRENT_SOURCE_DIR}/../src/compat_win.h)
     target_link_libraries(pipeline-binary-initialization-test PRIVATE onecore)
 endif()
+# Spec 5: AvPlayer driven like Tsukihime (FileReplacement, tests/data/tiny_*.mp4); one forked child
+# per case, so Linux only: ninja -C out/gpu avplayer-test && out/gpu/avplayer-test tests/data.
+if (NOT WIN32)
+    add_executable(avplayer-test EXCLUDE_FROM_ALL ../tests/test_avplayer.cpp
+        ../tests/test_gpu_runtime_stubs.cpp)
+    target_include_directories(avplayer-test PRIVATE shim shadps4 third_party/gcn/include)
+    target_link_libraries(avplayer-test PRIVATE gow3gpu)
+    target_compile_options(avplayer-test PRIVATE -fPIC -UNDEBUG -Wall -Wextra -Werror)
+endif()
 set_source_files_properties(../tests/test_pipeline_binary_cache.cpp PROPERTIES
     COMPILE_OPTIONS "-fvisibility=hidden;-fvisibility-inlines-hidden")
 add_executable(motion-history-test EXCLUDE_FROM_ALL ../tests/test_motion_history.cpp)
