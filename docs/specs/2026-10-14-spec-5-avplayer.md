@@ -1,8 +1,9 @@
 # Spec 5 — Vídeo: AvPlayer
 
-Fecha: 2026-10-14. Estado: **en curso**: las tareas 1 (trazador y contrato), 2 (arnés) y 3 (carrera de
-`Kernel::Thread` y otras causas) del plan están cerradas desde el 2026-10-24 (§9). Fuera del juego, el
-arnés pasa entero. La siguiente es la 4, `JumpToTime`; la confirmación en el juego es la 6.
+Fecha: 2026-10-14. Estado: **en curso**: las tareas 1 (trazador y contrato), 2 (arnés), 3 (carrera de
+`Kernel::Thread` y otras causas) y 4 (`JumpToTime` real y bucle) del plan están cerradas desde el
+2026-10-24 (§9). Fuera del juego, el arnés pasa entero. La siguiente es la 5, el barrido de los 134
+vídeos; la confirmación en el juego es la 6.
 Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 5".
 Depende de: Specs 2 y 3 (el juego tiene que llegar a pedir un vídeo).
 
@@ -41,7 +42,8 @@ espera, y que el juego continúe después.
   desde su callback de `StateReady`, que corre en el hilo del controlador de AvPlayer. `SetLooping(1)`
   solo en `titlebg1.mp4`. Nunca llama a `SetAvSyncMode`, `Pause`, `Resume`, `SetTrickSpeed`,
   `DisableStream` ni a las variantes `Ex`. Sí llama a `JumpToTime`: siempre con
-  `CurrentTime() + ~1 000` y seguido de `Stop` en el mismo milisegundo.
+  `CurrentTime() + ~1 000` y seguido de `Stop` en el mismo milisegundo. *Era un stub que devolvía 0;
+  desde la tarea 4 salta de verdad (§9).*
 - **[V]** ffmpeg completo de RPM Fusion instalado en el contenedor `ps4dev` (`ffmpeg-free` no decodifica H.264).
 - **[V]** Primer vídeo real (2026-10-17, fin de la fase 2A de la Spec 2, `out/run-2a-10b.log`): tras
   la init y la política de captura, el juego abre `image/movie/prologue_en.mp4` **con
@@ -152,6 +154,20 @@ espera, y que el juego continúe después.
     - El juego ve `IsActive()` falso, su `Stop` devuelve 0 y recibe `StateStop`: sigue por su camino de
       siempre.
     - No se añade un evento de error, porque no sabemos si el AvPlayer real lo emite.
+- **[V] 2026-10-24: el bucle se congelaba en la primera vuelta** (tarea 4). `titlebg1.mp4`, el fondo
+  del menú de título, va en bucle (`SetLooping(1)`).
+  - Al llegar a EOF, el demultiplexor hacía `avio_seek(pb, 0)` antes de `avformat_seek_file`
+    (`avplayer_source.cpp`). Con el `AVIOContext` de `FileReplacement`, el demultiplexor MOV releía el
+    `moov` ("Found duplicated MOOV Atom"). Desde ahí cada lectura daba EOF y cada búsqueda fallaba con
+    -1. Con una ruta de archivo no pasa (`out/t4-exp/loop2.c`, sin versionar).
+  - El vídeo se quedaba parado y el demultiplexor giraba sin pausa, con un `WAR_LOOPING_BACK` por giro:
+    12,7 millones en 2 s con `tiny_v20.mp4`, todos al callback del juego.
+  - En el juego ya pasó: `out/run-audiodec-a1.log:1280` (2026-10-20) tiene el "duplicated MOOV Atom",
+    unos 345 s después de abrirse el audio. Sin log `info` no se ve el giro.
+  - *Arreglado en la tarea 4* (`1ccd0f3`): sin el `avio_seek`, sale un aviso por vuelta.
+  - **Queda para la tarea 7, paso 4:** en un vídeo sin audio, `CurrentTime()` se queda en la duración
+    tras la primera vuelta. Las vueltas siguientes salen sin ritmo: 5 480 fotogramas en 2 s de
+    `tiny_v20.mp4`, en vez de unos 60.
 - **[V] 2026-10-24: el vídeo NO va más rápido que el tiempo real (la [H] era falsa; §9).** El prólogo
   dura 388 637 ms de pared desde `Start`, con 388 667 de archivo. Llegan todos los fotogramas y bloques,
   sin deriva (±20 ms), y llegan EOF y `StateStop`. El `STOP:` de 2026-10-17 llegó a los ~364 s del
@@ -399,3 +415,55 @@ por adjuntar). Nuevos: `tests/test_avplayer.cpp` (opcional).
     (`avcodec_send_packet(nullptr)`). Un vídeo con B-frames perdería sus últimos fotogramas; los
     fixtures no tienen B-frames. El barrido debe comparar los fotogramas entregados con los del
     archivo.
+
+### Tarea 4 — `JumpToTime` real y bucle (2026-10-24, `77bd6aa`, `1ccd0f3`)
+
+- **Uso real** (paso 1, `docs/avplayer.md` §4). Son 20 llamadas en los 10 logs que lo tienen, del
+  2026-10-17 al 2026-10-24:
+  - siempre con el vídeo en marcha, a `CurrentTime()` + 999–1 033 ms;
+  - siempre seguidas de `Stop`; en la traza, en el mismo milisegundo y sin ningún fotograma ni bloque
+    de audio entregado entre medias;
+  - `DisableStream`, `SetTrickSpeed` y `ChangeStream` no salen en ningún log y siguen como estaban.
+- **Decisión** (paso 2): implementarlo. El juego no puede recibir `ORBIS_OK` de algo que no se hizo.
+  Un error explícito habría cambiado lo que ve el juego (hasta ahora 0) sin saber si mira el valor.
+- **Qué hace** (`77bd6aa`):
+  - `AvPlayerSource::JumpToTime` para los hilos como `Stop` y busca el fotograma clave anterior
+    (`avformat_seek_file`). Vacía colas y códecs (`avcodec_flush_buffers`), devuelve a su reserva los
+    búferes de los fotogramas en cola, pone el reloj en el destino y vuelve a arrancar los hilos.
+  - Los decodificadores descartan lo que acaba antes del destino. El primer fotograma entregado es el
+    que está en pantalla en ese instante: 968 para un salto a 1 000, cuando el plan pedía
+    ≥ 1 000 − 1 fotograma.
+  - Más allá del final: en un vídeo en bucle, el tiempo da la vuelta (módulo de la duración). Si no
+    hay bucle, va al final y llegan EOF y `StateStop`.
+  - `AvPlayerState::JumpToTime` solo salta en `Play`, `Pause` o `Buffering`. Antes de `Start`, tras
+    `Stop` o al final devuelve `0x806A0002` y lo registra. Mientras salta tiene en exclusiva el mutex
+    del origen.
+  - Al acabar emite `WarningId` con `0x806A00A3` (`WAR_JUMP_COMPLETE`). **[H]** Que el AvPlayer real
+    lo emita: el código está en la lista de errores del SDK, igual que el `WAR_LOOPING_BACK` que ya se
+    emitía.
+- **Tests** (paso 3; `avplayer-test`, logs `out/t4-*.log` sin versionar):
+
+  | Caso | Con el stub | Con el salto |
+  |---|---|---|
+  | `jump_then_stop` | **Rojo:** `CurrentTime()` 300 tras saltar a 1 000; el vídeo sigue en 300 | Verde: salto en 3 ms, `CurrentTime` 1 000, primer fotograma 968 a los 2 ms, 121 fotogramas hasta 4 972 sin huecos, aviso y `StateStop` |
+  | `jump_then_stop_like_the_game` | Verde: es una guarda del patrón del juego, no detecta el stub | Verde: 20 ciclos con y sin audio; salto ≤ 4 ms, `Stop` ≤ 5 ms, segundo `Stop` → `0x806A0002` |
+  | `jump_past_the_end_and_when_stopped` | **Rojo:** activo 1 s después de saltar más allá del final | Verde: fin a los 21 ms con `StateStop`; en bucle, el tiempo da la vuelta (968); antes de `Start` y tras `Stop`, `0x806A0002` |
+  | `loops_back` (nuevo, por el bucle) | **Rojo:** 20 fotogramas, ninguna vuelta y 12,7 M avisos; el salto posterior da `0x806A0002` | Verde: 274 vueltas y 274 avisos en 2 s; el salto tras las vueltas da 467, el fotograma de los 500 ms |
+
+  Los subcasos (b) y (c) de `jump_past_the_end_and_when_stopped` no llegaron a ejecutarse con el stub,
+  porque (a) falló antes. (b) pasó de `tiny_v20` a `tiny_v150` después del rojo, porque con el bucle
+  roto el clip corto ya había dado la vuelta antes de saltar. Después lo cubre `loops_back`.
+- **El bucle** (`1ccd0f3`, §2) salió con `jump_past_the_end_and_when_stopped`. Se arregla en un
+  commit propio porque congelaba el fondo del menú de título y bloqueaba probar el salto en un bucle.
+  El ritmo de las vueltas siguientes queda para la tarea 7.
+- **Verde** (`out/t4-final-*.log`):
+  - `bash build.sh --test`: rc 0, con las mismas 17 líneas `PASS`/`ok` que en la tarea 3;
+  - `avplayer-test`: 14 de 14 en dos ejecuciones completas, y los casos nuevos, 3 de 3 por separado;
+  - `kernel-thread-test`: 3 de 3;
+  - Python: 267 ejecutados, OK (35 omitidos, 4 fallos esperados).
+- **Para las tareas siguientes:**
+  - **T6:** medir cuánto dura `JumpToTime` con 1920×1088 (traza: `JumpToTime … -> 0 (N ms)`) al salir
+    de `titlebg1` y `TM_CI`.
+  - **T7, paso 4:** el reloj del bucle sin audio (§2). Hay que verlo con `titlebg1.mp4` pasados
+    120 s en el menú de título, con la traza.
+

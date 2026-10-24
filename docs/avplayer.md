@@ -170,7 +170,8 @@ demultiplexor hacía `avio_seek(pb, 0)` antes de `avformat_seek_file`.
   (`out/t4-exp/loop2.c`; con una ruta de archivo no pasa).
 - El vídeo se congelaba al acabar la primera vuelta. El demultiplexor giraba sin pausa y emitía un
   `WAR_LOOPING_BACK` por giro: 12,7 millones en 2 s con `tiny_v20.mp4`, todos al callback del juego.
-  En el juego habría pasado a los 120 s del menú de título.
+  En el juego ya pasó: `out/run-audiodec-a1.log:1280` (2026-10-20) tiene el "duplicated MOOV Atom",
+  unos 345 s después de abrirse el audio. Sin log `info` no se ve el giro.
 - *Arreglado en la tarea 4:* sin el `avio_seek`. Ahora hay un aviso por vuelta (274 en 2 s), y un
   `JumpToTime` después de varias vueltas cae donde se pide (`loops_back`).
 
