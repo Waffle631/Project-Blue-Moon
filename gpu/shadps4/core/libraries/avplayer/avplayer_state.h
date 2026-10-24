@@ -70,6 +70,7 @@ private:
     void UpdateBufferingState();
     void UpdateEndOfFileState();
     bool IsStateTransitionValid(AvState state);
+    bool StopLocked(); // gow3: Stop with m_source_mutex already held
 
     std::unique_ptr<AvPlayerSource> m_up_source;
 
