@@ -335,6 +335,8 @@ bool AvPlayerSource::Stop() {
     m_start_time.reset();
     m_pause_time = {};
     m_pause_duration = {};
+    m_loop_base_ms = 0;
+    m_last_video_ts.reset();
 
     m_is_paused = false;
     m_is_eof = false;
@@ -377,11 +379,24 @@ bool AvPlayerSource::GetVideoData(AvPlayerFrameInfoEx& video_info) {
 
     const auto current_time = CurrentTime();
     const auto& new_frame = m_video_frames.Front();
+    // gow3: in a looping clip without audio, a timestamp that goes back starts the next loop. Its
+    // frames are due one duration later than their timestamps say; against the clock capped at the
+    // duration they all were due at once, and titlebg1.mp4 ran 3.3 times too fast from its second
+    // loop on (avplayer-test, loops_back_on_the_clock).
+    u64 loop_base = m_loop_base_ms;
+    if (!m_audio_stream_index.has_value() && m_last_video_ts.has_value() &&
+        new_frame.info.timestamp < m_last_video_ts.value()) {
+        loop_base += m_duration;
+    }
     if (m_state.GetSyncMode() == AvPlayerAvSyncMode::Default) {
-        if (new_frame.info.timestamp > current_time) {
+        if (m_audio_stream_index.has_value() ? new_frame.info.timestamp > current_time
+                                             : s64(new_frame.info.timestamp + loop_base) >
+                                                   ElapsedMillis()) {
             return false;
         }
     }
+    m_loop_base_ms = loop_base;
+    m_last_video_ts = new_frame.info.timestamp;
 
     if (m_current_video_frame.has_value()) {
         m_video_buffers.Push(std::move(m_current_video_frame->buffer));
@@ -486,13 +501,22 @@ u64 AvPlayerSource::CurrentTime() {
         return m_last_audio_ts.value_or(0) + elapsed;
     }
 
-    const auto elapsed =
-        duration_cast<milliseconds>(now - m_start_time.value() - m_pause_duration).count();
+    const auto elapsed = ElapsedMillis() - s64(m_loop_base_ms.load());
     if (elapsed <= 0) {
         return 0;
     }
     const auto current_time = u64(elapsed);
     return m_duration != 0 && current_time > m_duration ? m_duration : current_time;
+}
+
+// gow3: wall time since Start, less the pauses, without the cap at the duration (Spec 5, task 7).
+s64 AvPlayerSource::ElapsedMillis() const {
+    using namespace std::chrono;
+    if (!m_start_time.has_value()) {
+        return 0;
+    }
+    const auto now = m_is_paused.load() ? m_pause_time : high_resolution_clock::now();
+    return duration_cast<milliseconds>(now - m_start_time.value() - m_pause_duration).count();
 }
 
 bool AvPlayerSource::IsActive() {
@@ -548,6 +572,8 @@ bool AvPlayerSource::JumpToTime(u64 time) {
     m_last_audio_ts = time;
     m_last_data_time.reset();
     m_pause_duration = {};
+    m_loop_base_ms = 0;
+    m_last_video_ts.reset();
     if (m_is_paused) {
         m_pause_time = now;
     }

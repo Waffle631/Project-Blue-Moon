@@ -895,6 +895,62 @@ void LoopsBack() {
     CHECK(stop_ms < 2000 && close_ms < 2000, "Stop %lld ms, Close %lld ms", stop_ms, close_ms);
 }
 
+// A looping clip without audio keeps its pace after the first loop (the title menu loops
+// titlebg1.mp4, video only, 120 s a loop): each frame comes no earlier than its timestamp plus the
+// loops before it, and CurrentTime() is the time within the current loop. The clock of such a clip
+// was the wall time since Start capped at the duration, so after the first loop it stayed at the
+// duration and every later frame came as soon as it was asked for: in the game each loop of
+// titlebg1 took 36 s from the second one on (Spec 5, task 7).
+void LoopsBackOnTheClock() {
+    Options options;
+    options.looping = true;
+    Session s(options);
+    Step("AddSource tiny_v20, looping");
+    CHECK(Open(s, Data("tiny_v20.mp4")) == 0, "AddSource failed");
+    CHECK(s.WaitStarted(2000) && s.start_result == 0, "no Start within 2 s");
+    const long long loop_ms = (long long)s.duration_ms;
+    int frames = 0, wraps = 0;
+    u64 last = 0, time = 0;
+    long long max_early = LLONG_MIN, time_at = -1;
+    Step("playing 2.5 s");
+    const auto begin = Clock::now();
+    while (MsSince(begin) < 2500) {
+        AvPlayerFrameInfo info{};
+        if (sceAvPlayerGetVideoData(s.handle, &info)) {
+            wraps += frames > 0 && info.timestamp < last;
+            last = info.timestamp;
+            ++frames;
+            const long long due = (long long)info.timestamp + wraps * loop_ms;
+            max_early = std::max(max_early, due - MsSince(s.StartTime()));
+        }
+        if (time_at < 0 && MsSince(s.StartTime()) >= 1500) {
+            time_at = MsSince(s.StartTime());
+            time = sceAvPlayerCurrentTime(s.handle);
+        }
+        std::this_thread::sleep_for(std::chrono::microseconds(200));
+    }
+    const long long played = MsSince(s.StartTime());
+    Step("Stop");
+    const s32 stop = sceAvPlayerStop(s.handle);
+    Step("Close");
+    sceAvPlayerClose(s.handle);
+    const long long expected = std::llround(double(played) / kFrameMs);
+    std::printf("  %d frames and %d wraps in %lld ms of a %lld ms clip (about %lld on the clock); a frame "
+                "came at most %lld ms early; CurrentTime %llu at %lld ms (expected about %lld)\n",
+                frames, wraps, played, loop_ms, expected, max_early, (unsigned long long)time,
+                time_at, time_at % loop_ms);
+    CHECK(frames <= expected + 3, "%d frames in %lld ms, at most %lld on the clock", frames, played,
+          expected + 3);
+    CHECK(frames >= expected - 10, "%d frames in %lld ms: the loop stalled (about %lld expected)",
+          frames, played, expected);
+    CHECK(wraps >= 2, "%d wraps in %lld ms", wraps, played);
+    CHECK(max_early <= 50, "a frame came %lld ms before its time", max_early);
+    CHECK(std::llabs((long long)time - time_at % loop_ms) <= 50,
+          "CurrentTime %llu at %lld ms, expected about %lld (the time within the loop)",
+          (unsigned long long)time, time_at, time_at % loop_ms);
+    CHECK(stop == 0, "Stop returned %#x", stop);
+}
+
 // A jump in the middle of tiny_v150, then the rest of the clip. Frames resume at the one on screen
 // at the target although FFmpeg decodes from the keyframe before it (0: one GOP), none is lost after
 // it, the clock follows the jump and the game is told the jump is complete.
@@ -1406,6 +1462,7 @@ int main(int argc, char** argv) {
         {"repeated_open_close", 120, RepeatedOpenClose},
         {"missing_garbage_and_truncated_stream", 30, MissingGarbageAndTruncatedStream, true},
         {"loops_back", 20, LoopsBack},
+        {"loops_back_on_the_clock", 20, LoopsBackOnTheClock},
         {"jump_then_stop", 20, JumpThenStop},
         {"jump_then_stop_like_the_game", 60, JumpThenStopLikeTheGame},
         {"jump_past_the_end_and_when_stopped", 20, JumpPastTheEndAndWhenStopped},
