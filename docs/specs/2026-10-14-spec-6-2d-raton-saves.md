@@ -149,6 +149,28 @@ unidades para cruzar el espacio virtual) es una decisión de la Tarea 6, no del 
   el hilo del juego sin que el runtime inicialice vídeo; sin ventana no hay ratones y devuelve 0 [H: lo confirma
   la Tarea 6].
 
+### Resultado de la Tarea 5 (2026-10-25): `src/runtime_mouse.c`
+
+- `libSceMouse` sale de `runtime_services.c` (donde `Open` devolvía un handle y `Read` un informe vacío) a su
+  propio archivo, enlazado en `runtime.c` antes de `services`. `tests/test_mouse.c` entra en `build.sh --test`
+  como `out/mouse-test`, el nombre del criterio de §10 (RED visto: faltaba `runtime_mouse.c`; GREEN después;
+  `bash build.sh --test` completo verde).
+- `SceMouseData` de 40 bytes con `_Static_assert` y los offsets que el juego lee (`+12` botones, `+16`/`+20`
+  ejes, `+24` rueda) [V: son los que lee el eboot, Tarea 3]. `sceMouseRead` escribe **un**
+  informe y devuelve 1 aunque `count` sea 8, porque el juego recorre `ret` informes (probado con un buffer de
+  320 bytes: el resto queda intacto).
+- Con un menú abierto (`gow3gpu_overlay_captures_input`) el ratón es «mudo»: `connected==1`, ejes, rueda y
+  botones a 0, pero el puente se **vacía igualmente**, así que lo movido durante el menú se descarta y no
+  llega de golpe al cerrarlo; los botones vuelven con su estado real. Sin ratón (`SDL_HasMouse()==0`) todos los
+  campos, también el `timestamp`, son 0.
+- Manejadores: tabla de 8 puertos (uno por usuario) con mutex. `Init` repetido devuelve 0; sin `Init`,
+  `Open`/`Read`/`Close` dan `NOT_INITIALIZED`; un handle cerrado da `INVALID_HANDLE` en `Read` y `Close`
+  y no libera un puerto abierto; reabrir el mismo usuario sin cerrar da `ALREADY_OPENED`; con los ocho
+  puertos ocupados `Open` da `FATAL` [H]. Las condiciones son [H] (sin SDK); los valores, [V].
+- `sceMouseOpen` imprime siempre `Runtime: sceMouseOpen(user, type, index) -> handle N|error 0x...`.
+- `--check-imports` solo lista las 3 trampas de siempre (`scePthreadCancel`, `sceKernelGetModuleInfoForUnwind`,
+  `sceKernelInternalMemoryGetModuleSegmentInfo`).
+
 #### Códigos de error de libSceMouse
 
 Fuente: tabla de psdevwiki (el usuario la pegó el 2026-10-25); no se tiene el SDK. Los **valores y nombres**
