@@ -26,7 +26,8 @@ Ejecuciones: `out/run-t1-trace.log` (partida actual, menú de título y título 
   audio 0 (`Default`).
 - **[V] Origen:** `sceAvPlayerAddSource` (no `Ex`) con la ruta `/app0/image/movie/<nombre>.mp4`. La ruta
   llega a los callbacks de `FileReplacement`, no a `fopen`. Justo después llama a `SetLooping`: 1 en
-  `titlebg1.mp4` (fondo del menú de título, 120 s), 0 en los demás.
+  `titlebg1.mp4` (fondo del menú de título, 120 s), 0 en los demás. Al empezar cada vuelta, el juego salta
+  él solo a 8 033 ms (tarea 7, §5).
 - **[V] Arranque desde el callback de eventos:** al recibir `StateReady`, el juego llama a `StreamCount`,
   a `GetStreamInfo` y a `EnableStream` por cada pista (vídeo y audio), a `Start` y otra vez a `SetLooping`
   con el mismo valor. Todo eso corre en el hilo del controlador de AvPlayer (`shadPS4:AvContr`), no en
@@ -60,6 +61,10 @@ Ejecuciones: `out/run-t1-trace.log` (partida actual, menú de título y título 
     en esa ejecución para llegar al capítulo 1.
   - **[V]** La primera no: en la tarea 6, sin ninguna entrada, `titlebg1` sale igual a los 1,1 s en las
     cinco ejecuciones.
+  - **[V]** `TM_CI` se salta con Cruz (tarea 7, tres de tres, Cruz a los ~1,5 s). `JumpToTime` tarda
+    1–3 ms y `Stop` 0 ms, `StateStop` llega en el mismo milisegundo y el aviso de fin de salto
+    (`0x806a00a3`) 3–4 ms después. El juego sigue hasta el menú de título. El `titlebg1` del menú sale
+    igual al pulsar CONTINUE. El prólogo no se salta.
 - **[V] Orden de arranque con la partida actual** (tarea 6):
   - `titlebg1` (1,1 s, la deja el propio juego) → `TM_CI` (6 s, entero; `StateStop` antes del `Stop` del
     juego) → advertencia legal → `titlebg1` en bucle con el menú de título, ~18 s después del primer
@@ -87,6 +92,19 @@ Medido desde `Start` en `out/run-t1-prologo.log`. Es la [H] "el vídeo va más r
 ejecución del 2026-10-17 no llegó al final del vídeo. El juego crea su primer decodificador ATRAC9
 (`sceAudiodecCreateDecoder`) a los **365,4 s del vídeo**, 23 s antes del final. Entonces esa API no
 existía y la ejecución paró ahí: 6 min 16 s de proceso menos ~12 s de arranque dan unos 364 s de vídeo.
+
+**[V] Tarea 7, con el arreglo de la tarea 5** (`out/run-t7-prologue-1.log`): 11 660 de 11 660 fotogramas,
+el último con marca 388 633. Lo demás no cambia: 18 219 bloques, `StateStop` a los 388 637 ms y pared −
+marca de −15 a +19 ms.
+
+**[V] El opening en el juego** (tarea 7, `out/run-t7-op-1.log`). `op1_arc_en.mp4` (107 140 ms, sin
+fotogramas B) entrega 3 211 de 3 211 fotogramas y 5 023 bloques, con pared − marca de −16 a +15 ms en
+vídeo y de −16 a 0 ms en audio. El último bloque entregado va de −21 a +17 ms de cada fotograma.
+`StateStop` llega a los 107 121 ms, y el usuario lo ve y lo oye sincronizado. Lo pide la historia: el
+guion llama a `_TOMP(5)` tras la elección del callejón ("...will help her."), a unas 5 900 líneas del
+título del capítulo 1.
+`_TOMP(n)` es el vídeo `n` de la tabla de rutas del eboot: 4 es el prólogo, 5 el opening y 8 en
+adelante los títulos (guiones de `allscr.mrg`, descomprimidos con `out/tsuki-scripts/`).
 
 ## 3. Cuelgue en `Stop` al final de `phasetitle_01_00_en.mp4` (2026-10-24)
 
@@ -185,11 +203,31 @@ demultiplexor hacía `avio_seek(pb, 0)` antes de `avformat_seek_file`.
 - *Arreglado en la tarea 4:* sin el `avio_seek`. Ahora hay un aviso por vuelta (274 en 2 s), y un
   `JumpToTime` después de varias vueltas cae donde se pide (`loops_back`).
 
-**[V] Queda para la tarea 7, paso 4: el ritmo a partir de la segunda vuelta.** En un vídeo sin audio,
-`CurrentTime()` es el tiempo de pared desde `Start` limitado a la duración. Tras la primera vuelta se
-queda en la duración y cada fotograma de las vueltas siguientes sale en cuanto se pide: 5 480
-fotogramas en 2 s de `tiny_v20.mp4`, en vez de unos 60. En el juego, `titlebg1.mp4` iría al ritmo al
-que el juego llama a `GetVideoData` (unas 3 llamadas por fotograma, §1) a partir de los 120 s.
+**[V] El ritmo a partir de la segunda vuelta** (tarea 7). En un vídeo sin audio, `CurrentTime()` era el
+tiempo de pared desde `Start` limitado a la duración. Tras la primera vuelta se quedaba en la duración y
+cada fotograma de las vueltas siguientes salía en cuanto se pedía: 5 480 fotogramas en 2 s de
+`tiny_v20.mp4`, en vez de unos 60.
+
+- En el juego (`out/run-t7-loop-1.log`, 11 min en el menú de título sin entrada), cada vuelta de
+  `titlebg1.mp4` (120 s, solo vídeo, como los cuatro `titlebg`) duraba 36,3 s desde la segunda, con sus
+  3 600 fotogramas y `CurrentTime` en 120 000. El fondo iba 3,3 veces más rápido.
+- *Arreglado* (`d8fd321`): en un vídeo sin audio, una marca que retrocede empieza la vuelta siguiente.
+  Sus fotogramas vencen una duración más tarde, y `CurrentTime()` descuenta las vueltas ya entregadas,
+  así que da el tiempo dentro de la vuelta. `Stop` y `JumpToTime` lo reinician. Caso
+  `loops_back_on_the_clock`: 7 472 fotogramas en 2,5 s antes y 75 después.
+- En el juego, después (`out/run-t7-loop-2.log`, 11 min): la primera vuelta dura 120,0 s y las siguientes
+  112,0 s, a tiempo real. Con el reloj bien, el juego salta él solo a 8 033 ms al empezar cada vuelta
+  (`JumpToTime`, `WAR_JUMP_COMPLETE`) y se salta la entrada desenfocada: el último fotograma se parece al
+  de 8 033 ms (SSIM 0,989) y no al primero (0,789). Antes no saltaba nunca, aunque también recibía el
+  fotograma 0: lo decide con `CurrentTime`, que se quedaba en 120 000 (deducido).
+- La memoria no crece en 11 min (VmRSS entre 1 388 904 y 1 399 792 kB en las dos ejecuciones), y el
+  `WAR_LOOPING_BACK` de cada vuelta no le hace nada al juego: salta 6 ms después de recibir el fotograma
+  0, no con el aviso, que llega 1,2 s antes porque el demultiplexor lee por delante.
+- **[H]** El juego recibe ese fotograma 0 antes de saltar, y el siguiente ~50 ms después. Si lo dibuja,
+  cada 112 s hay un destello desenfocado de unos tres cuadros. No se ha mirado en pantalla.
+- **[H]** Con audio, el reloj sigue al último bloque y vuelve a 0 con la vuelta siguiente. Un fotograma
+  de la vuelta anterior que siguiera en cola esperaría casi una vuelta. Ningún vídeo del juego hace bucle
+  con audio, y no hay caso.
 
 ## 6. Los 134 vídeos (tarea 5, 2026-10-24)
 
@@ -224,9 +262,9 @@ fotograma.
 | 115 s, `op1_arc_en.mp4` (`out/avplayer-sweep-op1.log`) | — | OK: 3 211 de 3 211 fotogramas y 5 023 bloques; `late` 835 ms |
 
 `ffmpeg` también decodifica 5 023 tramas de los 5 024 paquetes AAC del opening (y 94 de 95 en `tiny_av`): la
-que falta no la pierde AvPlayer. **[H]** Los 835 ms de `late` son deriva del consumidor de audio del arnés.
+que falta no la pierde AvPlayer. **[V]** Los 835 ms de `late` son deriva del consumidor de audio del arnés.
 Despierta ~0,17 ms tarde por bloque, porque sondea cada 200 µs, y el reloj con audio sigue al audio:
-5 023 × 0,17 ≈ 835 ms.
+5 023 × 0,17 ≈ 835 ms. En el juego, el opening no deriva (tarea 7, §2).
 
 El único mensaje de stderr en los 134 es `Stop: Could not stop playback: already stopped.`: lo emite
 `Close` después del `Stop` del juego, y también sale en los fixtures.

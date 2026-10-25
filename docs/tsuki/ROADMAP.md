@@ -181,7 +181,7 @@ motivos están en la sección "Hito".
 | 6 | Servicios del sistema que faltan | **Spec 3** | Spec 2 | 2–3 días (real: 1 día, más las 15 adelantadas en la Spec 2) | ✅ Concluida el 2026-10-19 (23 de 23: 15 adelantadas en la Spec 2 y 8 en la Spec 3; `--check-imports` da 11, todos de las Specs 2 y 4) |
 | 7a | Audio ATRAC9 (`libSceAudiodec`): música → voces → efectos `vse`, con investigación previa | **Spec 4a** | Spec 2 | 1–2 semanas, sin tope (real: 3 días de plan, del 19 al 21 de octubre, más el estudio del sitio de llamada del 17) | ✅ Concluida el 2026-10-21 (las seis funciones sobre LibAtrac9, bit-exactas contra LibAtrac9; **suenan bien la música, las voces y los efectos `vse`**; `--check-imports` sin Audiodec; arranque de 60 s sin `STOP:` ni errores de Audiodec) |
 | 7b | Audio HEVAG (`libSceAudiodecCpu`): efectos de `vag.mrg`, con investigación previa | **Spec 4b** | Spec 4a (música y voces) | sin estimar, sin tope (real: 1 día, el 21 de octubre) | ✅ Concluida el 2026-10-21 (`QueryMemSize`, `InitDecoder` y `Decode` sobre el HEVAG de vgmstream, con el estado en la memoria de trabajo del guest; **los efectos de `vag.mrg` suenan bien**; 240 voces sin errores en el menú de título; queda la revisión adversarial de la tarea 13 del plan) |
-| 8 | Vídeo (AvPlayer) | **Spec 5** | Specs 2 y 3 | 2–3 días (antes 2–4) | 🟨 En curso (tareas 1–6 del plan cerradas el 2026-10-24: **arreglado el cuelgue en `sceAvPlayerStop` del título del capítulo 1**, confirmado en el juego tres de tres veces; los 134 vídeos se reproducen fuera del juego; el prólogo va a tiempo real; quedan opening, salto y bucle en el juego, tarea 7; sección Spec 5) |
+| 8 | Vídeo (AvPlayer) | **Spec 5** | Specs 2 y 3 | 2–3 días (antes 2–4) | 🟨 En curso (tareas 1–7 del plan cerradas el 2026-10-24: **arreglado el cuelgue en `sceAvPlayerStop` del título del capítulo 1**, confirmado en el juego tres de tres veces; en el juego, el opening llega entero y sincronizado según el usuario, el prólogo a tiempo real, saltar el logo no cuelga y el fondo del menú de título ya no se acelera; los 134 vídeos se reproducen fuera del juego; queda el cierre, tarea 8; sección Spec 5) |
 | 9 | 2D correcto, ratón y saves | **Spec 6** | Hito (empieza), Specs 1b, 3, 4 y 5 (cierra) | 1–3 semanas | ⬜ Pendiente (se puede empezar: el hito está cerrado) |
 | 10 | Renombrar `gow3` → `tsuki` | **Spec 7** | Spec 6 | 2–3 días | ⬜ Pendiente |
 
@@ -850,12 +850,13 @@ a través de `runtime_file.c`.
 
 **Criterios de aceptación**
 
-- [ ] El opening en inglés (`op1_arc_en.mp4`) se reproduce completo, sincronizado.
+- [x] El opening en inglés (`op1_arc_en.mp4`) se reproduce completo, sincronizado.
+  *2026-10-24, en el juego; el usuario lo ve y lo oye sincronizado (spec 5, tarea 7).*
 - [x] El título del capítulo 1 en inglés (`phasetitle_01_00_en.mp4`) se reproduce y el juego continúa después.
   *2026-10-24, tres de tres ejecuciones (spec 5, tarea 6).*
-- [ ] Saltar un vídeo no cuelga el juego.
+- [x] Saltar un vídeo no cuelga el juego. *2026-10-24, el logo `TM_CI` con Cruz, tres de tres (spec 5, tarea 7).*
 
-**Estado (2026-10-24):** tareas 1–6 del plan cerradas. Detalle en la spec, §2 y §9.
+**Estado (2026-10-24):** tareas 1–7 del plan cerradas. Detalle en la spec, §2 y §9.
 
 - **Contrato del juego** (`docs/avplayer.md`): `Init` con `FileReplacement`, `AddSource` con
   `/app0/image/movie/…`, `GetVideoData`/`GetAudioData`. Arranca desde su callback de `StateReady`. Sale
@@ -868,12 +869,18 @@ a través de `runtime_file.c`.
   - `Stop`, que rebobinaba el lector bajo el demultiplexor;
   - `JumpToTime`, que era un stub;
   - el bucle, que se congelaba en la primera vuelta;
-  - los últimos fotogramas de los vídeos con fotogramas B.
+  - los últimos fotogramas de los vídeos con fotogramas B;
+  - el ritmo del bucle sin audio, que desde la segunda vuelta iba 3,3 veces más rápido en el fondo del
+    menú de título.
 - **Fuera del juego** se reproducen los 134 vídeos, y los dos de los criterios, enteros.
 - **En el juego**, el título del capítulo 1 termina y el juego sigue, tres de tres veces, con una ruta
-  grabada desde el menú de título. El prólogo va a tiempo real: la [H] "más rápido" era falsa.
-- **Queda** (tarea 7): el opening completo y sincronizado, saltar un vídeo y el bucle del menú de título
-  pasados unos minutos. Después, el cierre (tarea 8).
+  grabada desde el menú de título. El prólogo va a tiempo real (la [H] "más rápido" era falsa) y entero,
+  con 11 660 de 11 660 fotogramas. El opening, al que se llega jugando (unas 5 900 líneas tras el título
+  del capítulo 1), da sus 3 211 fotogramas sin deriva, y el usuario lo ve y lo oye sincronizado. El logo
+  `TM_CI` se salta con Cruz sin colgar, tres de tres. El fondo del menú de título hace bucle 11 minutos
+  sin que crezca la memoria y, con el arreglo, a tiempo real: el juego vuelve él solo a los 8 s en cada
+  vuelta, cosa que con el reloj clavado no hacía.
+- **Queda** el cierre (tarea 8): suites, recorrido final, revisión adversarial.
 
 *Estado anterior (2026-10-17):* sin cambios en el código.
 

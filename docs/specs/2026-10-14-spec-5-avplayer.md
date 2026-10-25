@@ -1,10 +1,11 @@
 # Spec 5 — Vídeo: AvPlayer
 
 Fecha: 2026-10-14. Estado: **en curso**: las tareas 1 (trazador y contrato), 2 (arnés), 3 (carrera de
-`Kernel::Thread` y otras causas), 4 (`JumpToTime` real y bucle), 5 (barrido de los 134 vídeos) y 6 (título
-del capítulo 1 en el juego) del plan están cerradas desde el 2026-10-24 (§9). Fuera del juego, el arnés
-pasa entero y los 134 vídeos se reproducen. En el juego, el título del capítulo 1 termina y el juego
-sigue, tres de tres veces. La siguiente es la 7: opening, prólogo, salto y bucle en el juego.
+`Kernel::Thread` y otras causas), 4 (`JumpToTime` real y bucle), 5 (barrido de los 134 vídeos), 6 (título
+del capítulo 1 en el juego) y 7 (opening, prólogo, salto y bucle en el juego) del plan están cerradas
+desde el 2026-10-24 (§9). Fuera del juego, el arnés pasa entero y los 134 vídeos se reproducen. En el
+juego, el título del capítulo 1 termina y el juego sigue, el opening y el prólogo llegan enteros y a
+tiempo real, saltar el logo no cuelga y el bucle del menú de título va a su ritmo. Queda la 8: cierre.
 Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 5".
 Depende de: Specs 2 y 3 (el juego tiene que llegar a pedir un vídeo).
 
@@ -173,9 +174,27 @@ espera, y que el juego continúe después.
   - En el juego ya pasó: `out/run-audiodec-a1.log:1280` (2026-10-20) tiene el "duplicated MOOV Atom",
     unos 345 s después de abrirse el audio. Sin log `info` no se ve el giro.
   - *Arreglado en la tarea 4* (`1ccd0f3`): sin el `avio_seek`, sale un aviso por vuelta.
-  - **Queda para la tarea 7, paso 4:** en un vídeo sin audio, `CurrentTime()` se queda en la duración
+  - **Quedaba para la tarea 7, paso 4:** en un vídeo sin audio, `CurrentTime()` se queda en la duración
     tras la primera vuelta. Las vueltas siguientes salen sin ritmo: 5 480 fotogramas en 2 s de
-    `tiny_v20.mp4`, en vez de unos 60.
+    `tiny_v20.mp4`, en vez de unos 60. *Visto y arreglado en la tarea 7 (siguiente punto).*
+- **[V] 2026-10-24: el fondo del menú de título iba 3,3 veces más rápido desde su segunda vuelta**
+  (tarea 7, §9). En 11 minutos sin entrada, cada vuelta de `titlebg1.mp4` (120 s) duró 36,3 s desde la
+  segunda, con sus 3 600 fotogramas y `CurrentTime` clavado en 120 000.
+  - Causa: sin audio, el reloj es el tiempo de pared desde `Start` limitado a la duración
+    (`avplayer_source.cpp`, `CurrentTime`). Los fotogramas de la segunda vuelta vuelven a marcar 0, así
+    que todos vencían a la vez y salían en cuanto el juego los pedía. Con audio no pasa: ese reloj sigue
+    al último bloque de audio, cuya marca también vuelve. Los cuatro `titlebg` son solo vídeo.
+  - *Arreglado* (`d8fd321`): una marca que retrocede empieza la vuelta siguiente, sus fotogramas vencen
+    una duración más tarde y `CurrentTime` descuenta las vueltas entregadas. Caso
+    `loops_back_on_the_clock`: rojo con 7 472 fotogramas en 2,5 s, verde con 75.
+  - En el juego, después del arreglo (`out/run-t7-loop-2.log`), la primera vuelta dura 120,0 s y las
+    siguientes 112,0 s, a tiempo real. Al empezar cada vuelta el juego salta él solo a 8 033 ms
+    (`JumpToTime`, y luego `WAR_JUMP_COMPLETE`) y se salta los 8 s de entrada, que empieza desenfocada.
+    El último fotograma se parece al de 8 033 ms (SSIM 0,989) y no al primero (0,789): es el punto de
+    bucle del vídeo. Antes del arreglo no saltaba nunca, aunque también recibía el fotograma 0 de cada
+    vuelta: lo decide con `CurrentTime`, que se quedaba en 120 000 (deducido de las dos ejecuciones).
+  - La memoria no crece (VmRSS entre 1 388 904 y 1 399 792 kB en las dos ejecuciones de 11 min), y el
+    juego sigue en el menú sin `STOP:` ni `Fault:`.
 - **[V] 2026-10-24: el vídeo NO va más rápido que el tiempo real (la [H] era falsa; §9).** El prólogo
   dura 388 637 ms de pared desde `Start`, con 388 667 de archivo. Llegan todos los fotogramas (menos
   el último, que el decodificador retenía: tarea 5) y bloques, sin deriva (±20 ms), y llegan EOF y
@@ -201,6 +220,20 @@ espera, y que el juego continúe después.
   - O el juego dejó el vídeo antes de su final, o decide el final por su cuenta. Hay que medirlo
     en el paso 2: tiempo de pared contra la marca de tiempo de los fotogramas y del audio entregados.
     Es la fila "Se corta o se desincroniza" del paso 3.
+  - *Tarea 7:* con el arreglo de la tarea 5, el prólogo da 11 660 de 11 660 fotogramas en el juego,
+    con la misma pared (388 637 ms hasta `StateStop`) y sin deriva.
+- **[V] 2026-10-24: el opening en el juego** (tarea 7, §9). `op1_arc_en.mp4` lo pide la historia, no un
+  menú: `_TOMP(5)` en el guion de la entrada 90 de `allscr.mrg`, tras la elección "...will help her."
+  del callejón, a unas 5 900 líneas de texto del título del capítulo 1. El usuario llegó jugando.
+  - Llegan los 3 211 fotogramas y 5 023 bloques de audio (los que decodifica `ffmpeg`), con pared −
+    marca de −16 a +15 ms en 107 s y el último audio entregado a −21…+17 ms de cada fotograma.
+  - `StateStop` a los 107 121 ms, y el `Stop` del juego devuelve `0x806A0002` en 0 ms.
+  - El usuario lo vio y lo oyó entero y sincronizado ("no vi nada raro").
+  - Confirma la [H] de la tarea 5: los 835 ms de `late` del arnés eran de su consumidor de audio.
+- **[V] 2026-10-24: `TM_CI` se salta con Cruz, tres de tres** (tarea 7, §9). Una Cruz 1,5 s después de su
+  `AddSource`: el juego llama a `JumpToTime(actual + ~1 s)` (1–3 ms) y a `Stop` (0 ms), llega
+  `StateStop`, el segundo `Stop` da `0x806A0002` y el juego sigue hasta el menú de título. El aviso de fin
+  de salto (`0x806A00A3`) llega 3–4 ms después de `StateStop`, y al juego no le importa.
 - **[V] 2026-10-24: orden de arranque sin entrada** (tarea 6, cinco ejecuciones con la partida actual).
   - `titlebg1` sale sola a los 1,1 s: el propio juego llama a `JumpToTime` y a `Stop`.
   - `TM_CI` (con audio) llega a su final: `StateStop` a los 6 s, antes del `Stop` del juego, que
@@ -244,7 +277,7 @@ juego.
 | Se cierra al abrir | Tamaño de las estructuras de `Init/InitEx` del SDK 11.008 frente a las de shadPS4 (la versión de AvPlayer puede haber cambiado) |
 | Se queda negro | `GetVideoDataEx`: formato de píxel, dimensiones, alineación del búfer; textura creada por el juego |
 | Se corta o se desincroniza | Reloj de AvPlayer (`avplayer_source.cpp`), `SetAvSyncMode`, tiempo de `AudioOut` |
-| Cuelgue al terminar o saltar | Evento de fin de flujo (`AvPlayerEvent`), cierre y `Close` desde el guest, hilos de decodificación. *2026-10-21: visto con `phasetitle_01_00_en.mp4`, en `sceAvPlayerStop`, con un `join` sobre un hilo que ya no existe (§2). 2026-10-24: arreglado fuera del juego (tarea 3, §9) y confirmado en el juego, tres de tres (tarea 6)* |
+| Cuelgue al terminar o saltar | Evento de fin de flujo (`AvPlayerEvent`), cierre y `Close` desde el guest, hilos de decodificación. *2026-10-21: visto con `phasetitle_01_00_en.mp4`, en `sceAvPlayerStop`, con un `join` sobre un hilo que ya no existe (§2). 2026-10-24: arreglado fuera del juego (tarea 3, §9) y confirmado en el juego, tres de tres (tarea 6). Saltar `TM_CI` con Cruz no cuelga, tres de tres (tarea 7)* |
 | No encuentra el archivo | Los callbacks del juego pasan por su FIOS → `runtime_file.c` (`/app0/image/movie/…`); mirar `open(...) -> not found` en el log |
 | Cuelga el hilo del host al llamar al guest | Falta de `runtime_thread_attach_host` en un hilo nuevo de AvPlayer |
 
@@ -273,11 +306,15 @@ por adjuntar). Nuevos: `tests/test_avplayer.cpp` (opcional).
 
 ## 7. Criterios de aceptación
 
-- [ ] El opening en inglés (`op1_arc_en.mp4`) se reproduce completo, sincronizado.
+- [x] El opening en inglés (`op1_arc_en.mp4`) se reproduce completo, sincronizado. *2026-10-24:* en el
+  juego, 3 211 de 3 211 fotogramas y 5 023 bloques sin deriva (`out/run-t7-op-1.log`), y el usuario lo
+  vio y oyó sincronizado (tarea 7, §9).
 - [x] El título del capítulo 1 en inglés (`phasetitle_01_00_en.mp4`) se reproduce y el juego continúa.
   *2026-10-24:* tres de tres ejecuciones con la ruta grabada (`out/run-t6-{1,2,3}.log`), con 150 de 150
   fotogramas, `StateStop` y la escena siguiente en las capturas (tarea 6, §9).
-- [ ] Saltar un vídeo no cuelga el juego.
+- [x] Saltar un vídeo no cuelga el juego. *2026-10-24:* `TM_CI` con Cruz, tres de tres
+  (`out/run-t7-skip-tmci-{1,2,3}.log`), más el salto del usuario en la tarea 6; el juego sigue hasta el
+  menú de título (tarea 7, §9).
 - [ ] El log del recorrido no contiene `STOP:` ni `Fault:` relacionados con AvPlayer.
 - [x] Hay una nota con el contrato real del juego con AvPlayer (paso 1). *2026-10-24:* `docs/avplayer.md`,
   con la traza de `out/run-t1-trace.log` y `out/run-t1-prologo.log` (tarea 1, §9).
@@ -607,3 +644,97 @@ por adjuntar). Nuevos: `tests/test_avplayer.cpp` (opcional).
   como en la tarea 5.
 - **Para la tarea 7:** la ruta llega al capítulo 1 en ~30 s desde el menú, pero en ella no sale el
   opening `op1_arc_en.mp4`.
+
+### Tarea 7 — opening, prólogo, salto y bucle en el juego (2026-10-24, `d8fd321`)
+
+- **Dónde está el opening** (paso 1). La traza solo muestra que lo pide la historia, sin ningún menú
+  delante. Para saber dónde, descomprimí los guiones (`image/allscr.mrg`: entradas MZX con los
+  literales en XOR 0xFF; herramientas en `out/tsuki-scripts/`, sin versionar).
+  - `_TOMP(n)` reproduce el vídeo `n` de la tabla del eboot: 4 es el prólogo, 5 `op1_arc`, 6
+    `op2_ciel` y del 8 en adelante los títulos de capítulo. Lo confirma el menú de depuración
+    `SEL_MOVIETEST`, que no se puede abrir.
+  - `_TOMP(5)` está en la entrada 90, tras la elección "...will help her." del callejón. La otra opción,
+    "...can't help her. There's no way.", lleva a otra escena. Entre el título del capítulo 1 (entrada
+    5) y el opening hay 5 877 líneas de texto y 15 elecciones, contando las ramas; el juego guarda
+    solo antes de cada elección (`_ATSV(1)`).
+  - Las escenas no leídas no se saltan (lo dice el usuario), así que no hay atajo. El usuario jugó hasta
+    la persecución del callejón (línea 5 993; copia en `out/savedata-cerca-op/`). Un guion pulsó
+    CONTINUE y Cruz cada 0,8 s durante 1 min 40 s, y luego el usuario pidió dejar la automatización y
+    llegó él al opening.
+- **Opening** (`out/run-t7-op-1.log`, una ejecución):
+
+  | Dato | Valor |
+  |---|---|
+  | Fotogramas | 3 211 de 3 211; el último, en 107 107 |
+  | Bloques de audio | 5 023, los que decodifica `ffmpeg` de sus 5 024 paquetes; el último, en 107 136 |
+  | Pared − marca | vídeo de −16 a +15 ms, audio de −16 a 0 ms; sin deriva en 107 s |
+  | Último audio entregado − fotograma | de −21 a +17 ms |
+  | Fin | `StateStop` a los 107 121 ms de `Start` (el archivo dura 107 140); el `Stop` del juego devuelve `0x806A0002` en 0 ms |
+  | Memoria | VmRSS 1 757 300 kB al empezar y 1 757 272 kB al acabar |
+
+  El usuario lo vio y lo oyó sincronizado ("no vi nada raro"). No hay `STOP:`, `Fault:`, `join failed`,
+  `<Error>` ni `[h264 @`. El juego guardó después (22:57:42; copia en `out/savedata-tras-op/`), y esa es
+  la partida que queda en `user/savedata`.
+- **Prólogo** (paso 2, `out/run-t7-prologue-1.log`). La medición de la tarea 1 ya daba el caso (a): la
+  [H] "más rápido" es falsa. Se repitió para ver en el juego el arreglo de la tarea 5, porque el prólogo
+  es el único vídeo del juego con fotogramas B que llega a EOF:
+  - 11 660 de 11 660 fotogramas (en la tarea 1, 11 659); el último en 388 633 (antes, 388 600);
+  - 18 219 bloques de audio, pared − marca de −15 a +19 ms;
+  - `StateStop` a los 388 637 ms de `Start`, y el `Stop` del juego devuelve `0x806A0002` en 0 ms.
+
+  El guion pone la partida sin progreso y, al cerrar, devuelve la que había (`out/spec5-t7/run-prologue.sh`).
+- **Salto** (paso 3). Qué se sale y cómo:
+  - el primer `titlebg1` lo deja el propio juego a los 1,1 s (tarea 6); el del menú, al pulsar CONTINUE
+    (`JumpToTime` en 5 ms y `Stop` en 0 ms en la ejecución del opening);
+  - `TM_CI`, el logo, se salta con Cruz. Tres ejecuciones con una Cruz 1,5 s después de su `AddSource`
+    (`out/spec5-t7/run-skip-tmci.sh`, `out/run-t7-skip-tmci-{1,2,3}.log`):
+
+    | Ejecución | Salto, desde `Start` | `JumpToTime` | `Stop` | `StateStop` | Fotogramas / bloques |
+    |---|---|---|---|---|---|
+    | 1 | 1 548 ms | a 2 561, 3 ms | 0, 0 ms | en el mismo ms | 47 / 74 |
+    | 2 | 1 543 ms | a 2 556, 2 ms | 0, 0 ms | en el mismo ms | 47 / 73 |
+    | 3 | 1 544 ms | a 2 557, 1 ms | 0, 0 ms | en el mismo ms | 47 / 74 |
+
+    En las tres, el segundo `Stop` devuelve `0x806A0002`, `Close` llega 11 s después (antes del `Init`
+    siguiente) y el juego sigue hasta el menú de título. El aviso de fin de salto (`0x806A00A3`) llega
+    3–4 ms después de `StateStop`.
+  - el prólogo no se salta (§2). No se probó a saltar el opening ni los títulos de capítulo.
+- **Bucle** (paso 4). `titlebg1.mp4` bajo el menú de título, 11 minutos sin entrada
+  (`out/spec5-t7/run-loop.sh`), antes y después del arreglo:
+
+  | | Antes (`out/run-t7-loop-1.log`) | Después (`out/run-t7-loop-2.log`) |
+  |---|---|---|
+  | Vueltas en 11 min | 16 | 6 |
+  | Primera vuelta | 3 600 fotogramas en 119,9 s | 3 600 fotogramas en 120,0 s |
+  | Las siguientes | 3 600 fotogramas en 36,1–36,5 s; `CurrentTime` clavado en 120 000 | 3 360 fotogramas (de 8 033 a 119 967 ms) en 112,0 s; `CurrentTime` de ~8 100 a ~119 300 |
+  | Repetidos o perdidos | ninguno | ninguno repetido; faltan los 240 primeros de cada vuelta, que el juego salta |
+  | `WAR_LOOPING_BACK` | 15, uno por vuelta | 5, uno por vuelta; tras cada uno, `JumpToTime(8 033)` y `WAR_JUMP_COMPLETE` |
+  | VmRSS a los 0, 5 y 10 min | 1 388 904, 1 393 056 y 1 395 468 kB | 1 390 172, 1 399 792 y 1 396 880 kB |
+
+  Después del arreglo, el juego salta 6 ms después de recibir el fotograma 0 de la vuelta, no con el
+  `WAR_LOOPING_BACK`, que llega 1,2 s antes porque el demultiplexor lee por delante. Antes recibía el mismo
+  fotograma 0 y no saltaba: lo que cambió es `CurrentTime`, que ahora vuelve a 0 con la vuelta, en
+  vez de quedarse en 120 000. El aviso no rompe nada: en las dos ejecuciones el juego sigue en el menú,
+  sin `STOP:` ni `Fault:`.
+- **Arreglo** (`d8fd321`, causa en §2), con TDD:
+  - caso nuevo `loops_back_on_the_clock` (`tiny_v20`, 2,5 s): **rojo** con 7 472 fotogramas, 373 vueltas,
+    un fotograma 246 s adelantado y `CurrentTime` 667 a los 1 500 ms; **verde** (3 de 3) con 75
+    fotogramas, 3 vueltas, ninguno adelantado y `CurrentTime` 165, cuando se esperaba ~166;
+  - `loops_back` sigue en verde, y ahora da 60 fotogramas en 2 s en vez de 5 470.
+- **Suites** (`out/t7-final-*.log`): `avplayer-test`, 16 de 16 tres veces; `kernel-thread-test`, 4 de 4
+  tres veces; `bash build.sh --test`, rc 0 con las mismas 17 líneas `PASS`/`ok`; Python, 267 ejecutados,
+  OK (35 omitidos, 4 fallos esperados).
+- **§7:** casillas 1 y 3 marcadas. La 4, el log del recorrido, queda para la tarea 8. En las ejecuciones
+  de esta tarea tampoco hay `STOP:` ni `Fault:`.
+- **Deuda anotada, sin caso:** **[H]** en un bucle con audio, el reloj vuelve a 0 con el primer bloque
+  de la vuelta siguiente. Si quedara en cola un fotograma de la vuelta anterior, el vídeo esperaría casi
+  una vuelta. Ningún vídeo del juego hace bucle con audio.
+  **[H]** El juego recibe el fotograma 0 (desenfocado) de cada vuelta 6 ms antes de saltar, y el
+  siguiente ~50 ms después. Si lo dibuja, cada 112 s hay un destello de unos tres cuadros. Nadie lo ha
+  mirado en pantalla.
+- **Para la tarea 8:**
+  - `out/spec5-t6/run-t6.sh` pone `out/savedata-pre-ruta/` en `user/savedata` sin guardar lo que había.
+    Ahora la partida del usuario va más allá (`out/savedata-tras-op/`), así que hay que devolverla
+    después del recorrido.
+  - Repetir el opening exige jugar desde `out/savedata-cerca-op/`: de ahí al vídeo hay ~500 líneas y la
+    elección.
