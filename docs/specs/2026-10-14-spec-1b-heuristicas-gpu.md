@@ -1,6 +1,6 @@
 # Spec 1b — Eliminar las heurísticas de GPU de GoW3
 
-Fecha: 2026-10-14. Estado: **borrador para aprobación**. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 1b".
+Fecha: 2026-10-14. Estado: **aprobada (2026-10-24), en ejecución**; plan: `docs/plans/2026-10-24-spec-1b-plan.md`. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 1b".
 Depende de: Spec 1a y del hito de primer fotograma (necesita su herramienta de captura de píxeles).
 
 Marcas: **[V]** comprobado en el repo; **[H]** hipótesis a confirmar; **[D]** decisión del usuario.
@@ -79,3 +79,33 @@ escenas (`despues-<n>.png`) y comparar con `tools/compare_captures.sh`.
   renderizador sin poder comparar antes y después.
 - Borrar `gbuffer_draw` afecta a los upscalers temporales (usan el vector de movimiento). Están
   fuera de la Alpha; se dejan funcionando solo si lo hacen sin esa heurística.
+
+## 7. Resultado
+
+### Tarea 0 — línea base de tests (2026-10-25)
+
+Rama `tsuki/spec-1b`, cortada de `tsuki/main` en `4567014` con el árbol limpio (solo el submódulo
+`fsr-vulkan` aparece modificado: son los parches que aplica `build.sh`). Logs en `out/spec1b-t0/` (sin
+versionar), generados por `out/spec1b-t0/run-baseline.sh` dentro del distrobox.
+
+- `bash build.sh --test` (`build-test.log`): sale con 0; 17 líneas PASS/ok (pad, pad-map, runtime,
+  file-mods, sema, eventflag ×4, content, mp3, Audiodec, HEVAG, videodec, services, isa-emulate,
+  isa-stub) y ningún `SKIP`, igual que al cerrar la Spec 4.
+- `python3 -m unittest discover -s tests` (`py.log`): **267 ejecutados / 35 omitidos / 4 fallos
+  esperados**, OK. Al cerrar la 1a eran 254 / 37 / — (`out/baseline-py-1a.log`); los tests nuevos vienen
+  de las specs 2 a 5. Es la referencia que tienen que repetir las tareas 4, 5 y 6.
+- `out/gow3-probe --vulkan-only`: `AMD Radeon RX 6650 XT (RADV NAVI23); command submission + 4096-byte
+  readback PASS`.
+- **Línea base C++** (`cpp.txt`), que se repite al final de las tareas 3, 4 y 5 compilando con
+  `ninja -C out/gpu <destino>` y ejecutando `out/gpu/<destino>`. Los 24 dan 0:
+  `motion-history`, `png-decode`, `screenshot`, `aliasing`, `blend-rewrite`, `depth-stencil-state`,
+  `async-compiler`, `warmup-inbox`, `wave-stats`, `pass-census`, `frame-capture`, `lighting-test-knob`,
+  `amd-paths`, `no-msaa`, `async-pipeline-cache`, `async-fetch-snapshot`, `ui-composition`,
+  `upscaler-support`, `readback-queue`, `wait-diagnostics`, `readback-sources`, `page-state`,
+  `kernel-thread` y `avplayer` (este con el argumento `tests/data`), todos con el sufijo `-test`.
+  Los 22 primeros son los que `out/baseline-cpp-1a.log` daba como `=0` y siguen existiendo
+  (`stat-multipliers-test` y `signatures-test` se borraron en la 1a). `kernel-thread-test` y
+  `avplayer-test` son posteriores a la 1a; entran en la lista porque pasan y enlazan `libgow3gpu`.
+  Fuera de la lista, porque ya fallaban antes de esta spec: `camera-motion-test` y los otros que no
+  enlazan en Linux (`runtime_report` sin definir), los que no compilan en Linux y los 9 solo de Windows.
+  En la Tarea 5, `no-msaa-test` pasa a llamarse `msaa-samples-test`.
