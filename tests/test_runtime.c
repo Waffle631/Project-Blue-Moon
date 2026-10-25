@@ -311,6 +311,39 @@ static void savedata_call_log(void) {
     assert(!strstr(d+strlen(unmounted),"unmounted from")); /* the second unmount found nothing mounted */
     snprintf(cmd,sizeof cmd,"rm -rf %s",user); assert(system(cmd)==0);
 }
+/* Spec 6 (5): a save written in one run is mounted and read back in the next. The load half runs in a new
+   process (--savedata-load), so only the host files carry over, not the mount slots. */
+typedef struct { int32_t user,pad; const char *dir; uint64_t blocks; uint32_t mode; uint8_t reserved[36]; } SaveMount2;
+typedef int32_t (ABI *SaveMount)(const SaveMount2 *,void *);
+typedef int32_t (ABI *SaveUmount)(const void *);
+static void save_pattern(unsigned char *bytes) { for (int i=0;i<4096;++i) bytes[i]=(unsigned char)(i*31+7); }
+static uint32_t save_status(const char *result) { uint32_t status; memcpy(&status,result+28,4); return status; } /* MountResult.status */
+static void savedata_load(const char *user) {
+    typedef int32_t (ABI *Init)(const void *);
+    SaveMount mount=GET(SaveMount,"0z45PIH+SNI#libSceSaveData"); SaveUmount umount=GET(SaveUmount,"BMR4F-Uek3E#libSceSaveData");
+    Init init=GET(Init,"TywrFKCoLGY#libSceSaveData");
+    runtime_file_configure("out",user); assert(mount && umount && init && init(NULL)==0);
+    char dir[32]="savedata000",missing[32]="savedata999",result[64],path[80];
+    SaveMount2 m={1,0,dir,0x60,1,{0}}, none={1,0,missing,0x60,1,{0}}; /* RDONLY with 0x60 blocks, as the game loads (eboot +0x121716) */
+    assert(mount(&m,result)==0 && save_status(result)==0); /* existing, not created */
+    unsigned char expected[4096], bytes[4096]; save_pattern(expected);
+    snprintf(path,sizeof path,"%s/x",result); int fd=(int)runtime_file_open(path,0,0);
+    assert(fd>=0 && runtime_file_read(fd,bytes,sizeof bytes)==(int64_t)sizeof bytes && !memcmp(bytes,expected,sizeof bytes));
+    assert(runtime_file_read(fd,bytes,1)==0 && !runtime_file_close(fd)); /* exactly 4096 bytes */
+    assert(umount(result)==0 && (uint32_t)mount(&none,result)==0x809F0008);
+}
+static void savedata_survives_remount(const char *self) {
+    SaveMount mount=GET(SaveMount,"0z45PIH+SNI#libSceSaveData"); SaveUmount umount=GET(SaveUmount,"BMR4F-Uek3E#libSceSaveData");
+    char user[]="out/savedata-test-XXXXXX",dir[32]="savedata000",result[64],path[80],cmd[160];
+    assert(mount && umount && mkdtemp(user)); runtime_file_configure("out",user);
+    SaveMount2 m={1,0,dir,0x60,32,{0}}; /* CREATE2: created when missing */
+    assert(mount(&m,result)==0 && save_status(result)==1);
+    unsigned char bytes[4096]; save_pattern(bytes);
+    snprintf(path,sizeof path,"%s/x",result); int fd=(int)runtime_file_open(path,1|0x200|0x400,0644); /* O_WRONLY|O_CREAT|O_TRUNC */
+    assert(fd>=0 && runtime_file_write(fd,bytes,sizeof bytes)==(int64_t)sizeof bytes && !runtime_file_close(fd) && umount(result)==0);
+    snprintf(cmd,sizeof cmd,"%s --savedata-load %s",self,user); fflush(stdout); assert(system(cmd)==0);
+    snprintf(cmd,sizeof cmd,"rm -rf %s",user); assert(system(cmd)==0);
+}
 /* Spec 3: fJgP+wqifno is DiscMap 0x7C980FFB0AA27E7A (the NID's bytes). libSceFios2.prx asks it for a
    file's LBA package location (call at +0x3411a) and takes its fallback path on any nonzero result.
    Like its twin ioKMruft1ek, it reports that no disc bitmap exists and leaves the outputs alone. */
@@ -682,10 +715,11 @@ int main(int argc,char **argv) {
     if (argc>1 && !strcmp(argv[1],"--time-conversion")) { time_conversion(); return 0; }
     if (argc>1 && !strcmp(argv[1],"--file-metadata")) { file_metadata(); return 0; }
     if (argc>1 && !strcmp(argv[1],"--decided-traps")) { decided_traps(); return 0; }
+    if (argc>2 && !strcmp(argv[1],"--savedata-load")) { savedata_load(argv[2]); return 0; }
     if (argc>1 && !strcmp(argv[1],"--rtld-underflow")) {
         static int dso; GET(DsoCount,"8OnWXlgQlvo#libkernel")(&dso); return 99;
     }
-    libc_support(); posix_mutexes(); wall_time(); kernel_time_names(); sanitizer_and_neo(); heap_trace_info(); audiodec_init(); savedata_initialize3(); savedata_mount2(); savedata_umount_with_backup(); savedata_backup_queries(); savedata_call_log(); discmap_location(); gpu_stats_line(); exit_handlers(); guards(); mutexes(); direct_memory(); memory_primitives();
+    libc_support(); posix_mutexes(); wall_time(); kernel_time_names(); sanitizer_and_neo(); heap_trace_info(); audiodec_init(); savedata_initialize3(); savedata_mount2(); savedata_umount_with_backup(); savedata_backup_queries(); savedata_call_log(); savedata_survives_remount(argv[0]); discmap_location(); gpu_stats_line(); exit_handlers(); guards(); mutexes(); direct_memory(); memory_primitives();
     rw_lifecycle(); rw_concurrency(); rw_timeouts(); posix_rwlocks(); thread_get_name(); file_metadata(); decided_traps();
     time_conversion(); /* last: changes TZ */
     puts("PASS: callback lifecycle, guard ABI, mutex errors, shared direct memory, memory primitives, resolver scope, "
