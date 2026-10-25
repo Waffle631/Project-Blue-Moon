@@ -342,6 +342,12 @@ extern "C" int gow3gpu_overlay_captures_input(void) {
     return Gow3Overlay::CapturesInput() ? 1 : 0;
 }
 
+extern "C" int gow3gpu_mouse_read(int32_t* dx, int32_t* dy, int32_t* wheel, uint32_t* buttons) {
+    Gow3Overlay::MarkMouseInUse();
+    Gow3Overlay::Mouse().Take(dx, dy, wheel, buttons);
+    return SDL_HasMouse() ? 1 : 0;
+}
+
 extern "C" int gow3gpu_text_input_begin(const char* initial, const char* prompt) {
     if (!g_window) return 0;
     g_window->BeginTextInput(initial ? initial : "", prompt ? prompt : "Text");

@@ -62,7 +62,8 @@ WindowSDL::WindowSDL(s32 width_, s32 height_, const char* title) : width{width_}
         Gow3Settings::Get().display_mode = Gow3Graphics::Borderless;
     }
     ApplyDisplayMode(Gow3Settings::Get().display_mode);
-    // gow3: the game has no mouse; the in-game menu draws its own cursor (Gow3Overlay::SetOpen).
+    // gow3: the SDL cursor is always hidden: the game draws its own once it opens the mouse, and the
+    // settings menu draws ImGui's (Gow3Overlay::SetOpen).
     SDL_HideCursor();
     int w = 0, h = 0;
     SDL_GetWindowSizeInPixels(window, &w, &h);
@@ -127,6 +128,7 @@ bool WindowSDL::PollEvents() {
     if (!text_active) {
         Gow3Overlay::UpdateTextInput(window);
     }
+    Gow3Overlay::UpdateMouseMode(window);
     if (const int mode = Gow3Settings::Get().display_mode; mode != display_mode) {
         ApplyDisplayMode(mode);
     }

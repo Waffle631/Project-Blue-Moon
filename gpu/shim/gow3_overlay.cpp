@@ -797,7 +797,31 @@ bool HandleChoiceEvent(const SDL_Event& event) {
     return true;
 }
 
+static Gow3Mouse::MouseAccumulator game_mouse;
+static std::atomic<bool> game_uses_mouse{false};
+
+Gow3Mouse::MouseAccumulator& Mouse() { return game_mouse; }
+void MarkMouseInUse() { game_uses_mouse.store(true, std::memory_order_relaxed); }
+
+void UpdateMouseMode(SDL_Window* window) {
+    static bool relative = false; // window thread only
+    const bool want = game_uses_mouse.load(std::memory_order_relaxed) && !CapturesInput();
+    if (want != relative) {
+        relative = want;
+        SDL_SetWindowRelativeMouseMode(window, want);
+    }
+}
+
 bool HandleEvent(const SDL_Event& event) {
+    // gow3: the game's mouse sees every event, whatever the menu does with it. The held buttons
+    // stay right while the menu is open (a release behind the menu must not stick).
+    switch (event.type) {
+    case SDL_EVENT_MOUSE_MOTION: game_mouse.Motion(event.motion.xrel, event.motion.yrel); break;
+    case SDL_EVENT_MOUSE_WHEEL: game_mouse.Wheel(event.wheel.y); break;
+    case SDL_EVENT_MOUSE_BUTTON_DOWN:
+    case SDL_EVENT_MOUSE_BUTTON_UP: game_mouse.Button(event.button.button, event.button.down); break;
+    default: break;
+    }
     std::scoped_lock lock{imgui_mutex};
     if (!initialized) {
         return false;

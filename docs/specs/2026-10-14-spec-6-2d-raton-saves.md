@@ -133,6 +133,22 @@ nuevos. `mouse_read` devuelve 1 y escribe un solo informe de 40 bytes, lo que cu
 Devolver `0` sin ratón o un informe de ceros dan lo mismo al juego. El factor 1:1 del movimiento (640
 unidades para cruzar el espacio virtual) es una decisión de la Tarea 6, no del runtime.
 
+### Resultado de la Tarea 4 (2026-10-25): el puente `gow3gpu_mouse_read`
+
+- `MouseAccumulator` (`gpu/shim/gow3_mouse.h`, solo cabecera) suma movimiento y rueda como `float` y los entrega
+  truncados hacia cero **conservando el resto**: tres movimientos de `(3,-2)`, `(3,-2)` y `(0.6,0.6)` dan
+  `(6,-3)` y dejan `(0.6,-0.4)` para la siguiente lectura. Los botones son estado y `Take` no los borra [V]
+  (`mouse-accumulator-test`, ejecutado: `ok`). Como `Take` lo llama el hilo del juego y `Motion` el de ventana,
+  el acumulador lleva su propio `std::mutex`.
+- `HandleEvent` alimenta el acumulador **antes** de sus guardas, sin cambiar lo que devuelve, de modo que el
+  juego sigue viendo el estado real de los botones con el menú abierto y ImGui recibe sus eventos [V en el
+  compilado; el efecto con el menú abierto se comprueba en la Tarea 5/6].
+- `UpdateMouseMode` (cada vuelta de `PollEvents`, también durante el cuadro de texto del juego) activa el modo
+  relativo de SDL solo si el juego ha leído el ratón y `CapturesInput()` es falso [H: efecto real en la Tarea 6].
+- `gow3gpu_mouse_read` está exportado por `libgow3gpu.so` (`nm -D`) y devuelve `SDL_HasMouse()`. Se llama desde
+  el hilo del juego sin que el runtime inicialice vídeo; sin ventana no hay ratones y devuelve 0 [H: lo confirma
+  la Tarea 6].
+
 #### Códigos de error de libSceMouse
 
 Fuente: tabla de psdevwiki (el usuario la pegó el 2026-10-25); no se tiene el SDK. Los **valores y nombres**

@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include "common/types.h"
+#include "gow3_mouse.h"
 #include "gow3_png.h"
 #include "video_core/renderer_vulkan/vk_common.h"
 
@@ -27,6 +28,14 @@ void Init(const Vulkan::Instance& instance, vk::Format format, u32 image_count);
 bool HandleEvent(const SDL_Event& event);
 /// Turns SDL text input on while the menu edits a value (window thread, once per poll).
 void UpdateTextInput(SDL_Window* window);
+
+/// The mouse events seen by HandleEvent, for gow3gpu_mouse_read (guest thread).
+Gow3Mouse::MouseAccumulator& Mouse();
+/// Guest thread: the game reads the mouse, so UpdateMouseMode may switch SDL to relative motion.
+void MarkMouseInUse();
+/// Window thread, once per poll: relative mouse mode while the game uses the mouse and nothing
+/// (menu, text entry, save list) captures the input; absolute otherwise so ImGui gets a cursor.
+void UpdateMouseMode(SDL_Window* window);
 
 /// Start-up loading screen (pipeline cache warm-up): `total` 0 shows no count.
 void SetLoading(bool active, u32 done, u32 total);
