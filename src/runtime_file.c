@@ -190,8 +190,10 @@ static File *get(int fd) {
     if (fd<3 || fd>=MAX_FILES || !files[fd].used) return NULL;
     return &files[fd];
 }
-/* GOW3_AUDIO_TRACE=1: sound file opens and failed reads (missing game sounds). */
+/* GOW3_AUDIO_TRACE=1: failed reads of sound files (missing game sounds). Opens are GOW3_FILE_TRACE's. */
 static int audio_trace(void) { static int v=-1; if (v<0) { const char *e=getenv("GOW3_AUDIO_TRACE"); v=e && e[0]=='1'; } return v; }
+/* GOW3_FILE_TRACE=1: every guest open, with path, descriptor and size (or the errno of the failure). */
+static int file_trace(void) { static int v=-1; if (v<0) { const char *e=getenv("GOW3_FILE_TRACE"); v=e && e[0]=='1'; } return v; }
 /* Game mounts (including linked mod overlays) are read-only. Saves use other mounts. */
 static int game_path(const char *p) {
     if (!p || !*p) return 0;
@@ -199,12 +201,18 @@ static int game_path(const char *p) {
     return (!strncmp(p,"/app0",5) && (!p[5] || p[5]=='/')) ||
            (!strncmp(p,"/hostapp",8) && (!p[8] || p[8]=='/'));
 }
+/* A failed open: ENOENT keeps its always-on "not found" line (counted in the final report); the trace adds every errno. */
+static int64_t open_failed(const char *guest,int e) {
+    if (e==ENOENT) { ++missing; printf("Runtime: open(%s) -> not found\n",guest); }
+    if (file_trace()) printf("File trace: open(%s) -> errno %d\n",guest,e);
+    return -e;
+}
 /* All operations return >=0 or -(host errno); wrappers adapt the convention. */
 static int64_t do_open(const char *guest,int flags,int mode) {
-    if (game_path(guest) && (flags & (3|0x8|0x200|0x400|0x800))) return -EROFS;
+    if (game_path(guest) && (flags & (3|0x8|0x200|0x400|0x800))) return open_failed(guest,EROFS);
     char path[1024];
     int e=translate(guest,path,sizeof(path));
-    if (e) return -e;
+    if (e) return open_failed(guest,e);
 #ifdef _WIN32
     /* Windows cannot open a directory as a CRT descriptor: directories are listings only. */
     (void)mode;
@@ -212,27 +220,21 @@ static int64_t do_open(const char *guest,int flags,int mode) {
     Listing *dir=NULL;
     int host=-1;
     if (!host_stat(path,&s) && S_ISDIR(s.st_mode)) {
-        if (flags&3) return -EISDIR;
-        if (!(dir=list_directory(path))) return -EACCES;
+        if (flags&3) return open_failed(guest,EISDIR);
+        if (!(dir=list_directory(path))) return open_failed(guest,EACCES);
     } else if (flags&0x20000) {
-        e=errno==ENOENT ? ENOENT : ENOTDIR;
-        if (e==ENOENT) { ++missing; printf("Runtime: open(%s) -> not found\n",guest); }
-        return -e;
+        return open_failed(guest,errno==ENOENT ? ENOENT : ENOTDIR);
     } else {
         host=open(path,host_flags(flags)&~O_DIRECTORY,_S_IREAD|_S_IWRITE);
         if (host<0) {
-            e=errno;
-            if (e==ENOENT) { ++missing; printf("Runtime: open(%s) -> not found\n",guest); }
-            return -e;
+            return open_failed(guest,errno);
         }
         if (host_fstat(host,&s)) memset(&s,0,sizeof(s));
     }
 #else
     int host=open(path,host_flags(flags),mode ? mode : 0644);
     if (host<0) {
-        e=errno;
-        if (e==ENOENT) { ++missing; printf("Runtime: open(%s) -> not found\n",guest); }
-        return -e;
+        return open_failed(guest,errno);
     }
     struct stat s;
     Listing *dir=NULL;
@@ -241,12 +243,12 @@ static int64_t do_open(const char *guest,int flags,int mode) {
     pthread_mutex_lock(&lock);
     int fd=-1;
     for (int i=3;i<MAX_FILES;++i) if (!files[i].used) { fd=i; break; }
-    if (fd<0) { pthread_mutex_unlock(&lock); if (host>=0) close(host); free_listing(dir); return -EMFILE; }
+    if (fd<0) { pthread_mutex_unlock(&lock); if (host>=0) close(host); free_listing(dir); return open_failed(guest,EMFILE); }
     files[fd]=(File){.used=1,.host=host,.dir=dir};
     snprintf(files[fd].path,sizeof(files[fd].path),"%s",guest);
     ++opens;
     pthread_mutex_unlock(&lock);
-    if (audio_trace() && strstr(guest,"sound/")) printf("Audio trace: open(%s) -> fd %d, %lld bytes\n",guest,fd,(long long)s.st_size);
+    if (file_trace()) printf("File trace: open(%s) -> fd %d, %lld bytes\n",guest,fd,(long long)s.st_size);
     const char *mod_trace=getenv("GOW3_MOD_TRACE"), *mod_root=getenv("GOW3_MODS_DIR");
     if (mod_trace && mod_trace[0]=='1' && mod_root) {
         char actual[PATH_MAX],root[PATH_MAX];

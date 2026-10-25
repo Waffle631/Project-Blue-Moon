@@ -1,6 +1,7 @@
 /* Exercise actual guest file operations on a linked overlay and writable saves. */
 #include "../src/runtime_file.c"
 #include <assert.h>
+#include <unistd.h>
 static int32_t guest_errno;
 int32_t *runtime_errno(void) { return &guest_errno; }
 int32_t runtime_guest_errno(int e) { return e; }
@@ -8,7 +9,18 @@ uintptr_t runtime_lookup(const RuntimeExport *table,size_t n,const char *name) {
     for (size_t i=0;i<n;++i) if (!strcmp(table[i].name,name)) return (uintptr_t)table[i].function;
     return 0;
 }
+/* Opens path with stdout sent to a temporary file; returns the descriptor and copies what it printed to out. */
+static int traced_open(const char *path,char *out,size_t size) {
+    fflush(stdout); FILE *tmp=tmpfile(); assert(tmp);
+    int saved=dup(1); assert(saved>=0 && dup2(fileno(tmp),1)>=0);
+    int fd=(int)do_open(path,0,0); fflush(stdout); dup2(saved,1); close(saved);
+    rewind(tmp); size_t n=fread(out,1,size-1,tmp); out[n]=0; fclose(tmp);
+    return fd;
+}
+static int lines_of(const char *text) { int n=0; for (; *text; ++text) n+=*text=='\n'; return n; }
 int main(void) {
+    setenv("GOW3_FILE_TRACE","1",1); /* read once, so before the first open */
+    unsetenv("GOW3_AUDIO_TRACE");
     char root[]="/tmp/gow3-mod-files-XXXXXX";
     assert(mkdtemp(root));
     char game[512],user[512],source[512],link[512];
@@ -32,6 +44,21 @@ int main(void) {
         assert(path_op(path,2,0)==-EROFS);
         assert(do_rename(path,"/data/moved")==-EROFS);
     }
+    /* GOW3_FILE_TRACE logs every open: path, descriptor and size; failures with their errno (not only ENOENT). */
+    char log[1024];
+    int traced=traced_open("/app0/asset.dcx",log,sizeof(log)); assert(traced>=3 && lines_of(log)==1);
+    assert(!strncmp(log,"File trace: open(/app0/asset.dcx) -> fd ",40));
+    assert(strstr(log,", 6 bytes\n") && !do_close(traced));
+    assert(traced_open("/app0/no-existe",log,sizeof(log))==-ENOENT && lines_of(log)==2);
+    assert(strstr(log,"File trace: open(/app0/no-existe) -> errno 2\n") && strstr(log,"Runtime: open(/app0/no-existe) -> not found\n"));
+    assert(traced_open("/app0/asset.dcx/x",log,sizeof(log))==-ENOTDIR && lines_of(log)==1); /* not ENOENT: no "not found" line */
+    assert(!strcmp(log,"File trace: open(/app0/asset.dcx/x) -> errno 20\n"));
+    char sounds[512],sound[640];
+    snprintf(sounds,sizeof(sounds),"%s/game/sound",root); snprintf(sound,sizeof(sound),"%s/x.at9",sounds);
+    assert(!mkdir(sounds,0755)); f=fopen(sound,"w"); assert(f && !fclose(f));
+    traced=traced_open("/app0/sound/x.at9",log,sizeof(log)); assert(traced>=3 && lines_of(log)==1);
+    assert(!strncmp(log,"File trace: open(/app0/sound/x.at9) -> fd ",42) && !strstr(log,"Audio trace") && !do_close(traced));
+    assert(!unlink(sound) && !rmdir(sounds));
     int dir=(int)do_open("/app0",0x20000,0); assert(dir>=3);
     char entries[1024]; int64_t count=do_getdents(dir,entries,sizeof(entries),NULL); assert(count>0);
     int found=0;
