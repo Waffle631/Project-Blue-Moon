@@ -54,6 +54,12 @@ Para cada captura rechazada, clasificar el defecto:
 | Colores raros | Formato de superficie (hay avisos de `A2B10G10R10…` y `R32G32B32…` no soportados por la tarjeta) |
 | Textura corrupta | Caché de texturas, formato tileado, mip |
 
+*2026-10-25, pendiente de triage (visto en la Tarea 8, bloque C):* la miniatura de una ranura en el menú de
+guardar/cargar del juego sale «un poco pixelada» (lo dice el usuario; la fecha y el resto del menú se ven bien).
+No es `icon0.png`, que es una imagen fija del título de 228×128. La miniatura la genera el juego y la guarda
+dentro de `savedata000`. **[H]** Puede venir del propio juego (una captura pequeña ampliada) o de cómo se lee
+la imagen de la GPU (lectura diferida/obsoleta, filtro). Sin una captura de la PS4 no se puede saber.
+
 ### A3 — Corregir con captura antes y después
 Cada corrección: captura antes → cambio → captura después → `compare_captures`. Si una optimización
 heredada causa el error, **se elimina**, no se desactiva.
@@ -248,6 +254,31 @@ elegido no cambia lo que hace el juego**, solo lo que muestra el log.
 - Test: `savedata_call_log` en `tests/test_runtime.c` comprueba el orden montaje → parámetro → icono → desmontaje y que el
   segundo desmontaje no imprime nada. Lo vi fallar antes de añadir las líneas.
 
+### Resultado de la Tarea 8 (2026-10-25): grabar, cerrar, reiniciar y cargar
+
+- **[V]** Test `savedata_survives_remount` (`tests/test_runtime.c`): monta con `CREATE2`, escribe 4096 bytes y desmonta.
+  Después lanza un **proceso nuevo** (`--savedata-load`) que monta en solo lectura con 0x60 bloques, como el juego, y lee
+  los mismos bytes. Comprueba también que un directorio que no existe da `0x809F0008`. El código ya lo hacía; sin save,
+  la mitad de carga aborta.
+- **[V] En el juego** (logs `out/spec6-c/save-1.log` y `save-2.log`, con `GOW3_FILE_TRACE=1`): el usuario grabó 3 veces
+  desde el menú del juego y cerró la ventana; al reiniciar cargó la partida y volvió donde la había dejado.
+  La fecha y la miniatura de la ranura se ven (la miniatura, algo pixelada: ver A2).
+  - `savedata000/savedata000` cambió (sha256 `3dbd36eb…` → `0901a20c…`) y sigue midiendo 4 194 304 bytes.
+    `icon0.png` se reescribió; `param.bin` no.
+  - Ningún `STOP:`, `Fault:`, `CheckBackupData` ni `RestoreBackupData`. La carga no modificó el save.
+- **[V] Qué llama el juego y en qué orden:**
+  - Al arrancar (en las dos ejecuciones): dos veces `Mount2` en solo lectura → lee entero `/savedata0/savedata000` →
+    `Umount`. La carga desde el menú no vuelve a montar: usa lo que leyó al arrancar.
+  - Al grabar, desde un hilo `save thread`: `Mount2` para escritura (`existing`) → abre `savedata000` truncándolo
+    (`0 bytes` al abrir) y lo reescribe entero → `SaveIcon` → `UmountWithBackup`. Entre un grabado y el siguiente,
+    un hilo `load thread` vuelve a montar en solo lectura y relee los 4 MiB.
+  - **No llama** a `SetParam`, `DirNameSearch`, `Delete` ni a SaveDataMemory. Las ranuras van todas dentro del único
+    archivo de 4 MiB, y `param.bin` se queda como lo dejó el primer montaje (vacío).
+- **Riesgo (foco 5), no se cambia aquí:** como el juego trunca el archivo antes de reescribirlo, si el proceso muere a
+  mitad de un grabado queda un `savedata000` corto. Además `UmountWithBackup` no guarda copia (Spec 3 §4.4), así que
+  `CheckBackupData` no tendría nada que restaurar. En esta prueba la ventana se cerró después de grabar y el archivo
+  quedó completo. Un cierre a mitad no se probó.
+
 ## 6. Bloque D — Idioma
 
 - Verificar con el log que el juego eligió inglés: carga `ft_en.mrg` y los `*_en.mp4`, y ningún
@@ -301,7 +332,7 @@ guardado revela fallos, `tests/test_mouse.c`.
 - [ ] El texto en inglés es legible, sin glifos rotos ni cortes de línea incorrectos (lo juzga el usuario).
 - [x] `out/mouse-test` pasa y, en el juego, el ratón avanza el texto y maneja los menús (Tarea 6).
 - [x] Mando, teclado y ratón avanzan el texto (Tarea 6).
-- [ ] Un save grabado sobrevive al reinicio y se carga.
+- [x] Un save grabado sobrevive al reinicio y se carga (Tarea 8).
 - [ ] El log con `GOW3_FILE_TRACE=1` muestra recursos `_en` y ninguno de otro idioma.
 - [ ] El recorrido grabado se repite entero con `GOW3_PAD_REPLAY`, sin `STOP:` ni `Fault:`.
 
