@@ -1,11 +1,10 @@
 # Spec 5 — Vídeo: AvPlayer
 
-Fecha: 2026-10-14. Estado: **en curso**: las tareas 1 (trazador y contrato), 2 (arnés), 3 (carrera de
-`Kernel::Thread` y otras causas), 4 (`JumpToTime` real y bucle), 5 (barrido de los 134 vídeos), 6 (título
-del capítulo 1 en el juego) y 7 (opening, prólogo, salto y bucle en el juego) del plan están cerradas
-desde el 2026-10-24 (§9). Fuera del juego, el arnés pasa entero y los 134 vídeos se reproducen. En el
-juego, el título del capítulo 1 termina y el juego sigue, el opening y el prólogo llegan enteros y a
-tiempo real, saltar el logo no cuelga y el bucle del menú de título va a su ritmo. Queda la 8: cierre.
+Fecha: 2026-10-14. Estado: **cerrada** el 2026-10-25. Las ocho tareas del plan están hechas (§9), salvo
+la revisión adversarial de la tarea 8 (paso 4), que queda pendiente a petición del usuario. Fuera del
+juego, el arnés pasa entero y los 134 vídeos se reproducen. En el juego, el título del capítulo 1 termina
+y el juego sigue, el opening y el prólogo llegan enteros y a tiempo real, saltar el logo no cuelga y el
+bucle del menú de título va a su ritmo. Las cinco casillas de §7 están marcadas.
 Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 5".
 Depende de: Specs 2 y 3 (el juego tiene que llegar a pedir un vídeo).
 
@@ -315,7 +314,9 @@ por adjuntar). Nuevos: `tests/test_avplayer.cpp` (opcional).
 - [x] Saltar un vídeo no cuelga el juego. *2026-10-24:* `TM_CI` con Cruz, tres de tres
   (`out/run-t7-skip-tmci-{1,2,3}.log`), más el salto del usuario en la tarea 6; el juego sigue hasta el
   menú de título (tarea 7, §9).
-- [ ] El log del recorrido no contiene `STOP:` ni `Fault:` relacionados con AvPlayer.
+- [x] El log del recorrido no contiene `STOP:` ni `Fault:` relacionados con AvPlayer. *2026-10-25:* el
+  recorrido final con la ruta grabada (`out/run-t8-route.log`) no tiene `STOP:`, `Fault:`, `join failed`
+  ni `<Error>` de AvPlayer; los logs de las tareas 6 y 7 tampoco (tarea 8, §9).
 - [x] Hay una nota con el contrato real del juego con AvPlayer (paso 1). *2026-10-24:* `docs/avplayer.md`,
   con la traza de `out/run-t1-trace.log` y `out/run-t1-prologo.log` (tarea 1, §9).
 
@@ -730,11 +731,48 @@ por adjuntar). Nuevos: `tests/test_avplayer.cpp` (opcional).
   de la vuelta siguiente. Si quedara en cola un fotograma de la vuelta anterior, el vídeo esperaría casi
   una vuelta. Ningún vídeo del juego hace bucle con audio.
   **[H]** El juego recibe el fotograma 0 (desenfocado) de cada vuelta 6 ms antes de saltar, y el
-  siguiente ~50 ms después. Si lo dibuja, cada 112 s hay un destello de unos tres cuadros. Nadie lo ha
-  mirado en pantalla.
+  siguiente ~50 ms después. Si lo dibuja, cada 112 s hay un destello de unos tres cuadros. El usuario
+  cree que no ocurre (2026-10-24, tarea 8), así que no se persigue.
 - **Para la tarea 8:**
   - `out/spec5-t6/run-t6.sh` pone `out/savedata-pre-ruta/` en `user/savedata` sin guardar lo que había.
     Ahora la partida del usuario va más allá (`out/savedata-tras-op/`), así que hay que devolverla
     después del recorrido.
   - Repetir el opening exige jugar desde `out/savedata-cerca-op/`: de ahí al vídeo hay ~500 líneas y la
     elección.
+
+### Tarea 8 — cierre (2026-10-25)
+
+- **Suites** (paso 1, `out/t8-*.log`, resumen en `out/spec5-t8/suites.txt`), iguales a las de la tarea 7:
+  - `bash build.sh --test`: rc 0, con las mismas 17 líneas `PASS`/`ok`;
+  - `kernel-thread-test`: 4 de 4, tres veces; `avplayer-test`: 16 de 16, tres veces;
+  - Python: 267 ejecutados, OK (35 omitidos, 4 fallos esperados).
+- **Barridos fuera del juego**, repetidos porque `d8fd321` cambió `GetVideoData` en todos los vídeos sin
+  audio:
+  - `--seconds 3`, los 134 (`out/t8-sweep-3s.log`): 134 OK.
+  - `--seconds 12`, los 117 que llegan al final (`out/t8-sweep-end.log`): 117 OK. Fotogramas y bloques de
+    audio, vídeo a vídeo, iguales a los de la tarea 5 (`out/avplayer-sweep-end.log`); `end` varía ±2 ms y
+    `late` llega a 69 ms (antes, 70).
+- **Recorrido final** (paso 2, `out/run-t8-route.log`): la ruta de la tarea 6 (CONTINUE y 16 Cruz) con
+  la traza, sobre la partida de prueba `out/savedata-pre-ruta/`. `out/spec5-t8/run-route.sh` es
+  `run-t6.sh` con un añadido: antes copia la partida del usuario a `out/savedata-usuario-t8/` y al cerrar
+  la devuelve. Quedó igual a `out/savedata-tras-op/`.
+  - `TM_CI` llega entero (180 fotogramas, 282 bloques), y el `titlebg1` del menú se deja al pulsar
+    CONTINUE (`JumpToTime` en 5 ms, `Stop` en 0 ms).
+  - `phasetitle_01_00_en.mp4`, a los 50,9 s del primer vídeo: 150 de 150 fotogramas, el último en 4 972;
+    `IsActive()` falso en `play` 4 973; el `Stop` del juego devuelve `0x806A0002` en 0 ms y `StateStop`
+    llega 4 ms después. Es lo mismo que en las tres ejecuciones de la tarea 6.
+  - En las capturas (`out/spec5-t8/shots/`) sale "DAY 1 — Homecoming I" a mitad del vídeo y, 10 s
+    después del final, la escena del metro en fundido, como en la tarea 6.
+  - `grep -E 'STOP:|Fault:|join failed'` no da nada, y tampoco hay `<Error>`, `[h264 @` ni "duplicated
+    MOOV". Los únicos avisos de AvPlayer son los 5 `Stop: Could not stop playback: already stopped` de
+    siempre. La línea `GPU:` da `unimplemented=0`.
+  - El mismo `grep` sobre los logs de las tareas 6 y 7 (`out/run-t6-*.log`, `out/run-t7-*.log`) tampoco
+    da nada.
+- **Paso 4** (revisión adversarial): pendiente, a petición del usuario (2026-10-24). Como en la Spec 4
+  (su tarea 13), la spec se cierra sin esa segunda mirada.
+- **§7:** casilla 4 marcada. Las cinco lo están.
+- **Queda abierto**, todo **[H]** y sin un caso que falle:
+  - el bucle con audio (tarea 7), que ningún vídeo del juego usa;
+  - el destello del fotograma 0 al dar la vuelta `titlebg1` (tarea 7), que el usuario cree que no ocurre;
+  - `IsActive()` sin contar lo que tiene el decodificador, y el decodificador de audio sin vaciar (tarea 5);
+  - no se probó a saltar el opening ni los títulos de capítulo.

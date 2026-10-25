@@ -48,8 +48,11 @@ with before/after captures; the `gow3` → `tsuki` rename is Spec 7, done last).
   decodes ATRAC9 (LibAtrac9) and `libSceAudiodecCpu` decodes HEVAG (`third_party/vgmstream_hevag`, state in
   the guest's work memory; `docs/audiodec.md`), so `--check-imports` lists only those 3 traps.
   GnmDriver/VideoOut/AvPlayer NIDs all exist in the shadPS4 tables. Cutscenes are 134 `.mp4` in
-  `image/movie/` played through **`sceAvPlayer`** (not `sceVideodec`). libSceMouse is used and
-  already covered. Start bring-up with
+  `image/movie/` played through **`sceAvPlayer`** (not `sceVideodec`). Spec 5 is closed (2026-10-25; its
+  adversarial review, plan task 8 step 4, is pending): the vendored AvPlayer plays all 134 outside the game
+  (`avplayer-test --movie-dir`), and in game the opening, the prologue, the chapter 1 title, skipping the
+  logo and the title-menu loop work; the game's AvPlayer contract is in `docs/avplayer.md`. libSceMouse
+  is used and already covered. Start bring-up with
   `out/gow3-probe out/boot-linked.bin --app0 Tsukihime/CUSA47999 --check-imports`.
 - What a run shows depends on the save in `user/savedata/1/CUSA47999/`. With no progress in it, the
   boot plays the prologue video first (`prologue_en.mp4`, ~6 min 29 s, buttons do not skip it). The first run to get past the video (2026-10-20, once ATRAC9 decoded) saved progress, and

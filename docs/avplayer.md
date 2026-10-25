@@ -224,7 +224,8 @@ cada fotograma de las vueltas siguientes salía en cuanto se pedía: 5 480 fotog
   `WAR_LOOPING_BACK` de cada vuelta no le hace nada al juego: salta 6 ms después de recibir el fotograma
   0, no con el aviso, que llega 1,2 s antes porque el demultiplexor lee por delante.
 - **[H]** El juego recibe ese fotograma 0 antes de saltar, y el siguiente ~50 ms después. Si lo dibuja,
-  cada 112 s hay un destello desenfocado de unos tres cuadros. No se ha mirado en pantalla.
+  cada 112 s hay un destello desenfocado de unos tres cuadros. El usuario cree que no ocurre (2026-10-24),
+  así que no se persigue.
 - **[H]** Con audio, el reloj sigue al último bloque y vuelve a 0 con la vuelta siguiente. Un fotograma
   de la vuelta anterior que siguiera en cola esperaría casi una vuelta. Ningún vídeo del juego hace bucle
   con audio, y no hay caso.
