@@ -1,7 +1,8 @@
 # Spec 1b — Eliminar las heurísticas de GPU de GoW3
 
-Fecha: 2026-10-14. Estado: **aprobada (2026-10-24), en ejecución**: el plan de implementación está aprobado y su
-Tarea 0 (línea base de tests) hecha (§7). Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 1b".
+Fecha: 2026-10-14. Estado: **aprobada (2026-10-24), en ejecución**: el plan de implementación está aprobado y sus
+tareas 0 (línea base de tests) y 1 (clasificación, §2.1) hechas (§7). La Tarea 1 amplió el alcance, por decisión del
+usuario, a los hashes fijos de shaders del upscaler temporal. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 1b".
 Depende de: Spec 1a y del hito de primer fotograma (necesita su herramienta de captura de píxeles).
 
 Marcas: **[V]** comprobado en el repo; **[H]** hipótesis a confirmar; **[D]** decisión del usuario.
@@ -20,11 +21,74 @@ la misma captura antes y después que Tsukihime no cambia (o que el cambio está
 | Escalado de la escena a 1920×1080 | `vk_rasterizer.cpp:3044-3068` | "El viewport de la película de UI es 1920×1080 aunque la escena sea 960×540"; los pasos de media resolución mantienen el factor de la escena (`size/1920`, `size/1080`) | **Decidido: se conserva.** El proyecto trabaja de base a 1080p, así que esta lógica es la resolución base y no es específica de GoW3. No se borra; se documenta y, si hace falta, se renombra en la Spec 7 |
 | MSAA por vendor | `gpu/shadps4/video_core/amdgpu/gow3_msaa_default.h`, decisión en `vk_instance.cpp`, propiedades en `tools/gpu_capabilities.c` | En AMD y Intel propietario en Windows, crea las imágenes multimuestra con una muestra | **[V]** No incluye RADV (el driver de Linux): la 6650 XT de pruebas mantiene el multimuestreo del juego |
 | `GOW3_READBACK_LINEAR=1` por defecto | `run.py:216` | Activa lectura lineal de imágenes para la CPU | **[H] Activa**; cambia rendimiento más que imagen |
-| Otros restos de GoW3 en el núcleo | `liverpool.cpp` (46 coincidencias `gow3`), `texture_cache.cpp`, `vk_pipeline_cache.cpp` (43), `videoout/driver.cpp` (65), `vk_frame_capture.cpp`, `camera_motion.comp`, `motion_history.h`, `vk_lighting_test.h`, `vk_temporal_upscaler.h` | Mezclan marcas `gow3:` (cambios nuestros sobre shadPS4, que **se conservan**) con comentarios o nombres de GoW3 | Por clasificar en el paso 1 |
+| Hashes fijos de shaders en el upscaler temporal | `ui_composition.h:25-30` (`MovieShader`: 5 hashes de vertex shaders de la UI Scaleform), `vk_temporal_upscaler.h:197` (`trigger_hash = 0x9a9cf8a9`, el compute antes del cual se escala), `:215` (`ui_trigger_vs = 0x34e8a281`); usos en `vk_temporal_upscaler.cpp:361,1306,1321` y `tests/test_ui_composition.cpp:19-21` | Deciden en qué compute se escala la escena y qué draws son UI. Son de otro juego: entraron el 2026-09-26 (`0403703`, `ff221f7`), cuando el upscaler aún se llamaba `BB_UPSCALER`; no son shaders de Tsukihime | **[V] Dormidos** bajo `run.py`: fija `GOW3_UPSCALER=none` (`run.py:214-215`) y todas las llamadas al upscaler exigen `upscaler->Enabled()` (`vk_rasterizer.cpp:1012,1236,1353`). **[D] Se borran (2026-10-25)**: los valores por defecto pasan a «sin disparador»; `GOW3_UPSCALE_BEFORE_CS` y `GOW3_UI_TRIGGER_VS` siguen permitiendo fijarlos |
+| Otros restos de GoW3 en el núcleo | `liverpool.cpp` (46 coincidencias `gow3`), `texture_cache.cpp`, `vk_pipeline_cache.cpp` (43), `videoout/driver.cpp` (65), `vk_frame_capture.cpp`, `camera_motion.comp`, `motion_history.h`, `vk_lighting_test.h`, `vk_temporal_upscaler.h` | Mezclan marcas `gow3:` (cambios nuestros sobre shadPS4, que **se conservan**) con comentarios o nombres de GoW3 | **[V] Clasificados (2026-10-25, §2.1)**: comentarios y lógica genérica. Hay dos excepciones: los hashes de la fila anterior y el clasificador de 864 bytes de `motion_history.h`, que se queda |
 
 Nota importante: las 2551 coincidencias de `gow3` no son todas código de GoW3. Casi todas son la
 **marca de cambios propios** (`gow3:`), que es genérica y se renombra en la Spec 7. Esta spec solo borra
 lógica específica de GoW3.
+
+### 2.1 Clasificación de coincidencias (Tarea 1, 2026-10-25)
+
+`git grep -nE 'God of War|GoW3 specific|gbuffer|864|1920|1080|Kratos' -- gpu/shadps4/video_core gpu/shim` da
+**65 coincidencias** en 23 archivos (`out/spec1b-t1/grep.txt`, sin versionar). Todas están en la tabla, sin
+cambiar código. Rutas relativas a `gpu/shadps4/video_core/` salvo las de `gpu/shim/`.
+
+| Coincidencias (archivo:línea) | Clase | Detalle y destino |
+|---|---|---|
+| `renderer_vulkan/vk_rasterizer.cpp:269,270,1336,1819,2187`, `vk_rasterizer.h:336` | lógica específica de GoW3 | `gbuffer_draw`. Se borra en la Tarea 3 |
+| `renderer_vulkan/vk_rasterizer.cpp:2121,2182` | lógica específica de GoW3 | Constante de cámara de 864 bytes; exige `gbuffer_draw`. Se borra en la Tarea 3 |
+| `renderer_vulkan/motion_history.h:45` (`size == 864`) y su comentario `:40` | lógica específica de otro juego | Clasificador de buffers de los vectores de movimiento por objeto. Según su comentario, la calibración es de otro juego y está «still to be recalibrated for God of War III». Lo prueba `tests/test_motion_history.cpp:86` y lo usa también `vk_pipeline_cache.cpp:892-900`. **Se queda, como excepción escrita** (decisión del 2026-10-24: `ObjectMotion` queda inerte) |
+| `renderer_vulkan/vk_camera_motion.h:72` | comentario | Describe la firma de 864 bytes de `CameraMotion::OnConstants`, que se queda sin llamadores tras la Tarea 3. Es excepción escrita, como la fila anterior |
+| `renderer_vulkan/vk_camera_motion.h:57` | comentario | Documenta `RenderSize()`: los destinos pueden ser mayores que la escena (1916×1080 para 1916×1078). Es genérico |
+| `renderer_vulkan/vk_rasterizer.cpp:3044,3063,3068` | lógica genérica | Escalado a 1920×1080. Se conserva (comprobación del paso 3, abajo) |
+| `renderer_vulkan/ui_composition.h:21-22` (`NativeViewport`), `:35-36` (`Scale`) | lógica genérica | Viewport nativo de 1080p y factor de escala de la UI |
+| `renderer_vulkan/ui_composition.h:26` | comentario | Justifica `MovieShader` (hashes fijos, abajo). Se borra con ella |
+| `renderer_vulkan/scene_resolution.h:10`, `vk_scene_resolution.cpp:72,74,96,111`, `vk_scene_resolution.h:29,32` | lógica genérica | Proxies de la escena a 1920×1080 y a media resolución (960×540); solo actúan con `upscaler->RasterScaling()` |
+| `renderer_vulkan/vk_temporal_upscaler.cpp:194,195,352,354,1283,1288`, `vk_temporal_upscaler.h:8,9,150,152,214` | lógica genérica | Tamaño base de 1080p del upscaler y comentarios que lo describen |
+| `renderer_vulkan/vk_temporal_upscaler.h:2` | comentario | «Off for God of War III». El upscaler sigue apagado por defecto (`run.py:215`) |
+| `renderer_vulkan/fsr411/fsr411.cpp:581,582,742,743`, `fsr411.h:45` | lógica genérica | Juegos de recursos de FSR 4 según el tamaño de salida (1080p o 2160p) |
+| `host_shaders/fsr/ffx_fsr1.h:146` | comentario | Ejemplo del SDK de AMD (FSR 1) |
+| `host_shaders/camera_motion.comp:3` | comentario | `CameraMotion` se queda (decisión del 2026-10-24) |
+| `renderer_vulkan/vk_presenter.h:114-116` | lógica genérica | Tamaño de fotograma esperado de 1080p |
+| `renderer_vulkan/vk_frame_capture.cpp:229` | comentario | La regla es genérica: una pasada que tiene un display buffer como único destino marca la frontera de fotograma. El comentario explica, con el caso de GoW3, por qué no basta con que escriba un display buffer |
+| `renderer_vulkan/vk_lighting_test.h:3` | comentario | Origen de los cuatro ajustes de `GOW3_LIGHTING_TEST` (build de KrachDev). Es un diagnóstico opcional: sin la variable está apagado, y no depende del juego |
+| `amdgpu/liverpool.cpp:914` | comentario | El aviso único de `IT_SET_PREDICATION` es genérico; el comentario da como motivo que GoW3 lo emitía unas 1000 veces por fotograma |
+| `amdgpu/gow3_msaa.h:4` | comentario | Explica el MSAA por vendor. El archivo entero se borra en la Tarea 5 |
+| `texture_cache/texture_cache.cpp:109` | comentario | Regla de bytes del modo `GOW3_STALE_READBACK=1`, que exige `GOW3_DEFERRED_READBACK=1`; los dos están apagados por defecto. La regla es genérica; el comentario cita el caso de GoW3 que la motivó |
+| `texture_cache/texture_cache.cpp:161` | comentario | Registrar todas las copias y esperar a la GPU una sola vez es genérico; el comentario cita el rendimiento medido en GoW3 |
+| `gpu/shim/core/emulator_settings.h:25-26` | lógica genérica | Resolución interna por defecto de 1920×1080 |
+| `gpu/shim/gow3_settings.h:23,24,26,77` | lógica genérica | Resoluciones de salida. El «the game's own size» de `:26` (1920×1080) también vale para Tsukihime |
+| `gpu/shim/gow3_overlay.cpp:338,991,992` | lógica genérica | Etiquetas de resolución y escala de la UI del menú |
+| `gpu/shim/gow3_overlay.cpp:847` | comentario | El acorde R3+L2 que abre el menú se eligió porque L3+R3 era una acción de GoW3. El acorde es genérico y se queda |
+
+Ninguna coincidencia queda **por probar**. Lo único por probar de esta spec es `GOW3_READBACK_LINEAR`, que el
+patrón no encuentra y mide la Tarea 4.
+
+**Fuera del patrón.** Para el paso 4 del plan se hizo una búsqueda complementaria en `video_core`,
+`shader_recompiler` y `gpu/shim`: hashes comparados con constantes, `_hash = 0x`, `Scaleform`, `GoW`. Encontró:
+
+- **Hashes fijos de shaders del upscaler temporal** (fila nueva de la tabla de §2): `MovieShader`
+  (`ui_composition.h:27-30`), `trigger_hash` (`vk_temporal_upscaler.h:197`) y `ui_trigger_vs` (`:215`). Son
+  lógica de otro juego y no forman parte de las cuatro heurísticas. **[D] El usuario decidió el 2026-10-25 borrarlos
+  en esta spec** (Tarea 3b del plan).
+- `vk_pipeline_serialization.cpp:470`, nombre de hilo `GoW3:ShaderWarmup`: es un nombre y se renombra en la Spec 7.
+- `vk_pipeline_cache.cpp` y `core/libraries/videoout/driver.cpp` no tienen coincidencias del patrón. Sus `gow3`
+  son marcas y variables `GOW3_*` de opciones genéricas: estadísticas de fotograma, límite de FPS, hilo de
+  presentación, `GOW3_INTERP_INT_FIX` para Pascal y shaders asíncronos.
+
+**Comprobación del paso 3 (escalado, `vk_rasterizer.cpp:3041-3069`).** El bloque no tiene constantes de GoW3: solo
+usa la base 1920×1080 (`NativeViewport`, `Scale`, `size / 1920`). Sus dos entradas, en cambio, vienen del upscaler
+temporal:
+
+- `redirect.native_ui` solo es verdadero en la fase de UI del upscaler (`RedirectColor`,
+  `vk_temporal_upscaler.cpp:1792-1798`). Esa fase empieza con los hashes fijos de arriba, o con `scaled_session` y
+  un viewport nativo.
+- `reduced` exige `upscaler->RasterScaling()` (`vk_rasterizer.cpp:2775`).
+
+Bajo `run.py` el bloque no se ejecuta con Tsukihime. Se conserva tal cual: su única dependencia de otro juego son
+esos hashes, que se borran en la Tarea 3b. Después, la fase de UI solo empezará con `GOW3_UI_TRIGGER_VS`, o con
+`GOW3_RENDER_RES` y un viewport nativo.
 
 ## 3. Diseño
 
@@ -39,8 +103,9 @@ existan en ese momento (logo, y las siguientes que alcance el juego). Guardarlas
 como `antes-<n>.png`.
 
 ### Paso 3 — Borrar una heurística por commit
-Orden: de la más dormida a la más activa. (1) `gbuffer_draw` y la constante de 864 bytes; (2) lectura
-lineal por defecto en `run.py` y `scripts/graphics_options.py`; (3) MSAA por vendor. El escalado a
+Orden: de la más dormida a la más activa. (1) `gbuffer_draw` y la constante de 864 bytes; (1b) hashes fijos
+de shaders del upscaler temporal (§2.1, decisión del 2026-10-25); (2) lectura lineal por defecto en `run.py` y
+`scripts/graphics_options.py`; (3) MSAA por vendor. El escalado a
 1920×1080 **no se borra** (1080p es la resolución base del proyecto); el paso 1 solo verifica que no
 contenga lógica de GoW3 mezclada.
 
@@ -70,6 +135,10 @@ escenas (`despues-<n>.png`) y comparar con `tools/compare_captures.sh`.
   explicada por escrito en la tabla del paso 1.
 - [ ] Búsqueda por lista cerrada, con palabra completa y sin `docs/`:
   `git grep -nwE 'gbuffer_draw|GOW3_READBACK_LINEAR|gow3_no_msaa_default'` sin resultados.
+- [ ] Sin la constante de 864 bytes en `vk_rasterizer.cpp`. Excepción escrita (§2.1): `motion_history.h:45` y el
+  comentario `vk_camera_motion.h:72` se quedan con `CameraMotion`/`ObjectMotion`.
+- [ ] Sin hashes fijos de shaders en el upscaler temporal:
+  `git grep -nE 'MovieShader|0x9a9cf8a9|0x34e8a281' -- . ':!docs'` sin resultados.
 - [ ] El log de arranque ya no menciona `gow3_msaa` ni lectura lineal; `GPU: guest multisampling` queda
   decidido por el driver, no por el vendor.
 
@@ -110,3 +179,18 @@ versionar), generados por `out/spec1b-t0/run-baseline.sh` dentro del distrobox.
   Fuera de la lista, porque ya fallaban antes de esta spec: `camera-motion-test` y los otros que no
   enlazan en Linux (`runtime_report` sin definir), los que no compilan en Linux y los 9 solo de Windows.
   En la Tarea 5, `no-msaa-test` pasa a llamarse `msaa-samples-test`.
+
+### Tarea 1 — clasificación de coincidencias (2026-10-25)
+
+Sin cambios de código. La tabla está en §2.1 y la salida del grep en `out/spec1b-t1/grep.txt`.
+
+- 65 coincidencias. **Lógica específica de GoW3:** las 8 de `gbuffer_draw` y la constante de 864 de
+  `vk_rasterizer.cpp`/`.h`, que se borran en la Tarea 3. **Excepciones escritas:** `motion_history.h:45`, con su
+  comentario `:40`, y el comentario `vk_camera_motion.h:72`, que se quedan con `CameraMotion`/`ObjectMotion`. El
+  resto son comentarios (12) o lógica genérica (42), casi siempre la base de 1080p. No queda ninguna por probar.
+- El escalado a 1920×1080 (`vk_rasterizer.cpp:3041-3069`) no tiene lógica de GoW3 propia. Solo corre con el
+  upscaler activo, y el único dato de otro juego que recibe son los hashes de shaders.
+- **Ampliación del alcance:** la búsqueda complementaria encontró hashes fijos de shaders de otro juego en el
+  upscaler temporal, fuera de las cuatro heurísticas. Siguiendo el paso 4 del plan, se paró a preguntar. El usuario
+  decidió **borrarlos en esta spec** (2026-10-25): nueva Tarea 3b, después de `gbuffer_draw`, porque también están
+  dormidos. Hay un criterio nuevo en §5.
