@@ -7,11 +7,10 @@ uintptr_t runtime_lookup(const RuntimeExport *table, size_t count, const char *n
 
 /* Fake bridge: what the window thread has accumulated since the last read. Taking it clears the
  * movement and the wheel like the real one (gpu/shim/gow3_mouse.h), the buttons are state. */
-static int32_t acc_dx, acc_dy, acc_wheel; static uint32_t acc_buttons; static int present=1, capture;
+static int32_t acc_dx, acc_dy, acc_wheel; static uint32_t acc_buttons; static int present=1;
 int gow3gpu_mouse_read(int32_t *dx, int32_t *dy, int32_t *wheel, uint32_t *buttons) {
     *dx=acc_dx; *dy=acc_dy; *wheel=acc_wheel; *buttons=acc_buttons; acc_dx=acc_dy=acc_wheel=0; return present;
 }
-int gow3gpu_overlay_captures_input(void) { return capture; }
 
 typedef struct { uint64_t timestamp; uint8_t connected; uint32_t buttons; int32_t x, y, wheel, tilt; } Report;
 /* Reads through the guest ABI into a 8-report buffer like the game's 320 bytes; returns the count. */
@@ -53,36 +52,25 @@ static void handles(void) {
 }
 static void reads_motion_and_buttons(void) {
     int32_t h=mouse_open(7,0,0,NULL); assert(h>0);
-    acc_dx=5; acc_dy=-3; acc_wheel=1; acc_buttons=0x1; present=1; capture=0;
+    acc_dx=5; acc_dy=-3; acc_wheel=1; acc_buttons=0x1; present=1;
     Report r; assert(read_report(h,&r)==1);
     assert(r.connected==1 && r.x==5 && r.y==-3 && r.wheel==1 && r.buttons==0x1 && r.timestamp>0 && r.tilt==0);
 }
 static void accumulator_resets(void) {
     int32_t h=mouse_open(8,0,0,NULL); assert(h>0);
-    acc_dx=5; acc_dy=-3; acc_wheel=1; acc_buttons=0x3; present=1; capture=0;
+    acc_dx=5; acc_dy=-3; acc_wheel=1; acc_buttons=0x3; present=1;
     Report r; assert(read_report(h,&r)==1 && r.x==5);
     assert(read_report(h,&r)==1);
     assert(r.x==0 && r.y==0 && r.wheel==0 && r.buttons==0x3); /* movement is a delta, the buttons are state */
 }
 static void no_device(void) {
     int32_t h=mouse_open(9,0,0,NULL); assert(h>0);
-    acc_dx=5; acc_dy=-3; acc_wheel=1; acc_buttons=0x1; present=0; capture=0;
+    acc_dx=5; acc_dy=-3; acc_wheel=1; acc_buttons=0x1; present=0;
     Report r; assert(read_report(h,&r)==1);
     assert(r.connected==0 && r.timestamp==0 && r.x==0 && r.y==0 && r.wheel==0 && r.buttons==0 && r.tilt==0);
     present=1;
 }
-static void menu_open_is_neutral(void) {
-    int32_t h=mouse_open(10,0,0,NULL); assert(h>0);
-    acc_dx=9; acc_dy=4; acc_wheel=2; acc_buttons=0x1; present=1; capture=1;
-    Report r; assert(read_report(h,&r)==1);
-    assert(r.connected==1 && r.x==0 && r.y==0 && r.wheel==0 && r.buttons==0); /* the menu owns the mouse: the game sees a quiet one */
-    acc_dx=3; capture=1; assert(read_report(h,&r)==1 && r.x==0);
-    capture=0; assert(read_report(h,&r)==1);
-    assert(r.x==0 && r.y==0 && r.wheel==0); /* what moved while the menu was open is dropped, not delivered at once */
-    assert(r.buttons==0x1); /* the real button state comes back when the menu closes */
-}
-
 int main(void) {
-    needs_init(); handles(); reads_motion_and_buttons(); accumulator_resets(); no_device(); menu_open_is_neutral();
+    needs_init(); handles(); reads_motion_and_buttons(); accumulator_resets(); no_device();
     puts("mouse test: ok"); return 0;
 }

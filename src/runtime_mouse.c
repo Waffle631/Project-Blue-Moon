@@ -1,5 +1,6 @@
 /* libSceMouse on the host mouse. The window thread accumulates SDL events (gpu/shim/gow3_mouse.h);
- * each sceMouseRead takes what arrived since the previous one through gow3gpu_mouse_read.
+ * each sceMouseRead takes what arrived since the previous one through gow3gpu_mouse_read: deltas that
+ * put the game's cursor where the pointer is.
  *
  * What the game does with it (eboot analysis, docs/specs/2026-10-14-spec-6-2d-raton-saves.md §4):
  * Init -> Open(user, 0, 0, &{1}) -> Read(handle, buffer of 8 reports, 8) every frame; it walks the
@@ -63,12 +64,10 @@ static ABI int32_t mouse_read(int32_t handle,unsigned char *data,int32_t count) 
     pthread_mutex_unlock(&lock);
     if (result) return result;
     int32_t dx=0, dy=0, wheel=0; uint32_t buttons=0;
-    int present=gow3gpu_mouse_read(&dx,&dy,&wheel,&buttons); /* always taken, so what moved under an open menu is dropped */
+    /* An open menu is the bridge's business (all zero): it alone knows where it left the game's cursor. */
+    int present=gow3gpu_mouse_read(&dx,&dy,&wheel,&buttons);
     MouseData report; memset(&report,0,sizeof(report));
-    if (present) {
-        report.timestamp=now_us(); report.connected=1;
-        if (!gow3gpu_overlay_captures_input()) { report.buttons=buttons; report.x_axis=dx; report.y_axis=dy; report.wheel=wheel; } /* the menu owns the mouse */
-    }
+    if (present) { report.timestamp=now_us(); report.connected=1; report.buttons=buttons; report.x_axis=dx; report.y_axis=dy; report.wheel=wheel; }
     memcpy(data,&report,sizeof(report));
     return 1; /* one report, whatever count is: the game walks `ret` reports */
 }

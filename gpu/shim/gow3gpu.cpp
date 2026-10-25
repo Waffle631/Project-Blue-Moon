@@ -343,8 +343,8 @@ extern "C" int gow3gpu_overlay_captures_input(void) {
 }
 
 extern "C" int gow3gpu_mouse_read(int32_t* dx, int32_t* dy, int32_t* wheel, uint32_t* buttons) {
-    Gow3Overlay::MarkMouseInUse();
-    Gow3Overlay::Mouse().Take(dx, dy, wheel, buttons);
+    // A menu, the text entry or the save list owns the mouse: the game gets a quiet one.
+    Gow3Overlay::Mouse().Take(dx, dy, wheel, buttons, Gow3Overlay::CapturesInput());
     return SDL_HasMouse() ? 1 : 0;
 }
 

@@ -85,13 +85,20 @@ float base_scale = 1.0f;
 std::chrono::steady_clock::time_point last_present{};
 float frame_ms_avg = 0.0f;
 
+float PixelDensity(SDL_WindowID id);
+
 void SetOpen(bool value) {
     if (menu_open.exchange(value) == value) {
         return;
     }
-    ImGui::GetIO().MouseDrawCursor = value;
     if (value) {
         requested_tab = Gow3Settings::Get().menu_tab;
+        // gow3: ImGui learns the pointer only from motion events, which it does not get while the
+        // menu is closed; without this a click before moving lands where the pointer was last time.
+        float x = 0.0f, y = 0.0f;
+        SDL_GetMouseState(&x, &y);
+        const float density = PixelDensity(SDL_GetWindowID(SDL_GetMouseFocus()));
+        ImGui::GetIO().AddMousePosEvent(x * density, y * density);
     }
     if (!value && dirty) {
         dirty = false;
@@ -798,17 +805,14 @@ bool HandleChoiceEvent(const SDL_Event& event) {
 }
 
 static Gow3Mouse::MouseAccumulator game_mouse;
-static std::atomic<bool> game_uses_mouse{false};
 
 Gow3Mouse::MouseAccumulator& Mouse() { return game_mouse; }
-void MarkMouseInUse() { game_uses_mouse.store(true, std::memory_order_relaxed); }
 
-void UpdateMouseMode(SDL_Window* window) {
-    static bool relative = false; // window thread only
-    const bool want = game_uses_mouse.load(std::memory_order_relaxed) && !CapturesInput();
-    if (want != relative) {
-        relative = want;
-        SDL_SetWindowRelativeMouseMode(window, want);
+void UpdateCursor() {
+    static bool shown = false; // window thread only, like SDL's cursor calls
+    if (const bool want = menu_open; want != shown) {
+        shown = want;
+        want ? SDL_ShowCursor() : SDL_HideCursor();
     }
 }
 
@@ -816,7 +820,13 @@ bool HandleEvent(const SDL_Event& event) {
     // gow3: the game's mouse sees every event, whatever the menu does with it. The held buttons
     // stay right while the menu is open (a release behind the menu must not stick).
     switch (event.type) {
-    case SDL_EVENT_MOUSE_MOTION: game_mouse.Motion(event.motion.xrel, event.motion.yrel); break;
+    case SDL_EVENT_MOUSE_MOTION:
+        if (SDL_Window* window = SDL_GetWindowFromID(event.motion.windowID)) {
+            int w = 0, h = 0;
+            SDL_GetWindowSize(window, &w, &h); // the event's coordinates are window units, not pixels
+            game_mouse.Position(event.motion.x, event.motion.y, float(w), float(h));
+        }
+        break;
     case SDL_EVENT_MOUSE_WHEEL: game_mouse.Wheel(event.wheel.y); break;
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
     case SDL_EVENT_MOUSE_BUTTON_UP: game_mouse.Button(event.button.button, event.button.down); break;

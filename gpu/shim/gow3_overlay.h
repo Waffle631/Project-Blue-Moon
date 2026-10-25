@@ -31,11 +31,9 @@ void UpdateTextInput(SDL_Window* window);
 
 /// The mouse events seen by HandleEvent, for gow3gpu_mouse_read (guest thread).
 Gow3Mouse::MouseAccumulator& Mouse();
-/// Guest thread: the game reads the mouse, so UpdateMouseMode may switch SDL to relative motion.
-void MarkMouseInUse();
-/// Window thread, once per poll: relative mouse mode while the game uses the mouse and nothing
-/// (menu, text entry, save list) captures the input; absolute otherwise so ImGui gets a cursor.
-void UpdateMouseMode(SDL_Window* window);
+/// Window thread, once per poll: the system cursor shows while the settings menu is open (ImGui's
+/// software cursor was not drawn there, Spec 6 task 6) and stays hidden otherwise.
+void UpdateCursor();
 
 /// Start-up loading screen (pipeline cache warm-up): `total` 0 shows no count.
 void SetLoading(bool active, u32 done, u32 total);

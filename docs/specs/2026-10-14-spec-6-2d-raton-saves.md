@@ -79,12 +79,14 @@ rueda reales.
   el runtime solo ve C. Se añade a `gpu/gow3gpu.h` una función
   `gow3gpu_mouse_read(int32_t *dx, int32_t *dy, int32_t *wheel, uint32_t *buttons)` que devuelve y
   reinicia los acumuladores desde `gow3_overlay.cpp` (donde ya se reciben los eventos de ratón) y se
-  usa desde `mouse_read`. El movimiento es relativo y se acumula entre lecturas; los botones son
+  usa desde `mouse_read`. ~~El movimiento es relativo y se acumula entre lecturas~~ (Tarea 6: el cursor
+  del juego sigue la **posición** del puntero, ver «Resultado de la Tarea 6»); los botones son
   estado. Mismo patrón que `gow3gpu_text_input_*` y `gow3gpu_overlay_captures_input`.
 - **Con el menú Insert abierto**, el ratón es del menú: el juego recibe un ratón sin movimiento
   (`gow3gpu_overlay_captures_input() == 1`), como el mando.
 - **Cursor.** `window.cpp:65` oculta el cursor. Cuando el juego abre el ratón, el cursor de SDL se
-  mantiene oculto (el juego dibuja el suyo) y se usa movimiento relativo; el comentario de esa línea se
+  mantiene oculto (el juego dibuja el suyo) ~~y se usa movimiento relativo~~ (Tarea 6: sin modo relativo; el
+  cursor del sistema se muestra con el menú Insert abierto); el comentario de esa línea se
   corrige para que no diga "el juego no tiene ratón".
 - `mouse_open`/`mouse_close` llevan cuenta de manejadores; `mouse_read` devuelve el número de lecturas
   escritas (1) y `connected=1` solo si SDL tiene un ratón (`SDL_HasMouse()`).
@@ -171,6 +173,43 @@ unidades para cruzar el espacio virtual) es una decisión de la Tarea 6, no del 
 - `--check-imports` solo lista las 3 trampas de siempre (`scePthreadCancel`, `sceKernelGetModuleInfoForUnwind`,
   `sceKernelInternalMemoryGetModuleSegmentInfo`).
 
+### Resultado de la Tarea 6 (2026-10-25): el ratón en el juego
+
+Probado por el usuario con la partida actual (logs `out/spec6-b/raton.log`, `raton-2.log`, `raton-3.log`; en los
+tres `sceMouseOpen(user 1, type 0, index 0) -> handle 0x1` y ningún `STOP:` ni `Fault:`).
+
+- **Primera prueba (deltas 1:1 y modo relativo de la Tarea 4) [V]:** el cursor y la selección del menú de título
+  se mueven, los clics funcionan y ratón, mando y teclado avanzan el texto. El panel táctil no tapa al ratón (el
+  [H] de la Tarea 3 no se da). Dos defectos: (1) el cursor **se detiene en los bordes**: con un píxel de SDL por
+  unidad, 640 píxeles de mano cruzaban todo el espacio de 640×448, tres veces más rápido que el puntero en una
+  ventana de 1920 de ancho, y se clavaba en el borde virtual; (2) al abrir el menú Insert **el cursor
+  desaparece**.
+- **Cambio de diseño:** el cursor del juego sigue la **posición absoluta** del puntero. `MouseAccumulator::Position`
+  traduce la posición en la ventana a una celda de 640×448 y `Take` entrega el delta que lleva el cursor del
+  juego a esa celda. El acumulador lleva un espejo del cursor del juego: como no sabe dónde empieza, la primera
+  lectura tras ver el puntero lo empuja al origen (`-1024`, que el juego recorta a 0); al **llegar** a un borde
+  lo empuja contra él (`±1024`), lo que borra cualquier desfase. Quieto en el borde no envía nada, para que un
+  puntero aparcado no le quite la selección al mando. Se quita el modo relativo (`UpdateMouseMode`,
+  `MarkMouseInUse`).
+- **Menú abierto:** lo decide el puente (`Take(..., quiet=CapturesInput())`) y no el runtime, para que el espejo no
+  se desincronice entre dos comprobaciones. Mientras el menú esté abierto el juego no ve movimiento, rueda ni
+  botones. Al cerrarlo, el cursor del juego salta a donde está el puntero; la rueda girada en el menú se
+  descarta. `runtime_mouse.c` ya no consulta `gow3gpu_overlay_captures_input` (`menu_open_is_neutral` pasa de
+  `tests/test_mouse.c` a `menu_is_quiet` en `mouse-accumulator-test`).
+- **Cursor en el menú:** ImGui no dibujaba su cursor por software (`MouseDrawCursor`). La causa no se buscó: se
+  sustituyó por el **cursor del sistema**, que `Gow3Overlay::UpdateCursor` muestra con el menú Insert abierto y
+  oculta al cerrarlo. Al abrirlo, ImGui recibe la posición actual del puntero (`SDL_GetMouseState`). Esto no
+  tiene test: es una llamada a SDL en el hilo de ventana, y la comprobó el usuario.
+- **Segunda y tercera prueba [V]:** el cursor sigue a la mano y llega a los cuatro bordes; clics y avance de texto
+  bien con los tres dispositivos; con Insert se ve el cursor del PC y todo funciona. En ventana, el puntero puede
+  salir de ella y el cursor del juego se queda en el borde.
+- **Sin probar:** el diálogo de texto y la lista de saves con el ratón (pasos 3 y 4 de la Tarea 6). Con ellos
+  abiertos, el juego también recibe un ratón quieto (`CapturesInput`). Signos de ejes y rueda: el usuario no
+  vio nada invertido.
+- **Fuera del bloque:** el usuario notó que el overlay de rendimiento no muestra CPU, RAM ni VRAM. En Linux,
+  `gow3_perf_stats.cpp` solo mide el nombre de la GPU: esos valores solo existen en Windows desde `d9358cd`.
+  No es de esta spec.
+
 #### Códigos de error de libSceMouse
 
 Fuente: tabla de psdevwiki (el usuario la pegó el 2026-10-25); no se tiene el SDK. Los **valores y nombres**
@@ -249,8 +288,8 @@ guardado revela fallos, `tests/test_mouse.c`.
 
 - [ ] Las capturas del recorrido coinciden con la línea base que el usuario aprobó.
 - [ ] El texto en inglés es legible, sin glifos rotos ni cortes de línea incorrectos (lo juzga el usuario).
-- [ ] `out/mouse-test` pasa y, en el juego, el ratón avanza el texto y maneja los menús.
-- [ ] Mando, teclado y ratón avanzan el texto.
+- [x] `out/mouse-test` pasa y, en el juego, el ratón avanza el texto y maneja los menús (Tarea 6).
+- [x] Mando, teclado y ratón avanzan el texto (Tarea 6).
 - [ ] Un save grabado sobrevive al reinicio y se carga.
 - [ ] El log con `GOW3_FILE_TRACE=1` muestra recursos `_en` y ninguno de otro idioma.
 - [ ] El recorrido grabado se repite entero con `GOW3_PAD_REPLAY`, sin `STOP:` ni `Fault:`.
