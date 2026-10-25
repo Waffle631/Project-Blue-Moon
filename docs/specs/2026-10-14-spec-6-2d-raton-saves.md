@@ -334,7 +334,8 @@ guardado revela fallos, `tests/test_mouse.c`.
 - [x] `out/mouse-test` pasa y, en el juego, el ratón avanza el texto y maneja los menús (Tarea 6).
 - [x] Mando, teclado y ratón avanzan el texto (Tarea 6).
 - [x] Un save grabado sobrevive al reinicio y se carga (Tarea 8).
-- [ ] El log con `GOW3_FILE_TRACE=1` muestra recursos `_en` y ninguno de otro idioma.
+- [x] El log con `GOW3_FILE_TRACE=1` muestra recursos `_en` y ninguno de otro idioma (Tarea 2). **[D]** 2026-10-25: el
+  usuario lo da por cumplido aunque `ft_ja.mrg` se abra al arrancar, porque se abre con cualquier idioma (§6, «Resultado»).
 - [ ] El recorrido grabado se repite entero con `GOW3_PAD_REPLAY`, sin `STOP:` ni `Fault:`.
 
 ## 11. Riesgos y preguntas abiertas
