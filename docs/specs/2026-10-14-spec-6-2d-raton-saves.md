@@ -208,7 +208,7 @@ tres `sceMouseOpen(user 1, type 0, index 0) -> handle 0x1` y ningún `STOP:` ni 
   vio nada invertido.
 - **Fuera del bloque:** el usuario notó que el overlay de rendimiento no muestra CPU, RAM ni VRAM. En Linux,
   `gow3_perf_stats.cpp` solo mide el nombre de la GPU: esos valores solo existen en Windows desde `d9358cd`.
-  No es de esta spec.
+  No es de esta spec: el usuario la añadió a la Spec 7 (§9) el 2026-10-25.
 
 #### Códigos de error de libSceMouse
 

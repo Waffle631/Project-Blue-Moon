@@ -1033,6 +1033,9 @@ Las configuraciones y saves antiguos no se migran (no hay usuarios de los nombre
   `TSUKI_GAME_DIR=Tsukihime/CUSA47999 python3 run.py` repite el recorrido grabado igual que antes
   del renombrado (mismo log, sin `STOP:` ni `Fault:`).
 - [ ] Las capturas de la línea base coinciden antes y después.
+
+**Añadido el 2026-10-25** (spec §9): CPU, RAM, GPU y VRAM del overlay de rendimiento en Linux. Hoy solo se
+miden en Windows y en Linux salen "n/a". Va después del renombrado ya comprobado, en un commit aparte.
 - [ ] La ventana y el menú Insert muestran el título leído del `param.sfo`.
 
 ---

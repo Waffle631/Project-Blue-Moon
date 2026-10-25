@@ -1,6 +1,6 @@
 # Spec 7 — Renombrar `gow3` a `tsuki`
 
-Fecha: 2026-10-14. Estado: **borrador para aprobación**. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 7".
+Fecha: 2026-10-14, ampliada el 2026-10-25 (§9). Estado: **borrador para aprobación**. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 7".
 Depende de: Spec 6 (el recorrido grabado y las capturas son el oráculo del renombrado).
 
 Marcas: **[V]** comprobado el 2026-10-14; **[D]** decisión del usuario.
@@ -76,6 +76,7 @@ oráculo de que nada cambió.
    (`docs/gow3/`) no se renombra.
 6. **Parche de FSR.** Renombrar el archivo y las variables internas; comprobar que `build.sh` lo aplica al
    submódulo limpio.
+7. **Métricas del overlay en Linux** (§9), con el renombrado ya comprobado por el §7.
 
 ## 5. Requisitos
 
@@ -117,3 +118,56 @@ El script se ejecuta en `bash build.sh --test` para que no regrese ningún nombr
   se listan como pendientes de verificar cuando se aborde Windows.
 - Los hashes de PGO (si algún día se generan) y las cachés de pipelines/shaders con rutas o
   nombres antiguos quedan obsoletas; se regeneran.
+
+## 9. Añadido: CPU, RAM, GPU y VRAM del overlay de rendimiento en Linux
+
+**[D]** 2026-10-25: el usuario lo añade a esta spec. Lo vio al probar la Tarea 6 de la Spec 6: en el overlay
+de rendimiento, CPU, RAM y VRAM salen "n/a". Es el único cambio de comportamiento de la spec. Va **después**
+del renombrado ya comprobado (paso 7 del §4), en su propio commit, para que el oráculo de "nada cambió" (§5)
+siga valiendo para el renombrado. Para entonces el archivo se llamará `tsuki_perf_stats.*`.
+
+Hechos (**[V]** comprobados el 2026-10-25):
+
+- `gpu/shim/gow3_perf_stats.cpp:121-131`: en Linux, `Run()` solo rellena `gpu_name`. CPU, RAM, VRAM y GPU %
+  se quedan negativos, que `Format` muestra como "n/a". La medición solo existe en la rama `_WIN32` (desde
+  `d9358cd`).
+- La VRAM no depende del sistema operativo: `Instance::CanReportMemoryUsage()`, `GetDeviceMemoryUsage()` y
+  `GetDeviceMemoryBudgetNow()` (VK_EXT_memory_budget, `vk_instance.cpp:932-957`). Solo está metida dentro del
+  `#ifdef _WIN32`.
+- `CpuPercent` (`gow3_perf_stats.h`) ya es común y tiene test (`tests/test_perf_overlay.cpp`, objetivo
+  `perf-overlay-test`).
+- El equipo tiene dos GPU AMD: `card0` (PCI `0000:12:00.0`, la integrada del Ryzen) y `card1` (`0000:03:00.0`,
+  la RX 6650 XT). `gpu_busy_percent` existe en las dos, pero mide la tarjeta entera con todos los procesos.
+- El kernel (7.2) publica datos por proceso en `/proc/<pid>/fdinfo/<fd>` de cada descriptor DRM abierto:
+  `drm-pdev`, `drm-client-id`, `drm-engine-gfx` (ns) y `drm-resident-vram`. Equivale a los contadores
+  "GPU Engine" por proceso que usa la rama de Windows.
+
+Diseño propuesto:
+
+- **CPU:** tiempo de CPU del proceso (`CLOCK_PROCESS_CPUTIME_ID`) sobre tiempo de pared (`CLOCK_MONOTONIC`),
+  pasado por `CpuPercent` con el número de núcleos, como en Windows: 100 % son todos los núcleos.
+- **RAM:**
+  - Usada: el residente de `/proc/self/statm` (segunda columna × `sysconf(_SC_PAGESIZE)`), el equivalente
+    del `WorkingSetSize`. Incluye las páginas tocadas del pool de memoria directa (memfd), igual que en Windows
+    cuenta la sección.
+  - Total: `_SC_PHYS_PAGES` × página.
+- **VRAM:** el bloque de `CanReportMemoryUsage` pasa a código común a los dos sistemas.
+- **GPU %:**
+  - Fórmula: el delta de `drm-engine-gfx` entre dos muestras, dividido por el tiempo de pared.
+  - Clientes: se suman los descriptores DRM del proceso, sin repetir un `drm-client-id`. RADV puede abrir
+    también la integrada; su tiempo es casi cero y no estorba.
+  - Motor: solo `gfx`, como Windows, que solo cuenta `engtype_3D`.
+  - Sin esas claves (otro driver o un kernel viejo) sale "n/a".
+- **Pruebas:** las funciones que interpretan texto (la línea de `statm` y un `fdinfo`) son puras, viven en
+  `gow3_perf_stats.h` y se prueban en `tests/test_perf_overlay.cpp` con textos fijos. Leer `/proc` y el hilo
+  de muestreo no tienen test, porque dependen de la máquina.
+
+Criterios de aceptación:
+
+- [ ] `perf-overlay-test` cubre `statm`, un `fdinfo` de amdgpu con dos clientes y un `fdinfo` sin
+  `drm-engine-gfx` (resultado: "n/a").
+- [ ] En el juego, con CPU, RAM, GPU y VRAM activados en el overlay, las cuatro muestran cifras (RADV, este
+  equipo). CPU y RAM se comparan a mano con `top`, y VRAM con `mem_info_vram_used` de `card1`.
+- [ ] Las capturas de la línea base no cambian: CPU, RAM, GPU y VRAM no están en `DefaultItems`.
+- [ ] Windows: solo cambia que la VRAM pasa a código común. Queda pendiente de compilar en MSYS2 cuando se
+  aborde Windows (como el resto del §8).
