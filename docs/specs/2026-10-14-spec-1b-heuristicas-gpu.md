@@ -1,8 +1,9 @@
 # Spec 1b — Eliminar las heurísticas de GPU de GoW3
 
 Fecha: 2026-10-14. Estado: **aprobada (2026-10-24), en ejecución**: el plan de implementación está aprobado y sus
-tareas 0 (línea base de tests) y 1 (clasificación, §2.1) hechas (§7). La Tarea 1 amplió el alcance, por decisión del
-usuario, a los hashes fijos de shaders del upscaler temporal. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 1b".
+tareas 0 (línea base de tests), 1 (clasificación, §2.1) y 2 (capturas «antes» y fotogramas oráculo) hechas (§7). La
+Tarea 1 amplió el alcance, por decisión del usuario, a los hashes fijos de shaders del upscaler temporal. Roadmap:
+`docs/tsuki/ROADMAP.md`, sección "Spec 1b".
 Depende de: Spec 1a y del hito de primer fotograma (necesita su herramienta de captura de píxeles).
 
 Marcas: **[V]** comprobado en el repo; **[H]** hipótesis a confirmar; **[D]** decisión del usuario.
@@ -55,7 +56,7 @@ cambiar código. Rutas relativas a `gpu/shadps4/video_core/` salvo las de `gpu/s
 | `renderer_vulkan/vk_lighting_test.h:3` | comentario | Origen de los cuatro ajustes de `GOW3_LIGHTING_TEST` (build de KrachDev). Es un diagnóstico opcional: sin la variable está apagado, y no depende del juego |
 | `amdgpu/liverpool.cpp:914` | comentario | El aviso único de `IT_SET_PREDICATION` es genérico; el comentario da como motivo que GoW3 lo emitía unas 1000 veces por fotograma |
 | `amdgpu/gow3_msaa.h:4` | comentario | Explica el MSAA por vendor. El archivo entero se borra en la Tarea 5 |
-| `texture_cache/texture_cache.cpp:109` | comentario | Regla de bytes del modo `GOW3_STALE_READBACK=1`, que exige `GOW3_DEFERRED_READBACK=1`; los dos están apagados por defecto. La regla es genérica; el comentario cita el caso de GoW3 que la motivó |
+| `texture_cache/texture_cache.cpp:109` | comentario | Regla de bytes del modo `GOW3_STALE_READBACK=1`, que exige `GOW3_DEFERRED_READBACK=1`. Sin variable los dos están apagados, pero `run.py` los enciende (`scripts/graphics_options.py:14-15`; corregido en la Tarea 2, §7). La regla es genérica; el comentario cita el caso de GoW3 que la motivó |
 | `texture_cache/texture_cache.cpp:161` | comentario | Registrar todas las copias y esperar a la GPU una sola vez es genérico; el comentario cita el rendimiento medido en GoW3 |
 | `gpu/shim/core/emulator_settings.h:25-26` | lógica genérica | Resolución interna por defecto de 1920×1080 |
 | `gpu/shim/gow3_settings.h:23,24,26,77` | lógica genérica | Resoluciones de salida. El «the game's own size» de `:26` (1920×1080) también vale para Tsukihime |
@@ -131,8 +132,8 @@ escenas (`despues-<n>.png`) y comparar con `tools/compare_captures.sh`.
 - [ ] `bash build.sh --test` y `python3 -m unittest discover -s tests` pasan; los tests C++ de GPU
   que sigan siendo genéricos (`ninja -C out/gpu frame-capture-test`, etc.) también.
 - [ ] `out/gow3-probe --vulkan-only` sigue en PASS en la RX 6650 XT.
-- [ ] Para cada heurística borrada: `compare_captures` reporta "idéntico" o la diferencia está
-  explicada por escrito en la tabla del paso 1.
+- [ ] Para cada heurística borrada: `compare_captures` reporta "idéntico" en los fotogramas oráculo (§7, Tarea 2)
+  o la diferencia está explicada por escrito en la tabla del paso 1.
 - [ ] Búsqueda por lista cerrada, con palabra completa y sin `docs/`:
   `git grep -nwE 'gbuffer_draw|GOW3_READBACK_LINEAR|gow3_no_msaa_default'` sin resultados.
 - [ ] Sin la constante de 864 bytes en `vk_rasterizer.cpp`. Excepción escrita (§2.1): `motion_history.h:45` y el
@@ -146,7 +147,8 @@ escenas (`despues-<n>.png`) y comparar con `tools/compare_captures.sh`.
 
 - **Sin oráculo no se puede hacer.** Depende de la herramienta de captura de píxeles en proceso del
   hito (decidida el 2026-10-14). Si esa herramienta se retrasa, esta spec espera: no se borra nada del
-  renderizador sin poder comparar antes y después.
+  renderizador sin poder comparar antes y después. **Cubierto (2026-10-25):** la Tarea 2 fijó cuatro fotogramas
+  oráculo de dos pantallas distintas (§7).
 - Borrar `gbuffer_draw` afecta a los upscalers temporales (usan el vector de movimiento). Están
   fuera de la Alpha; se dejan funcionando solo si lo hacen sin esa heurística.
 
@@ -194,3 +196,41 @@ Sin cambios de código. La tabla está en §2.1 y la salida del grep en `out/spe
   upscaler temporal, fuera de las cuatro heurísticas. Siguiendo el paso 4 del plan, se paró a preguntar. El usuario
   decidió **borrarlos en esta spec** (2026-10-25): nueva Tarea 3b, después de `gbuffer_draw`, porque también están
   dormidos. Hay un criterio nuevo en §5.
+
+### Tarea 2 — línea base «antes» (2026-10-25)
+
+Mismo binario que en la Tarea 0: desde `4567014` la rama solo ha cambiado la spec. Se usó la partida del usuario, que
+tiene progreso y arranca al menú del título; antes de empezar se copió a `out/savedata-usuario-1b/`. Fueron seis
+arranques de 40 s sin entrada, a pantalla completa (`GOW3_FULLSCREEN=1`, ventana sin bordes). Los lanzó
+`out/spec1b-t2/run-antes.sh`: tomas a–c, fotogramas 120, 300, 420 y 900. Después los lanzó `run-antes-2.sh`: tomas d–f,
+con los fotogramas del 960 al 1560 de 60 en 60, para buscar el aviso legal. Capturas en
+`out/baseline/1b/antes-<toma>/` y logs en `out/spec1b-antes-<toma>.log`, todo sin versionar. Las capturas usan el nombre de
+la herramienta, `frame_<n>_1920x1080.png`, no `antes-<n>.png` (§3, paso 2).
+
+- En las seis tomas las capturas salen de 1920×1080 y `run.py` sale con 142, que es el watchdog a los 40 s. Ninguna da
+  `Fault:` ni un `STOP:` de import. Todas llegan al menú del título: su música abre el único `sceAudiodecCreateDecoder`.
+  La partida mantiene el mismo `sha256` (`out/spec1b-t2/save-sha-*.txt`).
+- Línea `GPU:` final, en este rango: `submits` 4678–4691, `draws` 268 393–276 682, `dispatches=0`, `flips` 2339–2345,
+  `unimplemented=0`. Cambia de una toma a otra porque el vídeo sigue el reloj real, así que sirve como orden de magnitud y
+  no como oráculo. Las seis tomas dan `GPU: guest multisampling on` y
+  `GPU: deferred image readback enabled (64 copies, 64 MiB pending limit); CPU reads use the previous frame's copy`.
+  Esta última línea muestra que `run.py` enciende las dos lecturas diferidas (`scripts/graphics_options.py:14-15`). En
+  la §2.1 esta fila decía que estaban apagadas; ya está corregida, y la clase de la fila no cambia.
+- Fotogramas. Las comparaciones están en `out/spec1b-t2/compare.txt`, `diffbox-def.txt` y `compare-oracle.txt`.
+  - **120, 300 y 420: aviso de autoguardado.** De una toma a otra cambian solo en el recuadro del icono «Saving…»
+    (x 1751–1829, y 960–1029), que sale en dos fases de su giro. Con el recuadro x 1750–1829, y 955–1034 tapado en negro
+    en las dos capturas, salen idénticos en las seis tomas. Sin tapar, ni siquiera el 300 es exacto.
+  - **900–1020: vídeo `TM_CI.mp4`** (el logo de TYPE-MOON y su fundido en blanco). Cambia de una toma a otra, así que no
+    sirve de oráculo. El 900 ya no es el aviso legal: desde la Spec 5 el logo dura sus 6 s completos y el aviso llega más
+    tarde.
+  - **1080–1560: aviso legal.** El 1080 y el 1560 caen en los fundidos y cambian. **Del 1140 al 1500 son idénticos** en
+    d, e y f.
+- **Fotogramas oráculo.** El 120, el 300 y el 420 con el recuadro del icono tapado, y el 1320 entero (aviso legal; está
+  en el centro del tramo estable, con 180 fotogramas de margen a cada lado). Son dos pantallas 2D distintas, sin vídeo.
+  La referencia es `out/baseline/1b/antes/`: una copia de la toma d, con su log como `run.log`.
+- **Receta de recaptura para las tareas 3 a 6.**
+  - Un arranque con el mismo entorno y `GOW3_SCREENSHOT_AT=120,300,420,1320`.
+  - Dentro del distrobox, `out/spec1b-t2/compare-oracle.sh out/baseline/1b/antes out/baseline/1b/despues-<n>`. Sale
+    con 0 solo si los cuatro fotogramas dan «idéntico».
+  - Se comprobó que el script detecta un solo píxel cambiado fuera del recuadro y un fotograma de fundido en el lugar
+    del 1320.
