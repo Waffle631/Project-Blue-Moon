@@ -110,6 +110,22 @@ dispositivo ausente.
   proyecto.
 - Si el juego pide otro idioma, mirar el id de `ParamGetInt` que consulta y el valor devuelto.
 
+### Resultado (2026-10-25)
+
+- **[V]** `GOW3_FILE_TRACE=1` (`src/runtime_file.c`) registra cada apertura: `File trace: open(<ruta>) -> fd <n>, <bytes> bytes`
+  o `-> errno <e>` (cualquier errno); la línea `Runtime: open(...) -> not found` se conserva. `GOW3_AUDIO_TRACE` queda para
+  lecturas fallidas y `runtime_ajm.c`. Test: `tests/test_file_mods.c`.
+- **[V]** `sceSystemServiceParamGetInt(language)` se registra la primera vez que se consulta
+  (`Runtime: sceSystemServiceParamGetInt(language) -> 1`). Test: `tests/test_services.c`. Logs en `out/spec6-d/`.
+- **[V]** Con la partida actual (menú de título) y con `out/savedata-sin-progreso/` (prólogo): una sola consulta de idioma, devuelve 1;
+  se abren `if_en.png`, `ft_en.mrg` y `movie/prologue_en.mp4`; ningún `_zc`/`_zt`/`_ko`; sin `STOP:` ni `Fault:`.
+- **Hallazgo:** `image/ft_ja.mrg` (9 MB) se abre al arrancar, antes de leer la partida, y `ft_en.mrg` (1,2 MB) después. Control con
+  `GOW3_LANGUAGE=0` (`out/spec6-d/idioma-ja.log`): las mismas aperturas en el mismo orden. Es decir, ni `ft_ja.mrg` ni `ft_en.mrg`
+  dependen del valor que devuelve `ParamGetInt` en los primeros 60 s; `ft_ja.mrg` no es señal de que el juego tomara el idioma
+  equivocado. En el eboot, uno de los sitios que consulta el id 1 (`+0x41755`) traduce 0 → índice 0 (ja), 11 → 2 (zc) y cualquier otro
+  valor → 1 (en): hay consumidores del valor, pero no los que cargan estas fuentes. **[H]** Qué consumidor decide qué (menús, textos del
+  guion) queda sin comprobar; la lista de aperturas de Tsukihime en inglés es la que se aceptó en el criterio de la §10.
+
 ## 7. Requisitos
 
 - Cuando una optimización heredada cause un error visual en Tsukihime, se debe **eliminar** del

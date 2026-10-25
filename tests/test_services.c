@@ -37,6 +37,7 @@ static void capture_policy(void) {
     assert(screenshot_disable()==0 && live_streaming_enable(0)==0 && shareplay_prohibition(2)==0);
     prohibited=1; assert(video_recording_info(0xd,&prohibited,4)==0);
 }
+static void language_twice(void) { int32_t v; assert(system_param(1,&v)==0 && system_param(1,&v)==0); }
 
 int main(void) {
     unsigned char param[128]={0}, result[64]={0}; /* the game zeroes the pointers it does not want */
@@ -136,6 +137,12 @@ int main(void) {
     assert(no_effect_calls[SCREENSHOT_ENABLE]==1 && no_effect_calls[LIVE_STREAMING_ENABLE]==2);
     assert(no_effect_calls[SHAREPLAY_PROHIBITION]==2 && no_effect_calls[VIDEO_RECORDING_INFO]==2);
     assert(printed_lines(capture_policy)==0 && no_effect_calls[SCREENSHOT_DISABLE]==4);
+    /* The first language query is logged once, so a run's log says which language the game was given. */
+    unsetenv("GOW3_LANGUAGE");
+    assert(printed_lines(language_twice)==1 && printed_lines(language_twice)==0);
+    int32_t language_id=0; assert(system_param(1,&language_id)==0 && language_id==1);
+    setenv("GOW3_LANGUAGE","8",1); assert(system_param(1,&language_id)==0 && language_id==8);
+    unsetenv("GOW3_LANGUAGE");
     puts("services test: ok");
     return 0;
 }

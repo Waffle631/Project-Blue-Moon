@@ -82,7 +82,13 @@ static int language(void) { const char *v=getenv("GOW3_LANGUAGE"); return v ? at
 static ABI int32_t system_param(int32_t id,int32_t *value) {
     if (!value) return SYSTEM_PARAMETER;
     switch (id) {
-    case 1: *value=language(); break;           /* language (1 = English US, 8 = Russian) */
+    case 1: {                                   /* language (1 = English US, 8 = Russian) */
+        *value=language();
+        static unsigned calls;                  /* the first query is logged: it says which language the run got */
+        pthread_mutex_lock(&lock); unsigned n=++calls; pthread_mutex_unlock(&lock);
+        if (n==1) printf("Runtime: sceSystemServiceParamGetInt(language) -> %d\n",*value);
+        break;
+    }
     case 2: *value=1; break;                    /* date format DD/MM/YYYY */
     case 3: *value=1; break;                    /* 24-hour clock */
 #ifdef _WIN32
