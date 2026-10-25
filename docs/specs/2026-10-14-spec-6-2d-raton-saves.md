@@ -1,6 +1,7 @@
 # Spec 6 — 2D correcto, ratón, saves e idioma
 
-Fecha: 2026-10-14. Estado: **borrador para aprobación**. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 6".
+Fecha: 2026-10-14. Estado: **en curso**. Los bloques B (ratón), C (saves) y D (idioma) se hicieron el 2026-10-25, en la
+rama `tsuki/spec-6bcd`; falta el bloque A (render 2D). Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 6".
 Empieza tras el hito de primer fotograma; se cierra cuando están hechas las Specs 1b, 3, 4 y 5.
 
 Marcas: **[V]** comprobado en el repo; **[H]** hipótesis a confirmar; **[D]** decisión del usuario.

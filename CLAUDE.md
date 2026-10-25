@@ -51,8 +51,7 @@ with before/after captures; the `gow3` → `tsuki` rename is Spec 7, done last).
   `image/movie/` played through **`sceAvPlayer`** (not `sceVideodec`). Spec 5 is closed (2026-10-25; its
   adversarial review, plan task 8 step 4, is pending): the vendored AvPlayer plays all 134 outside the game
   (`avplayer-test --movie-dir`), and in game the opening, the prologue, the chapter 1 title, skipping the
-  logo and the title-menu loop work; the game's AvPlayer contract is in `docs/avplayer.md`. libSceMouse
-  is used and already covered. Start bring-up with
+  logo and the title-menu loop work; the game's AvPlayer contract is in `docs/avplayer.md`. Start bring-up with
   `out/gow3-probe out/boot-linked.bin --app0 Tsukihime/CUSA47999 --check-imports`.
 - What a run shows depends on the save in `user/savedata/1/CUSA47999/`. With no progress in it, the
   boot plays the prologue video first (`prologue_en.mp4`, ~6 min 29 s, buttons do not skip it). The first run to get past the video (2026-10-20, once ATRAC9 decoded) saved progress, and
@@ -82,10 +81,20 @@ with before/after captures; the `gow3` → `tsuki` rename is Spec 7, done last).
 
   Task 4 was the only one that could change what Spec 6 sees. It has landed, and the oracle frames came out
   identical, so Spec 6's capture baseline (A1) does not depend on what is left.
+- Spec 6 (2D, mouse, saves, language): blocks B, C and D are done (2026-10-25, branch `tsuki/spec-6bcd`).
+  Block A, the 2D render baseline and its fixes, is pending.
+  - Mouse: `src/runtime_mouse.c`. The window thread accumulates SDL events (`gpu/shim/gow3_mouse.h`) and
+    `sceMouseRead` takes them through `gow3gpu_mouse_read`. The game's cursor lives in a 640×448 space, so
+    the bridge sends deltas that put that cursor where the host pointer is, not the raw SDL deltas. While
+    the Insert menu is open the game sees a connected mouse with no movement and no buttons.
+  - Saves: the game keeps every slot in one 4 MiB `savedata000`. At boot it reads the whole file read-only.
+    To save it truncates and rewrites the file, calls `SaveIcon`, then `UmountWithBackup`. It never calls
+    `SetParam` or `DirNameSearch`. The runtime logs mount, param, icon and unmount.
 - Target language: **English**. The game ships ja/en/zc/zt (`ft_*.mrg` fonts, `*_en.mp4` videos)
   and picks it from the system language (`sceSystemServiceParamGetInt`); `runtime_services.c`
-  already reports 1 = English (US) unless `GOW3_LANGUAGE` overrides it. Japanese and the other
-  languages are not a goal.
+  already reports 1 = English (US) unless `GOW3_LANGUAGE` overrides it, and logs the first query. Japanese
+  and the other languages are not a goal. `image/ft_ja.mrg` is opened at boot whatever the language is, so
+  that open alone does not mean the game picked Japanese.
 - Roadmap (Spanish): `docs/tsuki/ROADMAP.md` — stages, specs and the full missing-API table.
 - Dev/test machine: Bazzite 44 (Fedora-based, immutable), KDE Plasma 6 on Wayland, Ryzen 5 7600,
   16 GiB RAM, **AMD Radeon RX 6650 XT** (RADV). Linux is the primary platform; Windows comes later.
@@ -225,7 +234,8 @@ AIO, `sceKernelLoadStartModule`.
 
 The loader reports guest faults as image-relative offsets with an rbp backtrace; `--timeout N`
 arms a watchdog that dumps all thread stacks (Linux; SIGUSR2 dumps one thread). Scripted input:
-`GOW3_PAD_FILE`, `GOW3_PAD_RECORD`/`GOW3_PAD_REPLAY`. `tools/got_import.py [--linked] <offset>` names the import
+`GOW3_PAD_FILE`, `GOW3_PAD_RECORD`/`GOW3_PAD_REPLAY`. `GOW3_FILE_TRACE=1` logs every guest file open
+(`File trace: open(<path>) -> fd <n>, <size> bytes` or `-> errno <e>`); `GOW3_AUDIO_TRACE` only covers failed reads and Ajm. `tools/got_import.py [--linked] <offset>` names the import
 bound to a GOT slot (`--linked`: `out/boot-linked.bin`, which includes `libc.prx`). Frame capture: `GOW3_FRAME_CAPTURE_KEY` (F11). The full log of a launcher run is
 `user/last_run.log`.
 
