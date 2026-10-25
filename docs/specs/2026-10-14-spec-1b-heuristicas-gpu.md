@@ -1,6 +1,7 @@
 # Spec 1b — Eliminar las heurísticas de GPU de GoW3
 
-Fecha: 2026-10-14. Estado: **aprobada (2026-10-24), en ejecución**; plan: `docs/plans/2026-10-24-spec-1b-plan.md`. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 1b".
+Fecha: 2026-10-14. Estado: **aprobada (2026-10-24), en ejecución**: el plan de implementación está aprobado y su
+Tarea 0 (línea base de tests) hecha (§7). Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 1b".
 Depende de: Spec 1a y del hito de primer fotograma (necesita su herramienta de captura de píxeles).
 
 Marcas: **[V]** comprobado en el repo; **[H]** hipótesis a confirmar; **[D]** decisión del usuario.
