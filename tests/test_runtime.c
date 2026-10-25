@@ -270,6 +270,47 @@ static void savedata_backup_queries(void) {
     assert((uint32_t)check(NULL)==0x809F0000 && (uint32_t)restore(NULL)==0x809F0000);
     assert((uint32_t)check(&no_dir)==0x809F0000 && (uint32_t)restore(&no_dir)==0x809F0000);
 }
+/* stdout goes to a temporary file between capture_begin and capture_end, which returns what was printed. */
+static FILE *capture_file; static int capture_saved;
+static void capture_begin(void) {
+    capture_file=tmpfile(); assert(capture_file);
+    fflush(stdout); capture_saved=dup(1); assert(capture_saved>=0 && dup2(fileno(capture_file),1)==1);
+}
+static const char *capture_end(void) {
+    static char text[65536];
+    fflush(stdout); assert(dup2(capture_saved,1)==1); close(capture_saved);
+    rewind(capture_file); size_t length=fread(text,1,sizeof(text)-1,capture_file); text[length]=0; fclose(capture_file);
+    return text;
+}
+/* Spec 6 (5): the log shows the order of a save, mount -> param -> icon -> unmount. Unmounting a point
+   that is no longer mounted prints nothing. */
+static void savedata_call_log(void) {
+    typedef struct { int32_t user,pad; const char *dir; uint64_t blocks; uint32_t mode; uint8_t reserved[36]; } Mount2;
+    typedef struct { const void *buffer; uint64_t buffer_size,data_size; uint8_t reserved[32]; } Icon;
+    typedef int32_t (ABI *Mount)(const Mount2 *,void *);
+    typedef int32_t (ABI *Umount)(const void *);
+    typedef int32_t (ABI *SetParam)(const void *,uint32_t,const void *,uint64_t);
+    typedef int32_t (ABI *SaveIcon)(const void *,const Icon *);
+    Mount mount=GET(Mount,"0z45PIH+SNI#libSceSaveData"); Umount umount=GET(Umount,"BMR4F-Uek3E#libSceSaveData");
+    SetParam set_param=GET(SetParam,"85zul--eGXs#libSceSaveData"); SaveIcon save_icon=GET(SaveIcon,"c88Yy54Mx0w#libSceSaveData");
+    assert(mount && umount && set_param && save_icon);
+    char user[]="out/savedata-test-XXXXXX",dir[32]="savedata000",result[64],cmd[64],param[128],icon[128],unmounted[128];
+    assert(mkdtemp(user)); runtime_file_configure("out",user);
+    static const unsigned char png[8]={0x89,'P','N','G','\r','\n',0x1a,'\n'};
+    Mount2 m={1,0,dir,0x60,4,{0}}; Icon i={png,sizeof png,sizeof png,{0}}; /* CREATE */
+    capture_begin();
+    int32_t mounted=mount(&m,result), titled=set_param(result,1,"Title",5), iconed=save_icon(result,&i);
+    int32_t first=umount(result), second=umount(result);
+    const char *text=capture_end();
+    assert(!mounted && !titled && !iconed && !first && (uint32_t)second==0x809F0008);
+    snprintf(param,sizeof param,"Runtime: save data param set (type 1) on %s\n",result);
+    snprintf(icon,sizeof icon,"Runtime: save data icon saved on %s\n",result);
+    snprintf(unmounted,sizeof unmounted,"Runtime: save data unmounted from %s\n",result);
+    const char *a=strstr(text,"Runtime: save data 'savedata000' mounted at "), *b=strstr(text,param), *c=strstr(text,icon), *d=strstr(text,unmounted);
+    assert(a && b && c && d && a<b && b<c && c<d);
+    assert(!strstr(d+strlen(unmounted),"unmounted from")); /* the second unmount found nothing mounted */
+    snprintf(cmd,sizeof cmd,"rm -rf %s",user); assert(system(cmd)==0);
+}
 /* Spec 3: fJgP+wqifno is DiscMap 0x7C980FFB0AA27E7A (the NID's bytes). libSceFios2.prx asks it for a
    file's LBA package location (call at +0x3411a) and takes its fallback path on any nonzero result.
    Like its twin ioKMruft1ek, it reports that no disc bitmap exists and leaves the outputs alone. */
@@ -601,13 +642,8 @@ static void gpu_stats_line(void) {
     size_t n=runtime_gpu_stats_line(line,sizeof(line));
     assert(n==strlen(line) && !strcmp(line,"GPU: submits=0 draws=0 dispatches=0 flips=0 unimplemented=0\n"));
     char small[8]; assert(runtime_gpu_stats_line(small,sizeof(small))==7 && !strcmp(small,"GPU: su"));
-    FILE *capture=tmpfile(); assert(capture);
-    fflush(stdout); int saved=dup(1); assert(saved>=0 && dup2(fileno(capture),1)==1);
-    runtime_report(); fflush(stdout);
-    assert(dup2(saved,1)==1); close(saved);
-    static char text[65536]; rewind(capture);
-    size_t length=fread(text,1,sizeof(text)-1,capture); text[length]=0; fclose(capture);
-    const char *last=strstr(text,"GPU: submits=");
+    capture_begin(); runtime_report();
+    const char *last=strstr(capture_end(),"GPU: submits=");
     assert(last && !strcmp(last,line));
 }
 int main(int argc,char **argv) {
@@ -649,7 +685,7 @@ int main(int argc,char **argv) {
     if (argc>1 && !strcmp(argv[1],"--rtld-underflow")) {
         static int dso; GET(DsoCount,"8OnWXlgQlvo#libkernel")(&dso); return 99;
     }
-    libc_support(); posix_mutexes(); wall_time(); kernel_time_names(); sanitizer_and_neo(); heap_trace_info(); audiodec_init(); savedata_initialize3(); savedata_mount2(); savedata_umount_with_backup(); savedata_backup_queries(); discmap_location(); gpu_stats_line(); exit_handlers(); guards(); mutexes(); direct_memory(); memory_primitives();
+    libc_support(); posix_mutexes(); wall_time(); kernel_time_names(); sanitizer_and_neo(); heap_trace_info(); audiodec_init(); savedata_initialize3(); savedata_mount2(); savedata_umount_with_backup(); savedata_backup_queries(); savedata_call_log(); discmap_location(); gpu_stats_line(); exit_handlers(); guards(); mutexes(); direct_memory(); memory_primitives();
     rw_lifecycle(); rw_concurrency(); rw_timeouts(); posix_rwlocks(); thread_get_name(); file_metadata(); decided_traps();
     time_conversion(); /* last: changes TZ */
     puts("PASS: callback lifecycle, guard ABI, mutex errors, shared direct memory, memory primitives, resolver scope, "

@@ -237,6 +237,17 @@ elegido no cambia lo que hace el juego**, solo lo que muestra el log.
 - Si el juego usa `sceSaveDataDirNameSearch`/`SetParam`/`SaveIcon`, validar sus respuestas (ya existen).
 - Resultado esperado de los saves con copia (`CheckBackupData`): ver la Spec 3.
 
+### Resultado de la Tarea 7 (2026-10-25): el orden de llamadas en el log
+
+- **[V]** `src/runtime_savedata.c` imprime, además del montaje que ya existía
+  (`Runtime: save data 'savedata000' mounted at /savedata0 (created|existing[, read-only])`), tres líneas:
+  `Runtime: save data param set (type <t>) on /savedataN`, `Runtime: save data icon saved on /savedataN` y
+  `Runtime: save data unmounted from /savedataN`. Solo se imprimen cuando la llamada tiene éxito: un desmontaje de un punto
+  que ya no está montado devuelve `0x809F0008` y no imprime nada. `sceSaveDataUmountWithBackup` pasa por el mismo desmontaje
+  y también imprime la línea.
+- Test: `savedata_call_log` en `tests/test_runtime.c` comprueba el orden montaje → parámetro → icono → desmontaje y que el
+  segundo desmontaje no imprime nada. Lo vi fallar antes de añadir las líneas.
+
 ## 6. Bloque D — Idioma
 
 - Verificar con el log que el juego eligió inglés: carga `ft_en.mrg` y los `*_en.mp4`, y ningún

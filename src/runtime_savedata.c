@@ -192,6 +192,8 @@ static ABI int32_t save_umount(const MountPoint *point) {
     int slot=slot_of(point);
     if (slot>=0) { runtime_file_unmount(point->data); slots[slot].used=0; }
     pthread_mutex_unlock(&lock);
+    /* With the mount, param and icon lines this is the order of a save (spec 6, section 5); saves are rare. */
+    if (slot>=0) printf("Runtime: save data unmounted from /savedata%d\n",slot);
     return slot>=0 ? 0 : ERR_NOT_FOUND;
 }
 /* Spec 3 (4.4): unmounts like sceSaveDataUmount but keeps no backup copy, so CheckBackupData and
@@ -231,6 +233,7 @@ static ABI int32_t save_set_param(const MountPoint *point, uint32_t type, const 
     }
     write_param(slots[slot].meta,&p);
     pthread_mutex_unlock(&lock);
+    printf("Runtime: save data param set (type %u) on /savedata%d\n",type,slot);
     return 0;
 bad:
     pthread_mutex_unlock(&lock);
@@ -249,6 +252,7 @@ static ABI int32_t save_icon(const MountPoint *point, const Icon *icon) {
         if (f) fclose(f);
     }
     pthread_mutex_unlock(&lock);
+    if (!r) printf("Runtime: save data icon saved on /savedata%d\n",slot);
     return r;
 }
 static ABI int32_t save_delete(const Delete *d) {
