@@ -71,10 +71,10 @@ cada reproducción arranca con la misma partida, así que el recorrido debe fija
 **Qué falta:** `libSceMouse` debe informar de un dispositivo conectado y entregar movimiento, botones y
 rueda reales.
 
-- **Estructura `SceMouseData` [H]** (40 bytes, igual que el `memset` actual): `timestamp (u64)`,
+- **Estructura `SceMouseData` [V]** (40 bytes, igual que el `memset` actual): `timestamp (u64)`,
   `connected (u8)`, `buttons (u32)`, `xAxis (i32)`, `yAxis (i32)`, `wheel (i32)`, `tilt (i32)`, resto
   reservado. Se confirma con el sitio de llamada y con `mouse_read` frente a lo que lee el juego.
-- **Botones [H]:** primario `0x1`, secundario `0x2`, opcional `0x4`, `0x8` y `0x10` para los extras.
+- **Botones:** primario `0x1` [V], secundario `0x2` [V], medio `0x4` [V]; `0x8` y `0x10` para los extras [H], el juego no los mira.
 - **Puente SDL → runtime.** La ventana y sus eventos viven en la biblioteca de GPU (hilo de ventana);
   el runtime solo ve C. Se añade a `gpu/gow3gpu.h` una función
   `gow3gpu_mouse_read(int32_t *dx, int32_t *dy, int32_t *wheel, uint32_t *buttons)` que devuelve y
@@ -92,6 +92,65 @@ rueda reales.
 Decisión **[D]**: dónde vive el código. Opción recomendada: sacarlo de `runtime_services.c` a un
 `src/runtime_mouse.c` nuevo (resolvedor propio en la cadena de `runtime.c`), porque deja de ser un
 dispositivo ausente.
+
+### Resultado de la Tarea 3 (2026-10-25): lo que el eboot hace con el ratón
+
+Desensamblado de `out/eboot.elf` (primer segmento LOAD volcado a `out/spec6-d/eboot.dis`; los huecos GOT salen de
+`out/boot.bin`: `sceMouseInit` `0x4356b0`, `sceMouseOpen` `0x4356c0`, `sceMouseRead` `0x4355f8`, vía los
+saltos PLT `0x173940`/`0x173960`/`0x1737d0`). **Cada función tiene un solo sitio de llamada y el eboot no importa
+`sceMouseClose`.**
+
+- **Arranque `0xef091`–`0xef0bf` [V].** `sceMouseInit()`; si `eax<0` no sigue. Después
+  `sceUserServiceGetInitialUser(&user)` y, si devuelve 0, `sceMouseOpen(user, 0, 0, &param)`, con `param` = un
+  byte `1` en `[rsp+0x30]` y el resto de la pila sin inicializar. El resultado se guarda **tal cual** en un
+  global (`0x2085150`, valor inicial `-1`), error o handle. **Init va antes de Open [V]**, así que exigir
+  `NOT_INITIALIZED` no rompe al juego.
+- **Lectura `0xcf341` [V].** Una vez por llamada de su función de entrada (`0xcf240`):
+  `sceMouseRead(handle_global, buf, 8)` con `buf` global de **320 bytes** (`0x178ef20`–`0x178f05f`, 8 × 40).
+  Si `eax<=0` no hay movimiento ni rueda. Si no, recorre **`eax` informes** (zancada `0x28`), así que
+  **`eax` nunca puede pasar de `count`**: un valor mayor desbordaría el buffer del juego.
+- **Campos que lee de cada informe [V]:** `+12` botones (si el bit 31 está puesto, descarta el informe),
+  `+16` `xAxis` y `+20` `yAxis` (los lee juntos como 8 bytes y los suma entre informes), `+24` `wheel`.
+  **No lee `timestamp` (+0), `connected` (+8) ni `tilt` (+28).** Lo que el juego nunca lee no puede
+  distinguir un ratón conectado de otro ausente: para «sin ratón» sirve cualquier informe con ceros.
+- **Qué hace con ellos [V].** `xAxis`/`yAxis` son **deltas** que suma a un cursor propio en un espacio
+  virtual de **640×448** (`0x178ec34`/`0x178ec38`, recortado a `0..0x27f` y `0..0x1bf`), sin escala: un
+  píxel de movimiento relativo de SDL es una unidad de ese espacio. Los botones del último informe válido
+  se guardan (`0x178ef18`) y se convierten en banderas de pulsación/mantenido: bit `0x1` → `0x2`
+  (pulsado) y `0x8001` (mantenido), bit `0x2` → `0x8` y `0x4`, bit `0x4` → `0x20` y `0x10`. La rueda suma a
+  `0x178ec58`/`0x178ec5c`. Los botones `0x8` y `0x10` no se miran.
+- **El cursor del ratón solo manda si no hay dedo en el panel táctil [H].** Antes consulta una fuente
+  alternativa (`0x12b420` sobre `0x11f300`, un objeto de dos puntos de contacto de `0x70` bytes con un
+  identificador en `+0x20`). Si ese identificador es `>=0` usa esa posición y **ignora los deltas del
+  ratón**; si es `<0` usa el ratón. Que sea el panel táctil del mando es una lectura del código, no
+  una comprobación: se mira en la Tarea 6 (si el cursor no se mueve con el ratón, empezar por aquí).
+
+**Consecuencias para la Tarea 5 [V]:** la estructura de la spec (`connected` +8 `u8`, `buttons` +12, `xAxis`
++16, `yAxis` +20, `wheel` +24, `tilt` +28) **coincide** con lo que lee el eboot; no hay campos ni tamaños
+nuevos. `mouse_read` devuelve 1 y escribe un solo informe de 40 bytes, lo que cumple `ret<=count` con el
+`count` 8 de este juego. **El juego no itera hasta `ret==0`**, así que el plan no necesita
+`reads_zero_when_idle` (paso 6 de la Tarea 3). Con `count>8` el runtime sigue escribiendo solo un informe.
+Devolver `0` sin ratón o un informe de ceros dan lo mismo al juego. El factor 1:1 del movimiento (640
+unidades para cruzar el espacio virtual) es una decisión de la Tarea 6, no del runtime.
+
+#### Códigos de error de libSceMouse
+
+Fuente: tabla de psdevwiki (el usuario la pegó el 2026-10-25); no se tiene el SDK. Los **valores y nombres**
+son [V] contra esa fuente; las **condiciones** en que el SDK real los devuelve siguen [H].
+
+| Constante | Valor | Condición que usa este runtime [H] | ¿Lo distingue el eboot? |
+|---|---|---|---|
+| `SCE_MOUSE_ERROR_INVALID_ARG` | `0x80DF0001` | `data==NULL` o `count<1` en `sceMouseRead` | no: solo mira `eax<=0` |
+| `SCE_MOUSE_ERROR_INVALID_PORT` | `0x80DF0002` | `sceMouseOpen` con `type`/`index` distintos de 0/0 | no: guarda el valor y lo usa como handle |
+| `SCE_MOUSE_ERROR_INVALID_HANDLE` | `0x80DF0003` | `sceMouseRead`/`Close` con un handle no abierto | no: ídem |
+| `SCE_MOUSE_ERROR_ALREADY_OPENED` | `0x80DF0004` | `sceMouseOpen` de un puerto ya abierto | no: ídem (solo llama a Open una vez) |
+| `SCE_MOUSE_ERROR_NOT_INITIALIZED` | `0x80DF0005` | `Open`/`Read`/`Close` antes de `sceMouseInit` | no; `Init` va siempre antes |
+| `SCE_MOUSE_ERROR_FATAL` | `0x80DF00FF` | no se usa | no |
+
+Ningún sitio compara con una constante `0x80DF....`: `Init` solo mira el signo, `Open` guarda el valor sin
+mirarlo y `Read` solo mira `eax<=0` (caso a/c/d de la clasificación). Un `Open` fallido deja un código
+negativo como handle, que `Read` rechaza y el juego trata como «sin movimiento»; por tanto **un código mal
+elegido no cambia lo que hace el juego**, solo lo que muestra el log.
 
 ## 5. Bloque C — Saves
 
