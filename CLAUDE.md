@@ -229,8 +229,9 @@ bound to a GOT slot (`--linked`: `out/boot-linked.bin`, which includes `libc.prx
 ## Conventions
 
 - Development branch is `gow3`; `main` receives tested merges.
-- Commit messages are in Portuguese, `Type(Scope): description` (e.g. `Fix(GPU): ...`,
-  `Feat(Launcher): ...`, `Test(GPU): ...`, `Docs(Roadmap): ...`), body explaining the cause.
+- Commit messages are in **Spanish**, `Tipo(Ámbito): descripción` (e.g. `Feat(Kernel): implementar event flags`,
+  `Fix(GPU): ...`, `Test(GPU): ...`, `Docs(Spec1b): ...`), body explaining the cause. This has been the user's rule
+  since 2026-10-17; older commits from the GoW3 era are in Portuguese.
 - C is compiled with `-std=c11 -Wall -Wextra -Werror`; code style is dense (short lines joined with
   `;`, few braces) — match the surrounding file. Comments explain why, often referencing the
   file that depends on a contract.
