@@ -209,11 +209,9 @@ def main():
         except (ImportError, OSError):
             pass
         # The temporal upscalers and motion vectors are not calibrated for this game yet: they stay
-        # off unless the launcher's experimental switch is on (then gow3.ini decides); linear
-        # image readbacks fix its corrupted textures.
+        # off unless the launcher's experimental switch is on (then gow3.ini decides).
         if env.get('GOW3_EXPERIMENTAL_UPSCALER') != '1':
             env.setdefault('GOW3_UPSCALER', 'none')
-        env.setdefault('GOW3_READBACK_LINEAR', '1')
         if profile:
             names = selected_patches(profile[1], profile[2], env.get('GOW3_PATCHES', ''), env.get('GOW3_PATCHES_ONLY') == '1')
             # gow3.ini decides the resolution and frame rate patches (in-game menu, launcher).

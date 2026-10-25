@@ -67,18 +67,21 @@ with before/after captures; the `gow3` → `tsuki` rename is Spec 7, done last).
   pixel-identical from 1140 to 1500; then the title menu. Pixel oracle frames: 120/300/420 with the icon box
   masked, and 1320 whole. `out/spec1b-t2/compare-oracle.sh <before>/ <after>/` (untracked, runs inside the
   distrobox) compares them; the reference is `out/baseline/1b/antes/`.
-- Spec 1b (GPU heuristics, branch `tsuki/spec-1b`) is in progress: tasks 0–2 are done (2026-10-25). For
+- Spec 1b (GPU heuristics; on `tsuki/main` since `tsuki/spec-1b` was merged into it on 2026-10-25) is in
+  progress: tasks 0–2 and 4 are done (2026-10-25). For
   Tsukihime none of the heuristics is needed or in the way; the delete-don't-disable rule above is why they go.
   Scope, as the user decided on 2026-10-25 (spec §2.2):
   - deleted: `gbuffer_draw` and the 864-byte constant (task 3), and the temporal upscaler's hard-coded shader
     hashes from another game (task 3b);
-  - linear readback: only the `GOW3_READBACK_LINEAR=1` default in `run.py` goes (task 4);
-    `readback_linear_images` is a shadPS4 option and stays;
+  - linear readback: only the `GOW3_READBACK_LINEAR=1` default in `run.py` went (task 4, done). With it on,
+    Tsukihime put no image in `download_images`, either at boot or in the novel, so it did nothing for this
+    game. `readback_linear_images` is a shadPS4 option and stays: off by default, and
+    `GOW3_READBACK_LINEAR=1` still turns it on;
   - **not deleted:** the vendor-based guest MSAA decision, which is a Windows driver workaround and cannot be
     tested on RADV, and the 1920×1080 scaling, which is the project's base resolution.
 
-  Task 4 is the only one that can change what Spec 6 sees, so it should land before Spec 6's approved capture
-  baseline (A1).
+  Task 4 was the only one that could change what Spec 6 sees. It has landed, and the oracle frames came out
+  identical, so Spec 6's capture baseline (A1) does not depend on what is left.
 - Target language: **English**. The game ships ja/en/zc/zt (`ft_*.mrg` fonts, `*_en.mp4` videos)
   and picks it from the system language (`sceSystemServiceParamGetInt`); `runtime_services.c`
   already reports 1 = English (US) unless `GOW3_LANGUAGE` overrides it. Japanese and the other
@@ -205,7 +208,7 @@ TEB TLS slot on Windows, patched by `patch_tcb_loads`).
     `motion_history.h:45` stays, with the inert `CameraMotion`/`ObjectMotion`.
   - The temporal upscaler's hard-coded shader hashes: `UiComposition::MovieShader`, `trigger_hash` and
     `ui_trigger_vs`.
-  - The `GOW3_READBACK_LINEAR=1` default in `run.py`. Only the default goes; the option stays.
+  - ~~The `GOW3_READBACK_LINEAR=1` default in `run.py`~~: removed (task 4, 2026-10-25). The option stays.
 
   Not GoW3 code, so they stay: the 1920×1080 scene scaling (the project's base resolution), and the
   vendor-based guest MSAA decision (`gow3_msaa_default.h`, a workaround for AMD's and Intel's Windows drivers;

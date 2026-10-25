@@ -4,7 +4,8 @@ Fecha: 2026-10-14. Estado: **aprobada (2026-10-24), en ejecución**: el plan de 
 tareas 0 (línea base de tests), 1 (clasificación, §2.1) y 2 (capturas «antes» y fotogramas oráculo) hechas (§7). La
 Tarea 1 amplió el alcance, por decisión del usuario, a los hashes fijos de shaders del upscaler temporal. Tras la
 Tarea 2 el usuario redujo el alcance (§2.2, 2026-10-25): de la lectura lineal solo se quita el valor por defecto, y el
-MSAA por vendor sale de la spec. Roadmap:
+MSAA por vendor sale de la spec. La Tarea 4 (ese valor por defecto) está hecha: no tenía efecto en Tsukihime (§7).
+Roadmap:
 `docs/tsuki/ROADMAP.md`, sección "Spec 1b".
 Depende de: Spec 1a y del hito de primer fotograma (necesita su herramienta de captura de píxeles).
 
@@ -23,7 +24,7 @@ la misma captura antes y después que Tsukihime no cambia (o que el cambio está
 | Constante de cámara de 864 bytes | `vk_rasterizer.cpp:2121`, `:2182` | Reconoce el buffer de constantes de cámara de GoW3 por su tamaño | **[V] Dormida**, la condición exige `gbuffer_draw` |
 | Escalado de la escena a 1920×1080 | `vk_rasterizer.cpp:3044-3068` | "El viewport de la película de UI es 1920×1080 aunque la escena sea 960×540"; los pasos de media resolución mantienen el factor de la escena (`size/1920`, `size/1080`) | **Decidido: se conserva.** El proyecto trabaja de base a 1080p, así que esta lógica es la resolución base y no es específica de GoW3. No se borra; se documenta y, si hace falta, se renombra en la Spec 7 |
 | MSAA por vendor | `gpu/shadps4/video_core/amdgpu/gow3_msaa_default.h`, decisión en `vk_instance.cpp`, propiedades en `tools/gpu_capabilities.c` | En AMD y Intel propietario en Windows, crea las imágenes multimuestra con una muestra | **[V]** No incluye RADV (el driver de Linux): la 6650 XT de pruebas mantiene el multimuestreo del juego. **[D] Se queda (2026-10-25, §2.2):** es un parche de driver, no del juego |
-| `GOW3_READBACK_LINEAR=1` por defecto | `run.py:216` | Activa lectura lineal de imágenes para la CPU | **[H] Activa**; cambia rendimiento más que imagen. **[D] Solo se quita el valor por defecto (2026-10-25, §2.2):** la opción de shadPS4 que enciende se queda |
+| `GOW3_READBACK_LINEAR=1` por defecto | `run.py:216` | Activa lectura lineal de imágenes para la CPU | **[H] Activa**; cambia rendimiento más que imagen. **[D] Solo se quita el valor por defecto (2026-10-25, §2.2):** la opción de shadPS4 que enciende se queda. **[V] Sin efecto (Tarea 4, §7):** con la opción encendida, Tsukihime no metió ninguna imagen en `download_images`. Valor por defecto quitado |
 | Hashes fijos de shaders en el upscaler temporal | `ui_composition.h:25-30` (`MovieShader`: 5 hashes de vertex shaders de la UI Scaleform), `vk_temporal_upscaler.h:197` (`trigger_hash = 0x9a9cf8a9`, el compute antes del cual se escala), `:215` (`ui_trigger_vs = 0x34e8a281`); usos en `vk_temporal_upscaler.cpp:361,1306,1321` y `tests/test_ui_composition.cpp:19-21` | Deciden en qué compute se escala la escena y qué draws son UI. Son de otro juego: entraron el 2026-09-26 (`0403703`, `ff221f7`), cuando el upscaler aún se llamaba `BB_UPSCALER`; no son shaders de Tsukihime | **[V] Dormidos** bajo `run.py`: fija `GOW3_UPSCALER=none` (`run.py:214-215`) y todas las llamadas al upscaler exigen `upscaler->Enabled()` (`vk_rasterizer.cpp:1012,1236,1353`). **[D] Se borran (2026-10-25)**: los valores por defecto pasan a «sin disparador»; `GOW3_UPSCALE_BEFORE_CS` y `GOW3_UI_TRIGGER_VS` siguen permitiendo fijarlos |
 | Otros restos de GoW3 en el núcleo | `liverpool.cpp` (46 coincidencias `gow3`), `texture_cache.cpp`, `vk_pipeline_cache.cpp` (43), `videoout/driver.cpp` (65), `vk_frame_capture.cpp`, `camera_motion.comp`, `motion_history.h`, `vk_lighting_test.h`, `vk_temporal_upscaler.h` | Mezclan marcas `gow3:` (cambios nuestros sobre shadPS4, que **se conservan**) con comentarios o nombres de GoW3 | **[V] Clasificados (2026-10-25, §2.1)**: comentarios y lógica genérica. Hay dos excepciones: los hashes de la fila anterior y el clasificador de 864 bytes de `motion_history.h`, que se queda |
 
@@ -66,7 +67,7 @@ cambiar código. Rutas relativas a `gpu/shadps4/video_core/` salvo las de `gpu/s
 | `gpu/shim/gow3_overlay.cpp:847` | comentario | El acorde R3+L2 que abre el menú se eligió porque L3+R3 era una acción de GoW3. El acorde es genérico y se queda |
 
 Ninguna coincidencia queda **por probar**. Lo único por probar de esta spec es `GOW3_READBACK_LINEAR`, que el
-patrón no encuentra y mide la Tarea 4.
+patrón no encuentra y mide la Tarea 4. **Medido (§7, Tarea 4):** 0 inserciones con la opción encendida.
 
 **Fuera del patrón.** Para el paso 4 del plan se hizo una búsqueda complementaria en `video_core`,
 `shader_recompiler` y `gpu/shim`: hashes comparados con constantes, `_hash = 0x`, `Scaleform`, `GoW`. Encontró:
@@ -105,7 +106,7 @@ implementar la Tarea 5. Las tareas 4 y 5 del plan y los criterios de §5 ya est�
 |---|---|---|
 | 3: `gbuffer_draw` y la constante de 864 | **[V] Dormida** (§2). Solo se activa con 5 o más render targets y profundidad, que una novela visual 2D no tiene **[H]** | Sin cambios: se borra |
 | 3b: hashes del upscaler | **[V] Dormidos** (§2). Son shaders de otro juego y no coinciden con los de Tsukihime | Sin cambios: se borran (**[D]** 2026-10-25) |
-| 4: lectura lineal | **[V] La única activa** bajo `run.py` | **[D]** Quitar solo el valor por defecto de `run.py`. La opción de shadPS4 se queda |
+| 4: lectura lineal | **[V] La única encendida** bajo `run.py`, pero sin efecto: 0 inserciones (§7, Tarea 4) | **[D]** Quitar solo el valor por defecto de `run.py`. La opción de shadPS4 se queda. **Hecho** |
 | 5: MSAA por vendor | **[V] Sin efecto en RADV**: el valor por vendor siempre fue 0 en la máquina de pruebas | **[D] No se implementa.** El mecanismo se queda tal cual |
 
 **Tarea 4.** Lo único de GoW3 es `env.setdefault('GOW3_READBACK_LINEAR', '1')` (`run.py:216`), y su comentario lo
@@ -121,6 +122,9 @@ Storage lineales con dirección del guest (`FindTexture`, `:1066`). El paso 2 de
   capturas;
 - la opción se queda en shadPS4, y la variable se renombra en la Spec 7;
 - el criterio de §5 que exigía que `GOW3_READBACK_LINEAR` desapareciera del árbol ahora exige que `run.py` no la fije.
+
+Resultado (§7, Tarea 4): N = 0, así que el contraste quedó en 0 / 0 / 0. Que la opción sigue viva lo prueba su estado,
+que el contador también imprimía: apagada sin la variable y encendida con ella.
 
 **Tarea 5.** `gow3_msaa_default.h` no es una heurística del juego, sino un parche para un fallo de dos drivers de
 Windows. El propietario de AMD (#65, RX 6600) y el de Intel (#28, Arc) leen mal una profundidad de 2 muestras usada como
@@ -279,3 +283,45 @@ la herramienta, `frame_<n>_1920x1080.png`, no `antes-<n>.png` (§3, paso 2).
     con 0 solo si los cuatro fotogramas dan «idéntico».
   - Se comprobó que el script detecta un solo píxel cambiado fuera del recuadro y un fotograma de fundido en el lugar
     del 1320.
+
+### Tarea 4 — sin el valor por defecto de la lectura lineal (2026-10-25)
+
+Se hizo antes que las tareas 3 y 3b, a petición del usuario. Es la única que podía cambiar lo que ve la Spec 6.
+Desde esta tarea se trabaja en `tsuki/main`, donde se fusionó `tsuki/spec-1b` (avance rápido) el 2026-10-25. Solo
+cambia `run.py`: se borraron `env.setdefault('GOW3_READBACK_LINEAR', '1')` y la frase del comentario que lo justificaba
+por las texturas corruptas de GoW3. La opción `readback_linear_images` de shadPS4, `download_images` y la variable no
+cambian. Logs y scripts en `out/spec1b-t4/`, sin versionar. Cada toma sigue la receta de la Tarea 2 (`run-t4.sh`: 40 s, a
+pantalla completa, con la partida del usuario, que siguió intacta tras cada toma).
+
+- **Contador temporal.** Contaba las inserciones en `download_images` en sus dos únicos escritores, `FindRenderTarget` y
+  `FindTexture`, y las imprimía cada 5 s junto con el estado de `readback_linear_images`. No se commitea: se quitó
+  restaurando el archivo desde git, porque todas sus líneas eran añadidas.
+
+  | Toma | `run.py` | Entorno | Opción | Inserciones |
+  |---|---|---|---|---|
+  | `t4-con-defecto` | con el `setdefault` | — | encendida | 0 |
+  | ruta de la Spec 5 (`run-route-t4.sh`) | con el `setdefault` | — | encendida | 0 |
+  | `t4-sin-variable` | sin él | — | apagada | 0 |
+  | `t4-con-variable` | sin él | `GOW3_READBACK_LINEAR=1` | encendida | 0 |
+
+- **N = 0: la opción no hacía nada con Tsukihime.** El juego no tiene ningún render target lineal ni de 8 píxeles de
+  ancho o menos, y no usa imágenes Storage (`dispatches=0` en todas las tomas). Pasa en el arranque y también en la
+  novela. La ruta de la Spec 5 hizo 9056 envíos por el menú, CONTINUE, el título del capítulo 1 y la escena del metro, y
+  dio 0. Esa ruta no estaba en el plan: se añadió porque un 0 solo en el arranque no cubría las escenas de la novela. El
+  contraste N / 0 / N del plan queda en 0 / 0 / 0. Que la opción sigue viva lo prueba su estado: apagada sin la variable
+  y encendida con ella.
+- **Tests.**
+  - `bash build.sh --test` sale con 0, con las mismas líneas PASS/ok que en la Tarea 0.
+  - Python: 267 ejecutados, 35 omitidos y 4 fallos esperados, OK.
+  - `out/gow3-probe --vulkan-only`: PASS.
+  - Línea base C++: los 24 destinos dan 0, igual que en la Tarea 0 (`out/spec1b-t4/cpp.txt`). El plan decía que no hacía
+    falta porque no cambia código de GPU. Se repitió porque esta sección, en la Tarea 0, la pide al final de la Tarea 4.
+  - `git grep -n 'GOW3_READBACK_LINEAR' -- run.py`: sin resultados.
+- **Capturas.** `despues-4` se tomó con el binario sin contador. `compare-oracle.sh antes despues-4` da **idénticos** el
+  120, el 300, el 420 y el 1320 (`out/spec1b-t4/compare-oracle.txt`).
+  - Línea `GPU:` final: `submits=4692 draws=272707 dispatches=0 flips=2346 unimplemented=0`, del mismo orden que en la
+    Tarea 2.
+  - El único `STOP:` es el watchdog de los 40 s, como en la línea base.
+  - Sin diferencia de imagen no hacía falta medir el tiempo de fotograma (paso 5 del plan).
+- **Para la Spec 6:** lo que queda de esta spec (tareas 3, 3b y 6) está dormido bajo `run.py`, así que su línea base de
+  capturas (A1) ya no depende de la 1b.
