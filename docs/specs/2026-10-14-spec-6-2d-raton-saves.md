@@ -120,6 +120,12 @@ cada reproducción arranca con la misma partida, así que el recorrido debe fija
   diferentes (PSNR ≈ 54.7, el icono «Saving…» que gira), y con el recuadro del icono tapado (`1750 955 80 80`)
   salen idénticas. El save de `user/` no cambió (`sha256sum -c`). La copia fija `out/route/save/` y su
   `user-save.sha256` (paso 1 de la Tarea 3) se hicieron ya para esta prueba.
+- **La primera grabación del usuario (2026-10-28) no sirvió.** F9 la cortó en la lectura 1109, cuando acababa de
+  salir el menú de título, así que `pad.txt` solo tenía la muestra en reposo y las 4 capturas F12 (2141–7609)
+  quedaron fuera. Las instrucciones decían «F9 para la grabación», que se lee como «F9 sirve para grabar». Ahora
+  `route.sh record` dice que ya graba desde el arranque y que no se pulse F9. Al acabar, rechaza una grabación sin
+  pulsaciones o cortada antes de alguna captura (el juego lee el mando una vez por flip, así que lectura y
+  fotograma coinciden) y la mueve a `out/route/failed-<hora>/`.
 
 ## 4. Bloque B — Ratón (trabajo nuevo)
 

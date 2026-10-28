@@ -8,8 +8,9 @@
 #   frames.txt  how each frame is compared (tools/compare_route.sh); record writes it from the F12 captures
 #   record/, <name>/, <name>.log   the captures and the log of each run
 # record: the user plays (pad or keyboard, no mouse: GOW3_MOUSE=0) and presses F12 on each scene for the
-# reference, then closes the window. replay <name>: plays pad.txt back, captures every frame of frames.txt into
-# <name>/ and closes the game once the replay is over. Exit 0, 1 when the game stops (STOP:/Fault:) or a capture is
+# reference, then closes the window (F9 cuts the recording: only after the last F12); a recording with nothing
+# pressed or cut before a capture is moved to failed-<time>/. replay <name>: plays pad.txt back, captures every
+# frame of frames.txt into <name>/ and closes the game once the replay is over. Exit 0, 1 when the game stops (STOP:/Fault:) or a capture is
 # missing, 2 on a usage error. Runs inside the distrobox (re-entered from the host when it is not).
 set -u
 PORT=$(cd -- "$(dirname -- "$0")/.." && pwd) && cd "$PORT" || exit 2
@@ -51,15 +52,27 @@ close() { pkill -TERM -x gow3-probe; wait "$game"; }
 stopped() { grep -q -E 'STOP:|Fault:' "$log"; }
 echo "route $name: log in $log"
 if [[ $name == record ]]; then
-    echo "route record: no pulses nada hasta el menú de título; F12 en cada escena de la referencia; no guardes partida; F9 para la grabación; cierra la ventana al acabar"
+    echo "route record: ya está grabando desde el arranque. No pulses nada hasta el menú de título; F12 en cada escena de la referencia; no guardes partida; al acabar, cierra la ventana. No pulses F9: corta la grabación"
     while kill -0 "$game" 2> /dev/null; do stopped && { close; echo "route record: el juego paró (STOP:/Fault:), mira $log" >&2; exit 1; }; sleep 0.2; done
     wait "$game"; stopped && { echo "route record: el juego paró (STOP:/Fault:), mira $log" >&2; exit 1; }
+    # A recording with nothing pressed, or cut by F9 before an F12 capture, cannot bring the replay to that capture.
+    # The game reads the pad once per flip, so a read and a frame number are the same point in the run.
+    samples=$(($(wc -l 2> /dev/null < "$R/pad.txt" || echo 1) - 1))
+    cut=$(grep -o 'pad recording stopped at read [0-9]*' "$log" | tail -n 1); cut=${cut##* }; late=()
+    for f in "$R"/record/frame_*_*.png; do [[ -f $f ]] || continue; b=${f##*/frame_}; ((${cut:-0} && 10#${b%%_*} > cut)) && late+=("$((10#${b%%_*}))"); done
+    if ((samples <= 1 || ${#late[@]})); then
+        failed=$R/failed-$(date +%Y%m%d-%H%M%S); mkdir -p "$failed" && mv "$R/pad.txt" "$R/record" "$log" "$failed/"
+        ((samples <= 1)) && echo "route record: la grabación no tiene ninguna pulsación${cut:+ (F9 la cortó en la lectura $cut)}" >&2
+        ((${#late[@]})) && echo "route record: F9 cortó la grabación en la lectura $cut, antes de las capturas ${late[*]}" >&2
+        echo "route record: no sirve; la he movido a $failed/. Graba otra vez" >&2; exit 1
+    fi
+    [[ -n $cut ]] && echo "route record: F9 cortó la grabación en la lectura $cut, después de la última captura: sirve"
     if [[ ! -e $R/frames.txt ]]; then
         { echo "# tools/route.sh record, $(date -I): exact by default; Task 3 classifies each frame"
           for f in "$R"/record/frame_*_*.png; do [[ -f $f ]] || continue; b=${f##*/frame_}; echo "$((10#${b%%_*})) exact"; done | sort -n
         } > "$R/frames.txt"
     fi
-    echo "route record: $(($(wc -l 2> /dev/null < "$R/pad.txt" || echo 1) - 1)) muestras en $R/pad.txt, $(grep -c ' exact$' "$R/frames.txt") fotogramas en $R/frames.txt"
+    echo "route record: $samples muestras en $R/pad.txt, $(grep -c ' exact$' "$R/frames.txt") fotogramas en $R/frames.txt"
     exit 0
 fi
 until grep -q 'pad replay finished' "$log"; do
