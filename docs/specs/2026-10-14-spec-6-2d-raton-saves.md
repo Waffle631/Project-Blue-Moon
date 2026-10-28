@@ -158,6 +158,16 @@ cada reproducción arranca con la misma partida, así que el recorrido debe fija
   acabaron con `pad replay finished at read 12700`. El save de `user/` no cambió (`sha256sum -c`).
 - **La primera grabación** no sirvió: F9 la cortó en la lectura 1109 (ver la Tarea 2).
 
+#### Resultado de la Tarea 4 del bloque A (2026-10-28): línea base aprobada
+
+- **[V] El usuario aprobó las 8 capturas** de `out/route/r1/`: 2700 y 2890 (menú de carga), 4859, 5573, 7744,
+  10593, 11408 y 12964. No rechazó ninguna. Junto con `frames.txt`, son la línea base en `out/baseline/6a/`, que no
+  se versiona. `compare_route.sh out/baseline/6a out/route/r3 out/route/frames.txt` sale con 0.
+- **[V] Texto legible.** El usuario dio por buenos los recortes a tamaño real de las ventanas de texto
+  (`out/route/review/texto-*.png`): no hay glifos rotos ni cortes de línea incorrectos.
+- La miniatura «algo pixelada» de A2 sigue pendiente de triage (Tarea 5). Que el usuario aprobara la captura 2890
+  no la descarta: lo que se aprobó es la línea base contra la que se compara el arreglo.
+
 ## 4. Bloque B — Ratón (trabajo nuevo)
 
 **Qué falta:** `libSceMouse` debe informar de un dispositivo conectado y entregar movimiento, botones y
@@ -415,7 +425,7 @@ guardado revela fallos, `tests/test_mouse.c`.
 ## 10. Criterios de aceptación
 
 - [ ] Las capturas del recorrido coinciden con la línea base que el usuario aprobó.
-- [ ] El texto en inglés es legible, sin glifos rotos ni cortes de línea incorrectos (lo juzga el usuario).
+- [x] El texto en inglés es legible, sin glifos rotos ni cortes de línea incorrectos (lo juzga el usuario; Tarea 4 del bloque A, 2026-10-28).
 - [x] `out/mouse-test` pasa y, en el juego, el ratón avanza el texto y maneja los menús (Tarea 6).
 - [x] Mando, teclado y ratón avanzan el texto (Tarea 6).
 - [x] Un save grabado sobrevive al reinicio y se carga (Tarea 8).
