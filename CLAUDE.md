@@ -234,7 +234,8 @@ AIO, `sceKernelLoadStartModule`.
 
 The loader reports guest faults as image-relative offsets with an rbp backtrace; `--timeout N`
 arms a watchdog that dumps all thread stacks (Linux; SIGUSR2 dumps one thread). Scripted input:
-`GOW3_PAD_FILE`, `GOW3_PAD_RECORD`/`GOW3_PAD_REPLAY`. `GOW3_FILE_TRACE=1` logs every guest file open
+`GOW3_PAD_FILE`, `GOW3_PAD_RECORD`/`GOW3_PAD_REPLAY` (both from the game's first pad read, F9 only stops
+recording; clocked in pad reads, file header `reads`, old ms files are refused), `GOW3_MOUSE=0` (no mouse, for replays). `GOW3_FILE_TRACE=1` logs every guest file open
 (`File trace: open(<path>) -> fd <n>, <size> bytes` or `-> errno <e>`); `GOW3_AUDIO_TRACE` only covers failed reads and Ajm. `tools/got_import.py [--linked] <offset>` names the import
 bound to a GOT slot (`--linked`: `out/boot-linked.bin`, which includes `libc.prx`). Frame capture: `GOW3_FRAME_CAPTURE_KEY` (F11). The full log of a launcher run is
 `user/last_run.log`.

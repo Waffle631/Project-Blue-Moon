@@ -182,7 +182,12 @@ dispositivos y `MESA_VK_DEVICE_SELECT=<vendor:device>` fuerza uno.
   pero no en los vídeos: AvPlayer sigue el reloj real.
 - Para ver qué teclas recibe el juego: `SDL_EVENT_LOGGING=1 SDL_LOGGING='*=info'` escribe cada evento
   de SDL en el log (`SDL EVENT: SDL_EVENT_KEY_DOWN …`).
-- `GOW3_PAD_FILE`, `GOW3_PAD_RECORD` / `GOW3_PAD_REPLAY` — entrada de mando por guion.
+- `GOW3_PAD_FILE` (botones y ejes por guion), `GOW3_PAD_RECORD=<archivo>` / `GOW3_PAD_REPLAY=<archivo>`
+  (graba y repite un recorrido). Las dos empiezan en la primera lectura del mando del juego, y F9 solo para la
+  grabación. El reloj son las lecturas del juego, no los ms: el archivo empieza con la línea `reads` y sigue con
+  `<lectura> <botones> <lx> <ly> <rx> <ry> <l2> <r2>`. Un archivo del formato antiguo (ms, sin cabecera) no se
+  repite. La repetición acaba 30 lecturas después de la última línea (`Runtime: pad replay finished at read <r>`).
+- `GOW3_MOUSE=0` — el juego no ve ningún ratón; el recorrido no graba el ratón y el puntero movería su cursor.
 - `gdb --args out/gow3-probe out/boot-linked.bin --app0 Tsukihime/CUSA47999` — `gdb` viene en el
   bloque `dnf`.
 

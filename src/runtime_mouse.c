@@ -10,6 +10,7 @@
 #include "runtime.h"
 #include "gpu/gow3gpu.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
 #include <time.h>
@@ -32,14 +33,21 @@ _Static_assert(offsetof(MouseData,buttons)==12 && offsetof(MouseData,x_axis)==16
     "the offsets the game reads");
 
 static pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER;
-static int initialized, next_handle=1;
+static int initialized, disabled, next_handle=1; /* disabled: GOW3_MOUSE=0, read at Init */
 static struct { int32_t handle, user; } ports[MOUSE_PORTS]; /* handle 0 = free */
 
 static uint64_t now_us(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC,&t); return (uint64_t)t.tv_sec*1000000u+(uint64_t)t.tv_nsec/1000u; }
 /* Port index of an open handle, or -1. Caller holds the lock. */
 static int find_handle(int32_t handle) { if (handle<=0) return -1; for (int i=0; i<MOUSE_PORTS; i++) if (ports[i].handle==handle) return i; return -1; }
 
-static ABI int32_t mouse_init(void) { pthread_mutex_lock(&lock); initialized=1; pthread_mutex_unlock(&lock); return 0; }
+/* GOW3_MOUSE=0 reports no mouse: a recorded route (GOW3_PAD_REPLAY) does not record the mouse, and a
+ * pointer left somewhere else would move the game's cursor on each replay. */
+static ABI int32_t mouse_init(void) {
+    const char *env=getenv("GOW3_MOUSE");
+    pthread_mutex_lock(&lock); initialized=1; disabled=env && !strcmp(env,"0"); pthread_mutex_unlock(&lock);
+    if (disabled) puts("Runtime: mouse disabled (GOW3_MOUSE=0)");
+    return 0;
+}
 static ABI int32_t mouse_open(int32_t user,int32_t type,int32_t index,const void *param) {
     (void)param;
     pthread_mutex_lock(&lock); int32_t result;
@@ -65,7 +73,7 @@ static ABI int32_t mouse_read(int32_t handle,unsigned char *data,int32_t count) 
     if (result) return result;
     int32_t dx=0, dy=0, wheel=0; uint32_t buttons=0;
     /* An open menu is the bridge's business (all zero): it alone knows where it left the game's cursor. */
-    int present=gow3gpu_mouse_read(&dx,&dy,&wheel,&buttons);
+    int present=gow3gpu_mouse_read(&dx,&dy,&wheel,&buttons) && !disabled; /* drained either way */
     MouseData report; memset(&report,0,sizeof(report));
     if (present) { report.timestamp=now_us(); report.connected=1; report.buttons=buttons; report.x_axis=dx; report.y_axis=dy; report.wheel=wheel; }
     memcpy(data,&report,sizeof(report));

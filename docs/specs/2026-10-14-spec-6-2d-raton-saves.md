@@ -73,6 +73,36 @@ título; sin progreso pasa antes por el vídeo del prólogo (Spec 5). Una grabac
 cada reproducción arranca con la misma partida, así que el recorrido debe fijar cuál
 (`out/savedata-sin-progreso/` es la de sin progreso) y restaurarla antes de reproducir.*
 
+#### Resultado de la Tarea 1 del bloque A (2026-10-28): entrada determinista
+
+- **[V] El reloj de la repetición son las lecturas del mando, no los ms.** `src/runtime_pad.c` cuenta cada
+  llamada a `sample()` en `pad_reads`, también las que se hacen con el menú Insert abierto (la cuenta va antes de
+  la vuelta temprana). Antes la repetición iba por reloj y la armaba un script escribiendo `replay` en
+  `GOW3_PAD_FILE`. Entre una ejecución y otra, la entrada caía unos fotogramas antes o después.
+- **Formato v2, sin compatibilidad hacia atrás.** Primera línea `reads`, luego
+  `<lectura> <botones> <lx> <ly> <rx> <ry> <l2> <r2>` en cada cambio de estado. La grabación
+  (`GOW3_PAD_RECORD`) y la repetición (`GOW3_PAD_REPLAY`) empiezan las dos en la primera lectura, y F9 solo para la
+  grabación. En la lectura `r` vale la última línea con `<lectura> <= r`. La repetición acaba 30 lecturas después de
+  la última línea (`Runtime: pad replay finished at read <r>`) y vuelve la entrada real. El token `replay` de
+  `GOW3_PAD_FILE` ya no existe, y `out/spec5-route.txt` (en ms) deja de valer.
+- **Archivos rotos.** Un archivo sin cabecera (el formato en ms) no se repite: sale
+  `... has no 'reads' header (old ms format); record it again`. Ante una línea mal formada, un eje o un gatillo
+  mayor que 255, o lecturas que van hacia atrás, la carga para y se avisa con `... line <k> malformed, <n> samples kept`.
+  Lo anterior a esa línea sí se repite.
+- **[V] `GOW3_MOUSE=0`** (se lee en `sceMouseInit`) hace que el juego vea un ratón ausente, con todo a cero. El
+  puente se vacía igualmente, para que lo movido entretanto no llegue después. Log: `Runtime: mouse disabled (GOW3_MOUSE=0)`.
+- **Tests.**
+  - `out/pad-test`: `replay_waits_for_reads`, `replay_rejects_ms_format`, `replay_stops_at_bad_line`,
+    `replay_finishes_and_releases`, `record_round_trip` y `clock_counts_captured_reads`.
+  - `out/mouse-test`: `mouse_off`.
+  - Se vio el RED de los dos antes de implementar: en el de mando faltaban las funciones, y en el de ratón la
+    aserción `connected==0`.
+  - `bash build.sh --test` en verde. `--check-imports` sigue en las 3 trampas.
+  - Un cambio frente al plan: la entrada «real» que vuelve al acabar la repetición la da el mando virtual de SDL
+    del test, no `GOW3_PAD_FILE`. Lo inyectado con `GOW3_PAD_FILE` se suma también durante la repetición, así que
+    con él no se distinguiría.
+- **[H]** Que las capturas por número de fotograma coincidan entre repeticiones lo mide la Tarea 3.
+
 ## 4. Bloque B — Ratón (trabajo nuevo)
 
 **Qué falta:** `libSceMouse` debe informar de un dispositivo conectado y entregar movimiento, botones y
