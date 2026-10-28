@@ -236,8 +236,6 @@ static void sample_host(PadData *d) {
  * three touchpad names being one button; lx= ly= rx= ry= (0..255) override the sticks. An empty
  * file releases everything. */
 static struct { uint32_t buttons; int stick[4]; } injected={0,{-1,-1,-1,-1}};
-static int replay_armed;      /* 1 while a GOW3_PAD_REPLAY recording plays, 2 once it ended */
-static uint64_t replay_start; /* 0: (re)start at the next sample */
 static void read_inject(void) {
     static const char *path; static int checked; static uint64_t last_check; static struct timespec mtime;
     if (!checked) { path=getenv("GOW3_PAD_FILE"); checked=1; }
@@ -262,7 +260,6 @@ static void read_inject(void) {
     for (int i=0;i<4;++i) injected.stick[i]=-1;
     char token[64];
     while (fscanf(f,"%63s",token)==1) {
-        if (!strcmp(token,"replay") && replay_armed!=1) { replay_armed=1; replay_start=0; } /* GOW3_PAD_REPLAY */
         for (size_t i=0;i<sizeof(ps_names)/sizeof(*ps_names);++i) if (!strcmp(token,ps_names[i].name)) injected.buttons|=ps_names[i].ps;
         for (int i=0;i<4;++i) if (!strncmp(token,sticks[i],3)) { int v=atoi(token+3); injected.stick[i]=v<0 ? 0 : v>255 ? 255 : v; }
     }
@@ -270,69 +267,95 @@ static void read_inject(void) {
     printf("Runtime: pad file: buttons 0x%x sticks %d %d %d %d\n",injected.buttons,
            injected.stick[0],injected.stick[1],injected.stick[2],injected.stick[3]);
 }
-/* GOW3_PAD_RECORD=<file>: F9 starts and stops recording the pad state (gamepad or keyboard) with
- * the time since F9; GOW3_PAD_REPLAY=<file> plays such a recording back, started by the token
- * "replay" in GOW3_PAD_FILE (scripted tests repeat a route the player ran once). Lines: ms buttons
- * lx ly rx ry l2 r2, written when the state changes. */
-typedef struct { uint32_t ms, buttons; uint8_t axes[4], l2, r2; } PadSample;
-static FILE *record_file;
-static uint64_t record_start;
-static PadSample record_last;
+/* GOW3_PAD_RECORD=<file> records the pad state (gamepad or keyboard) from the game's first read
+ * until F9; GOW3_PAD_REPLAY=<file> plays it back from the first read, so scripted runs repeat a route
+ * the player ran once. The clock is the game's own reads (pad_reads), not the wall clock: an input
+ * lands on the same iteration of the game, and the frame captures of two runs line up. Format: a
+ * first line "reads", then "<read> <buttons> <lx> <ly> <rx> <ry> <l2> <r2>", written when the state
+ * changes; at read r the last line with <read> <= r counts. 30 reads after the last line the replay
+ * ends and the real input comes back. */
+#define PAD_REPLAY_HEADER "reads"
+#define PAD_REPLAY_TAIL 30
+typedef struct { uint64_t read; uint32_t buttons; uint8_t axes[4], l2, r2; } PadSample;
+static uint64_t pad_reads; /* reads of the game, menu reads included */
+static void record_write(FILE *f, uint64_t read, const PadSample *s) {
+    fprintf(f,"%llu %u %u %u %u %u %u %u\n",(unsigned long long)read,s->buttons,s->axes[0],s->axes[1],s->axes[2],
+            s->axes[3],s->l2,s->r2);
+    fflush(f);
+}
+/* Returns the samples of a recording, 0 without the header. Loading stops at the first bad line
+ * (a cut file, a value out of range, reads going back): what came before it still plays. */
+static size_t replay_parse(FILE *f, const char *path, PadSample **out) {
+    char line[256]; size_t count=0, cap=0; unsigned line_no=1;
+    if (!fgets(line,sizeof(line),f) || strcmp(trim(line),PAD_REPLAY_HEADER)) {
+        printf("Runtime: pad replay: %s has no '" PAD_REPLAY_HEADER "' header (old ms format); record it again\n",path);
+        return 0;
+    }
+    while (fgets(line,sizeof(line),f)) {
+        ++line_no;
+        unsigned long long read; unsigned v[7]; int end=0;
+        const int ok=sscanf(line,"%llu %u %u %u %u %u %u %u %n",&read,&v[0],&v[1],&v[2],&v[3],&v[4],&v[5],&v[6],&end)==8 && !line[end] &&
+            v[1]<256 && v[2]<256 && v[3]<256 && v[4]<256 && v[5]<256 && v[6]<256 && (!count || read>=(*out)[count-1].read);
+        if (!ok) { printf("Runtime: pad replay: %s line %u malformed, %zu samples kept\n",path,line_no,count); break; }
+        if (count==cap) {
+            PadSample *grown=realloc(*out,(cap=cap ? cap*2 : 1024)*sizeof(**out));
+            if (!grown) break;
+            *out=grown;
+        }
+        (*out)[count++]=(PadSample){read,v[0],{(uint8_t)v[1],(uint8_t)v[2],(uint8_t)v[3],(uint8_t)v[4]},(uint8_t)v[5],(uint8_t)v[6]};
+    }
+    return count;
+}
 static void record_sample(const PadData *d) {
-    static const char *path; static int checked, f9_was_down;
-    if (!checked) { path=getenv("GOW3_PAD_RECORD"); checked=1; }
-    if (!path || !*path || !sdl_ready) return;
-    const bool *k=SDL_GetKeyboardState(NULL);
+    static const char *path; static int checked, f9_was_down; static FILE *file; static PadSample last;
+    if (!checked) {
+        checked=1; path=getenv("GOW3_PAD_RECORD");
+        if (path && *path) {
+            if ((file=fopen(path,"w"))) {
+                fputs(PAD_REPLAY_HEADER "\n",file); fflush(file);
+                memset(&last,0xff,sizeof(last));
+                printf("Runtime: pad recording from the first read (%s, F9 stops)\n",path);
+            } else printf("Runtime: pad recording: cannot open %s\n",path);
+        }
+    }
+    if (!file) return;
+    const bool *k=SDL_WasInit(SDL_INIT_VIDEO) ? SDL_GetKeyboardState(NULL) : NULL;
     const int f9=k && k[SDL_SCANCODE_F9];
     if (f9 && !f9_was_down) {
-        if (record_file) {
-            fclose(record_file); record_file=NULL;
-            printf("Runtime: pad recording stopped (%s)\n",path);
-        } else if ((record_file=fopen(path,"w"))) {
-            record_start=now_us();
-            memset(&record_last,0xff,sizeof(record_last));
-            printf("Runtime: pad recording started (%s, F9 stops)\n",path);
-        }
-    }
-    f9_was_down=f9;
-    if (!record_file) return;
-    PadSample s={(uint32_t)((now_us()-record_start)/1000),d->buttons,
-                 {d->left_x,d->left_y,d->right_x,d->right_y},d->l2,d->r2};
-    if (s.buttons==record_last.buttons && !memcmp(s.axes,record_last.axes,4) &&
-        s.l2==record_last.l2 && s.r2==record_last.r2) return;
-    record_last=s;
-    fprintf(record_file,"%u %u %u %u %u %u %u %u\n",s.ms,s.buttons,s.axes[0],s.axes[1],s.axes[2],
-            s.axes[3],s.l2,s.r2);
-    fflush(record_file);
-}
-static PadSample *replay; static size_t replay_count, replay_next;
-static void replay_sample(PadData *d) {
-    if (!replay_armed) return;
-    if (!replay_start) {
-        static int loaded;
-        if (!loaded) {
-            loaded=1;
-            const char *path=getenv("GOW3_PAD_REPLAY");
-            FILE *f=path ? fopen(path,"r") : NULL;
-            PadSample s; unsigned v[8]; size_t cap=0;
-            while (f && fscanf(f,"%u %u %u %u %u %u %u %u",&v[0],&v[1],&v[2],&v[3],&v[4],&v[5],&v[6],&v[7])==8) {
-                s=(PadSample){v[0],v[1],{(uint8_t)v[2],(uint8_t)v[3],(uint8_t)v[4],(uint8_t)v[5]},(uint8_t)v[6],(uint8_t)v[7]};
-                if (replay_count==cap && !(replay=realloc(replay,(cap=cap ? cap*2 : 1024)*sizeof(*replay)))) break;
-                replay[replay_count++]=s;
-            }
-            if (f) fclose(f);
-            printf("Runtime: pad replay of %zu samples from %s\n",replay_count,path ? path : "(unset)");
-        }
-        replay_start=now_us();
-        replay_next=0;
-    }
-    const uint32_t ms=(uint32_t)((now_us()-replay_start)/1000);
-    while (replay_next<replay_count && replay[replay_next].ms<=ms) ++replay_next;
-    if (!replay_next) return;
-    if (replay_next==replay_count && ms>replay[replay_count-1].ms+500) {
-        if (replay_armed==1) { puts("Runtime: pad replay finished"); replay_armed=2; }
+        fclose(file); file=NULL;
+        printf("Runtime: pad recording stopped at read %llu (%s)\n",(unsigned long long)(pad_reads-1),path);
         return;
     }
+    f9_was_down=f9;
+    PadSample s={pad_reads-1,d->buttons,{d->left_x,d->left_y,d->right_x,d->right_y},d->l2,d->r2};
+    if (s.buttons==last.buttons && !memcmp(s.axes,last.axes,4) && s.l2==last.l2 && s.r2==last.r2) return;
+    last=s;
+    record_write(file,s.read,&s);
+}
+static PadSample *replay; static size_t replay_count, replay_next;
+static int replay_state; /* 0 not loaded yet, 1 playing, 2 over (or no recording) */
+static void replay_sample(PadData *d) {
+    if (!replay_state) {
+        replay_state=2;
+        const char *path=getenv("GOW3_PAD_REPLAY");
+        if (!path || !*path) return;
+        FILE *f=fopen(path,"r");
+        if (!f) { printf("Runtime: pad replay: cannot open %s\n",path); return; }
+        replay_count=replay_parse(f,path,&replay); replay_next=0;
+        fclose(f);
+        if (!replay_count) return;
+        printf("Runtime: pad replay of %zu samples from %s\n",replay_count,path);
+        replay_state=1;
+    }
+    if (replay_state!=1) return;
+    const uint64_t r=pad_reads-1;
+    while (replay_next<replay_count && replay[replay_next].read<=r) ++replay_next;
+    if (replay_next==replay_count && r>replay[replay_count-1].read+PAD_REPLAY_TAIL) {
+        printf("Runtime: pad replay finished at read %llu\n",(unsigned long long)r);
+        replay_state=2;
+        return;
+    }
+    if (!replay_next) return;
     const PadSample *s=&replay[replay_next-1];
     d->buttons=s->buttons;
     d->left_x=s->axes[0]; d->left_y=s->axes[1]; d->right_x=s->axes[2]; d->right_y=s->axes[3];
@@ -342,6 +365,7 @@ static void replay_sample(PadData *d) {
  * name) stay hidden until released: the game would take them as a new press. */
 static int hold_after_capture;
 static void sample(PadData *d) {
+    ++pad_reads; /* before the menu's early return: the replay clock counts every read */
     sample_host(d);
     if (gow3gpu_overlay_captures_input()) { hold_after_capture=1; return; }
     record_sample(d);
