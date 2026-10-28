@@ -180,6 +180,15 @@ dispositivos y `MESA_VK_DEVICE_SELECT=<vendor:device>` fuerza uno.
   falta, que no es una imagen o de otro tamaño es un error (sale 2). Entre dos ejecuciones, el mismo
   número de fotograma da la misma imagen en el 2D del juego (el aviso de autoguardado, fotograma 300),
   pero no en los vídeos: AvPlayer sigue el reloj real.
+- `tools/compare_route.sh a/ b/ frames.txt` compara dos carpetas de capturas según `frames.txt`: una línea por
+  fotograma, `<N> exact`, `<N> mask <x> <y> <w> <h> […]` (esos recuadros en negro en las dos) o `<N> eye` (no se
+  compara), y `#` para comentarios. Sale 0 si todo lo comparado es idéntico, 1 si algo difiere y 2 ante un error
+  (captura que falta, línea mal formada, recuadro fuera de la imagen).
+- `tools/route.sh record` / `tools/route.sh replay <nombre>` — el recorrido grabado de la Spec 6 (bloque A), todo en
+  `out/route/`. Cada ejecución parte de la copia fija `out/route/save/` en un `out/route/user/` nuevo, con
+  `out/route/gow3.ini` (`async_shaders=0`), pantalla completa y sin ratón. `record` graba `pad.txt` y las capturas
+  de F12, y escribe `frames.txt`; `replay` repite `pad.txt`, captura los fotogramas de `frames.txt` en
+  `out/route/<nombre>/` y cierra el juego al acabar. Desde el host vuelve a entrar en el distrobox.
 - Para ver qué teclas recibe el juego: `SDL_EVENT_LOGGING=1 SDL_LOGGING='*=info'` escribe cada evento
   de SDL en el log (`SDL EVENT: SDL_EVENT_KEY_DOWN …`).
 - `GOW3_PAD_FILE` (botones y ejes por guion), `GOW3_PAD_RECORD=<archivo>` / `GOW3_PAD_REPLAY=<archivo>`

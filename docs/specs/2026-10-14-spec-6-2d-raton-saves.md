@@ -103,6 +103,24 @@ cada reproducción arranca con la misma partida, así que el recorrido debe fija
     con él no se distinguiría.
 - **[H]** Que las capturas por número de fotograma coincidan entre repeticiones lo mide la Tarea 3.
 
+#### Resultado de la Tarea 2 del bloque A (2026-10-28): herramientas del recorrido
+
+- **`tools/compare_route.sh a/ b/ frames.txt`** generaliza `out/spec1b-t2/compare-oracle.sh`. Cada línea de
+  `frames.txt` es `<N> exact`, `<N> mask <x> <y> <w> <h> […]` o `<N> eye`, con `#` para el nombre de la escena.
+  Revisa el archivo entero, que estén todas las capturas y que cada recuadro quepa en la imagen antes de comparar
+  nada, así que un `frames.txt` roto no imprime ningún resultado (sale 2). Las máscaras se pintan en RGB, sin
+  pasar por YUV, para que una diferencia de un paso junto al recuadro no se pierda.
+- **`tools/route.sh record | replay <nombre>`** trabaja en `out/route/` (decisión 4 del plan): restaura `user/`
+  desde `save/`, escribe `gow3.ini` con `async_shaders=0` si falta, y arranca `run.py` con `GOW3_FULLSCREEN=1`,
+  `GOW3_MOUSE=0` y `GOW3_FILE_TRACE=1`. `record` no pisa una grabación que ya exista. `replay` espera a
+  `pad replay finished`, da 10 s a las últimas capturas y cierra con SIGTERM. Con `STOP:` o `Fault:` sale con 1.
+- **Prueba.** `tests/test_compare_route.py` (6 tests; RED con el script ausente, luego verde). La suite Python
+  entera: 273 tests, OK. `route.sh` se probó con una grabación sintética de una muestra y `frames.txt` = 120 y 300
+  (el aviso de autoguardado). Las dos repeticiones acabaron en 7 s con las dos capturas. Enteras salen
+  diferentes (PSNR ≈ 54.7, el icono «Saving…» que gira), y con el recuadro del icono tapado (`1750 955 80 80`)
+  salen idénticas. El save de `user/` no cambió (`sha256sum -c`). La copia fija `out/route/save/` y su
+  `user-save.sha256` (paso 1 de la Tarea 3) se hicieron ya para esta prueba.
+
 ## 4. Bloque B — Ratón (trabajo nuevo)
 
 **Qué falta:** `libSceMouse` debe informar de un dispositivo conectado y entregar movimiento, botones y
