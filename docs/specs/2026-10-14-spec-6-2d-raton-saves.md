@@ -127,6 +127,37 @@ cada reproducción arranca con la misma partida, así que el recorrido debe fija
   pulsaciones o cortada antes de alguna captura (el juego lee el mando una vez por flip, así que lectura y
   fotograma coinciden) y la mueve a `out/route/failed-<hora>/`.
 
+#### Resultado de la Tarea 3 del bloque A (2026-10-28): el recorrido grabado y su determinismo
+
+- **El recorrido** (`out/route/pad.txt`, 149 muestras hasta la lectura 12669, solo teclado) parte de la copia fija
+  de la partida del usuario (`out/route/save/`). Va del menú de título a Load, elige la cuarta ranura («Alice in the
+  River of Flames», 2026/10/24 22:57) y sigue la novela hasta la escena del hotel. El usuario pulsó F12 en 6 escenas.
+  Los fotogramas 2700 y 2890 (el menú de carga, con las miniaturas) los añadí yo: el usuario pasó por él sin F12, y
+  en él está el único defecto conocido. Cada repetición tarda 3 min 40 s.
+- **[V] Determinismo.** Se hicieron 4 ejecuciones (la grabación y r1, r2, r3). Se compararon todos los pares en las 6
+  escenas, y los dos fotogramas del menú de carga entre r1, r2 y r3. Clasificación (`out/route/frames.txt`):
+
+  | Fotograma | Escena | Clase | Entre ejecuciones |
+  |---|---|---|---|
+  | 2700, 2890 | menú de carga, cursor en la ranura 1 y en la 4 | `eye` | PSNR 46–49: detrás está `titlebg1.mp4`, que va por reloj real |
+  | 4859 | texto largo sobre fondo (prólogo) | `mask 1446 845 64 64` | PSNR 68.3 entero; idéntico con máscara |
+  | 5573 | «Wha—?», fundido a negro, texto corto | `mask 216 365 64 64` | PSNR 66.7–72.8 entero; idéntico con máscara |
+  | 7744 | salpicadura roja, sin texto | `exact` | idéntico |
+  | 10593 | Arcueid en la habitación, sprite sobre fondo | `exact` | idéntico |
+  | 11408 | Arcueid en el callejón, filtro gris | `exact` | idéntico |
+  | 12964 | diálogo sobre el fundido habitación / Arcueid | `mask 1050 601 64 64` | PSNR 71.1–71.3 entero; idéntico con máscara |
+
+  Las diferencias de los fotogramas con texto caen siempre en el cursor animado de «espera al clic», al final del
+  texto: el icono `≡`, o un arco que gira. Ocupa como mucho 42×44 y la máscara es de 64×64 alrededor. Se comprobó a
+  ojo que la máscara no tapa texto. Ninguna escena 2D difiere fuera de un recuadro fijo, así que no se aplica la
+  regla de parada.
+- **Menú de carga.** El fondo cambia en cada ejecución, pero las miniaturas de las ranuras no resaltadas salen
+  idénticas. La ranura resaltada lleva un brillo animado. La corrección de la miniatura (Tarea 5/6) podrá comparar
+  un recorte de esas ranuras.
+- **[V] Sin `STOP:` ni `Fault:`** en las 6 repeticiones (dos tandas de r1–r3) ni en la grabación. Las repeticiones
+  acabaron con `pad replay finished at read 12700`. El save de `user/` no cambió (`sha256sum -c`).
+- **La primera grabación** no sirvió: F9 la cortó en la lectura 1109 (ver la Tarea 2).
+
 ## 4. Bloque B — Ratón (trabajo nuevo)
 
 **Qué falta:** `libSceMouse` debe informar de un dispositivo conectado y entregar movimiento, botones y
@@ -390,7 +421,7 @@ guardado revela fallos, `tests/test_mouse.c`.
 - [x] Un save grabado sobrevive al reinicio y se carga (Tarea 8).
 - [x] El log con `GOW3_FILE_TRACE=1` muestra recursos `_en` y ninguno de otro idioma (Tarea 2). **[D]** 2026-10-25: el
   usuario lo da por cumplido aunque `ft_ja.mrg` se abra al arrancar, porque se abre con cualquier idioma (§6, «Resultado»).
-- [ ] El recorrido grabado se repite entero con `GOW3_PAD_REPLAY`, sin `STOP:` ni `Fault:`.
+- [x] El recorrido grabado se repite entero con `GOW3_PAD_REPLAY`, sin `STOP:` ni `Fault:` (Tarea 3 del bloque A, 2026-10-28).
 
 ## 11. Riesgos y preguntas abiertas
 
