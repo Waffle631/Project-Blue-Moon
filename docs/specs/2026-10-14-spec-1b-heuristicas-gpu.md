@@ -364,3 +364,36 @@ Scripts, logs y capturas en `out/spec1b-t3/` y `out/baseline/1b/`, sin versionar
   `run.py:153` lanza `gow3-probe --cpu-features` antes de fijar `GOW3_GPU_USER_DIR` (`run.py:252`). El inicializador
   estático de `path_util.cpp` de shadPS4 cae entonces en `./user` y rehace sus carpetas y ese aviso. Ya pasaba antes de
   esta spec y también pasa con el recorrido de la Spec 6. No toca partidas ni cachés, y no se corrige aquí.
+
+### Tarea B: contraste antes de borrar (2026-10-28)
+
+Bajo `run.py` (`GOW3_UPSCALER=none`) las dos heurísticas están dormidas, así que sus capturas salen iguales por
+construcción. La prueba de que no hacían nada con Tsukihime es un contador temporal con las dos encendidas
+(`GOW3_EXPERIMENTAL_UPSCALER=1`, que activa a la vez `CameraMotion` y el upscaler temporal). Se midió una vez, para las
+tareas 3 y 3b, sobre `61e34a3`. El contador (prefijo `T1B:`, impreso cada 5 s) no se commiteó: se quitó con
+`git checkout --`, `git diff` quedó vacío y se recompiló el árbol limpio.
+
+| Contador | Arranque (40 s) | Recorrido de la Spec 6 |
+|---|---|---|
+| Draws que evalúan `gbuffer_draw` | 272 268 | 5 165 990 |
+| … con `camera_motion->Enabled()` | 272 268 | 5 165 990 |
+| `gbuffer_draw` verdadero (= llamadas a `OnGBufferPass`) | 0 | 0 |
+| Buffers de constantes de 864 bytes, con o sin `gbuffer_draw` | 0 | 0 |
+| `OnConstants` | 0 | 0 |
+| `TemporalUpscaler::OnDispatch` (`cs_hash == trigger_hash`) | 0 (0) | 0 (0) |
+| `TemporalUpscaler::OnDraw` | 272 268 | 5 165 990 |
+| … `vs_hash == ui_trigger_vs` | 0 | 0 |
+| … `MovieShader(vs_hash)` | 0 | 0 |
+
+- **Arranque:** `run-oracle.sh contraste-antes GOW3_EXPERIMENTAL_UPSCALER=1` (`out/spec1b-t3/contraste-antes.log`).
+  El log dice `Upscaler: FSR 3.1 available (off) on scene color before compute shader 000000009a9cf8a9`. Sale con 142
+  (el watchdog) con `unimplemented=0`. Sus cuatro fotogramas oráculo son **idénticos** a `antes/`.
+- **Novela:** `GOW3_EXPERIMENTAL_UPSCALER=1 bash tools/route.sh replay spec1b-contraste-antes`, dentro del distrobox
+  (`out/route/spec1b-contraste-antes.log`). Sale con 0, sin `Fault:`, con `unimplemented=0`. `compare_route.sh` frente a
+  `out/baseline/6a/` da 6 fotogramas idénticos y los 2 `eye` (2700, 2890), y sale con 0.
+- Aquí la línea del upscaler dice `(on)`: el `on`/`off` es el ajuste `upscaler` del `gow3.ini`. El de la raíz pone
+  `upscaler=off`, y `out/route/gow3.ini` deja el valor por defecto. En las dos tomas el upscaler estaba disponible y
+  recibía las llamadas.
+- **Lectura:** Tsukihime nunca tiene un pase con 5 o más color targets y profundidad, ni buffers de 864 bytes, ni
+  dibuja con los shaders de otro juego. `OnDispatch` da 0 porque el juego no lanza compute (`dispatches=0`), así que
+  `trigger_hash` no tiene nada con que compararse. Ninguna coincidencia: se puede borrar sin cambiar nada.
