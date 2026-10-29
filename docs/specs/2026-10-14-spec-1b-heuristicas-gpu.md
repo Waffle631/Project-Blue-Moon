@@ -329,3 +329,38 @@ pantalla completa, con la partida del usuario, que siguió intacta tras cada tom
   - Sin diferencia de imagen no hacía falta medir el tiempo de fotograma (paso 5 del plan).
 - **Para la Spec 6:** lo que queda de esta spec (tareas 3, 3b y 6) está dormido bajo `run.py`, así que su línea base de
   capturas (A1) ya no depende de la 1b.
+
+### Tareas 3 y 3b: preparación (2026-10-28)
+
+Plan nuevo para lo que faltaba: `~/.claude/plans/quiero-que-hagas-un-iterative-gem.md`, que también recoge el criterio
+del recorrido de la Spec 6 (§5). Rama `tsuki/spec-1b-cierre`, desde `tsuki/main` en `06401c1`, que ya incluye la Spec 6.
+Scripts, logs y capturas en `out/spec1b-t3/` y `out/baseline/1b/`, sin versionar.
+
+- **Línea base de suites en `06401c1`** (`out/spec1b-t3/run-baseline.sh`, copia de la de la Tarea 0; `D=` elige la
+  carpeta; resultado en `out/spec1b-t3/base/`). Es la referencia de las tareas 3, 3b y 6.
+  - `bash build.sh --test` sale con 0.
+  - Python: 273 ejecutados, 35 omitidos y 4 fallos esperados, OK.
+  - `out/gow3-probe --vulkan-only`: PASS.
+  - C++: los 24 destinos de la Tarea 0 dan 0. Se añadió `mouse-accumulator-test` (nuevo de la Spec 6), que compila y
+    pasa, así que ahora son 25. Los que ya no compilaban en la Spec 1a siguen fuera; entre ellos `camera-motion-test`.
+- **Receta de recaptura nueva** (`out/spec1b-t3/run-oracle.sh <toma> [VAR=valor …]`, en el lado del host). La de la
+  Tarea 2 ya no valía tal cual por dos motivos:
+  - usaba la partida de `user/savedata`, que cambió el 2026-10-25 con los guardados de la Spec 6. La que corresponde a
+    `out/baseline/1b/antes/` es la copia `out/savedata-usuario-1b/`;
+  - desde la Spec 6 el juego ve un ratón conectado, y la receta no ponía `GOW3_MOUSE=0`.
+
+  En cada toma la receta rehace un `GOW3_USER_DIR` propio, `out/spec1b-t3/user/`: copia `user/` sin `savedata` ni
+  `savedata_backups` y pone ahí la partida fija. Después arranca 40 s a pantalla completa, sin ratón, con los fotogramas
+  oráculo en `out/baseline/1b/<toma>/`. Las variables extra van detrás de las fijas y mandan sobre ellas.
+- **Control antes de tocar código:** dos tomas con el binario de `06401c1`, `control-a` y `control-b`
+  (`out/spec1b-t3/control-compare.txt`).
+  - `compare-oracle.sh antes control-a`: **idénticos** el 120, el 300, el 420 y el 1320. `control-a` frente a
+    `control-b`: también idénticos. La receta nueva reproduce la referencia, y `antes/` sigue siendo el oráculo.
+  - Las dos salen con 142 (el watchdog de los 40 s) y llegan al menú del título (un `sceAudiodecCreateDecoder`).
+    Dan `unimplemented=0`, `GPU: guest multisampling on` y `Runtime: mouse disabled (GOW3_MOUSE=0)`. Línea `GPU:`
+    final: `submits` 4682/4690, `draws` 275 001/272 415, `dispatches=0`, del mismo orden que en la Tarea 2.
+  - La partida fija sigue igual tras cada toma, y nada de `user/savedata` cambió.
+- **Lo único que una toma escribe en `user/`** es `user/custom_trophy/Notice.txt`, con su texto fijo de siempre.
+  `run.py:153` lanza `gow3-probe --cpu-features` antes de fijar `GOW3_GPU_USER_DIR` (`run.py:252`). El inicializador
+  estático de `path_util.cpp` de shadPS4 cae entonces en `./user` y rehace sus carpetas y ese aviso. Ya pasaba antes de
+  esta spec y también pasa con el recorrido de la Spec 6. No toca partidas ni cachés, y no se corrige aquí.
