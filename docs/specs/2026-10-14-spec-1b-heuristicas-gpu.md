@@ -1,10 +1,10 @@
 # Spec 1b — Eliminar las heurísticas de GPU de GoW3
 
-Fecha: 2026-10-14. Estado: **aprobada (2026-10-24), en ejecución**: el plan de implementación está aprobado y sus
-tareas 0 (línea base de tests), 1 (clasificación, §2.1) y 2 (capturas «antes» y fotogramas oráculo) hechas (§7). La
-Tarea 1 amplió el alcance, por decisión del usuario, a los hashes fijos de shaders del upscaler temporal. Tras la
-Tarea 2 el usuario redujo el alcance (§2.2, 2026-10-25): de la lectura lineal solo se quita el valor por defecto, y el
-MSAA por vendor sale de la spec. La Tarea 4 (ese valor por defecto) está hecha: no tenía efecto en Tsukihime (§7).
+Fecha: 2026-10-14. Estado: **cerrada (2026-10-28)**. Aprobada el 2026-10-24; tareas 0, 1, 2 y 4 hechas el 2026-10-25,
+y 3, 3b, el recorrido de la Spec 6 y el cierre el 2026-10-28 (§7). La Tarea 1 amplió el alcance, por decisión del
+usuario, a los hashes fijos de shaders del upscaler temporal. Tras la Tarea 2 el usuario redujo el alcance (§2.2,
+2026-10-25): de la lectura lineal solo se quita el valor por defecto, y el MSAA por vendor sale de la spec. Rama
+`tsuki/spec-1b-cierre`; su fusión en `tsuki/main` queda pendiente, a decisión del usuario.
 Roadmap:
 `docs/tsuki/ROADMAP.md`, sección "Spec 1b".
 Depende de: Spec 1a y del hito de primer fotograma (necesita su herramienta de captura de píxeles).
@@ -20,12 +20,12 @@ la misma captura antes y después que Tsukihime no cambia (o que el cambio está
 
 | Heurística | Dónde | Qué hace | ¿Activa para Tsukihime? |
 |---|---|---|---|
-| `gbuffer_draw` | `vk_rasterizer.cpp:269-270` (se define), `:1336` (se pone a falso), `:1819`, `:2121`, `:2182`, `:2187` | Marca el draw de G-buffer (≥5 render targets con profundidad). Alimenta el vector de movimiento y la captura | **[V] Dormida**: depende de `camera_motion->Enabled()`, que está apagado por defecto ("Object motion: off" en `out/first-run.log`) |
-| Constante de cámara de 864 bytes | `vk_rasterizer.cpp:2121`, `:2182` | Reconoce el buffer de constantes de cámara de GoW3 por su tamaño | **[V] Dormida**, la condición exige `gbuffer_draw` |
+| `gbuffer_draw` | `vk_rasterizer.cpp:269-270` (se define), `:1336` (se pone a falso), `:1819`, `:2121`, `:2182`, `:2187` | Marca el draw de G-buffer (≥5 render targets con profundidad). Alimenta el vector de movimiento y la captura | **[V] Dormida**: depende de `camera_motion->Enabled()`, que está apagado por defecto ("Object motion: off" en `out/first-run.log`). **Borrada (Tarea 3, `ba39fdc`)** |
+| Constante de cámara de 864 bytes | `vk_rasterizer.cpp:2121`, `:2182` | Reconoce el buffer de constantes de cámara de GoW3 por su tamaño | **[V] Dormida**, la condición exige `gbuffer_draw`. **Borrada (Tarea 3, `ba39fdc`)** |
 | Escalado de la escena a 1920×1080 | `vk_rasterizer.cpp:3044-3068` | "El viewport de la película de UI es 1920×1080 aunque la escena sea 960×540"; los pasos de media resolución mantienen el factor de la escena (`size/1920`, `size/1080`) | **Decidido: se conserva.** El proyecto trabaja de base a 1080p, así que esta lógica es la resolución base y no es específica de GoW3. No se borra; se documenta y, si hace falta, se renombra en la Spec 7 |
 | MSAA por vendor | `gpu/shadps4/video_core/amdgpu/gow3_msaa_default.h`, decisión en `vk_instance.cpp`, propiedades en `tools/gpu_capabilities.c` | En AMD y Intel propietario en Windows, crea las imágenes multimuestra con una muestra | **[V]** No incluye RADV (el driver de Linux): la 6650 XT de pruebas mantiene el multimuestreo del juego. **[D] Se queda (2026-10-25, §2.2):** es un parche de driver, no del juego |
 | `GOW3_READBACK_LINEAR=1` por defecto | `run.py:216` | Activa lectura lineal de imágenes para la CPU | **[H] Activa**; cambia rendimiento más que imagen. **[D] Solo se quita el valor por defecto (2026-10-25, §2.2):** la opción de shadPS4 que enciende se queda. **[V] Sin efecto (Tarea 4, §7):** con la opción encendida, Tsukihime no metió ninguna imagen en `download_images`. Valor por defecto quitado |
-| Hashes fijos de shaders en el upscaler temporal | `ui_composition.h:25-30` (`MovieShader`: 5 hashes de vertex shaders de la UI Scaleform), `vk_temporal_upscaler.h:197` (`trigger_hash = 0x9a9cf8a9`, el compute antes del cual se escala), `:215` (`ui_trigger_vs = 0x34e8a281`); usos en `vk_temporal_upscaler.cpp:361,1306,1321` y `tests/test_ui_composition.cpp:19-21` | Deciden en qué compute se escala la escena y qué draws son UI. Son de otro juego: entraron el 2026-09-26 (`0403703`, `ff221f7`), cuando el upscaler aún se llamaba `BB_UPSCALER`; no son shaders de Tsukihime | **[V] Dormidos** bajo `run.py`: fija `GOW3_UPSCALER=none` (`run.py:214-215`) y todas las llamadas al upscaler exigen `upscaler->Enabled()` (`vk_rasterizer.cpp:1012,1236,1353`). **[D] Se borran (2026-10-25)**: los valores por defecto pasan a «sin disparador»; `GOW3_UPSCALE_BEFORE_CS` y `GOW3_UI_TRIGGER_VS` siguen permitiendo fijarlos |
+| Hashes fijos de shaders en el upscaler temporal | `ui_composition.h:25-30` (`MovieShader`: 5 hashes de vertex shaders de la UI Scaleform), `vk_temporal_upscaler.h:197` (`trigger_hash = 0x9a9cf8a9`, el compute antes del cual se escala), `:215` (`ui_trigger_vs = 0x34e8a281`); usos en `vk_temporal_upscaler.cpp:361,1306,1321` y `tests/test_ui_composition.cpp:19-21` | Deciden en qué compute se escala la escena y qué draws son UI. Son de otro juego: entraron el 2026-09-26 (`0403703`, `ff221f7`), cuando el upscaler aún se llamaba `BB_UPSCALER`; no son shaders de Tsukihime | **[V] Dormidos** bajo `run.py`: fija `GOW3_UPSCALER=none` (`run.py:214-215`) y todas las llamadas al upscaler exigen `upscaler->Enabled()` (`vk_rasterizer.cpp:1012,1236,1353`). **[D] Se borran (2026-10-25)**: los valores por defecto pasan a «sin disparador»; `GOW3_UPSCALE_BEFORE_CS` y `GOW3_UI_TRIGGER_VS` siguen permitiendo fijarlos. **Borrados (Tarea 3b, `76b739f`)** |
 | Otros restos de GoW3 en el núcleo | `liverpool.cpp` (46 coincidencias `gow3`), `texture_cache.cpp`, `vk_pipeline_cache.cpp` (43), `videoout/driver.cpp` (65), `vk_frame_capture.cpp`, `camera_motion.comp`, `motion_history.h`, `vk_lighting_test.h`, `vk_temporal_upscaler.h` | Mezclan marcas `gow3:` (cambios nuestros sobre shadPS4, que **se conservan**) con comentarios o nombres de GoW3 | **[V] Clasificados (2026-10-25, §2.1)**: comentarios y lógica genérica. Hay dos excepciones: los hashes de la fila anterior y el clasificador de 864 bytes de `motion_history.h`, que se queda |
 
 Nota importante: las 2551 coincidencias de `gow3` no son todas código de GoW3. Casi todas son la
@@ -174,23 +174,23 @@ escenas (`despues-<n>.png`) y comparar con `tools/compare_captures.sh`.
 
 ## 5. Pruebas y criterios de aceptación
 
-- [ ] `bash build.sh --test` y `python3 -m unittest discover -s tests` pasan; los tests C++ de GPU
-  que sigan siendo genéricos (`ninja -C out/gpu frame-capture-test`, etc.) también.
-- [ ] `out/gow3-probe --vulkan-only` sigue en PASS en la RX 6650 XT.
-- [ ] *(Viene de la Spec 6, **[D]** 2026-10-28.)* Después de las tareas 3 y 3b, el recorrido grabado de la Spec 6 se
+- [x] `bash build.sh --test` y `python3 -m unittest discover -s tests` pasan; los tests C++ de GPU
+  que sigan siendo genéricos (`ninja -C out/gpu frame-capture-test`, etc.) también. *(Cierre, §7: 273/35/4 y 25 C++ a 0.)*
+- [x] `out/gow3-probe --vulkan-only` sigue en PASS en la RX 6650 XT. *(Cierre, §7.)*
+- [x] *(Viene de la Spec 6, **[D]** 2026-10-28.)* Después de las tareas 3 y 3b, el recorrido grabado de la Spec 6 se
   repite sin cambios: `bash tools/route.sh replay spec1b-despues`, y luego
   `bash tools/compare_route.sh out/baseline/6a out/route/spec1b-despues out/route/frames.txt`, que debe salir con 0.
-  El log de la repetición no debe tener `STOP:` ni `Fault:`.
-- [ ] Para cada heurística borrada: `compare_captures` reporta "idéntico" en los fotogramas oráculo (§7, Tarea 2)
-  o la diferencia está explicada por escrito en la tabla del paso 1.
-- [ ] Búsqueda por lista cerrada, con palabra completa, sin `docs/` ni `CLAUDE.md` (que nombra lo borrado):
+  El log de la repetición no debe tener `STOP:` ni `Fault:`. *(Tarea C, §7: sale con 0; los dos `eye` revisados.)*
+- [x] Para cada heurística borrada: `compare_captures` reporta "idéntico" en los fotogramas oráculo (§7, Tarea 2)
+  o la diferencia está explicada por escrito en la tabla del paso 1. *(Tareas 3, 3b, 4 y cierre: 4/4 idénticos.)*
+- [x] Búsqueda por lista cerrada, con palabra completa, sin `docs/` ni `CLAUDE.md` (que nombra lo borrado):
   `git grep -nwE 'gbuffer_draw'` sin resultados, y `run.py` ya no fija `GOW3_READBACK_LINEAR`. Antes la lista incluía
   `GOW3_READBACK_LINEAR` y `gow3_no_msaa_default`; desde el 2026-10-25 (§2.2) la opción de shadPS4, su variable y el
-  MSAA por vendor se quedan.
-- [ ] Sin la constante de 864 bytes en `vk_rasterizer.cpp`. Excepción escrita (§2.1): `motion_history.h:45` y el
-  comentario `vk_camera_motion.h:72` se quedan con `CameraMotion`/`ObjectMotion`.
-- [ ] Sin hashes fijos de shaders en el upscaler temporal:
-  `git grep -nE 'MovieShader|0x9a9cf8a9|0x34e8a281' -- . ':!docs' ':!CLAUDE.md'` sin resultados.
+  MSAA por vendor se quedan. *(Cierre, §7: las dos vacías.)*
+- [x] Sin la constante de 864 bytes en `vk_rasterizer.cpp`. Excepción escrita (§2.1): `motion_history.h:45` y el
+  comentario `vk_camera_motion.h:72` se quedan con `CameraMotion`/`ObjectMotion`. *(Cierre, §7.)*
+- [x] Sin hashes fijos de shaders en el upscaler temporal:
+  `git grep -nE 'MovieShader|0x9a9cf8a9|0x34e8a281' -- . ':!docs' ':!CLAUDE.md'` sin resultados. *(Cierre, §7.)*
 - Retirado el 2026-10-25 (§2.2): «el log de arranque ya no menciona `gow3_msaa` ni lectura lineal; `GPU: guest
   multisampling` queda decidido por el driver, no por el vendor». El MSAA por vendor se queda, y la línea
   `GPU: guest multisampling` sigue en el log.
@@ -202,7 +202,8 @@ escenas (`despues-<n>.png`) y comparar con `tools/compare_captures.sh`.
   renderizador sin poder comparar antes y después. **Cubierto (2026-10-25):** la Tarea 2 fijó cuatro fotogramas
   oráculo de dos pantallas distintas (§7).
 - Borrar `gbuffer_draw` afecta a los upscalers temporales (usan el vector de movimiento). Están
-  fuera de la Alpha; se dejan funcionando solo si lo hacen sin esa heurística.
+  fuera de la Alpha; se dejan funcionando solo si lo hacen sin esa heurística. **Resultado (Tarea 3):** sin ella no
+  funcionan; el código se queda y las opciones que lo encienden se quitan en la Spec 7 (§10), decisión del usuario.
 
 ## 7. Resultado
 
@@ -467,3 +468,42 @@ disparador, la línea del arranque dice `Upscaler: FSR 3.1 available (…) on sc
 - **Búsquedas:** `git grep -nE 'MovieShader|0x9a9cf8a9|0x34e8a281' -- . ':!docs' ':!CLAUDE.md'` sale vacía.
   `docs/upscaler.md` explica que `9a9cf8a9` era el compute de GoW3 y que ahora hay que darlo con
   `GOW3_UPSCALE_BEFORE_CS`. `docs/plans/2026-10-12-gpu-corruption-rdna2.md` se queda como historia.
+
+### Tarea C — recorrido grabado de la Spec 6 (2026-10-28)
+
+Con el binario final (`76b739f`, tareas 3 y 3b) y sin variables extra, dentro del distrobox:
+`bash tools/route.sh replay spec1b-despues` sale con 0 (`out/route/spec1b-despues.log`), sin `STOP:` ni `Fault:`, con
+`unimplemented=0`, `GPU: guest multisampling on` y el ratón apagado. Línea `GPU:` final:
+`submits=25950 draws=5279480 dispatches=0 flips=12974`. Bajo `run.py` el upscaler está apagado, así que no imprime su
+línea.
+
+`bash tools/compare_route.sh out/baseline/6a out/route/spec1b-despues out/route/frames.txt` sale con **0**: los
+fotogramas 4859, 5573, 7744, 10593, 11408 y 12964 son idénticos (con las máscaras del cursor de espera), y el 2700 y
+el 2890 se juzgan a ojo (`out/spec1b-t3/route-despues-vs-6a.txt`).
+
+- **Fotogramas a ojo** (menú de carga sobre `titlebg1.mp4`; `out/spec1b-t3/eye-6a-vs-despues.png`, lado a lado con
+  `6a`): la misma ranura seleccionada, las mismas fechas, títulos, miniaturas y nota. Cambian ~367 000 píxeles por
+  fotograma, todos en lo que se ve a través del vídeo de fondo: las nubes, la tarjeta azul translúcida y los brillos de
+  las tarjetas (`out/spec1b-t3/eye-2700-diff.png`). Es la fase del vídeo: frente a `6a`, `spec1b-contraste-antes`, que
+  se tomó antes de borrar nada, ya difería en ~96 000 píxeles, y `spec1b-contraste-despues` en ~480 000. Dentro de las
+  tarjetas opacas la diferencia máxima es de 34 niveles, en su fondo translúcido, no en el texto.
+
+### Tarea 6 — cierre (2026-10-28)
+
+- **Suites** (`D=out/spec1b-t3/cierre`): `bash build.sh --test` sale con 0; Python, 273 ejecutados, 35 omitidos y 4
+  fallos esperados (los del launcher), OK; `--vulkan-only` PASS; los 25 destinos C++ dan 0, `no-msaa-test` con su nombre.
+  Iguales a la base de la Tarea A.
+- **Búsquedas de aceptación**, las cuatro vacías:
+  - `git grep -nwE 'gbuffer_draw' -- . ':!docs' ':!CLAUDE.md'`;
+  - `git grep -n 'GOW3_READBACK_LINEAR' -- run.py`;
+  - `git grep -nE 'MovieShader|0x9a9cf8a9|0x34e8a281' -- . ':!docs' ':!CLAUDE.md'`;
+  - `git grep -n '864' -- gpu/shadps4/video_core/renderer_vulkan/vk_rasterizer.cpp`.
+- **Arranque de 60 s** (`run-oracle.sh cierre GOW3_TIMEOUT=60`, `out/spec1b-t3/cierre.log`): sale con 142 (el
+  watchdog, único `STOP:`), sin `Fault:`, con `unimplemented=0` y `GPU: guest multisampling on`. Llega al menú del
+  título (el `sceAudiodecCreateDecoder` de su música). Línea `GPU:` final:
+  `submits=7090 draws=632318 dispatches=0 flips=3545`. `compare-oracle.sh antes cierre` da **idénticos** el 120, el
+  300, el 420 y el 1320.
+- **Lo que queda, a propósito:** el clasificador de 864 de `motion_history.h`, `CameraMotion`, `ObjectMotion` y
+  `TemporalUpscaler`, ahora inalcanzables (Tarea 3). El usuario decidió conservar su código y quitar en la Spec 7 (§10)
+  las opciones que los encienden. También se quedan el escalado a 1920×1080 y el MSAA por vendor (§2.2).
+- La Spec 7 queda desbloqueada. La fusión de `tsuki/spec-1b-cierre` en `tsuki/main` la decide el usuario.

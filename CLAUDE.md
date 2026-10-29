@@ -19,8 +19,8 @@ No game files are in the repo. A decrypted (fake-signed) dump folder with `eboot
 This branch is porting **TSUKIHIME -A piece of blue glass moon-** (PS4, CUSA47999, v01.00) on top
 of the GoW3 codebase. Everything below still describes the GoW3 code as it is; the
 "Game-specific surface" section is the checklist of what must be generalized or replaced.
-GoW3-only features (orb/damage hooks, actors, enemy health bar, GoW3 patches XML, `gbuffer_draw`
-heuristics, touchpad semantics, GoW3-only tests) must be **deleted** from the tree, not disabled,
+GoW3-only features (orb/damage hooks, actors, enemy health bar, GoW3 patches XML, GPU heuristics,
+touchpad semantics, GoW3-only tests; Specs 1a and 1b removed them) must be **deleted** from the tree, not disabled,
 isolated or adapted: no dead code behind a switch. GoW3 stops being a supported title on this
 branch (history stays in git and the `gow3` branch). Generic code (loader, runtime, shadPS4 core,
 upscalers) stays. Order of work and acceptance criteria: `docs/tsuki/ROADMAP.md` (kernel Spec 2 first; Spec 1a deletes
@@ -65,13 +65,17 @@ with before/after captures; the `gow3` → `tsuki` rename is Spec 7, done last).
   from run to run; 900–1020 the `TM_CI.mp4` logo video (not deterministic); 1080–1560 the legal warning,
   pixel-identical from 1140 to 1500; then the title menu. Pixel oracle frames: 120/300/420 with the icon box
   masked, and 1320 whole. `out/spec1b-t2/compare-oracle.sh <before>/ <after>/` (untracked, runs inside the
-  distrobox) compares them; the reference is `out/baseline/1b/antes/`.
-- Spec 1b (GPU heuristics; on `tsuki/main` since `tsuki/spec-1b` was merged into it on 2026-10-25) is in
-  progress: tasks 0–2 and 4 are done (2026-10-25). For
-  Tsukihime none of the heuristics is needed or in the way; the delete-don't-disable rule above is why they go.
+  distrobox) compares them; the reference is `out/baseline/1b/antes/`. Since Spec 6 the user's save changed and
+  the game sees a mouse, so retakes use `out/spec1b-t3/run-oracle.sh <take> [VAR=value…]` (untracked, run from the
+  host): the fixed save `out/savedata-usuario-1b/` in its own `GOW3_USER_DIR`, `GOW3_MOUSE=0`, 40 s fullscreen.
+- Spec 1b (GPU heuristics) is closed (2026-10-28; branch `tsuki/spec-1b-cierre`, not yet merged into `tsuki/main`).
+  For Tsukihime none of the heuristics was needed or in the way; the delete-don't-disable rule above is why they went.
+  A temporary counter with them switched on (`GOW3_EXPERIMENTAL_UPSCALER=1`) found 0 matches at boot and on the
+  recorded route; after the deletions the oracle frames and the route match `out/baseline/6a/`.
   Scope, as the user decided on 2026-10-25 (spec §2.2):
   - deleted: `gbuffer_draw` and the 864-byte constant (task 3), and the temporal upscaler's hard-coded shader
-    hashes from another game (task 3b);
+    hashes from another game (task 3b). The upscaler now has no trigger by default: `UiComposition::Trigger` fires
+    only on a hash given by `GOW3_UPSCALE_BEFORE_CS` / `GOW3_UI_TRIGGER_VS`;
   - linear readback: only the `GOW3_READBACK_LINEAR=1` default in `run.py` went (task 4, done). With it on,
     Tsukihime put no image in `download_images`, either at boot or in the novel, so it did nothing for this
     game. `readback_linear_images` is a shadPS4 option and stays: off by default, and
@@ -79,12 +83,15 @@ with before/after captures; the `gow3` → `tsuki` rename is Spec 7, done last).
   - **not deleted:** the vendor-based guest MSAA decision, which is a Windows driver workaround and cannot be
     tested on RADV, and the 1920×1080 scaling, which is the project's base resolution.
 
-  Task 4 was the only one that could change what Spec 6 sees. It has landed, and the oracle frames came out
-  identical, so Spec 6's capture baseline (A1) does not depend on what is left.
+  Without `gbuffer_draw`, `CameraMotion` has no inputs (`OnGBufferPass`/`OnConstants` have no callers), so
+  `CameraMotion`, `ObjectMotion` and the temporal upscaler (FSR 3.1/4, DLSS, TAA) can no longer run with this game.
+  The user decided (2026-10-28) to keep that code and to remove the options that switch it on (launcher, `gow3.ini`,
+  `run.py`'s `GOW3_EXPERIMENTAL_UPSCALER`, env vars) in Spec 7 (§10), before the rename. FSR 1 and RCAS are spatial
+  and stay.
 - Spec 6 (2D, mouse, saves, language) is closed (2026-10-28): blocks B, C and D were done on 2026-10-25 and block A,
-  the 2D render baseline, on 2026-10-28 (branch `tsuki/spec-6bcd`, not yet merged into `tsuki/main`).
+  the 2D render baseline, on 2026-10-28 (branch `tsuki/spec-6bcd`, fast-forward merged into `tsuki/main`).
   - The user closed it without waiting for Spec 1b. Replaying the route after Spec 1b's deletions and matching
-    `out/baseline/6a/` is now a Spec 1b criterion, and Spec 7 depends on Spec 1b directly.
+    `out/baseline/6a/` became a Spec 1b criterion, met on 2026-10-28; Spec 7 is unblocked.
   - Recorded route: `tools/route.sh record | replay <name>` (inside the distrobox; it re-enters it from the host).
     Everything lives in `out/route/` (untracked):
     - every run starts from the fixed save copy `out/route/save/` in its own `GOW3_USER_DIR`, so `user/` is never
@@ -227,12 +234,12 @@ TEB TLS slot on Windows, patched by `patch_tcb_loads`).
 - Patches: `patches/God_of_War_III_Remastered.xml` (shadPS4/GoldHEN XML; `Pattern`/`At`
   signatures generated by `tools/make_signatures.py`), the `GAMES` profile and
   `REFERENCE_SHA256` in `scripts/patches.py`. Literal writes only; mask patches are rejected.
-- GPU heuristics (Spec 1b):
-  - `gbuffer_draw` and the 864-byte camera constant buffer in `vk_rasterizer.cpp`. The 864-byte classifier in
-    `motion_history.h:45` stays, with the inert `CameraMotion`/`ObjectMotion`.
-  - The temporal upscaler's hard-coded shader hashes: `UiComposition::MovieShader`, `trigger_hash` and
-    `ui_trigger_vs`.
-  - ~~The `GOW3_READBACK_LINEAR=1` default in `run.py`~~: removed (task 4, 2026-10-25). The option stays.
+- GPU heuristics (Spec 1b, closed 2026-10-28), all removed:
+  - ~~`gbuffer_draw` and the 864-byte camera constant buffer in `vk_rasterizer.cpp`~~ (task 3). The 864-byte
+    classifier in `motion_history.h:45` stays, with the now unreachable `CameraMotion`/`ObjectMotion`.
+  - ~~The temporal upscaler's hard-coded shader hashes (`UiComposition::MovieShader`, `trigger_hash`,
+    `ui_trigger_vs`)~~ (task 3b).
+  - ~~The `GOW3_READBACK_LINEAR=1` default in `run.py`~~ (task 4, 2026-10-25). The option stays.
 
   Not GoW3 code, so they stay: the 1920×1080 scene scaling (the project's base resolution), and the
   vendor-based guest MSAA decision (`gow3_msaa_default.h`, a workaround for AMD's and Intel's Windows drivers;
