@@ -1,7 +1,8 @@
 # Spec 7 — Renombrar `gow3` a `tsuki`
 
 Fecha: 2026-10-14, ampliada el 2026-10-25 (§9). Estado: **borrador para aprobación**. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 7".
-Depende de: Spec 6 (el recorrido grabado y las capturas son el oráculo del renombrado).
+Depende de: Spec 6 (el recorrido grabado y las capturas son el oráculo del renombrado) y Spec 1b. El renombrado va
+al final. Antes de que la Spec 6 se cerrara sin la 1b (2026-10-28), esta dependencia llegaba a través de la 6.
 
 Marcas: **[V]** comprobado el 2026-10-14; **[D]** decisión del usuario.
 

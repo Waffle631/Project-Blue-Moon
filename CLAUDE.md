@@ -81,8 +81,10 @@ with before/after captures; the `gow3` → `tsuki` rename is Spec 7, done last).
 
   Task 4 was the only one that could change what Spec 6 sees. It has landed, and the oracle frames came out
   identical, so Spec 6's capture baseline (A1) does not depend on what is left.
-- Spec 6 (2D, mouse, saves, language): blocks B, C and D are done (2026-10-25), and block A, the 2D render
-  baseline, on 2026-10-28 (branch `tsuki/spec-6bcd`). Spec 6 closes once Spec 1b is finished.
+- Spec 6 (2D, mouse, saves, language) is closed (2026-10-28): blocks B, C and D were done on 2026-10-25 and block A,
+  the 2D render baseline, on 2026-10-28 (branch `tsuki/spec-6bcd`, not yet merged into `tsuki/main`).
+  - The user closed it without waiting for Spec 1b. Replaying the route after Spec 1b's deletions and matching
+    `out/baseline/6a/` is now a Spec 1b criterion, and Spec 7 depends on Spec 1b directly.
   - Recorded route: `tools/route.sh record | replay <name>` (inside the distrobox; it re-enters it from the host).
     Everything lives in `out/route/` (untracked):
     - every run starts from the fixed save copy `out/route/save/` in its own `GOW3_USER_DIR`, so `user/` is never

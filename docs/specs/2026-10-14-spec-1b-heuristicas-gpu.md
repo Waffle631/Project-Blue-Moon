@@ -177,6 +177,10 @@ escenas (`despues-<n>.png`) y comparar con `tools/compare_captures.sh`.
 - [ ] `bash build.sh --test` y `python3 -m unittest discover -s tests` pasan; los tests C++ de GPU
   que sigan siendo genéricos (`ninja -C out/gpu frame-capture-test`, etc.) también.
 - [ ] `out/gow3-probe --vulkan-only` sigue en PASS en la RX 6650 XT.
+- [ ] *(Viene de la Spec 6, **[D]** 2026-10-28.)* Después de las tareas 3 y 3b, el recorrido grabado de la Spec 6 se
+  repite sin cambios: `bash tools/route.sh replay spec1b-despues`, y luego
+  `bash tools/compare_route.sh out/baseline/6a out/route/spec1b-despues out/route/frames.txt`, que debe salir con 0.
+  El log de la repetición no debe tener `STOP:` ni `Fault:`.
 - [ ] Para cada heurística borrada: `compare_captures` reporta "idéntico" en los fotogramas oráculo (§7, Tarea 2)
   o la diferencia está explicada por escrito en la tabla del paso 1.
 - [ ] Búsqueda por lista cerrada, con palabra completa, sin `docs/` ni `CLAUDE.md` (que nombra lo borrado):

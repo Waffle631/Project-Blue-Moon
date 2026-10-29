@@ -1,8 +1,10 @@
 # Spec 6 — 2D correcto, ratón, saves e idioma
 
-Fecha: 2026-10-14. Estado: **en curso**. Los bloques B (ratón), C (saves) y D (idioma) se hicieron el 2026-10-25, en la
-rama `tsuki/spec-6bcd`; falta el bloque A (render 2D). Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 6".
-Empieza tras el hito de primer fotograma; se cierra cuando están hechas las Specs 1b, 3, 4 y 5.
+Fecha: 2026-10-14. Estado: **cerrada (2026-10-28)**. Los bloques B (ratón), C (saves) y D (idioma) se hicieron el
+2026-10-25 y el A (render 2D) el 2026-10-28, en la rama `tsuki/spec-6bcd`. Roadmap: `docs/tsuki/ROADMAP.md`, sección
+"Spec 6". Empezó tras el hito de primer fotograma. Debía cerrarse cuando estuvieran hechas las Specs 1b, 3, 4 y 5.
+**[D]** 2026-10-28: el usuario la cierra sin esperar a la Spec 1b, y la comprobación que quedaba pasa a ser un criterio
+de la 1b: repetir el recorrido tras sus borrados y compararlo con `out/baseline/6a/`.
 
 Marcas: **[V]** comprobado en el repo; **[H]** hipótesis a confirmar; **[D]** decisión del usuario.
 Esta spec es la más incierta del proyecto: se divide en cuatro bloques (A–D) que pueden convertirse en
@@ -211,7 +213,12 @@ así que no hay tareas A3 (6.n).
   `pad replay finished` sin `STOP:` ni `Fault:`, y el save de `user/` no cambió.
 - **[V] Suites:** `bash build.sh --test` sale con 0, `frame-capture-test` pasa, y Python da 273 tests (35 omitidos,
   4 fallos esperados). Antes del bloque A eran 267: los 6 nuevos son los de `test_compare_route.py`.
-- El bloque A queda hecho. La Spec 6 se cierra cuando esté terminada la Spec 1b (tareas 3, 3b y 6).
+- El bloque A queda hecho. **[D]** El usuario cierra la Spec 6 el mismo día, sin esperar a la Spec 1b. Lo que
+  la ataba a la 1b era comprobar la línea base después de los borrados de las tareas 3 y 3b. Esa comprobación
+  pasa a la Spec 1b, §5: `tools/route.sh replay` y `tools/compare_route.sh` contra `out/baseline/6a/` deben salir
+  con 0. Lo que queda de la 1b no se espera que cambie ningún píxel, porque toca código que Tsukihime no ejecuta:
+  `gbuffer_draw`, y el upscaler temporal, que el recorrido no enciende. La tarea 4, la única que podía cambiar
+  algo, ya dio fotogramas idénticos.
 
 ## 4. Bloque B — Ratón (trabajo nuevo)
 
