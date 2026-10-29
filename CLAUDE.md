@@ -81,8 +81,21 @@ with before/after captures; the `gow3` → `tsuki` rename is Spec 7, done last).
 
   Task 4 was the only one that could change what Spec 6 sees. It has landed, and the oracle frames came out
   identical, so Spec 6's capture baseline (A1) does not depend on what is left.
-- Spec 6 (2D, mouse, saves, language): blocks B, C and D are done (2026-10-25, branch `tsuki/spec-6bcd`).
-  Block A, the 2D render baseline and its fixes, is pending.
+- Spec 6 (2D, mouse, saves, language): blocks B, C and D are done (2026-10-25), and block A, the 2D render
+  baseline, on 2026-10-28 (branch `tsuki/spec-6bcd`). Spec 6 closes once Spec 1b is finished.
+  - Recorded route: `tools/route.sh record | replay <name>` (inside the distrobox; it re-enters it from the host).
+    Everything lives in `out/route/` (untracked):
+    - every run starts from the fixed save copy `out/route/save/` in its own `GOW3_USER_DIR`, so `user/` is never
+      touched;
+    - `out/route/gow3.ini` sets `async_shaders=0`; runs are fullscreen with no mouse;
+    - `pad.txt` is the user's recording (pad reads); `frames.txt` says how each frame is compared.
+    `tools/compare_route.sh <a>/ <b>/ out/route/frames.txt` compares two capture folders. Frames are `exact`, or
+    `mask` with boxes that hide the animated click-wait cursor, or `eye` for the load menu over `titlebg1.mp4`.
+  - The approved reference is `out/baseline/6a/` (8 frames, untracked). Replays are pixel-identical to it with
+    those masks; a replay takes ~3 min 40 s.
+  - The pixelated save-slot thumbnail is the game's own: it builds it on the CPU from `allpac2.mrg` into a
+    512×256 one-mip texture, which Vulkan samples as the guest asks. The user decided to leave it as is
+    (2026-10-28).
   - Mouse: `src/runtime_mouse.c`. The window thread accumulates SDL events (`gpu/shim/gow3_mouse.h`) and
     `sceMouseRead` takes them through `gow3gpu_mouse_read`. The game's cursor lives in a 640×448 space, so
     the bridge sends deltas that put that cursor where the host pointer is, not the raw SDL deltas. While
@@ -237,7 +250,7 @@ arms a watchdog that dumps all thread stacks (Linux; SIGUSR2 dumps one thread). 
 `GOW3_PAD_FILE`, `GOW3_PAD_RECORD`/`GOW3_PAD_REPLAY` (both from the game's first pad read, F9 only stops
 recording; clocked in pad reads, file header `reads`, old ms files are refused), `GOW3_MOUSE=0` (no mouse, for replays). `GOW3_FILE_TRACE=1` logs every guest file open
 (`File trace: open(<path>) -> fd <n>, <size> bytes` or `-> errno <e>`); `GOW3_AUDIO_TRACE` only covers failed reads and Ajm. `tools/got_import.py [--linked] <offset>` names the import
-bound to a GOT slot (`--linked`: `out/boot-linked.bin`, which includes `libc.prx`). Frame capture: `GOW3_FRAME_CAPTURE_KEY` (F11). The full log of a launcher run is
+bound to a GOT slot (`--linked`: `out/boot-linked.bin`, which includes `libc.prx`). Frame capture: `GOW3_FRAME_CAPTURE_KEY` (F11), or `GOW3_CAPTURE_TRIGGER=<file>` (creating the file records the next frame: passes, sampled images with their mips, and samplers as the guest asks for them and as Vulkan gets them). The full log of a launcher run is
 `user/last_run.log`.
 
 ## Conventions

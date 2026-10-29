@@ -200,6 +200,19 @@ El usuario no rechazó ninguna captura, así que solo entra la miniatura «algo 
 |---|---|---|---|---|
 | Miniatura de ranura «algo pixelada» | 2700, 2890 | Textura | Textura de 512×256 sin mips que compone la CPU del juego y se reduce 1.6× con los samplers que pide el juego **[V]** | Del juego (a) |
 
+**[D] 2026-10-28: el usuario deja la miniatura como está.** Se habló de mejorarla con una opción genérica de
+filtrado en `gow3.ini`, o con un parche del eboot si la culpa fuera de la composición en la CPU. Decidió no hacerlo,
+así que no hay tareas A3 (6.n).
+
+#### Cierre del bloque A (2026-10-28)
+
+- **[V]** Dos repeticiones más (`cierre-1`, `cierre-2`) contra `out/baseline/6a/`: `compare_route.sh` sale con 0 en
+  las dos. Las 6 escenas comparadas dan idéntico, y las 2 del menú de carga son a ojo. Las dos llegan a
+  `pad replay finished` sin `STOP:` ni `Fault:`, y el save de `user/` no cambió.
+- **[V] Suites:** `bash build.sh --test` sale con 0, `frame-capture-test` pasa, y Python da 273 tests (35 omitidos,
+  4 fallos esperados). Antes del bloque A eran 267: los 6 nuevos son los de `test_compare_route.py`.
+- El bloque A queda hecho. La Spec 6 se cierra cuando esté terminada la Spec 1b (tareas 3, 3b y 6).
+
 ## 4. Bloque B — Ratón (trabajo nuevo)
 
 **Qué falta:** `libSceMouse` debe informar de un dispositivo conectado y entregar movimiento, botones y
@@ -456,7 +469,7 @@ guardado revela fallos, `tests/test_mouse.c`.
 
 ## 10. Criterios de aceptación
 
-- [ ] Las capturas del recorrido coinciden con la línea base que el usuario aprobó.
+- [x] Las capturas del recorrido coinciden con la línea base que el usuario aprobó (cierre del bloque A, 2026-10-28).
 - [x] El texto en inglés es legible, sin glifos rotos ni cortes de línea incorrectos (lo juzga el usuario; Tarea 4 del bloque A, 2026-10-28).
 - [x] `out/mouse-test` pasa y, en el juego, el ratón avanza el texto y maneja los menús (Tarea 6).
 - [x] Mando, teclado y ratón avanzan el texto (Tarea 6).
