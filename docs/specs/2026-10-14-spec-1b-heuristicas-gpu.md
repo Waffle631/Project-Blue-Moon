@@ -397,3 +397,36 @@ tareas 3 y 3b, sobre `61e34a3`. El contador (prefijo `T1B:`, impreso cada 5 s) n
 - **Lectura:** Tsukihime nunca tiene un pase con 5 o más color targets y profundidad, ni buffers de 864 bytes, ni
   dibuja con los shaders de otro juego. `OnDispatch` da 0 porque el juego no lanza compute (`dispatches=0`), así que
   `trigger_hash` no tiene nada con que compararse. Ninguna coincidencia: se puede borrar sin cambiar nada.
+
+### Tarea 3 — sin `gbuffer_draw` ni la constante de 864 bytes (2026-10-28)
+
+Borrado en `vk_rasterizer.cpp` y `vk_rasterizer.h` (38 líneas, todas quitadas):
+
+- en `UpdateRenderTargets`, la asignación de `gbuffer_draw` (pase con 5 o más color targets y profundidad) y la
+  llamada a `OnGBufferPass`. El bloque siguiente (`OnColorTarget` y el color de escena) se queda;
+- `gbuffer_draw = false;` al principio de `DispatchRecord`;
+- las dos lecturas de la constante de cámara de 864 bytes (rama del anillo de constantes y rama de los V#), que
+  llamaban a `OnConstants`. En la del anillo queda solo el `push_data.AddOffset` genérico;
+- las dos notas de captura de «Object motion research» (`gb vb` y `gb vs`), que solo salían en draws de G-buffer.
+  El `FrameCapture::Buffer` genérico de los V# se queda;
+- el miembro `gbuffer_draw` de `Rasterizer`.
+
+`OnGBufferPass` y `OnConstants` siguen definidos en `CameraMotion`, sin llamadores (decisión del 2026-10-24).
+
+- **Por qué no cambia nada:** el contador de la Tarea B dio 0 draws con `gbuffer_draw` verdadero y 0 buffers de 864
+  bytes, en el arranque y en el recorrido, con `CameraMotion` encendido.
+- **Tests** (`D=out/spec1b-t3/t3`): iguales a la base de la Tarea A. `bash build.sh --test` sale con 0; Python da 273
+  ejecutados, 35 omitidos y 4 fallos esperados, OK; `--vulkan-only` PASS; los 25 destinos C++ dan 0.
+- **Capturas:** `run-oracle.sh despues-3`. `compare-oracle.sh antes despues-3` da **idénticos** el 120, el 300, el 420
+  y el 1320. Sale con 142 (el watchdog), sin `Fault:`, con `unimplemented=0`. Línea `GPU:` final:
+  `submits=4686 draws=274122 dispatches=0 flips=2343`.
+- **Búsquedas:** `git grep -nwE 'gbuffer_draw' -- . ':!docs' ':!CLAUDE.md'` y
+  `git grep -n '864' -- gpu/shadps4/video_core/renderer_vulkan/vk_rasterizer.cpp` salen vacías. Los 864 que quedan son
+  la excepción escrita: el clasificador de `motion_history.h:45` (y su comentario de `:40`), el comentario de
+  `OnConstants` en `vk_camera_motion.h:72` y su test, `test_motion_history.cpp:86`.
+- **Consecuencia de interfaz:** `depth_id` solo se asignaba en `OnGBufferPass`, y `current.valid` solo en
+  `OnConstants`. Sin llamadores, `CameraMotion::Ready()` nunca es verdadero y `camera_motion->Depth()` siempre es nulo.
+  Los tres usos de `Depth()` en `vk_rasterizer.cpp` (color de escena en `UpdateRenderTargets`, en el draw y en el
+  pase de display) piden antes `db_desc.first` no nulo, así que ya no se cumplen. `CameraMotion`, `ObjectMotion` y la
+  parte de escena de `TemporalUpscaler` quedan inalcanzables, incluso con `GOW3_EXPERIMENTAL_UPSCALER=1`. Qué hacer con
+  ellos es una decisión pendiente para después de la Alpha.
