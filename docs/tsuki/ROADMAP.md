@@ -1068,6 +1068,12 @@ Las configuraciones y saves antiguos no se migran (no hay usuarios de los nombre
 miden en Windows y en Linux salen "n/a". Va después del renombrado ya comprobado, en un commit aparte.
 - [ ] La ventana y el menú Insert muestran el título leído del `param.sfo`.
 
+**Añadido el 2026-10-28** (spec §10): quitar las opciones que encienden el upscaler temporal (interruptor
+`GOW3_EXPERIMENTAL_UPSCALER` de `run.py`, sus controles del launcher, sus claves de `gow3.ini` y sus variables de
+entorno). Desde la tarea 3 de la Spec 1b, encendido ya no hace nada: `CameraMotion` se quedó sin entradas. El código se
+conserva (decisión del usuario); FSR 1 y RCAS, que son espaciales, se quedan. Va antes del renombrado, en un commit aparte.
+- [ ] Nada puede encender el upscaler temporal, y FSR 1 y RCAS siguen funcionando.
+
 ---
 
 ## 6. Riesgos

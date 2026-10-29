@@ -1,6 +1,6 @@
 # Spec 7 — Renombrar `gow3` a `tsuki`
 
-Fecha: 2026-10-14, ampliada el 2026-10-25 (§9). Estado: **borrador para aprobación**. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 7".
+Fecha: 2026-10-14, ampliada el 2026-10-25 (§9) y el 2026-10-28 (§10). Estado: **borrador para aprobación**. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 7".
 Depende de: Spec 6 (el recorrido grabado y las capturas son el oráculo del renombrado) y Spec 1b. El renombrado va
 al final. Antes de que la Spec 6 se cerrara sin la 1b (2026-10-28), esta dependencia llegaba a través de la 6.
 
@@ -172,3 +172,54 @@ Criterios de aceptación:
 - [ ] Las capturas de la línea base no cambian: CPU, RAM, GPU y VRAM no están en `DefaultItems`.
 - [ ] Windows: solo cambia que la VRAM pasa a código común. Queda pendiente de compilar en MSYS2 cuando se
   aborde Windows (como el resto del §8).
+
+## 10. Añadido: quitar las opciones del upscaler temporal, que ya no hacen nada
+
+**[D]** 2026-10-28: el usuario lo añade a esta spec, al cerrar la tarea 3 de la Spec 1b. El código del upscaler
+temporal **se queda**. Lo que se quita es todo lo que permite encenderlo, porque encendido ya no hace nada y una
+opción que no hace nada engaña a quien la toca.
+
+Hechos (**[V]** comprobados el 2026-10-28, en `c6f5fd4`):
+
+- La Spec 1b (tarea 3) borró `gbuffer_draw` y la lectura de la constante de 864 bytes, que eran las únicas entradas
+  de `CameraMotion` (`OnGBufferPass`, `OnConstants`). Sin ellas `camera_motion.Ready()` nunca es verdadero y
+  `camera_motion->Depth()` siempre es nulo.
+- El upscaler solo escala desde `TemporalUpscaler::OnDispatch`, que pide `camera_motion.Ready()` (y un compute shader,
+  que Tsukihime no lanza), o desde el color de escena, que pide `Depth()`. FSR 3.1, FSR 4, FSR 4.1.1, DLSS y TAA no
+  pueden ejecutarse con este juego, tampoco con `GOW3_EXPERIMENTAL_UPSCALER=1`.
+- **No es del upscaler temporal y se queda:** FSR 1 y el afilado RCAS (`fsr1`, `rcas`, `rcas_strength`, menú Insert y
+  `GOW3_FSR1`). Son espaciales, al presentar, y funcionan.
+
+Lo que hay que quitar (punto de partida; se rehace el inventario al empezar):
+
+- `run.py:211-214`: el interruptor `GOW3_EXPERIMENTAL_UPSCALER`. Sin él, `GOW3_UPSCALER=none` deja de hacer falta: el
+  upscaler queda apagado siempre.
+- Launcher (`launcher/gow3_launcher_win.py`): el bloque comentado de «Experimental»/«Upscaling» de `build_graphics`
+  (~`:1177`), el envío de `experimental_upscaler` (~`:703`), las claves `upscaler`, `preset`, `output_res`,
+  `live_resolution` y `object_motion` de `INI_DEFAULTS` si nada vivo las usa, y sus textos en `gow3_lang.py`. Los
+  tests del launcher que las cubren (`test_launcher_upscale.py`, `test_upscaler_assets.py`, partes de
+  `test_launcher_save.py`) se ajustan o se borran con ellas.
+- `gow3.ini` y `Gow3Settings`: dejar de leer y escribir las claves del upscaler temporal (`upscaler`, `preset`,
+  `jitter`, `reactive*`, `object_motion`, `debug_view`, `output_res`), con el valor fijo «apagado». El elemento
+  «Upscaler» del overlay de rendimiento sale de la lista.
+- Variables de entorno que lo encienden o lo configuran: `GOW3_UPSCALER`, `GOW3_UPSCALE_PRESET`,
+  `GOW3_UPSCALE_BEFORE_CS`, `GOW3_UI_TRIGGER_VS`, `GOW3_PRESET_FILE`, `GOW3_JITTER`, `GOW3_OBJECT_MOTION*`,
+  `GOW3_DEBUG_MOTION`, `GOW3_TAA_DIAGNOSTICS`, `GOW3_DLSS*`, `GOW3_FSR4_*`, `GOW3_FSR411_DIR`. `GOW3_RENDER_RES` se mira
+  aparte, porque también la usa el escalado de escena.
+- Empaquetado y documentación: los assets de FSR 4 / 4.1.1 (`packaging/`), y `docs/upscaler.md`, que pasa a decir
+  que el upscaler está aparcado y sin forma de encenderlo.
+
+Orden: **antes** del renombrado (paso 1 del §4), en su propio commit, para no renombrar a `TSUKI_*` variables que se
+van a quitar. El oráculo no cambia: `run.py` ya fuerza `GOW3_UPSCALER=none`, así que las capturas y el recorrido
+grabado tienen que salir iguales.
+
+Fuera de esta spec: borrar el código del upscaler temporal, `CameraMotion`, `ObjectMotion`, los shaders de movimiento
+y el submódulo `fsr-vulkan`. El usuario decidió conservarlo (2026-10-28).
+
+Criterios de aceptación:
+
+- [ ] Ni el launcher, ni el menú Insert, ni `gow3.ini`, ni una variable de entorno pueden encender el upscaler temporal.
+  Lo comprueba un test que ponga `upscaler=fsr3` en el `.ini` y `GOW3_UPSCALER=fsr3` en el entorno, y vea el
+  upscaler apagado.
+- [ ] FSR 1 y RCAS siguen funcionando como antes.
+- [ ] Suites verdes; las capturas de la línea base y el recorrido grabado no cambian.

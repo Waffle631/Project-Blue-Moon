@@ -428,5 +428,8 @@ Borrado en `vk_rasterizer.cpp` y `vk_rasterizer.h` (38 líneas, todas quitadas):
   `OnConstants`. Sin llamadores, `CameraMotion::Ready()` nunca es verdadero y `camera_motion->Depth()` siempre es nulo.
   Los tres usos de `Depth()` en `vk_rasterizer.cpp` (color de escena en `UpdateRenderTargets`, en el draw y en el
   pase de display) piden antes `db_desc.first` no nulo, así que ya no se cumplen. `CameraMotion`, `ObjectMotion` y la
-  parte de escena de `TemporalUpscaler` quedan inalcanzables, incluso con `GOW3_EXPERIMENTAL_UPSCALER=1`. Qué hacer con
-  ellos es una decisión pendiente para después de la Alpha.
+  parte de escena de `TemporalUpscaler` quedan inalcanzables, incluso con `GOW3_EXPERIMENTAL_UPSCALER=1`: el upscaler
+  temporal ya no puede escalar con este juego.
+- **Decisión del usuario (2026-10-28):** ese código no se borra. Lo que se quita son las opciones que permiten
+  encenderlo (launcher, `gow3.ini`, `run.py`, variables de entorno), porque encendido no hace nada. Va a la Spec 7
+  (§10), antes del renombrado.
