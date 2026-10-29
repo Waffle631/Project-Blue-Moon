@@ -12,6 +12,11 @@
 #include <vector>
 
 #include "common/types.h"
+#include "video_core/renderer_vulkan/vk_common.h"
+
+namespace AmdGpu {
+struct Sampler;
+}
 
 namespace VideoCore {
 struct ImageInfo;
@@ -47,6 +52,10 @@ public:
     static void Draw(u64 vs_hash, u64 ps_hash, u32 num_indices, u32 num_instances);
     static void Dispatch(u64 cs_hash, u32 x, u32 y, u32 z);
     static void Sampled(const VideoCore::ImageInfo& info, bool storage);
+    /// A sampler of the next draw: what the guest's S# asks for and the filters and LOD bias
+    /// Vulkan was given for it (the caller translates, so this file needs no liverpool_to_vk).
+    static void SamplerUsed(const AmdGpu::Sampler& guest, vk::Filter mag, vk::Filter min,
+                            vk::SamplerMipmapMode mip, float lod_bias);
     /// Contents of a bound buffer (first 1 KiB), kept for small passes and a pass's first draw.
     static void Buffer(u64 stage_hash, u32 slot, VAddr address, const void* data, u64 size);
     static void Note(const char* text);

@@ -2567,8 +2567,16 @@ void Rasterizer::BindSamplers(const Shader::Info& stage, const PreparedStage* pr
         const auto& sampler = stage.samplers[sampler_index];
         auto ssharp =
             prepared ? prepared->sampler_sharps[sampler_index] : sampler.GetSharp(stage);
-        const auto vk_sampler = texture_cache.GetSampler(
-            ssharp, Regs().ta_bc_base, sampler.is_depth, sampler.is_depth ? 0.0f : sampler_lod_bias);
+        const float extra_bias = sampler.is_depth ? 0.0f : sampler_lod_bias;
+        const auto vk_sampler =
+            texture_cache.GetSampler(ssharp, Regs().ta_bc_base, sampler.is_depth, extra_bias);
+        if (FrameCapture::Active()) {
+            // gow3: the analyzer lists what the guest asked for beside what Vulkan got (Spec 6, A2).
+            FrameCapture::SamplerUsed(ssharp, LiverpoolToVK::Filter(ssharp.xy_mag_filter),
+                                      LiverpoolToVK::Filter(ssharp.xy_min_filter),
+                                      LiverpoolToVK::MipFilter(ssharp.mip_filter),
+                                      ssharp.LodBias() + extra_bias);
+        }
         image_infos.emplace_back(vk_sampler, VK_NULL_HANDLE, vk::ImageLayout::eGeneral);
         auto& set_write = set_writes[write_index++];
         set_write.dstSet = VK_NULL_HANDLE;

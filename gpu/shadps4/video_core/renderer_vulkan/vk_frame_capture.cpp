@@ -8,6 +8,9 @@
 #include <format>
 #include <mutex>
 
+#include <magic_enum/magic_enum.hpp>
+
+#include "video_core/amdgpu/resource.h"
 #include "video_core/renderer_vulkan/vk_common.h"
 #include "video_core/texture_cache/image_info.h"
 
@@ -19,6 +22,7 @@ struct Target {
     VAddr address{};
     vk::Format format{};
     u32 width{}, height{};
+    u32 levels{}; ///< mip levels; only said for what a pass samples
     bool operator==(const Target&) const = default;
 };
 
@@ -30,6 +34,7 @@ struct Entry {
     u64 indices{};
     std::vector<u64> shaders; ///< vs/ps pairs (graphics) or cs (compute), first few
     std::vector<std::pair<Target, bool>> sampled; ///< textures (false) and storage images (true)
+    std::vector<std::string> samplers;             ///< distinct sampler lines
     std::string state; ///< census line of the first pipeline (vk_pass_census.h)
     std::string note;
     std::vector<std::string> buffers; ///< dumped constants, per draw
@@ -38,6 +43,7 @@ struct Entry {
 // GPU thread only.
 std::vector<Entry> entries;
 std::vector<std::pair<Target, bool>> pending_sampled;
+std::vector<std::string> pending_samplers;
 std::vector<std::string> pending_buffers;
 
 void AddBuffers(Entry& entry) {
@@ -58,7 +64,8 @@ std::array<std::atomic<VAddr>, 16> display_list{};
 std::atomic<u32> display_count{0};
 
 Target ToTarget(const VideoCore::ImageInfo& info) {
-    return {info.guest_address, info.pixel_format, info.size.width, info.size.height};
+    return {info.guest_address, info.pixel_format, info.size.width, info.size.height,
+            info.resources.levels};
 }
 
 std::string Describe(const Target& t) {
@@ -76,6 +83,19 @@ void AddSampled(Entry& entry) {
         }
     }
     pending_sampled.clear();
+    for (auto& s : pending_samplers) {
+        if (entry.samplers.size() < 16 &&
+            std::ranges::find(entry.samplers, s) == entry.samplers.end()) {
+            entry.samplers.push_back(std::move(s));
+        }
+    }
+    pending_samplers.clear();
+}
+
+void ClearPending() {
+    pending_sampled.clear();
+    pending_samplers.clear();
+    pending_buffers.clear();
 }
 
 void AddShader(Entry& entry, u64 hash) {
@@ -140,7 +160,11 @@ void Write(VAddr presented) {
             std::fprintf(f, "  %s\n", e.state.c_str());
         }
         for (const auto& [t, storage] : e.sampled) {
-            std::fprintf(f, "  %s %s\n", storage ? "writes " : "samples", Describe(t).c_str());
+            std::fprintf(f, "  %s %s mips %u\n", storage ? "writes " : "samples", Describe(t).c_str(),
+                         t.levels);
+        }
+        for (const auto& s : e.samplers) {
+            std::fprintf(f, "  %s\n", s.c_str());
         }
         if (!e.note.empty()) {
             std::fprintf(f, "  note: %s\n", e.note.c_str());
@@ -234,20 +258,17 @@ void FrameCapture::BeginPass(const VideoCore::ImageInfo* const* colors, u32 num_
         if (state.load(std::memory_order_relaxed) == Recording) {
             Write(last_presented.load(std::memory_order_relaxed));
             entries.clear();
-            pending_sampled.clear();
-            pending_buffers.clear();
+            ClearPending();
             state.store(Idle, std::memory_order_release);
             return;
         }
         entries.clear();
-        pending_sampled.clear();
-        pending_buffers.clear();
+        ClearPending();
         pass_open = false;
         state.store(Recording, std::memory_order_release);
     }
     if (state.load(std::memory_order_relaxed) != Recording) {
-        pending_sampled.clear();
-        pending_buffers.clear();
+        ClearPending();
         return;
     }
     const Target d = depth ? ToTarget(*depth) : Target{};
@@ -276,8 +297,7 @@ void FrameCapture::Draw(u64 vs_hash, u64 ps_hash, u32 num_indices, u32 num_insta
 
 void FrameCapture::Dispatch(u64 cs_hash, u32 x, u32 y, u32 z) {
     if (state.load(std::memory_order_relaxed) != Recording) {
-        pending_sampled.clear();
-        pending_buffers.clear();
+        ClearPending();
         return;
     }
     if (!entries.empty() && entries.back().compute && !entries.back().shaders.empty() &&
@@ -313,6 +333,22 @@ void FrameCapture::Sampled(const VideoCore::ImageInfo& info, bool storage) {
     if (pending_sampled.size() < 64) {
         pending_sampled.emplace_back(ToTarget(info), storage);
     }
+}
+
+void FrameCapture::SamplerUsed(const AmdGpu::Sampler& guest, vk::Filter mag, vk::Filter min,
+                               vk::SamplerMipmapMode mip, float lod_bias) {
+    if (pending_samplers.size() >= 16) {
+        return;
+    }
+    pending_samplers.push_back(std::format(
+        "sampler guest mag {} min {} mip {} aniso {} lod bias {} range {}-{} -> vk mag {} min {} "
+        "mipmap {} lod bias {}",
+        magic_enum::enum_name(guest.xy_mag_filter.Value()),
+        magic_enum::enum_name(guest.xy_min_filter.Value()),
+        magic_enum::enum_name(guest.mip_filter.Value()),
+        magic_enum::enum_name(guest.max_aniso.Value()), guest.LodBias(),
+        guest.MinLod(), guest.MaxLod(), vk::to_string(mag), vk::to_string(min), vk::to_string(mip),
+        lod_bias));
 }
 
 void FrameCapture::Note(const char* text) {
