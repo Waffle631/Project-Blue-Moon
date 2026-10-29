@@ -194,7 +194,9 @@ private:
 
     bool enabled = false;
     bool failed = false;
-    u64 trigger_hash = 0x9a9cf8a9;
+    // gow3: no trigger by default; the hashes of another game were removed (Spec 1b).
+    // GOW3_UPSCALE_BEFORE_CS and GOW3_UI_TRIGGER_VS set them.
+    u64 trigger_hash = 0;
     VideoCore::ImageId scene_color{};
     bool done_this_frame = false;
     u32 preset_file_frames = 0; ///< GOW3_PRESET_FILE polling
@@ -212,7 +214,7 @@ private:
     u32 out_width = 0, out_height = 0;     ///< output size of the context
     bool context_hdr = true;
     u32 target_width = 1920, target_height = 1080; ///< output size of scaled presets
-    u64 ui_trigger_vs = 0x34e8a281;
+    u64 ui_trigger_vs = 0; ///< see trigger_hash
     VideoCore::ImageId ldr_target{};
     VideoCore::ImageId ui_color{}, ui_depth{};
     bool ui_phase = false;         ///< from the upscale to the next display pass

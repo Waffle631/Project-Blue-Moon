@@ -210,7 +210,11 @@ TemporalUpscaler::TemporalUpscaler(const Instance& instance_, Scheduler& schedul
         std::printf("Upscaler: shaderStorageImageWriteWithoutFormat unsupported, FSR 3 off\n");
         enabled = false;
     }
-    if (enabled) {
+    if (enabled && trigger_hash == 0) {
+        std::printf("Upscaler: FSR 3.1 available (%s) on scene color: no trigger "
+                    "(GOW3_UPSCALE_BEFORE_CS)\n",
+                    Gow3Settings::Get().upscaler != Gow3Settings::UpscalerOff ? "on" : "off");
+    } else if (enabled) {
         std::printf("Upscaler: FSR 3.1 available (%s) on scene color before compute shader "
                     "%016llx\n",
                     Gow3Settings::Get().upscaler != Gow3Settings::UpscalerOff ? "on" : "off",
@@ -358,7 +362,7 @@ bool TemporalUpscaler::OnFrameStart() {
 }
 
 void TemporalUpscaler::OnDispatch(u64 cs_hash) {
-    if (cs_hash != trigger_hash || done_this_frame || failed || Scaled()) {
+    if (!UiComposition::Trigger(cs_hash, trigger_hash) || done_this_frame || failed || Scaled()) {
         return;
     }
     done_this_frame = true;
@@ -1303,7 +1307,7 @@ void TemporalUpscaler::OnColorTarget(VideoCore::ImageId color) {
 
 void TemporalUpscaler::OnDraw(u64 vs_hash, VideoCore::ImageId color,
                               VideoCore::ImageId depth, bool native_viewport) {
-    if (!Scaled() && vs_hash == ui_trigger_vs) done_this_frame = true;
+    if (!Scaled() && UiComposition::Trigger(vs_hash, ui_trigger_vs)) done_this_frame = true;
     if (!Scaled() || !color) {
         return;
     }
@@ -1318,7 +1322,7 @@ void TemporalUpscaler::OnDraw(u64 vs_hash, VideoCore::ImageId color,
         return;
     }
     const auto& image = texture_cache.GetImage(color);
-    const bool movie = vs_hash == ui_trigger_vs || UiComposition::MovieShader(vs_hash) ||
+    const bool movie = UiComposition::Trigger(vs_hash, ui_trigger_vs) ||
                        (scaled_session && native_viewport);
     const bool ui_draw = movie &&
         (image.info.pixel_format == vk::Format::eR8G8B8A8Unorm ||

@@ -16,14 +16,16 @@ int main() {
     assert(Choose(false, true, true, true) == Background::None);
     assert(NativeViewport(1920, -1080));
     assert(!NativeViewport(960, -540));
-    assert(MovieShader(0x34e8a281) && MovieShader(0x24042a9b));
-    assert(!MovieShader(0x0b0acf50)); // fullscreen post/tonemap also has a native viewport
-    assert(!MovieShader(0x6c62a79f)); // shadow geometry
+    // A trigger shader is only one the user configured: 0 means none, so hash 0 never fires.
+    assert(!Trigger(0, 0));
+    assert(Trigger(0x1234, 0x1234));
+    assert(!Trigger(0x1234, 0));
+    assert(!Trigger(0x1234, 0x5678));
     const auto display = Scale(960, 540, 1920, 1080, false);
     assert(display[0] == 2 && display[1] == 2);
     const auto ui = Scale(960, 540, 1920, 1080, true);
     assert(ui[0] == 1 && ui[1] == 1); // don't double an already native UI viewport
     const auto larger = Scale(960, 540, 3840, 2160, true);
     assert(larger[0] == 2 && larger[1] == 2);
-    std::puts("UI composition: PASS (menu without camera, HUD, FSR off, viewport scaling)");
+    std::puts("UI composition: PASS (menu without camera, HUD, FSR off, viewport scaling, trigger only when configured)");
 }

@@ -22,11 +22,10 @@ inline bool NativeViewport(float width, float height) {
            std::abs(std::abs(height) - 1080.0f) < 0.5f;
 }
 
-// Scaleform draws, including the first stencil/movie pass. A native-size viewport
-// alone also matches every fullscreen post pass when guest targets stay at 1080p.
-constexpr bool MovieShader(uint64_t hash) {
-    return hash == 0x34e8a281 || hash == 0x81d336ce || hash == 0x09957251 ||
-           hash == 0x24042a9b || hash == 0xa400228b;
+// gow3: a trigger shader is one the user configured (GOW3_UPSCALE_BEFORE_CS, GOW3_UI_TRIGGER_VS).
+// 0 means no trigger, so a shader whose hash is 0 never fires.
+constexpr bool Trigger(uint64_t hash, uint64_t configured) {
+    return configured != 0 && hash == configured;
 }
 
 inline std::array<float, 2> Scale(uint32_t guest_width, uint32_t guest_height,

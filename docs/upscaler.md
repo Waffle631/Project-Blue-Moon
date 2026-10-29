@@ -132,6 +132,9 @@ Las matrices del fotograma anterior no están en el fotograma; el port debe cons
 - FSR 3.1 (`GOW3_UPSCALER=fsr3`, submódulo FireBurn/FSR-Vulkan): color de escena antes de la
   combinación de postprocesado (compute shader 9a9cf8a9), 1:1, RGB escrito de vuelta (el juego guarda datos
   en el alfa). El toggle 1<<24 lo apaga en tiempo de ejecución.
+  `9a9cf8a9` era el compute de God of War III. Desde la Spec 1b (2026-10-28) no hay disparador por defecto: hay
+  que darlo con `GOW3_UPSCALE_BEFORE_CS=<hash>` (y el shader de la interfaz con `GOW3_UI_TRIGGER_VS`). Con Tsukihime
+  el upscaler temporal no puede escalar (`CameraMotion` sin entradas; ver la Spec 1b, tarea 3).
 - Jitter: desplazamiento del viewport de la geometría de escena (dibujada con la profundidad de escena, no con quads
   a pantalla completa), Halton(2,3) 8 fases; el signo se comprobó por nitidez (correcto 255, invertido 208, apagado 271 —
   el jitter 1:1 cambia aliasing de alta frecuencia por una imagen algo más suave). Toggle 1<<25 lo apaga.
