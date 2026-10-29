@@ -168,6 +168,38 @@ cada reproducción arranca con la misma partida, así que el recorrido debe fija
 - La miniatura «algo pixelada» de A2 sigue pendiente de triage (Tarea 5). Que el usuario aprobara la captura 2890
   no la descarta: lo que se aprobó es la línea base contra la que se compara el arreglo.
 
+#### Resultado de la Tarea 5 del bloque A (2026-10-28): triage
+
+El usuario no rechazó ninguna captura, así que solo entra la miniatura «algo pixelada» del menú de carga.
+
+- **El analizador de fotogramas ya lista samplers y mips** (commit `6a082f3`, test `frame-capture-test`). Cada pase
+  dice cuántos mips tiene lo que muestrea, y cada sampler tal como lo pide el S# del guest junto a lo que recibe
+  Vulkan. El disparo fue con `GOW3_CAPTURE_TRIGGER` durante una repetición: el archivo se crea al ver en el log la
+  captura de un fotograma, sin F11.
+- **[V] Cómo se dibuja.** En el menú (fotograma 2700 y siguientes) las miniaturas son texturas
+  `R8G8B8A8Unorm` de 512×256 con 1 mip, una por ranura. Se dibujan en un cuadro de unos 288×162 en pantalla, así
+  que el juego las reduce 1.6 veces, no las amplía. El pase usa dos samplers del guest y Vulkan recibe los dos tal
+  cual:
+  - `mag Bilinear min Bilinear mip Linear` → `vk Linear/Linear/Linear`;
+  - `mag Point min Point mip Point` → `vk Nearest/Nearest/Nearest`.
+
+  En los dos casos, aniso One y LOD bias 0 (no hay sesgo nuestro: `render_resolution=native`). El analizador no
+  dice cuál de los dos dibuja la miniatura.
+- **[V] De dónde sale.** `savedata000` no guarda ninguna imagen. Cada ranura es un registro de unos 28 KB
+  (separación 0x7000) con el estado del guion (`allscr.mrg`, banderas), poco variado byte a byte para ser una
+  imagen comprimida. Al abrir el menú no hay ningún pase que dibuje en una textura de 512×256 (40 capturas
+  seguidas a partir del fotograma 2440). Entre los fotogramas 2440 y 2700 el juego solo abre `allpac2.mrg` (21 veces) y compone las miniaturas en la CPU
+  con su propio código, que corre tal cual en el port. El eboot no importa ningún decodificador de imagen
+  (PNG/JPEG) que pudiera ser nuestro.
+- **Veredicto: caso (a), es del juego.** Los píxeles los produce el código del juego a partir de sus recursos, y
+  el dibujado usa los filtros que pide el juego, que Vulkan reproduce 1:1. No hay ninguna lectura de la GPU por la
+  CPU por medio, así que no es el caso (c). **[H]** Sin una captura de la PS4 no se puede confirmar a ojo que allí
+  se vea igual. La decisión es del usuario (Tarea 5): si no es nuestro, no se «mejora».
+
+| Defecto | Fotograma | Clase | Causa | ¿Del juego o nuestro? |
+|---|---|---|---|---|
+| Miniatura de ranura «algo pixelada» | 2700, 2890 | Textura | Textura de 512×256 sin mips que compone la CPU del juego y se reduce 1.6× con los samplers que pide el juego **[V]** | Del juego (a) |
+
 ## 4. Bloque B — Ratón (trabajo nuevo)
 
 **Qué falta:** `libSceMouse` debe informar de un dispositivo conectado y entregar movimiento, botones y
