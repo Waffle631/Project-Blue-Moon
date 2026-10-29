@@ -433,3 +433,37 @@ Borrado en `vk_rasterizer.cpp` y `vk_rasterizer.h` (38 líneas, todas quitadas):
 - **Decisión del usuario (2026-10-28):** ese código no se borra. Lo que se quita son las opciones que permiten
   encenderlo (launcher, `gow3.ini`, `run.py`, variables de entorno), porque encendido no hace nada. Va a la Spec 7
   (§10), antes del renombrado.
+
+### Tarea 3b — sin los hashes fijos del upscaler temporal (2026-10-28)
+
+Commit `76b739f`. Se borraron los hashes de shaders de God of War III que el upscaler traía de serie:
+
+- `trigger_hash = 0x9a9cf8a9` (el compute antes del que escalaba la escena) y `ui_trigger_vs = 0x34e8a281` (primera
+  pasada de la interfaz), en `vk_temporal_upscaler.h`. Ahora valen 0;
+- `UiComposition::MovieShader`, con sus cinco hashes de Scaleform, en `ui_composition.h`.
+
+En su lugar, `UiComposition::Trigger(hash, configurado)` solo dispara con un hash dado por `GOW3_UPSCALE_BEFORE_CS` o
+`GOW3_UI_TRIGGER_VS`. 0 significa «sin disparador», así que un shader con hash 0 nunca dispara. Lo usan
+`OnDispatch`, el `done_this_frame` de `OnDraw` y la decisión de qué draw es interfaz, que se queda con el disparador
+configurado o con el viewport nativo en una sesión escalada. La lectura de las dos variables no cambia. Sin
+disparador, la línea del arranque dice `Upscaler: FSR 3.1 available (…) on scene color: no trigger (GOW3_UPSCALE_BEFORE_CS)`.
+
+- **TDD:** `tests/test_ui_composition.cpp` cambia las tres aserciones de `MovieShader` por cuatro de `Trigger`
+  (`(0,0)`, `(h,h)`, `(h,0)`, `(h,otro)`). Antes del cambio no compilaba (`'Trigger' was not declared in this scope`,
+  `out/spec1b-t3/t3b-red.log`). Después: `UI composition: PASS (…, trigger only when configured)`.
+- **Por qué no cambia nada:** el contador de la Tarea B dio 0 en `trigger_hash`, `ui_trigger_vs` y `MovieShader`, en el
+  arranque y en el recorrido, con el upscaler encendido.
+- **Tests** (`D=out/spec1b-t3/t3b`): iguales a la base de la Tarea A. `build.sh --test` sale con 0; Python da 273/35/4,
+  OK; los 25 destinos C++ dan 0; `--vulkan-only` PASS.
+- **Capturas, con el upscaler apagado (`run.py`):** `compare-oracle.sh antes despues-3b` da **idénticos** los cuatro
+  fotogramas. Sale con 142 (el watchdog), sin `Fault:`, con `unimplemented=0`.
+- **Contraste después, con el upscaler encendido** (`GOW3_EXPERIMENTAL_UPSCALER=1`, tareas 3 y 3b aplicadas, sin
+  contador):
+  - Arranque: `compare-oracle.sh contraste-antes contraste-despues` da **idénticos** los cuatro. El log dice «no
+    trigger» y no tiene `Fault:`; el único `STOP:` es el watchdog.
+  - Recorrido: `route.sh replay spec1b-contraste-despues` sale con 0, sin `STOP:` ni `Fault:`, con
+    `unimplemented=0`. `compare_route.sh` sale con 0 frente a `spec1b-contraste-antes` y también frente a
+    `out/baseline/6a/`: 6 idénticos y los 2 `eye` (2700, 2890).
+- **Búsquedas:** `git grep -nE 'MovieShader|0x9a9cf8a9|0x34e8a281' -- . ':!docs' ':!CLAUDE.md'` sale vacía.
+  `docs/upscaler.md` explica que `9a9cf8a9` era el compute de GoW3 y que ahora hay que darlo con
+  `GOW3_UPSCALE_BEFORE_CS`. `docs/plans/2026-10-12-gpu-corruption-rdna2.md` se queda como historia.
