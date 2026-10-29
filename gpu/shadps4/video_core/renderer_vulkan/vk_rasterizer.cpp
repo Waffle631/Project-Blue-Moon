@@ -264,12 +264,6 @@ void Rasterizer::PrepareRenderState(const GraphicsPipeline* pipeline) {
     } else {
         db_desc.first = {};
     }
-    // gow3: the G-buffer pass (5+ color targets) holds the scene depth, and its constants the
-    // main camera (shadow passes bind the same layout with the light's camera).
-    gbuffer_draw = camera_motion->Enabled() && std::popcount(key.mrt_mask) >= 5 && db_desc.first;
-    if (gbuffer_draw) {
-        camera_motion->OnGBufferPass(db_desc.first);
-    }
     if (upscaler->Enabled() && cb_descs[0].first) {
         upscaler->OnColorTarget(cb_descs[0].first);
     }
@@ -1333,7 +1327,6 @@ void Rasterizer::DispatchDirect() {
 
 void Rasterizer::DispatchRecord(const ComputePipeline* pipeline) {
     FrameCapture::Poll();
-    gbuffer_draw = false;
 
     scheduler.PopPendingOperations();
     DiagPassBoundary(true);
@@ -1815,16 +1808,6 @@ void Rasterizer::ResolveVertexBuffers(const GraphicsPipeline* pipeline,
                                 : XXH3_64bits(guest_buffers.data(),
                                               guest_buffers.size() * sizeof(AmdGpu::Buffer));
     }
-    // Object motion research: vertex streams of G-buffer draws.
-    if (FrameCapture::Active() && gbuffer_draw) {
-        for (const auto& vb : guest_buffers) {
-            char note[128];
-            std::snprintf(note, sizeof(note), "\n  gb vb at %#llx size %u stride %u",
-                          (unsigned long long)vb.base_address, u32(vb.GetSize()),
-                          u32(vb.GetStride()));
-            FrameCapture::Note(note);
-        }
-    }
 
     struct BufferRange {
         VAddr base_address;
@@ -2118,10 +2101,6 @@ void Rasterizer::BindBuffers(const Shader::Info& stage, const PreparedStage* pre
                                      constant_ring->Data(ring->offset), ring->size);
             }
             if (!desc.IsSpecial()) {
-                if (ring->size == 864 && gbuffer_draw &&
-                    memory->IsValidGpuMapping(ring->address, 0)) {
-                    camera_motion->OnConstants(reinterpret_cast<const float*>(ring->address));
-                }
                 push_data.AddOffset(binding.buffer, 0);
             }
             buffer_infos.emplace_back(constant_ring->Handle(), ring->offset, ring->size);
@@ -2179,22 +2158,6 @@ void Rasterizer::BindBuffers(const Shader::Info& stage, const PreparedStage* pre
         } else {
             const auto vsharp =
                 prepared ? prepared->buffer_sharps[buffer_index] : desc.GetSharp(stage);
-            if (vsharp.GetSize() == 864 && gbuffer_draw &&
-                memory->IsValidGpuMapping(vsharp.base_address, 0)) {
-                camera_motion->OnConstants(reinterpret_cast<const float*>(vsharp.base_address));
-            }
-            // Object motion research: the vertex shader buffers of G-buffer draws.
-            if (FrameCapture::Active() && gbuffer_draw && stage.sw_stage == Shader::SwStage::Vertex &&
-                vsharp.base_address != 0 && memory->IsValidGpuMapping(vsharp.base_address, 0)) {
-                const auto* f = reinterpret_cast<const float*>(vsharp.base_address);
-                char note[192];
-                std::snprintf(note, sizeof(note),
-                              "\n  gb vs %08x slot %u at %#llx size %u stride %u: %g %g %g %g",
-                              u32(stage.pgm_hash), binding.buffer,
-                              (unsigned long long)vsharp.base_address, u32(vsharp.GetSize()),
-                              u32(vsharp.GetStride()), f[0], f[1], f[2], f[3]);
-                FrameCapture::Note(note);
-            }
             if (FrameCapture::Active() && vsharp.base_address != 0 && vsharp.GetSize() != 0 &&
                 memory->IsValidGpuMapping(vsharp.base_address, 0)) {
                 FrameCapture::Buffer(stage.pgm_hash, binding.buffer, vsharp.base_address,
