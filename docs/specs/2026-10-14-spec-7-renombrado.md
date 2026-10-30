@@ -1,8 +1,8 @@
 # Spec 7 — Renombrar `gow3` a `tsuki`
 
 Fecha: 2026-10-14, ampliada el 2026-10-25 (§9), el 2026-10-28 (§10) y el 2026-10-30 (§11). Estado: **borrador para aprobación**; tareas 0 (rama
-`tsuki/spec-7` y línea base, §4), 1 (`tools/check_rename.sh`, §6), 2 y 3 (§10 completa) y 4 (inventario, prosa y
-§11) del plan hechas el 2026-10-30. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 7".
+`tsuki/spec-7` y línea base, §4), 1 (`tools/check_rename.sh`, §6), 2 y 3 (§10 completa), 4 (inventario, prosa y
+§11) y 5 (variables `TSUKI_*`, §4 paso 2) del plan hechas el 2026-10-30. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 7".
 Depende de: Spec 6 (el recorrido grabado y las capturas son el oráculo del renombrado) y Spec 1b. El renombrado va
 al final. Antes de que la Spec 6 se cerrara sin la 1b (2026-10-28), esta dependencia llegaba a través de la 6.
 
@@ -102,6 +102,27 @@ fotogramas `eye` (2700, 2890: el menú de carga sobre `titlebg1.mp4`) quedan a o
    al submódulo limpio.
 7. **Métricas del overlay en Linux** (§9), con el renombrado ya comprobado por el §7.
 
+**Hecho, paso 2 (tarea 5 del plan, 2026-10-30):**
+- Cambio mecánico de `GOW3_` a `TSUKI_` en 143 archivos versionados, sin alias. Quedan fuera los de la lista de
+  excepciones del §6, `gpu/patches/` (paso 6) y los README del jugador. Los dos nombres de CMake sin guion bajo
+  (`GOW3GPU_KIND` y la guarda `GOW3GPU_H`) se cambiaron a mano. El mismo cambio se aplicó a los 19 scripts de `out/`
+  que usaban esas variables (oráculos, recorridos y análisis de specs anteriores).
+- Solo quedan `GOW3_` en las cuatro líneas marcadas de los tests nuevos y en el parche `0001`, que se borra en el
+  paso 6. El nombre `X-GOW3-Integration` del `.desktop` del launcher no es una variable y cambia en el paso 4.
+- **Corrección del inventario.** La afirmación de que `GOW3_FSR4_PROFILE` solo se leía en el parche `0001` era falsa:
+  `fsr411/fsr411.cpp` también la lee, como perfilador propio del FSR 4.1.1 conservado. Se aplicó la regla de los
+  diagnósticos del código que se queda (§10): pasó a `TSUKI_FSR4_PROFILE`. La del parche se borra con él.
+- Tests de que la variable vieja no tiene efecto, rojos antes del cambio y verdes después:
+  - `test_services.c`: `GOW3_LANGUAGE=8` deja el idioma en 1, y `TSUKI_LANGUAGE=8` lo cambia a 8;
+  - `test_graphics_settings.cpp`: `GOW3_FSR1=1` no enciende `fsr1`, y `TSUKI_FSR1=1` sí.
+- Se borró `out/gpu`, porque la caché de CMake guardaba `GOW3_LTO` y `GOW3_PGO`, y se recompiló desde cero.
+  - `build.sh --test` sale verde (12 PASS) y `graphics-settings-test` pasa.
+  - Python: 284 tests OK, 35 omitidos, 4 fallos esperados.
+  - El recorrido grabado (`out/route/spec7-t5/`) coincide con `out/baseline/6a/`: 6 fotogramas idénticos y los
+    dos del menú de carga, revisados a ojo. El log muestra que el juego leyó `out/route/gow3.ini` por `TSUKI_CONFIG`.
+- `README.md` (5 menciones) y `README.pt-BR.md` (3) siguen nombrando las variables `GOW3_*`, que ya no funcionan,
+  hasta que se reescriban para la Alpha (§11).
+
 ## 5. Requisitos
 
 - Ninguna variable `GOW3_*` debe seguir leyéndose.
@@ -146,7 +167,7 @@ branch» (`CLAUDE.md:25`) no es una de las formas del punto 4: hay que escribirl
   `STOP:` ni `Fault:`).
 - [ ] Las capturas de píxeles de la línea base coinciden antes y después (`tools/compare_captures.sh`).
 - [ ] La ventana y el menú Insert muestran el título leído del `param.sfo`.
-- [ ] Un test comprueba que una variable `GOW3_*` ya no tiene efecto (por ejemplo, `GOW3_LANGUAGE=8`
+- [x] Un test comprueba que una variable `GOW3_*` ya no tiene efecto (por ejemplo, `GOW3_LANGUAGE=8`
   no cambia el idioma, `TSUKI_LANGUAGE=8` sí).
 
 ## 8. Riesgos
@@ -245,6 +266,8 @@ Lo que hay que quitar (punto de partida; se rehace el inventario al empezar):
   `GOW3_DEBUG_MOTION`, `GOW3_TAA_DIAGNOSTICS`, `GOW3_DLSS*`, `GOW3_FSR4_*`, `GOW3_FSR411_DIR`. `GOW3_RENDER_RES` se mira
   aparte, porque también la usa el escalado de escena. `GOW3_FSR4_PROFILE` y `GOW3_FSR4_STATS` solo se leen dentro
   del parche `0001` de FSR-Vulkan: se van con él en el paso 6 del §4 (**[D]** 2026-10-30, §2), nunca se renombran.
+  (*Corregido en la tarea 5: `fsr411/fsr411.cpp` también lee `GOW3_FSR4_PROFILE`. Es un diagnóstico del código
+  conservado y pasó a `TSUKI_FSR4_PROFILE`; ver §4.*)
 - El ítem «Upscaler» del overlay sale de `DefaultItems` **y** del valor inicial `overlay_items{7}` de
   `Gow3Settings` (`gow3_settings.h:44`), que repite a mano los bits 0-2. Si no, el bit 2 sigue encendido por
   defecto (**[D]** 2026-10-30).
