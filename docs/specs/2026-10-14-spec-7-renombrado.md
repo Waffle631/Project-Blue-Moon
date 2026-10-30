@@ -1,7 +1,7 @@
 # Spec 7 — Renombrar `gow3` a `tsuki`
 
-Fecha: 2026-10-14, ampliada el 2026-10-25 (§9) y el 2026-10-28 (§10). Estado: **borrador para aprobación**; tarea 0 del plan (rama
-`tsuki/spec-7` y línea base, §4) hecha el 2026-10-30. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 7".
+Fecha: 2026-10-14, ampliada el 2026-10-25 (§9) y el 2026-10-28 (§10). Estado: **borrador para aprobación**; tareas 0 (rama
+`tsuki/spec-7` y línea base, §4) y 1 (`tools/check_rename.sh`, §6) del plan hechas el 2026-10-30. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 7".
 Depende de: Spec 6 (el recorrido grabado y las capturas son el oráculo del renombrado) y Spec 1b. El renombrado va
 al final. Antes de que la Spec 6 se cerrara sin la 1b (2026-10-28), esta dependencia llegaba a través de la 6.
 
@@ -120,6 +120,14 @@ fotogramas `eye` (2700, 2890: el menú de carga sobre `titlebg1.mp4`) quedan a o
    una variable `GOW3_*` ya no tiene efecto tiene que nombrarla).
 
 El script se ejecuta en `bash build.sh --test` para que no regrese ningún nombre antiguo.
+
+Hecho el 2026-10-30 (tarea 1 del plan): `tools/check_rename.sh [repo_dir]` y `tests/test_check_rename.py` (8 casos
+sobre un repositorio temporal). Sale 0 sin salida si no queda nada, 1 con cada resto (`ruta:línea:texto` y luego cada
+ruta con `gow3`), 2 si `repo_dir` no es un repositorio. Busca sin distinguir mayúsculas y solo en archivos versionados.
+En `CLAUDE.md` y el roadmap quita las frases permitidas del punto 4 antes de buscar otra vez, así que otro `gow3` en la
+misma línea sigue contando. Punto de partida en `65b6c13`: 2504 restos, 2467 líneas en 295 archivos y 37 rutas. Aún no
+se engancha a `build.sh --test`, porque quedaría en rojo hasta el final; se engancha en la tarea 9 del plan. «the `gow3`
+branch» (`CLAUDE.md:25`) no es una de las formas del punto 4: hay que escribirla como «branch `gow3`» en el paso 5.
 
 ## 7. Pruebas y criterios de aceptación
 
