@@ -1,6 +1,7 @@
 # Spec 7 — Renombrar `gow3` a `tsuki`
 
-Fecha: 2026-10-14, ampliada el 2026-10-25 (§9) y el 2026-10-28 (§10). Estado: **borrador para aprobación**. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 7".
+Fecha: 2026-10-14, ampliada el 2026-10-25 (§9) y el 2026-10-28 (§10). Estado: **borrador para aprobación**; tarea 0 del plan (rama
+`tsuki/spec-7` y línea base, §4) hecha el 2026-10-30. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 7".
 Depende de: Spec 6 (el recorrido grabado y las capturas son el oráculo del renombrado) y Spec 1b. El renombrado va
 al final. Antes de que la Spec 6 se cerrara sin la 1b (2026-10-28), esta dependencia llegaba a través de la 6.
 
@@ -19,6 +20,10 @@ mecánico, no reduce riesgo técnico y mezclaría sus errores con los de las spe
 - **[V]** No hay nombres de variable construidos dinámicamente en C, C++, Python o shell
   (patrones `GOW3_%s`, `"GOW3_"+…`, `startswith('GOW3')`, `GOW3_$…`): sin resultados el
   2026-10-14. Se repite al empezar.
+- **[V]** Repetido el 2026-10-30 en `c75138c` (tarea 0): 2913 líneas en 308 archivos, 185 variables `GOW3_*`
+  distintas y 38 archivos con `gow3` en el nombre (la Spec 1a borró `gpu/shim/gow3_{actors,orbs}.*` y
+  `tools/gow3_frame_map.py`; después llegaron `gpu/shim/gow3_mouse.h` y `gow3_screenshot.*`). Los patrones dinámicos de arriba, ampliados a literales `"GOW3_"`/`'GOW3'` sueltos y a
+  concatenación de macros, solo aparecen en esta spec y en el roadmap, como texto.
 - **[V]** `GOW3_*` aparece también como **variables de compilación**, no solo de ejecución:
   `GOW3_LTO`, `GOW3_PGO`, `GOW3_PGO_DIR`, `GOW3_IN_NIX_SHELL` en `build.sh` y `gpu/CMakeLists.txt`
   (`-DGOW3_LTO`, `-DGOW3_PGO_DIR`); `docs/ENTORNO.md` las documenta.
@@ -61,6 +66,12 @@ Alpha, como se decidió el 2026-10-14.
 Antes de empezar: una captura de la línea base de las pruebas (`bash build.sh --test`, Python), el
 log del recorrido grabado (`user/last_run.log`) y las capturas de píxeles (`out/baseline/`). Son el
 oráculo de que nada cambió.
+
+Línea base tomada el 2026-10-30 en `c75138c` (`out/baseline/7/`, sin versionar): `bash build.sh --test` verde
+(`tests-c.log`); Python, 273 tests, 35 omitidos y 4 fallos esperados (`tests-py.log`); `--check-imports`, las 3
+trampas de libkernel (`imports.log`); el recorrido grabado (`antes/`, `antes.log`) da idénticos los 6 fotogramas
+`exact`/`mask` frente a `out/baseline/6a/`, sin `STOP:` ni `Fault:`, con `Settings: out/route/gow3.ini`. Los 2
+fotogramas `eye` (2700, 2890: el menú de carga sobre `titlebg1.mp4`) quedan a ojo.
 
 1. **Inventario.** `git grep -ohiE '[a-z0-9_.-]*gow3[a-z0-9_.-]*' | sort -u` y `git ls-files | grep -i gow3`,
    más strings, `CMakeLists.txt`, `build.sh`, `run.py`, `run.sh`, `shell.nix`, `.gitignore`, empaquetado y
