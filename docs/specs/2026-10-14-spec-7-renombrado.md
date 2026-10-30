@@ -122,7 +122,9 @@ fotogramas `eye` (2700, 2890: el menú de carga sobre `titlebg1.mp4`) quedan a o
 6. el propio script y su test, y las líneas marcadas con `rename-check: ok` (el test del §7 que comprueba que
    una variable `GOW3_*` ya no tiene efecto tiene que nombrarla);
 7. **[D]** 2026-10-30 (§11): `README.md`, `README.pt-BR.md`, `packaging/windows/README-Windows.txt` y las líneas
-   `Copyright … gow3 contributors`. Desde entonces busca también `god of war`, `CUSA01623` y `CUSA01715`.
+   `Copyright … gow3 contributors`. Desde entonces busca también `god of war`, `CUSA01623` y `CUSA01715`;
+8. desde el 2026-10-30, la ruta `docs/gow3/` en cualquier archivo: el usuario movió allí `docs/plans/` y los tres
+   documentos del upscaler (§11), y el código los cita. El `sed` de las tareas 5 a 8 no debe tocarla.
 
 El script se ejecuta en `bash build.sh --test` para que no regrese ningún nombre antiguo.
 
@@ -444,8 +446,11 @@ Orden: la prosa, los comentarios y los textos de esta sección van en la tarea 4
   variables quitadas en la §10 ya no las nombran.
 - Resultados: `check_rename.sh` no encuentra ninguna línea con el nombre o los seriales (2233 restos, todos
   nombres `gow3`). `build.sh --test` verde (12 PASS); Python 283 tests, 35 omitidos y los 4 fallos esperados.
-- Queda para antes de la tarea 5: `docs/upscaler.md`, `docs/DEPTH_ADAPTIVE_TAA.md` y `docs/motion_vectors.md`
-  nombran variables quitadas en la §10, que el `sed` convertiría en nombres `TSUKI_*` que nunca existieron.
+- `docs/upscaler.md`, `docs/DEPTH_ADAPTIVE_TAA.md` y `docs/motion_vectors.md` nombraban variables quitadas en la §10,
+  que el `sed` convertiría en nombres `TSUKI_*` que nunca existieron. **[D]** 2026-10-30: el usuario los movió a
+  `docs/gow3/`, con `docs/plans/` (commit `c48d6c0`). Las referencias del código (siete comentarios) y del roadmap
+  apuntan a la ruta nueva; `check_rename.sh` acepta `docs/gow3/` en todo el árbol (§6 punto 8, con test). Los
+  README del jugador siguen enlazando `docs/upscaler.md`: se rehacen para la Alpha.
 
 Criterios de aceptación:
 

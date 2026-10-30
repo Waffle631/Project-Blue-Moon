@@ -68,6 +68,18 @@ class CheckRenameTests(unittest.TestCase):
         self.assertEqual(r.returncode,1,r.stderr)
         self.assertEqual(r.stdout,'CLAUDE.md:2:Run with `GOW3_GAME_DIR`; branch `gow3`.\n')
 
+    def test_history_path_allowed_anywhere(self):
+        self.write('gpu/a.h','// Parked; see docs/gow3/upscaler.md.\n')
+        r=self.check()
+        self.assertEqual((r.returncode,r.stdout),(0,''),r.stderr)
+        self.write('gpu/b.h','// gow3: parked; see docs/gow3/upscaler.md.\n') # the marker still counts
+        r=self.check()
+        self.assertEqual(r.returncode,1,r.stderr)
+        self.assertIn('gpu/b.h:1:',r.stdout)
+        self.write('docs/c.md','See [it](../gow3/ROADMAP.md).\n') # the relative form only in CLAUDE.md and the roadmap
+        r=self.check()
+        self.assertIn('docs/c.md:1:',r.stdout)
+
     def test_game_name_and_serials_fail(self):
         self.write('src/a.c','// God of War III draws\n')
         self.write('tests/b.py',"sfo(TITLE_ID='CUSA01623')\n")

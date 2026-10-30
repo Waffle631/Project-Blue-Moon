@@ -683,7 +683,7 @@ tiene forma de comprobarse. Por eso esta spec va después del hito.
   salvo lo explicado en el paso 3.
 - La heurística de MSAA por vendor **se queda** (decisión del 2026-10-25, spec §2.2), y de la lectura lineal solo se
   quita el valor por defecto de `run.py`: la opción de shadPS4 se queda. La documentación del defecto RDNA2
-  (`docs/plans/2026-10-12-gpu-corruption-rdna2.md`) se conserva como historia.
+  (`docs/gow3/plans/2026-10-12-gpu-corruption-rdna2.md`) se conserva como historia.
 
 **Criterios de aceptación**
 
@@ -1061,7 +1061,7 @@ está en la spec (§3). Las configuraciones y saves antiguos no se migran (no ha
 - [ ] `bash build.sh --test` y `python3 -m unittest discover -s tests` pasan.
 - [ ] Un script único de comprobación (`tools/check_rename.sh`) busca los nombres viejos sin distinguir mayúsculas
   con `git grep -i` y devuelve error si encuentra alguno fuera de las **excepciones explícitas**: `docs/gow3/`,
-  `docs/plans/` y `docs/specs/` (documentos históricos), los submódulos, los README del jugador y la mención de la
+  `docs/specs/` (documentos históricos), los submódulos, los README del jugador y la mención de la
   rama `gow3` por su nombre en `CLAUDE.md` y en este roadmap. La lista completa está en la spec, §6.
 - [ ] `bash build.sh` produce `out/tsuki-probe` y `out/gpu/libtsukigpu.so`, y
   `TSUKI_GAME_DIR=Tsukihime/CUSA47999 python3 run.py` repite el recorrido grabado igual que antes
@@ -1106,7 +1106,7 @@ jugador, el icono, la fuente de títulos y la paleta del launcher esperan a la A
 | Borrar por error código compartido con lo genérico | Medio | Borrar por pasos, compilar y pasar los tests tras cada uno; la historia queda en git y en la rama `gow3`. En la Spec 1a (2026-10-19) no hubo regresiones en tests, log ni capturas |
 | El launcher y el empaquetado se quedan rotos hasta su limpieza: tras la Spec 1a, el launcher no reconoce un dump (usaba el perfil de parches del juego anterior) y el empaquetado copia una carpeta `patches/` que ya no existe | Bajo (el launcher solo es de Windows/Tk, y en Linux se usa `run.py`) | Se arreglan juntos después de la Alpha; los 4 tests del launcher afectados están marcados como fallo esperado, y unittest avisa en cuanto vuelvan a pasar |
 | El renombrado masivo rompe el build o una variable queda a medias (el juego ignora la opción sin avisar) | Medio | Va al final (Spec 7), con recorrido grabado y capturas como oráculo; renombrar por capas con `git mv`; sin alias; script de comprobación con excepciones explícitas |
-| Defecto de render RDNA2 (franjas oscuras) documentado en `docs/plans/2026-10-12-gpu-corruption-rdna2.md`; la máquina de pruebas es una Navi 23 | Bajo | Visto solo en Windows y en la ruta de MSAA del juego anterior. La Spec 1b no la borra: el parche de MSAA por vendor para Windows se queda (2026-10-25), así que el riesgo no cambia; `--vulkan-only` pasa en RADV. En el hito (2026-10-18) no apareció nada parecido |
+| Defecto de render RDNA2 (franjas oscuras) documentado en `docs/gow3/plans/2026-10-12-gpu-corruption-rdna2.md`; la máquina de pruebas es una Navi 23 | Bajo | Visto solo en Windows y en la ruta de MSAA del juego anterior. La Spec 1b no la borra: el parche de MSAA por vendor para Windows se queda (2026-10-25), así que el riesgo no cambia; `--vulkan-only` pasa en RADV. En el hito (2026-10-18) no apareció nada parecido |
 | El juego no elige inglés o mezcla recursos de otro idioma | Bajo | El runtime ya reporta inglés; verificar `_en` en el log de archivos abiertos |
 | Sin estimaciones fiables de esfuerzo | Bajo | Las de la sección 4 son una propuesta; se corrigieron tras el hito (2026-10-18) y se vuelven a revisar cuando se vea el 2D de la novela |
 | Licencia | Bajo | Mantener GPL-2.0 y los créditos; no distribuir nunca archivos del juego (tampoco capturas: `out/baseline/` no se versiona) |
@@ -1139,7 +1139,8 @@ Ideas para versiones siguientes, sin compromiso:
   - Dejar de mostrar `Backspace`/`back` como teclas por defecto de "Touchpad right".
   - Dar un mensaje propio al código 30.
   - Quitar el `cp -r patches` de `packaging/linux/build.sh` y de `packaging/windows/package.sh`.
-  - Quitar la mención de `tools/gow3_frame_map.py` en `docs/upscaler.md`.
+  - ~~Quitar la mención de la herramienta de mapa de fotogramas en `docs/upscaler.md`.~~ El documento pasó a `docs/gow3/`
+    (historia) el 2026-10-30.
   - Quitar la elección de parches de resolución y de frame rate por nombre del juego anterior (sección 2), con
     el aviso de `run.py` sobre el parche de frame rate. Está en `scripts/patches.py`
     (`EXCLUSIVE_PREFIX`, que importa el launcher), `scripts/graphics_options.py`, `run.py`, el menú

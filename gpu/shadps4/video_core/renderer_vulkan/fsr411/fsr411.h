@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // gow3: FSR 4.1.1 (AMD's INT8 model of the 4.1.1 upscaler DLL) on Vulkan, replaying what the DLL
-// does on D3D12 (docs/upscaler.md). Its asset sets (SPIR-V of every pass and the model weights)
-// were recorded and extracted by tools/fsr4cap, removed in Spec 7 §10 (it is in git history).
+// does on D3D12 (docs/gow3/upscaler.md). Its asset sets (SPIR-V of every pass and the model
+// weights) were recorded and extracted by tools/fsr4cap, removed in Spec 7 §10 (it is in git
+// history).
 //
 // Plain Vulkan (no renderer types); vk_fsr4.cpp uses it. Frames record into the caller's command
 // buffer; the caller keeps the images in layout General and makes sure that the frame recorded

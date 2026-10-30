@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// gow3: temporal upscaling of the HDR scene color (docs/upscaler.md). Parked: it has had no inputs
-// since Spec 1b and nothing switches it on since Spec 7 §10 (Gow3Settings::TemporalUpscalerAvailable).
+// gow3: temporal upscaling of the HDR scene color (docs/gow3/upscaler.md). Parked: it has had no
+// inputs since Spec 1b and nothing switches it on since Spec 7 §10
+// (Gow3Settings::TemporalUpscalerAvailable).
 // FSR 3.1 (FireBurn/FSR-Vulkan, native Vulkan) ran on the scene color right before the
 // post-processing combine pass, with the scene depth and camera motion vectors, and writes the
 // result back so the game's own post, tonemap and UI continue unchanged (Native AA preset).
