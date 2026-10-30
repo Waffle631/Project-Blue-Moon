@@ -22,7 +22,7 @@ def sfo_bytes(**values):
             + entries + keys + data)
 
 
-BASE_SFO = sfo_bytes(TITLE_ID='CUSA01623', APP_VER='01.00')
+BASE_SFO = sfo_bytes(TITLE_ID='CUSA47999', APP_VER='01.00')
 
 
 class ControlMapTest(unittest.TestCase):
@@ -102,8 +102,8 @@ class ControlMapTest(unittest.TestCase):
         for key in ('game_dir', 'user_dir', 'mods_dir', 'patches_dir', 'language', 'player_name', 'hdr',
                     'draw_pipe', 'readbacks', 'background_warmup', 'parallel_warmup', 'controls', 'pad_style'):
             self.assertIn(key, launcher.APP_DEFAULTS)
-        env = launcher.game_environment({**launcher.APP_DEFAULTS, 'player_name': ' Kratos '})
-        self.assertEqual(env['GOW3_USER_NAME'], 'Kratos')
+        env = launcher.game_environment({**launcher.APP_DEFAULTS, 'player_name': ' Shiki '})
+        self.assertEqual(env['GOW3_USER_NAME'], 'Shiki')
         for key in ('display_mode', 'fps_limit', 'render_resolution', 'engine_fps'):
             self.assertIn(key, launcher.INI_DEFAULTS)
 
@@ -127,7 +127,7 @@ class GameFilesTest(unittest.TestCase):
         for name in ('collect', 'play_button', 'status', 'meta_dir', 'summary', 'messagebox', 'show'):
             setattr(app, name, mock.Mock())
         with mock.patch.object(launcher.threading, 'Thread'), \
-                mock.patch.object(launcher, 'game_info', return_value=('God of War III', '01.02')):
+                mock.patch.object(launcher, 'game_info', return_value=('TSUKIHIME -A piece of blue glass moon-', '01.00')):
             app.adopt_in_background('Sc0', 'Image0')
             app.play()
             app.refresh_status()
@@ -208,7 +208,7 @@ class GameFilesTest(unittest.TestCase):
             self.assertEqual(launcher.describe_missing(missing)[2], 'sce_module/libc.prx (unreadable)')
 
     def test_ready_to_play_needs_a_complete_dump(self):
-        # The --play role (Steam, "Play God of War III.exe") opens the launcher instead of
+        # The --play role (Steam, "Play Tsukihime.exe") opens the launcher instead of
         # starting a dump the Play button would refuse.
         import tempfile
         from pathlib import Path
@@ -231,7 +231,7 @@ class GameFilesTest(unittest.TestCase):
             (update / 'sce_sys/param.sfo').write_bytes(BASE_SFO)
             self.assertTrue(launcher.ready_to_play(folder, str(update)))
 
-    # Spec 1a removed the GoW3 patch profile (scripts/patches.py GAMES is empty), which the launcher
+    # Spec 1a removed the previous game's patch profile (scripts/patches.py GAMES is empty), which the launcher
     # uses to recognize a game dump; the launcher is cleaned up after the Alpha (docs/tsuki/ROADMAP.md).
     @unittest.expectedFailure
     def test_system_files_beside_a_pkg_extraction(self):
@@ -294,7 +294,7 @@ class GameFilesTest(unittest.TestCase):
             self.assertEqual(base['APP_VER'], '01.00')
             beside = root / 'Base0'  # the base game beside this folder: Sc0 at its version is its own
             self.assertIsNone(launcher.system_files_beside(game, reference=base, base=beside))
-            self.assertEqual(launcher.system_files_beside(game, reference={'TITLE_ID': 'CUSA01623', 'APP_VER': '01.02'},
+            self.assertEqual(launcher.system_files_beside(game, reference={'TITLE_ID': 'CUSA47999', 'APP_VER': '01.02'},
                                                          base=beside), root / 'Sc0')
             self.assertIsNone(launcher.system_files_beside(game, reference={'TITLE_ID': 'CUSA00001', 'APP_VER': '01.02'},
                                                            base=beside))
@@ -336,7 +336,7 @@ class GameFilesTest(unittest.TestCase):
             # A drive root has no siblings to look at.
             self.assertIsNone(launcher.system_files_beside(root.anchor))
 
-    # Spec 1a removed the GoW3 patch profile (scripts/patches.py GAMES is empty), which the launcher
+    # Spec 1a removed the previous game's patch profile (scripts/patches.py GAMES is empty), which the launcher
     # uses to recognize a game dump; the launcher is cleaned up after the Alpha (docs/tsuki/ROADMAP.md).
     @unittest.expectedFailure
     def test_play_offers_to_adopt_the_system_files(self):
@@ -355,7 +355,7 @@ class GameFilesTest(unittest.TestCase):
             if placeholder is not None:
                 (game / 'sce_sys/param.sfo').write_bytes(placeholder)
             (root / name / 'Sc0').mkdir()
-            (root / name / 'Sc0/param.sfo').write_bytes(sfo_bytes(TITLE_ID='CUSA01623', APP_VER=version))
+            (root / name / 'Sc0/param.sfo').write_bytes(sfo_bytes(TITLE_ID='CUSA47999', APP_VER=version))
             return game
 
         def launcher_app(game, update=''):

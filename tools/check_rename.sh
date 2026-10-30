@@ -5,8 +5,8 @@
 # CUSA01715). Exceptions: docs/gow3/, docs/plans/ and docs/specs/ (history with the names of their time), the
 # submodules, pgo/, this script and its test, the player READMEs (rewritten for the Alpha), lines marked
 # "rename-check: ok" (a test that checks an old variable no longer works has to name it), "gow3 contributors" on a
-# copyright line, and in CLAUDE.md and docs/tsuki/ROADMAP.md the branch `gow3` and the path docs/gow3/. Exit 0 with
-# no output when nothing is left, 1 when something is, 2 on an error.
+# copyright line, and in CLAUDE.md and docs/tsuki/ROADMAP.md the branch `gow3` and the path docs/gow3/ (or ../gow3/).
+# Exit 0 with no output when nothing is left, 1 when something is, 2 on an error.
 set -u
 (($# <= 1)) || { echo "uso: $0 [repo_dir]" >&2; exit 2; }
 repo=${1:-$(dirname -- "$(realpath -- "$0")")/..}
@@ -21,7 +21,7 @@ found=$({
         awk -v old="$old" '{
             path = $0; sub(/:.*/, "", path); rest = $0; sub(/^[^:]*:[^:]*:/, "", rest); rest = tolower(rest)
             if (path == "CLAUDE.md" || path == "docs/tsuki/ROADMAP.md")
-                gsub(/rama `gow3`|branch `gow3`|branch gow3|docs\/gow3\//, "", rest)
+                gsub(/rama `gow3`|branch `gow3`|branch gow3|docs\/gow3\/|\.\.\/gow3\//, "", rest)
             if (rest ~ /copyright/) gsub(/gow3 contributors/, "", rest)
             if (rest ~ old) print }'
     git -C "$repo" -c core.quotePath=false ls-files -- . "${skip[@]}" | grep -iE "$old"

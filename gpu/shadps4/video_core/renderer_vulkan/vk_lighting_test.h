@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// gow3: GOW3_LIGHTING_TEST=shading,msdepth,dref,bias (or `all`). The four changes of the
-// KrachDev/shadPS4_GOW3 build "God of War III Remastered - Lighting, Scanline & AMD Fix" (commit
-// eaa1027f), which its author reports removes the black scanlines on an RX 6600, each behind its
-// own token so a tester can bisect them on the RDNA2 black-lines issue (#65):
+// gow3: GOW3_LIGHTING_TEST=shading,msdepth,dref,bias (or `all`). The four changes of the build
+// below (commit eaa1027f), which its author reports removes the black scanlines on an RX 6600,
+// each behind its own token so a tester can bisect them on the RDNA2 black-lines issue (#65):
+// KrachDev/shadPS4_GOW3, "God of War III Remastered - Lighting, Scanline & AMD Fix" (rename-check: ok)
 //   shading  sampleShadingEnable always false (vk_graphics_pipeline.cpp)
 //   msdepth  colour-to-MSAA-depth blit falls back to the red channel for samples that read 0
 //            (host_shaders/color_to_ms_depth.frag)

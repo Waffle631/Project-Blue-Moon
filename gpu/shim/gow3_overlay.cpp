@@ -867,7 +867,7 @@ bool HandleEvent(const SDL_Event& event) {
     case SDL_EVENT_GAMEPAD_BUTTON_UP: {
         const bool down = event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN;
         const u8 button = event.gbutton.button;
-        // R3+L2 opens the menu: L3+R3 is a game action in God of War III.
+        // R3+L2 opens the menu.
         if (button == SDL_GAMEPAD_BUTTON_RIGHT_STICK) {
             r3_down = down;
             if (down && l2_down) {

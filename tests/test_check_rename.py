@@ -54,7 +54,7 @@ class CheckRenameTests(unittest.TestCase):
         self.assertEqual((r.returncode,r.stdout),(0,''),r.stderr)
 
     def test_branch_mention_only_in_claude_and_roadmap(self):
-        line='History stays in the rama `gow3`, branch gow3 and branch `gow3`; see docs/gow3/ROADMAP.md.\n'
+        line='History stays in the rama `gow3`, branch gow3 and branch `gow3`; see [docs/gow3/ROADMAP.md](../gow3/ROADMAP.md).\n'
         self.write('CLAUDE.md',line); self.write('docs/tsuki/ROADMAP.md',line)
         r=self.check()
         self.assertEqual((r.returncode,r.stdout),(0,''),r.stderr)

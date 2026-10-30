@@ -220,8 +220,6 @@ def available_patches(xml, app_version):
     return {m.get('Name') for m in ET.parse(xml).getroot().iter('Metadata') if m.get('AppVer')==app_version}
 
 
-# God of War III notes: the texture fix and the resolution patches both resize the video arena;
-# enable one, never both. A chosen resolution patch replaces the default texture fix.
 EXCLUSIVE_PREFIX='Resolution Patch'
 REPLACED_BY_EXCLUSIVE={'Bug Fix - Texture Corruption Fix'}
 

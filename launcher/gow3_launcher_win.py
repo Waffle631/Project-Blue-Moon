@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""God of War III (gow3) launcher for Windows and Linux (Tkinter).
+"""Tsukihime launcher for Windows and Linux (Tkinter).
 
 Every setting of the port in one window: the game folder and saves, gow3.ini (display,
 overlay, effects), start-up options passed to run.py as environment variables
 (frame rate, presentation, HDR, ...), mods, third-party patches and controls.
 Launcher options live in %APPDATA%/gow3-launcher/settings.json (~/.config/gow3-launcher on Linux).
 
-Frozen with PyInstaller (packaging/windows/package.sh) the same God of War III.exe also runs the
+Frozen with PyInstaller (packaging/windows/package.sh) the same Tsukihime.exe also runs the
 game without the window (`--play`), run.py (`--run`) and the preparation scripts (`--script`),
 so a packaged port needs no Python installation.
 """
@@ -43,7 +43,7 @@ CONFIG_DIR = (Path(os.environ.get('APPDATA', Path.home())) if WINDOWS else
               Path(os.environ.get('XDG_CONFIG_HOME') or Path.home() / '.config')) / 'gow3-launcher'
 CONFIG_FILE = CONFIG_DIR / 'settings.json'
 MOD_PRESETS = DATA_DIR / 'mods_presets.json'
-APP_NAME = 'God of War III'
+APP_NAME = 'Tsukihime'
 MAX_LOG_LINES = 6000
 NO_WINDOW = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
 # The game and everything it starts form one process group, ended together (GameJob).
@@ -51,7 +51,8 @@ NEW_GROUP = {} if WINDOWS else {'start_new_session': True}
 UI_FONT, MONO_FONT, SERIF_FONT = 'Segoe UI', 'Consolas', 'Georgia'
 # This build, shown on the Advanced page.
 VERSION = '2.1.8'
-# The God of War face for titles, next to gow3.ico; main() registers it for this process only.
+# The title font, next to gow3.ico; main() registers it for this process only.
+# It is the God of War face, kept until the Alpha with the icon and the colors (Spec 7 §11; rename-check: ok).
 FONT_FILE = PORT_DIR / 'launcher' / 'gowfont.ttf'
 FR_PRIVATE = 0x10
 
@@ -232,7 +233,7 @@ def register_font(path):
         return False
 
 
-# The God of War face has ASCII letters only: the Latin-script languages use it for headings with
+# The title font has ASCII letters only: the Latin-script languages use it for headings with
 # the accents stripped (heading_text); the other scripts keep the launcher's usual families.
 LATIN_UI_LANGUAGES = ('en', 'es', 'pt', 'fr', 'de', 'it', 'pl', 'tr')
 HEADING_LETTERS = {'ß': 'ss', 'ẞ': 'SS', 'œ': 'oe', 'Œ': 'OE', 'æ': 'ae', 'Æ': 'AE', 'ø': 'o', 'Ø': 'O',
@@ -240,7 +241,7 @@ HEADING_LETTERS = {'ß': 'ss', 'ẞ': 'SS', 'œ': 'oe', 'Œ': 'OE', 'æ': 'ae', 
 
 
 def heading_face(every_language=False):
-    """Whether headings are drawn with the God of War face: once its file is registered, in the
+    """Whether headings are drawn with the title font: once its file is registered, in the
     Latin-script languages, or in every language for the game's name."""
     return FONT_LOADED and (every_language or LANG in LATIN_UI_LANGUAGES)
 
@@ -259,7 +260,7 @@ def plain_letter(c):
 
 
 def heading_text(text, every_language=False):
-    """A heading's text for its font: in the God of War face the accents go (GRÁFICOS becomes
+    """A heading's text for its font: in the title font the accents go (GRÁFICOS becomes
     GRAFICOS) and the letters it lacks become their plain pair (ß becomes ss)."""
     if not heading_face(every_language):
         return text
@@ -283,7 +284,7 @@ FPS_LIMITS = [('30', ('30',)), ('60', ('60',)), ('120', ('120',)), ('240', ('240
 # The sidebar's pages, top to bottom, and the methods that refresh a page's lists when it is shown.
 PAGES = ('home', 'graphics', 'performance', 'game', 'advanced')
 PAGE_REFRESH = {'home': ('refresh_status',), 'game': ('refresh_lists', 'refresh_game_patches')}
-APP_DEFAULTS = {'ui_language': 'en', 'game_dir': os.environ.get('GOW3_GAME_DIR', str(PORT_DIR.parent / 'CUSA01623') if WINDOWS else ''), 'update_dir': '',
+APP_DEFAULTS = {'ui_language': 'en', 'game_dir': os.environ.get('GOW3_GAME_DIR', str(PORT_DIR.parent / 'CUSA47999') if WINDOWS else ''), 'update_dir': '',
                 'video_backend': 'auto', 'gamemode': False, 'mangohud': False, 'desktop_integration': True, 'user_dir': '',
                 'mods_dir': '', 'mods_enabled': True, 'patches_dir': '', 'language': '1',
                 'player_name': '', 'hdr': False, 'draw_pipe': '', 'readbacks': '', 'no_msaa': '', 'stream_memory': 'cached',
@@ -516,7 +517,7 @@ def describe_missing(missing):
 
 
 def ready_to_play(game_dir, update_dir=''):
-    """Whether --play (Steam, "Play God of War III.exe") may start the game at once; anything
+    """Whether --play (Steam, "Play Tsukihime.exe") may start the game at once; anything
     the Play button would refuse opens the launcher window instead."""
     if update_dir and same_folder(update_dir, game_dir or '.'):
         return False
@@ -532,7 +533,7 @@ def same_folder(a, b):
 def system_files_beside(folder, reference=None, base=None):
     """PKG extractors write the system files (param.sfo, icon0.png, pic1.png, trophy/) to Sc0/
     beside the game files (Image0/), while the port reads them from the folder's sce_sys/: the
-    Sc0 folder beside `folder` holding a God of War III param.sfo (patches.game_profile), while
+    Sc0 folder beside `folder` holding the param.sfo of a known game (patches.game_profile), while
     `folder` has none worth keeping (an unreadable one is a different problem). For an update
     folder the title must be that of `reference` (the base game's param.sfo values); an Sc0
     beside the base game itself (`base`) is the base game's own unless the base game's param.sfo
@@ -608,7 +609,7 @@ DESKTOP_MARKER = 'X-GOW3-Integration=true'
 
 def desktop_entry(command, icon, marker=False):
     """The menu entry; its StartupWMClass is the application id of the launcher and of the game window."""
-    return ('[Desktop Entry]\nType=Application\nName=God of War III Remastered\n'
+    return ('[Desktop Entry]\nType=Application\nName=TSUKIHIME -A piece of blue glass moon-\n'
             f'Exec={command}\nIcon={icon}\nTerminal=false\nCategories=Game;\nStartupWMClass=gow3\n'
             + (DESKTOP_MARKER + '\n' if marker else ''))
 
@@ -720,7 +721,7 @@ def game_environment(s):
 # ---------------------------------------------------------------------------------------------
 # The window.
 
-# God of War III's own colors: near black, ash and blood red (no gold or orange).
+# The previous game's colors, kept until the Alpha (Spec 7 §11): near black, ash and blood red.
 BG, PANEL, CARD, LINE = '#0d0b0b', '#161212', '#1d1717', '#2a2222'
 TEXT, MUTED, ACCENT, ACCENT_HI = '#e6e0d8', '#8a817a', '#a4161a', '#c81e25'
 RESOLUTION_CHOICES = [('native', ('Native (1080p)',)), ('480p', ('480p',)), ('720p', ('720p',)),
@@ -1210,10 +1211,10 @@ class Launcher:
         self.section(f, _('Folders'))
         self.folder(f, 'game_dir', _('Game folder', 'Папка игры'),
                     _('Choose the folder with eboot.bin', 'Выберите папку с eboot.bin'),
-                    _('Your own dump of the game (eboot.bin, sce_module, sce_sys): God of War III Remastered, '
-                      'any region and version.',
-                      'Ваш дамп игры (eboot.bin, sce_module, sce_sys): God of War III Remastered, '
-                      'любой регион и версия.'), on_change=self.game_changed)
+                    _('Your own dump of the game (eboot.bin, sce_module, sce_sys): '
+                      'TSUKIHIME -A piece of blue glass moon- (CUSA47999).',
+                      'Ваш дамп игры (eboot.bin, sce_module, sce_sys): '
+                      'TSUKIHIME -A piece of blue glass moon- (CUSA47999).'), on_change=self.game_changed)
         self.folder(f, 'update_dir', _('Update folder (optional)'),
                     _('Choose the folder of the update (eboot.bin, sce_sys)'),
                     _('Only if the update is dumped apart from the game: it is laid over the game folder '
@@ -1822,8 +1823,8 @@ class Launcher:
         if not self.collect():
             return
         if not game_info(self.app['game_dir']):
-            self.messagebox.showerror(APP_NAME, _('Choose the game folder with eboot.bin (CUSA01623).',
-                                                  'Выберите папку игры с eboot.bin (CUSA01623).'))
+            self.messagebox.showerror(APP_NAME, _('Choose the game folder with eboot.bin (CUSA47999).',
+                                                  'Выберите папку игры с eboot.bin (CUSA47999).'))
             self.show('game')
             return
         if not self.offer_system_files():
@@ -1958,7 +1959,7 @@ class Launcher:
                                                  'минут будет подтормаживать, пока кэш собирается заново.'))
 
     def shortcut(self):
-        """God of War III.lnk on the desktop (a .desktop entry in the menu and on the desktop on Linux)."""
+        """Tsukihime.lnk on the desktop (a .desktop entry in the menu and on the desktop on Linux)."""
         if not WINDOWS:
             self.linux_shortcut()
             return
@@ -1969,7 +1970,7 @@ class Launcher:
             target = str(pythonw if pythonw.exists() else sys.executable)
             arguments, icon = Path(__file__).resolve(), PORT_DIR / 'launcher' / 'gow3.ico'
         script = ('$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath("Desktop")'
-                  '+"\\God of War III.lnk");'
+                  '+"\\Tsukihime.lnk");'
                   f'$s.TargetPath="{target}";$s.WorkingDirectory="{PORT_DIR}";$s.IconLocation="{icon}";'
                   + (f"$s.Arguments='\"{arguments}\"';" if arguments else '') + '$s.Save()')
         result = subprocess.run(['powershell', '-NoProfile', '-Command', script], capture_output=True,
@@ -2004,7 +2005,7 @@ class Launcher:
                     continue
                 folder.mkdir(parents=True, exist_ok=True)
                 # In the applications menu the file is named after the window's application id.
-                target = folder / ('gow3.desktop' if folder == folders[0] else 'God of War III.desktop')
+                target = folder / ('gow3.desktop' if folder == folders[0] else 'Tsukihime.desktop')
                 target.write_text(entry, encoding='utf-8')
                 target.chmod(0o755)
                 created.append(str(target))
@@ -2019,8 +2020,8 @@ class Launcher:
             return
         game = self.var('game_dir', 'app').get()
         if not game_info(game):
-            self.messagebox.showerror(APP_NAME, _('Choose the game folder with eboot.bin (CUSA01623).',
-                                                  'Выберите папку игры с eboot.bin (CUSA01623).'))
+            self.messagebox.showerror(APP_NAME, _('Choose the game folder with eboot.bin (CUSA47999).',
+                                                  'Выберите папку игры с eboot.bin (CUSA47999).'))
             return
         self.root.configure(cursor='watch')
         self.root.update_idletasks()

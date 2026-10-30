@@ -15,7 +15,9 @@ import shutil
 import struct
 import subprocess
 
-APP_NAME = 'God of War III Remastered'
+APP_NAME = 'TSUKIHIME -A piece of blue glass moon-'
+# The logo's two lines.
+LOGO_TITLE, LOGO_SUBTITLE = 'TSUKIHIME', 'A PIECE OF BLUE GLASS MOON'
 CAPSULE = (600, 900)    # vertical capsule: <id>p.png
 WIDE = (920, 430)       # horizontal capsule: <id>.png
 HERO = (1920, 620)      # library background: <id>_hero.png
@@ -186,14 +188,14 @@ def usable_emblem(image):
 
 
 def make_logo(emblem, width):
-    """Transparent logo: the emblem (when there is one) over GOD OF WAR III and REMASTERED, `width` px wide."""
+    """Transparent logo: the emblem (when there is one) over LOGO_TITLE and LOGO_SUBTITLE, `width` px wide."""
     from PIL import Image, ImageDraw, ImageFilter
     scale = 2
     w = width * scale
     emblem_size = round(w * 0.30) if emblem is not None else 0
     probe = ImageDraw.Draw(Image.new('RGBA', (1, 1)))
-    title_face, title_gap = fit_face(probe, 'GOD OF WAR III', w * 0.94, 0.04)
-    sub_face, sub_gap = fit_face(probe, 'REMASTERED', w * 0.60, 0.45)
+    title_face, title_gap = fit_face(probe, LOGO_TITLE, w * 0.94, 0.04)
+    sub_face, sub_gap = fit_face(probe, LOGO_SUBTITLE, w * 0.80, 0.20)
     title_y = emblem_size + (w * 0.03 if emblem is not None else 0)
     sub_y = title_y + title_face.size * 1.35
     height = round(sub_y + sub_face.size * 1.5)
@@ -204,8 +206,8 @@ def make_logo(emblem, width):
     shadow = Image.new('RGBA', canvas.size, (0, 0, 0, 0))
     for layer, fill, offset in ((shadow, (0, 0, 0, 220), 3 * scale), (canvas, GOLD + (255,), 0)):
         draw = ImageDraw.Draw(layer)
-        spaced(draw, w / 2 + offset, title_y + offset, 'GOD OF WAR III', title_face, fill, title_gap)
-        spaced(draw, w / 2 + offset, sub_y + offset, 'REMASTERED', sub_face, fill, sub_gap)
+        spaced(draw, w / 2 + offset, title_y + offset, LOGO_TITLE, title_face, fill, title_gap)
+        spaced(draw, w / 2 + offset, sub_y + offset, LOGO_SUBTITLE, sub_face, fill, sub_gap)
     blurred = shadow.filter(ImageFilter.GaussianBlur(2 * scale))
     blurred.alpha_composite(canvas)
     return blurred.resize((width, round(height / scale)), Image.LANCZOS)

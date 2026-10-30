@@ -1,4 +1,4 @@
-"""The God of War title font: an optional launcher asset, never a reason the launcher cannot start."""
+"""The title font: an optional launcher asset, never a reason the launcher cannot start."""
 import sys
 import unittest
 from pathlib import Path

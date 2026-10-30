@@ -175,7 +175,7 @@ class GameProfileTests(unittest.TestCase):
 
 class BuiltInProfileTests(unittest.TestCase):
     def test_without_profile_nothing_applies(self):
-        self.assertEqual(patches.GAMES, [])  # God of War III's was the only built-in profile
+        self.assertEqual(patches.GAMES, [])
         self.assertIsNone(game_profile('CUSA47999'))
         self.assertIsNone(game_profile('CUSA47999', 'TSUKIHIME -A piece of blue glass moon-'))
 

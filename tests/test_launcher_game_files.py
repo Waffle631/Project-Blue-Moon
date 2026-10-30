@@ -30,7 +30,7 @@ class LauncherGameFilesTests(unittest.TestCase):
         (self.game / 'sce_module/libSceFios2.prx').write_bytes(b'synthetic module')
         self.source = self.folder / 'Sc0'
         self.source.mkdir()
-        (self.source / 'param.sfo').write_bytes(sfo_bytes(TITLE_ID='CUSA01623', APP_VER='01.02'))
+        (self.source / 'param.sfo').write_bytes(sfo_bytes(TITLE_ID='CUSA47999', APP_VER='01.02'))
         (self.source / 'trophy').mkdir()
         (self.source / 'trophy/test.trp').write_bytes(b'synthetic trophy')
         config = self.folder / 'config'
@@ -61,7 +61,7 @@ class LauncherGameFilesTests(unittest.TestCase):
             time.sleep(0.01)
         self.assertFalse(getattr(self.app, 'copying_system_files', False), 'copy did not finish')
 
-    # Spec 1a removed the GoW3 patch profile (scripts/patches.py GAMES is empty), which the launcher
+    # Spec 1a removed the previous game's patch profile (scripts/patches.py GAMES is empty), which the launcher
     # uses to recognize a game dump; the launcher is cleaned up after the Alpha (docs/tsuki/ROADMAP.md).
     @unittest.expectedFailure
     def test_cancel_then_copy_keeps_existing_files_and_reports_missing_module(self):
@@ -86,7 +86,7 @@ class LauncherGameFilesTests(unittest.TestCase):
         self.assertEqual(self.app.current_page, 'game')
         self.assertFalse(self.app.play_button.instate(['disabled']))
 
-    # Spec 1a removed the GoW3 patch profile (scripts/patches.py GAMES is empty), which the launcher
+    # Spec 1a removed the previous game's patch profile (scripts/patches.py GAMES is empty), which the launcher
     # uses to recognize a game dump; the launcher is cleaned up after the Alpha (docs/tsuki/ROADMAP.md).
     @unittest.expectedFailure
     def test_slow_copy_blocks_reentry_and_failure_allows_retry(self):

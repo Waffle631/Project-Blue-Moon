@@ -83,7 +83,7 @@ int main() {
     assert(v.rcas_strength == 75 && v.frames_queued == 1);
     assert(v.async_shaders);
     {
-        // An old gow3.ini with the removed God of War III keys: ignored, and not written back.
+        // An old gow3.ini with removed keys: ignored, and not written back.
         std::ofstream out(path);
         out << "cheat_health=1\nred_orb_multiplier=5.0\ndamage_taken=0.5\nenemy_health_bar=1\nvsync=0\n";
     }
