@@ -343,14 +343,16 @@ y el submódulo `fsr-vulkan`. El usuario decidió conservarlo (2026-10-28).
     `gow3-gpu-capabilities --list` lista las 3 GPUs.
   - Recorrido grabado `tras10`: los 6 fotogramas `exact`/`mask` son idénticos a `out/baseline/6a/`, y 2700 y 2890
     coinciden a ojo. Sin `STOP:`/`Fault:`; `Object motion: off`.
-- Pendiente del usuario: mirar a ojo, en una ejecución corta con el menú Insert abierto, que siguen los controles de
-  FSR 1 y RCAS (plan, tarea 3, paso 4).
+- Revisión a ojo del usuario (2026-10-30, partida `out/run-audiodec-a1.log`): en el menú Insert, «Scaling and
+  sharpening» muestra «Upscale with FSR 1», «Sharpening (RCAS)» y «Sharpening strength», y la pestaña Overlay ya no
+  tiene «Upscaler». El `gow3.ini` que guardó el juego al cerrar lleva los ítems del overlay que se tocaron y
+  `fsr1`/`rcas`/`rcas_strength`, sin ninguna clave del upscaler temporal.
 
 Criterios de aceptación:
 
 - [x] Ni el launcher, ni el menú Insert, ni `gow3.ini`, ni una variable de entorno pueden encender el upscaler temporal.
   Lo comprueba un test que ponga `upscaler=fsr3` en el `.ini` y `GOW3_UPSCALER=fsr3` en el entorno, y vea el
   upscaler apagado.
-- [ ] FSR 1 y RCAS siguen funcionando como antes. `graphics-settings-test` lee y guarda `fsr1`, `rcas` y
-  `rcas_strength`; falta que el usuario vea los controles en el menú Insert.
+- [x] FSR 1 y RCAS siguen funcionando como antes. `graphics-settings-test` lee y guarda `fsr1`, `rcas` y
+  `rcas_strength`, y el usuario vio sus controles en el menú Insert (2026-10-30).
 - [x] Suites verdes; las capturas de la línea base y el recorrido grabado no cambian (`t2` y `tras10`).
