@@ -93,7 +93,7 @@ fi
 "$CC" -std=c11 -O2 -g -Wall -Wextra -Werror -mgeneral-regs-only -c src/isa_emulate.c -o out/isa_emulate.o
 "$CC" -std=c11 -O2 -g -Wall -Wextra -Werror -pthread -no-pie "${includes[@]}" -I. -Isrc src/probe.c "${runtime[@]}" src/cpu_check.c src/vulkan_smoke.c out/isa_emulate.o src/isa_rewrite.c "${hevag[@]}" out/libatrac9.a -lm "${gpu[@]}" "${libraries[@]}" -o out/gow3-probe
 echo "Built $PWD/out/gow3-probe"
-# GPU check for run.sh (live_resolution=auto): links only the Vulkan loader.
+# GPU list for the launcher (tools/gpu_capabilities.c): links only the Vulkan loader.
 "$CC" -std=c11 -O2 -Wall -Wextra -Werror -Igpu/shadps4 tools/gpu_capabilities.c "${libraries[@]}" -o out/gow3-gpu-capabilities
 if [[ ${1:-} == --test ]]; then
     "$CC" -std=c11 -O2 -g -Wall -Wextra -Werror -pthread "${includes[@]}" -I. -Isrc tests/test_pad.c "${libraries[@]}" -o out/pad-test

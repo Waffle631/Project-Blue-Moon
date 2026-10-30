@@ -1,5 +1,15 @@
 # Temporal upscaling y frame generation — análisis de fotogramas y plan
 
+> **Estado (2026-10-30, Spec 7 §10): aparcado y sin forma de encenderlo.** El código del upscaler
+> temporal (FSR 3.1, FSR 4 y 4.1.1, DLSS, TAA, vectores de movimiento) se conserva, pero con
+> Tsukihime no tiene entradas desde la Spec 1b, y desde la Spec 7 nada lo enciende: ni `gow3.ini`,
+> ni el launcher, ni el menú del juego, ni las variables de entorno que lo configuraban
+> (`Gow3Settings::TemporalUpscalerAvailable` vale `false`). Las herramientas que descargaban,
+> optimizaban, comprobaban y medían los assets de FSR 4 y 4.1.1 se borraron con él y siguen en la
+> historia de git. FSR 1 y RCAS son espaciales y siguen en el menú. El resto del documento es la
+> referencia de cuando funcionaba con God of War III: las opciones, variables y herramientas que
+> nombra ya no existen.
+
 ## TAA nativo y assets de FSR 4 ausentes (2026-10-01)
 
 `upscaler=taa` / `GOW3_UPSCALER=taa` es un modo de AA temporal independiente a resolución

@@ -59,7 +59,7 @@ O andamento está em
   - **Performance:** limite de FPS (de 30 a ilimitado), quadros na fila, compilação de shaders
     em segundo plano; resolução, FPS do motor e as opções de leitura da GPU valem com um único
     botão "Apply and restart".
-  - **Overlay:** contador de desempenho com FPS, tempo de quadro, upscaler, GPU (nome e uso),
+  - **Overlay:** contador de desempenho com FPS, tempo de quadro, GPU (nome e uso),
     CPU, RAM e VRAM, cada um opcional, com tamanho da fonte, canto, transparência e formato. Os
     números são o uso do próprio jogo, não do sistema inteiro.
 
@@ -142,8 +142,8 @@ partir do código: `GOW3_GAME_DIR=/caminho/para/CUSA01623 python3 run.py` depois
   arquivo existe na hora da compilação, e `launcher/gow3.png` caso contrário.
 - **Patches:** o mesmo arquivo de patches serve a atualização 01.02 completa (`eboot.bin` com sha256
   `6e72330e…`) e o título europeu (CUSA01715): os patches e as trapaças acham seus pontos por assinatura.
-- **Gráficos (experimental):** os upscalers temporais (FSR 3.1, FSR 4, TAA, DLSS) ficam desligados por
-  padrão; o interruptor está no topo dessa página.
+- **Gráficos:** os upscalers temporais (FSR 3.1, FSR 4, TAA, DLSS) não podem ser ligados: o código
+  fica, mas não recebe entradas deste jogo (`docs/upscaler.md`). FSR 1 e RCAS estão no menu do jogo.
 
 ## Requisitos
 

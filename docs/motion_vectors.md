@@ -1,5 +1,8 @@
 # Vectores de movimiento: mejoras tras el vídeo del 2026-09-26
 
+> **Estado (2026-10-30):** el upscaler temporal y los vectores de movimiento no se pueden encender
+> desde la Spec 7 §10 (`docs/upscaler.md`); las opciones y variables que se nombran aquí ya no existen.
+
 Material de origen: `video_2026-09-26_04-19-53.mp4`, FSR 3.1 Performance,
 render 960×540 → salida 1920×1080, y `out/dev/t71.log`.
 Esto describe los cambios actuales del árbol de trabajo, no una confirmación de la calidad en el juego.

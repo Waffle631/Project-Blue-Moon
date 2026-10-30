@@ -85,9 +85,10 @@ with before/after captures; the `gow3` → `tsuki` rename is Spec 7, done last).
 
   Without `gbuffer_draw`, `CameraMotion` has no inputs (`OnGBufferPass`/`OnConstants` have no callers), so
   `CameraMotion`, `ObjectMotion` and the temporal upscaler (FSR 3.1/4, DLSS, TAA) can no longer run with this game.
-  The user decided (2026-10-28) to keep that code and to remove the options that switch it on (launcher, `gow3.ini`,
-  `run.py`'s `GOW3_EXPERIMENTAL_UPSCALER`, env vars) in Spec 7 (§10), before the rename. FSR 1 and RCAS are spatial
-  and stay.
+  The user decided (2026-10-28) to keep that code and to remove the options that switch it on; Spec 7 §10 did it
+  (2026-10-30): no launcher control, `gow3.ini` key, `run.py` switch or env var turns it on
+  (`Gow3Settings::TemporalUpscalerAvailable = false`), and the standalone FSR 4 tools (`tools/fsr4*`, `fsr4cap/`,
+  `fsr4-bench`) were deleted. FSR 1 and RCAS are spatial and stay.
 - Spec 6 (2D, mouse, saves, language) is closed (2026-10-28): blocks B, C and D were done on 2026-10-25 and block A,
   the 2D render baseline, on 2026-10-28 (branch `tsuki/spec-6bcd`, fast-forward merged into `tsuki/main`).
   - The user closed it without waiting for Spec 1b. Replaying the route after Spec 1b's deletions and matching
@@ -220,8 +221,8 @@ TEB TLS slot on Windows, patched by `patch_tcb_loads`).
 - `gpu/gow3gpu.h` — the C interface between loader/runtime and the GPU library.
 - Linux: `libgow3gpu.so` loaded via rpath `$ORIGIN/gpu`; Windows: static, linked into `gow3-probe.exe`.
 - Many behaviours are toggled by `GOW3_*` environment variables (diagnostics, readbacks,
-  upscalers, multisampling); `run.py` and `scripts/graphics_options.py` derive them from the
-  launcher/`gow3.ini`. Temporal upscalers/motion vectors are experimental and off by default.
+  multisampling); `run.py` and `scripts/graphics_options.py` derive them from the
+  launcher/`gow3.ini`. Temporal upscalers/motion vectors cannot be switched on (Spec 7 §10).
   `run.py` turns on deferred and stale image readback by default (`GOW3_DEFERRED_READBACK`,
   `GOW3_STALE_READBACK`, `scripts/graphics_options.py:14-15`), so CPU reads of GPU-written images use the
   previous frame's copy.

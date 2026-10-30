@@ -1,5 +1,8 @@
 # Depth-Adaptive TAA Improvements
 
+> **Estado (2026-10-30):** el upscaler temporal y los vectores de movimiento no se pueden encender
+> desde la Spec 7 §10 (`docs/upscaler.md`); las opciones y variables que se nombran aquí ya no existen.
+
 **Fecha:** 2026-10-01  
 **Estado:** Experimento histórico, reemplazado por la corrección de temporal reprojection.
 

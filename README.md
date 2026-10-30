@@ -59,7 +59,7 @@ Progress is tracked (in Portuguese) in [docs/gow3/ROADMAP.md](docs/gow3/ROADMAP.
   - **Performance:** frame rate limit (30 to unlimited), frames queued, background shader
     compiling; render resolution, engine frame rate and GPU readback options apply with one
     "Apply and restart" button.
-  - **Overlay:** a performance overlay with FPS, frametime, upscaler, GPU (name and use), CPU,
+  - **Overlay:** a performance overlay with FPS, frametime, GPU (name and use), CPU,
     RAM and VRAM, each optional, with font size, corner, background opacity and layout. The
     numbers are the game's own use, not the whole system's.
 
@@ -142,8 +142,8 @@ window. From a source tree: `GOW3_GAME_DIR=/path/to/CUSA01623 python3 run.py` af
   file exists at build time, and `launcher/gow3.png` otherwise.
 - **Patches:** the same patch file serves the full 01.02 update (`eboot.bin` sha256 `6e72330e…`) and
   the European title (CUSA01715): the patches and cheats find their sites by signature.
-- **Graphics (experimental):** the temporal upscalers (FSR 3.1, FSR 4, TAA, DLSS) are off by default;
-  the switch is at the top of that page.
+- **Graphics:** the temporal upscalers (FSR 3.1, FSR 4, TAA, DLSS) cannot be switched on: their code
+  stays, but it gets no input from this game (`docs/upscaler.md`). FSR 1 and RCAS are in the in-game menu.
 
 ## Requirements
 

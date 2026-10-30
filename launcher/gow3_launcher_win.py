@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """God of War III (gow3) launcher for Windows and Linux (Tkinter).
 
-Every setting of the port in one window: the game folder and saves, gow3.ini (upscaler,
-preset, output, effects), start-up options passed to run.py as environment variables
+Every setting of the port in one window: the game folder and saves, gow3.ini (display,
+overlay, effects), start-up options passed to run.py as environment variables
 (frame rate, presentation, HDR, ...), mods, third-party patches and controls.
 Launcher options live in %APPDATA%/gow3-launcher/settings.json (~/.config/gow3-launcher on Linux).
 
@@ -288,12 +288,10 @@ def heading_text(text, every_language=False):
 # Settings. gow3.ini keys (the game reads them, the in-game menu edits them) and the
 # launcher's own settings.json (passed to run.py as environment variables).
 
-INI_FLAGS = {'cheat_double_jumps', 'cheat_very_hard', 'object_motion', 'show_fps', 'vsync', 'async_shaders', 'deferred_readback',
+INI_FLAGS = {'cheat_double_jumps', 'cheat_very_hard', 'show_fps', 'vsync', 'async_shaders', 'deferred_readback',
              'stale_readback'}
 # The graphics keys are also in the in-game menu (Insert / R3+L2); run.py reads the startup ones.
-INI_DEFAULTS = {'upscaler': 'fsr3', 'preset': '1',
-                'object_motion': '1', 'show_fps': '1', 'output_res': '1920x1080',
-                'live_resolution': 'auto', 'display_mode': 'windowed', 'vsync': '1', 'fps_limit': '0',
+INI_DEFAULTS = {'show_fps': '1', 'display_mode': 'windowed', 'vsync': '1', 'fps_limit': '0',
                 'async_shaders': '1', 'deferred_readback': '1', 'stale_readback': '1',
                 'render_resolution': 'native', 'engine_fps': '120',
                 'frames_queued': '1', 'cheat_very_hard': '0', 'cheat_double_jumps': '0'}
@@ -302,7 +300,7 @@ FPS_LIMITS = [('30', ('30',)), ('60', ('60',)), ('120', ('120',)), ('240', ('240
 # The sidebar's pages, top to bottom, and the methods that refresh a page's lists when it is shown.
 PAGES = ('home', 'graphics', 'performance', 'game', 'advanced')
 PAGE_REFRESH = {'home': ('refresh_status',), 'game': ('refresh_lists', 'refresh_game_patches')}
-APP_DEFAULTS = {'ui_language': 'en', 'game_dir': os.environ.get('GOW3_GAME_DIR', str(PORT_DIR.parent / 'CUSA01623') if WINDOWS else ''), 'update_dir': '', 'experimental_upscaler': False,
+APP_DEFAULTS = {'ui_language': 'en', 'game_dir': os.environ.get('GOW3_GAME_DIR', str(PORT_DIR.parent / 'CUSA01623') if WINDOWS else ''), 'update_dir': '',
                 'video_backend': 'auto', 'gamemode': False, 'mangohud': False, 'desktop_integration': True, 'user_dir': '',
                 'mods_dir': '', 'mods_enabled': True, 'patches_dir': '', 'language': '1',
                 'player_name': '', 'hdr': False, 'draw_pipe': '', 'readbacks': '', 'no_msaa': '', 'stream_memory': 'cached',
@@ -365,15 +363,6 @@ def control_map(controls, kind):
     return ','.join(f'{button}={chosen[button].strip()}' for button, _key, _pad in CONTROLS
                     if button in chosen and not set(chosen[button]) & set(',='))
 
-UPSCALERS = [('fsr3', ('FSR 3.1 (every GPU)', 'FSR 3.1 (любая видеокарта)')),
-             ('taa', ('TAA (native resolution anti-aliasing)', 'TAA (нативное сглаживание)')),
-             ('off', ('Off', 'Выключен'))]
-PRESETS = [('0', ('Native AA (×1.0)',)), ('1', ('Quality (×1.5)',)), ('2', ('Balanced (×1.7)',)),
-           ('3', ('Performance (×2)',)), ('4', ('Ultra Performance (×3)',))]
-OUTPUTS = [('1280x720', ('1280 × 720 (Steam Deck)',)), ('1920x1080', ('1920 × 1080',)),
-           ('2560x1440', ('2560 × 1440',)), ('3840x2160', ('3840 × 2160 (4K)',))]
-LIVE = [('auto', ('Auto (by graphics card)', 'Авто (по видеокарте)')), ('0', ('Off (faster)', 'Выключена (быстрее)')),
-        ('1', ('On (change without restarting)', 'Включена (без перезапуска)'))]
 LANGUAGES = [('1', ('English', 'Английский')), ('8', ('Russian', 'Русский')), ('0', ('Japanese', 'Японский')),
              ('2', ('French', 'Французский')), ('3', ('Spanish', 'Испанский')), ('4', ('German', 'Немецкий')),
              ('5', ('Italian', 'Итальянский'))]
@@ -393,13 +382,6 @@ STREAM_MEMORY = [('cached', ('System RAM (cached, default)',)),
                  ('device', ('GPU memory (previous behavior)',))]
 FRAMES_QUEUED = [('1', ('1 (lowest latency)',)), ('2', ('2',)), ('0', ('Unlimited',))]
 UI_LANGUAGES = gow3_lang.LANGUAGE_NAMES
-
-def fsr4_folder():
-    """Next to the port; in the data directory when the port is read-only (AppImage)."""
-    if WINDOWS or os.access(PORT_DIR, os.W_OK):
-        return PORT_DIR / 'fsr4_shaders'
-    return DATA_DIR / 'fsr4_shaders'
-
 
 def load_json(path, default):
     try:
@@ -700,7 +682,6 @@ def game_environment(s):
     env = dict(os.environ)
     env['GOW3_GAME_DIR'] = s['game_dir']
     env.pop('GOW3_PATCH_DIR', None)
-    env['GOW3_EXPERIMENTAL_UPSCALER'] = '1' if s.get('experimental_upscaler') else '0'
     if s.get('update_dir'):
         env['GOW3_PATCH_DIR'] = s['update_dir']
     if not WINDOWS:
@@ -717,8 +698,6 @@ def game_environment(s):
         env['GOW3_PATCHES_ONLY'] = '1'
     if s['user_dir']:
         env['GOW3_USER_DIR'] = s['user_dir']
-    if not WINDOWS:
-        env['GOW3_FSR4_DIR'] = str(fsr4_folder())
     env['GOW3_MODS_DIR'] = s['mods_dir'] or str(DATA_DIR / 'mods')
     env['GOW3_MODS_CONFIG'] = str(DATA_DIR / 'mods.json')
     env['GOW3_MODS_ENABLED'] = '1' if s['mods_enabled'] else '0'
@@ -1171,33 +1150,9 @@ class Launcher:
             return self.banner_image.subsample(factor) if factor > 1 else self.banner_image
 
     def build_graphics(self):
-        """Window and overlay controls; temporal upscaling stays commented out."""
+        """Window and overlay controls."""
         f = self.scrolled_page('graphics', _('Graphics', 'Графика'), _('How the game appears on your screen.'))
         self.build_display(f)
-        # Temporal upscaling is parked until its image quality is validated.
-        # self.section(f, _('Experimental'))
-        # self.check(f, 'experimental_upscaler', 'app', _('Enable the upscaler (experimental)'),
-        #            _('Off (default): the game runs without temporal upscaling; FSR 3.1 and TAA need this switch on. '
-        #              'FSR 3.1 is not calibrated for this game yet: expect ghosting or flicker. The remaining options require this switch; '
-        #              'leave it off for normal gameplay.',
-        #              'Выкл. (по умолчанию): игра без временного апскейлинга; FSR 3.1 и TAA нужен этот переключатель. '
-        #              'FSR 3.1 ещё не откалиброван для этой игры: возможны гостинг и мерцание.'), restart=True)
-        # self.section(f, _('Upscaling', 'Апскейлинг'))
-        # self.row(f, _('Upscaler', 'Апскейлер'), self.choice(f, 'upscaler', 'ini', UPSCALERS))
-        # self.row(f, _('Quality preset', 'Пресет'), self.choice(f, 'preset', 'ini', PRESETS),
-        #          _('Render scale per axis: Quality renders at 1/1.5 of the output size.',
-        #            'Масштаб рендера по каждой оси: Quality рисует в 1/1.5 размера вывода.'))
-        # self.row(f, _('Output resolution', 'Разрешение вывода'), self.choice(f, 'output_res', 'ini', OUTPUTS),
-        #          _('What the upscaler produces; the HUD is drawn at this size too.',
-        #            'Что выдаёт апскейлер; интерфейс рисуется в этом же размере.'))
-        # self.row(f, _('Live resolution changes', 'Смена разрешения на лету'), self.choice(f, 'live_resolution', 'ini', LIVE),
-        #          _('Off: outputs other than 1080p are set by a patch at start (fastest; changing them in the '
-        #            'game restarts it). On: change output and preset in the game without a restart, at a cost.',
-        #            'Выкл.: разрешения кроме 1080p задаются патчем при запуске (быстрее). Вкл.: менять в игре '
-        #            'без перезапуска, но медленнее.'))
-        # self.check(f, 'object_motion', 'ini', _('Object motion vectors', 'Векторы движения объектов'),
-        #            _('Less ghosting on characters, cloth and weapons; costs about 10% FPS.',
-        #              'Меньше гостинга на персонажах и одежде; стоит около 10% FPS.'))
 
     def build_display(self, f):
         """Window and overlay: the top of the Graphics page."""

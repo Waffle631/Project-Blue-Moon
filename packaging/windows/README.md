@@ -40,14 +40,14 @@ game directly with the saved settings.
 `patches.py` applies the built-in patches only to the game build they were checked against
 (CUSA01623 01.02, by eboot.bin sha256; `GOW3_FORCE_PATCHES=1` overrides); other builds run unpatched.
 From a source tree it adds `C:\msys64\clang64\bin` (or `$MSYS2_ROOT`) to `PATH` for the DLLs.
-`bash tools/fetch_fsr4_assets.sh` works in the CLANG64 shell as on Linux.
 
 DLSS (optional): `DLSS_SDK_ROOT=<checkout of github.com/NVIDIA/DLSS> bash
 packaging/windows/build_dlss.sh` builds `gow3_dlss.dll` (`gpu/dlss_bridge`, the only code that
 uses the NVIDIA SDK, compiled with MSVC 2022) and copies it with `nvngx_dlss.dll` next to
-`out/gow3-probe.exe`; `package.sh` ships both when present. The renderer loads the bridge at run
-time (`vk_dlss.cpp`), adds the Vulkan extensions NGX asks for, and DLSS gets the same inputs as
-FSR 3 (scene color, depth, render-pixel motion vectors, jitter). `GOW3_DLSS=0` turns it off.
+`out/gow3-probe.exe`. The temporal upscalers cannot be switched on (Spec 7 §10), so the renderer
+never loads the bridge (`vk_dlss.cpp`) and `package.sh` refuses to ship `nvngx_dlss.dll`. The
+code stays: with the upscaler on, DLSS got the same inputs as FSR 3 (scene color, depth,
+render-pixel motion vectors, jitter).
 
 The launcher texts are written in English with the Russian beside them; the other languages
 are in `launcher/gow3_lang.py` (one list per language in the order of `KEYS`; a missing or
