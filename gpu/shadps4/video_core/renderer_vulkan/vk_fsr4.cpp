@@ -119,8 +119,9 @@ struct Fsr4Upscaler::Impl {
         const std::string dir = AssetDir() + "/";
         std::array<std::vector<u8>, FFX_FSR4_VK_PASS_COUNT> code;
         std::vector<u8> initializer, weights;
-        // gow3: tools/fsr4_optimize.sh puts fixed or faster passes into opt/ (post through
-        // shared memory, pass 11 without out-of-bounds writes); without them the originals load.
+        // gow3: opt/ holds fixed or faster passes (post through shared memory, pass 11 without
+        // out-of-bounds writes; tools/fsr4_optimize.sh, removed in Spec 7 §10, made them); without
+        // them the originals load.
         u32 optimized = 0;
         const auto load = [&](const char* name, std::vector<u8>& data) {
             if (ReadFile(dir + "opt/" + name, data)) {
@@ -130,7 +131,7 @@ struct Fsr4Upscaler::Impl {
             if (ReadFile(dir + name, data)) {
                 return true;
             }
-            Fail("missing " + dir + name + " (run tools/fetch_fsr4_assets.sh)", true);
+            Fail("missing " + dir + name, true);
             return false;
         };
         if (!load(assets.pre, code[0])) return false;
