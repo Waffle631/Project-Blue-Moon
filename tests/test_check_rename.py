@@ -8,7 +8,8 @@ SCRIPT=ROOT/'tools/check_rename.sh'
 
 # Spec 7 §6 (docs/specs/2026-10-14-spec-7-renombrado.md): check_rename.sh fails on any old name left in the tracked
 # tree, in a file's contents or in its path, except in the history folders, the submodules, pgo/, the branch
-# mention in CLAUDE.md and the roadmap, and lines marked "rename-check: ok".
+# mention in CLAUDE.md and the roadmap, and lines marked "rename-check: ok". Since §11 it also fails on the previous
+# game's name and serials, except in the player READMEs (rewritten for the Alpha) and "gow3 contributors" credits.
 class CheckRenameTests(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory(); self.repo=Path(self.tmp.name)
@@ -57,15 +58,43 @@ class CheckRenameTests(unittest.TestCase):
         self.write('CLAUDE.md',line); self.write('docs/tsuki/ROADMAP.md',line)
         r=self.check()
         self.assertEqual((r.returncode,r.stdout),(0,''),r.stderr)
-        self.write('README.md',line)
+        self.write('docs/a.md',line)
         r=self.check()
         self.assertEqual(r.returncode,1,r.stderr)
-        self.assertIn('README.md:1:',r.stdout)
-        self.write('README.md','Tsukihime port.\n')
+        self.assertIn('docs/a.md:1:',r.stdout)
+        self.write('docs/a.md','Tsukihime port.\n')
         self.write('CLAUDE.md',line+'Run with `GOW3_GAME_DIR`; branch `gow3`.\n')
         r=self.check()
         self.assertEqual(r.returncode,1,r.stderr)
         self.assertEqual(r.stdout,'CLAUDE.md:2:Run with `GOW3_GAME_DIR`; branch `gow3`.\n')
+
+    def test_game_name_and_serials_fail(self):
+        self.write('src/a.c','// God of War III draws\n')
+        self.write('tests/b.py',"sfo(TITLE_ID='CUSA01623')\n")
+        self.write('docs/c.md','Region cusa01715.\n')
+        r=self.check()
+        self.assertEqual(r.returncode,1,r.stderr)
+        for match in ('src/a.c:1:','tests/b.py:1:','docs/c.md:1:'): self.assertIn(match,r.stdout)
+
+    def test_player_readmes_excepted(self):
+        text='God of War III Remastered (CUSA01623): run bin\\gow3-probe.exe\n'
+        for path in ('README.md','README.pt-BR.md','packaging/windows/README-Windows.txt'): self.write(path,text)
+        r=self.check()
+        self.assertEqual((r.returncode,r.stdout),(0,''),r.stderr)
+        self.write('packaging/windows/README.md',text) # a developer README follows the rename
+        r=self.check()
+        self.assertEqual(r.returncode,1,r.stderr)
+        self.assertEqual(r.stdout,'packaging/windows/README.md:1:'+text)
+
+    def test_contributors_credit_excepted(self):
+        self.write('gpu/x/LICENSE.txt','Copyright (c) 2026 gow3 contributors\n')
+        self.write('gpu/x/a.h','// SPDX-FileCopyrightText: Copyright 2026 IFreemz, gow3 contributors\n')
+        r=self.check()
+        self.assertEqual((r.returncode,r.stdout),(0,''),r.stderr)
+        self.write('gpu/x/b.h','// Copyright 2026 gow3 contributors; see gow3gpu.h\n') # another gow3 still counts
+        r=self.check()
+        self.assertEqual(r.returncode,1,r.stderr)
+        self.assertIn('gpu/x/b.h:1:',r.stdout)
 
     def test_marker_line_ignored(self):
         self.write('tests/test_lang.py','env={"GOW3_LANGUAGE":"8"} # rename-check: ok\n')

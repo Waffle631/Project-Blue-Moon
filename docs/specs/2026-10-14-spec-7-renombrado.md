@@ -1,6 +1,6 @@
 # Spec 7 — Renombrar `gow3` a `tsuki`
 
-Fecha: 2026-10-14, ampliada el 2026-10-25 (§9) y el 2026-10-28 (§10). Estado: **borrador para aprobación**; tareas 0 (rama
+Fecha: 2026-10-14, ampliada el 2026-10-25 (§9), el 2026-10-28 (§10) y el 2026-10-30 (§11). Estado: **borrador para aprobación**; tareas 0 (rama
 `tsuki/spec-7` y línea base, §4), 1 (`tools/check_rename.sh`, §6), 2 y 3 (§10 completa) del plan hechas el 2026-10-30. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 7".
 Depende de: Spec 6 (el recorrido grabado y las capturas son el oráculo del renombrado) y Spec 1b. El renombrado va
 al final. Antes de que la Spec 6 se cerrara sin la 1b (2026-10-28), esta dependencia llegaba a través de la 6.
@@ -64,7 +64,8 @@ Configuraciones y saves antiguos no se migran (no hay usuarios de los nombres vi
 
 `launcher/` y `packaging/`: se renombran con el resto (solo nombres, para que `tools/check_rename.sh`
 pase), pero su contenido (funciones, iconos, textos de identidad) se deja para el final, después de la
-Alpha, como se decidió el 2026-10-14.
+Alpha, como se decidió el 2026-10-14. **[D]** 2026-10-30: los textos que nombran God of War III sí se cambian
+en esta spec, y el actualizador del launcher se borra (§11); el icono, la fuente y la paleta siguen para la Alpha.
 
 ## 4. Orden de trabajo (por capas; compilar y pasar tests tras cada una)
 
@@ -83,13 +84,14 @@ fotogramas `eye` (2700, 2890: el menú de carga sobre `titlebg1.mp4`) quedan a o
    documentación. Resultado: una lista cerrada de nombres antiguos → nuevos (`tools/rename_map.txt`,
    solo local, no versionado).
 2. **Variables de entorno y de compilación** `GOW3_*` → `TSUKI_*`, en C, C++, Python, shell, CMake,
-   `docs/ENTORNO.md`, `README*.md` y `CLAUDE.md` a la vez, **sin alias** y sin leer los nombres viejos.
+   `docs/ENTORNO.md` y `CLAUDE.md` a la vez (no los README del jugador, §11 punto 6), **sin alias** y sin leer los nombres viejos.
    Una variable que quede a medias haría que el juego ignorara la opción sin avisar.
 3. **Archivos y directorios** con `git mv` (conserva la historia); después `#include`, listas de
    fuentes de CMake y `build.sh`.
 4. **Símbolos**, clases, binarios, la biblioteca de GPU, `.ini`, rutas de usuario y la marca `gow3:`
    → `tsuki:` en el código de shadPS4 (es un cambio de comentario, no de lógica).
-5. **Documentación.** `CLAUDE.md`, `README*.md`, este roadmap y la memoria del proyecto. El historial
+5. **Documentación.** `CLAUDE.md`, este roadmap, los README de desarrollo y la memoria del proyecto (los
+   README del jugador esperan a la Alpha, §11). El historial
    (`docs/gow3/`) no se renombra.
 6. **Parche de FSR.** Borrar `0001-…GOW3_FSR4_PROFILE….patch` (**[D]** 2026-10-30, §2) y quitarlo de su
    `README.md`; en `0002` y `0003`, los comentarios `gow3:` pasan a `tsuki:`. `build.sh` aplica los parches y
@@ -117,7 +119,9 @@ fotogramas `eye` (2700, 2890: el menú de carga sobre `titlebg1.mp4`) quedan a o
    en `CLAUDE.md` y en el roadmap;
 5. los submódulos y `pgo/`;
 6. el propio script y su test, y las líneas marcadas con `rename-check: ok` (el test del §7 que comprueba que
-   una variable `GOW3_*` ya no tiene efecto tiene que nombrarla).
+   una variable `GOW3_*` ya no tiene efecto tiene que nombrarla);
+7. **[D]** 2026-10-30 (§11): `README.md`, `README.pt-BR.md`, `packaging/windows/README-Windows.txt` y las líneas
+   `Copyright … gow3 contributors`. Desde entonces busca también `god of war`, `CUSA01623` y `CUSA01715`.
 
 El script se ejecuta en `bash build.sh --test` para que no regrese ningún nombre antiguo.
 
@@ -356,3 +360,65 @@ Criterios de aceptación:
 - [x] FSR 1 y RCAS siguen funcionando como antes. `graphics-settings-test` lee y guarda `fsr1`, `rcas` y
   `rcas_strength`, y el usuario vio sus controles en el menú Insert (2026-10-30).
 - [x] Suites verdes; las capturas de la línea base y el recorrido grabado no cambian (`t2` y `tras10`).
+
+## 11. Añadido: quitar «God of War III», no solo los nombres `gow3`
+
+**[D]** 2026-10-30, al empezar la tarea 4 del plan: el usuario lo añade a esta spec. Todo lo que nombre a God of War
+III se reemplaza o se quita, no solo los identificadores `gow3`. Esto cambia la decisión del 2026-10-14 (§3) para los
+textos del launcher y del empaquetado, salvo lo que el punto 6 deja para la Alpha.
+
+Hechos (**[V]** 2026-10-30, en `ef0c90c`, fuera de `docs/gow3/`, `docs/plans/`, `docs/specs/` y submódulos):
+
+- 237 líneas en 40 archivos nombran el juego por su nombre, `GoW3` o sus seriales (`God of War`, `GoW3`,
+  `CUSA01623`, `CUSA01715`, `Remastered`, `Kratos`). De ellas, 77 están en `README.md`, `README.pt-BR.md` y
+  `packaging/windows/README-Windows.txt`.
+- El `sed` de las tareas 5 y 7 haría falsas otras frases: «`bb`/`bbport` renamed to `gow3`», «GoW3-only features»,
+  «el trabajo de rendimiento 3D de gow3», «gow3 contributors».
+- `Kratos` en `sceUserServiceIsKratosUser`, `sceShellCoreUtilGoBackToKratosCurrentSessionGame` y parecidas
+  (`gpu/shadps4/core/libraries/system/`) es el nombre interno de la consola en la API de PS4, no el personaje.
+- El actualizador del launcher (`check_update`, `offer_update`, `install_update`, `--install-update`,
+  `RELEASES_API`/`RELEASES_PAGE` a `FelipePrado0/gow3_pc`) descargaría las versiones del port de God of War III
+  encima de este.
+
+Reglas, por tipo de mención (**[D]** 2026-10-30):
+
+1. **Identidad** (nombre de la aplicación, del `.exe` y del acceso directo, `.desktop`, acceso de Steam, textos del
+   launcher en los 12 idiomas, datos de prueba): pasa a Tsukihime. Nombre corto `Tsukihime` (`Tsukihime.exe`,
+   `Play Tsukihime.exe`, `APP_NAME`); título completo `TSUKIHIME -A piece of blue glass moon-` donde se muestra el
+   título del juego. Los datos de prueba usan `CUSA47999` y nombres del juego (`Shiki` en vez de `Kratos`).
+2. **Comentarios de código que explican algo con lo que hacía God of War III** (MSAA con dos muestras de
+   profundidad, la página que reescribe cada fotograma, «L3+R3 is a game action in God of War III», los hashes de
+   shaders, …): **se borran**, no se reescriben.
+3. **Créditos de otros proyectos** (el fork de shadPS4 de cuesta4, `KrachDev/shadPS4_GOW3` en
+   `vk_lighting_test.h`, el aviso de marca registrada, las líneas `Copyright … gow3 contributors`): se quedan como
+   están. Las líneas con God of War llevan `rename-check: ok`; `gow3 contributors` es una excepción de
+   `check_rename.sh`, para no meter el marcador en `LICENSE.txt`.
+4. **El actualizador del launcher se borra** (funciones, `--install-update`, el ajuste `check_updates`, su casilla,
+   su botón y sus textos). Es el único cambio de comportamiento de esta sección, solo en el launcher, y va en su
+   propio commit. El recorrido grabado no lo usa.
+5. **Historia** en `CLAUDE.md`, el roadmap y el resto de `docs/` (fuera de las excepciones del §6): dice «el juego
+   anterior» / «the previous game», con un enlace a `docs/gow3/ROADMAP.md`, que lo nombra.
+6. **Se deja para la Alpha, sin tocar:**
+   - `README.md`, `README.pt-BR.md` y `packaging/windows/README-Windows.txt` (la guía del jugador que va en el
+     paquete). Ni siquiera se renombran sus nombres `gow3`: se reescribirán enteros para la Alpha.
+   - La identidad visual del launcher: el icono (`launcher/gow3.png`/`.ico`, el símbolo Omega, también dentro del
+     `.exe` de Windows y en el `.desktop`), la fuente de títulos `launcher/gowfont.ttf` y la paleta. Los archivos
+     cambian de nombre con el §3 (`tsuki.png`/`.ico`), no de contenido; las líneas que nombran God of War por ellos
+     llevan `rename-check: ok`.
+   - Los README de desarrollo (`packaging/windows/README.md`, `gpu/patches/fsr-vulkan/README.md`) **no** son de
+     este punto: describen archivos que cambian de nombre y siguen el renombrado.
+7. No se tocan los nombres de la API de PS4 con `Kratos` (hecho 3).
+
+Comprobación: `tools/check_rename.sh` busca también `god of war`, `CUSA01623` y `CUSA01715` (sin distinguir
+mayúsculas), con las excepciones del §6 más los tres README del punto 6 y las líneas `Copyright … gow3 contributors`.
+
+Orden: la prosa, los comentarios y los textos de esta sección van en la tarea 4 del plan, **antes** de cualquier
+`sed`, porque el `sed` no los arregla y algunos los volvería falsos.
+
+Criterios de aceptación:
+
+- [ ] `tools/check_rename.sh` no encuentra `God of War`, `CUSA01623` ni `CUSA01715` fuera de las excepciones.
+- [ ] El launcher no tiene actualizador: ni `RELEASES_API`, ni `--install-update`, ni el ajuste `check_updates`;
+  un test lo comprueba.
+- [ ] `README.md`, `README.pt-BR.md`, `packaging/windows/README-Windows.txt`, el icono y `launcher/gowfont.ttf` no
+  cambian de contenido en esta spec.
