@@ -1052,8 +1052,9 @@ Las configuraciones y saves antiguos no se migran (no hay usuarios de los nombre
 
 1. Inventario: `git grep -ohiE '[a-z0-9_.-]*gow3[a-z0-9_.-]*'` y `git ls-files | grep -i gow3`,
    más los nombres en strings, scripts, `CMakeLists.txt`, `build.sh`, `run.py`, `shell.nix`,
-   empaquetado y documentación. Los submódulos `gpu/third_party/*` no se tocan; el parche `0001` de
-   `gpu/patches/fsr-vulkan/`, el único que nombra `GOW3_*`, se borra (decisión del usuario, 2026-10-30).
+   empaquetado y documentación. Los submódulos `gpu/third_party/*` no se tocan; de los parches de
+   `gpu/patches/fsr-vulkan/`, el `0001` (perfilado de FSR 4 con `GOW3_FSR4_*`) se borra, y en `0002` y `0003`
+   (cabeceras para compilar en Windows) los comentarios `gow3:` pasan a `tsuki:` (decisión del usuario, 2026-10-30).
    Un análisis previo no encontró nombres construidos dinámicamente (`GOW3_%s` o concatenaciones);
    se vuelve a comprobar al empezar.
 2. Variables de entorno `GOW3_*` → `TSUKI_*` en C, C++, Python y documentos a la vez, sin

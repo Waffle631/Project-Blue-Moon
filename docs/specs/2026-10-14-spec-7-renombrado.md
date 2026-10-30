@@ -37,7 +37,10 @@ mecánico, no reduce riesgo técnico y mezclaría sus errores con los de las spe
   lleva variables `GOW3_*` en su nombre y en su contenido. Se aplica al submódulo `gpu/third_party/fsr-vulkan`
   (`build.sh` lo hace), que no se modifica. **[D] 2026-10-30:** ese parche solo añade `GOW3_FSR4_PROFILE` y
   `GOW3_FSR4_STATS`, que miden un FSR 4 que con este juego ya no se ejecuta (§10). **Se borra en vez de
-  renombrarse** (paso 6 del §4). Los parches `0002` y `0003` no nombran `gow3` y se quedan.
+  renombrarse** (paso 6 del §4). Los parches `0002` y `0003` se quedan: añaden los `#include` que libc++/MinGW
+  necesitan para compilar en Windows el SDK FFX 1.1.4, que `libgow3gpu` sigue enlazando (`ffx-vulkan::portable`,
+  `gpu/CMakeLists.txt:181`) mientras se conserve el upscaler temporal. Nombran `gow3` en los siete comentarios
+  `// gow3:` de esos `#include`, que pasan a `tsuki:`.
 - **[V]** `pgo/` no existe en el árbol: renombrar funciones no invalida ningún perfil de PGO hoy. Si se
   añade uno antes del renombrado, hay que regenerarlo.
 
@@ -89,10 +92,11 @@ fotogramas `eye` (2700, 2890: el menú de carga sobre `titlebg1.mp4`) quedan a o
 5. **Documentación.** `CLAUDE.md`, `README*.md`, este roadmap y la memoria del proyecto. El historial
    (`docs/gow3/`) no se renombra.
 6. **Parche de FSR.** Borrar `0001-…GOW3_FSR4_PROFILE….patch` (**[D]** 2026-10-30, §2) y quitarlo de su
-   `README.md`. `build.sh` aplica los parches y nunca los quita, así que el `0001` se revierte una vez del árbol
-   de trabajo del submódulo con `git apply --reverse`. Hasta este paso, los pasos 2 a 4 no tocan
-   `gpu/patches/`: cambiar el parche con el `0001` viejo aplicado hace fallar `git apply` en `build.sh`.
-   Comprobar que `build.sh` aplica `0002` y `0003` al submódulo limpio.
+   `README.md`; en `0002` y `0003`, los comentarios `gow3:` pasan a `tsuki:`. `build.sh` aplica los parches y
+   nunca los quita, así que antes de tocarlos se revierten los tres del árbol de trabajo del submódulo con
+   `git apply --reverse`. Hasta este paso, los pasos 2 a 4 no tocan `gpu/patches/`: cambiar un parche con su
+   versión vieja aplicada hace fallar `git apply` en `build.sh`. Comprobar que `build.sh` aplica `0002` y `0003`
+   al submódulo limpio.
 7. **Métricas del overlay en Linux** (§9), con el renombrado ya comprobado por el §7.
 
 ## 5. Requisitos
