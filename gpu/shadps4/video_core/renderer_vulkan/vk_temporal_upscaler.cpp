@@ -9,7 +9,6 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
-#include <cstring>
 #include <string>
 
 #include <vk_mem_alloc.h>
@@ -172,22 +171,10 @@ TemporalUpscaler::TemporalUpscaler(const Instance& instance_, Scheduler& schedul
                         : dlss->Problem();
         Gow3Settings::ConfigureDlssSupport(dlss && dlss->Available(), problem.c_str());
     }
-    // Available unless GOW3_UPSCALER=none; on/off and the parameters are the menu's settings.
-    const char* env = std::getenv("GOW3_UPSCALER");
-    enabled = !(env && std::strcmp(env, "none") == 0);
-    if (const char* hash = std::getenv("GOW3_UPSCALE_BEFORE_CS")) {
-        trigger_hash = std::strtoull(hash, nullptr, 16);
-    }
-    if (const char* hash = std::getenv("GOW3_UI_TRIGGER_VS")) {
-        ui_trigger_vs = std::strtoull(hash, nullptr, 16);
-    }
-    if (const char* res = std::getenv("GOW3_OUTPUT_RES")) {
-        u32 w = 0, h = 0;
-        if (std::sscanf(res, "%ux%u", &w, &h) == 2 && w && h) {
-            target_width = w;
-            target_height = h;
-        }
-    }
+    // gow3: never available (Spec 7 §10; before, run.py switched it off): with no inputs since Spec 1b
+    // it cannot run with this game, and no setting, menu or variable switches it on. The triggers
+    // (trigger_hash, ui_trigger_vs) and the output size keep their defaults.
+    enabled = Gow3Settings::TemporalUpscalerAvailable;
     // Explicit resolution overrides retain the old compatibility path. Normal presets
     // keep guest allocations/UI native and change only host raster targets at frame boundaries.
     scaled_session = std::getenv("GOW3_RENDER_RES") && std::getenv("GOW3_RENDER_RES")[0];
@@ -211,8 +198,7 @@ TemporalUpscaler::TemporalUpscaler(const Instance& instance_, Scheduler& schedul
         enabled = false;
     }
     if (enabled && trigger_hash == 0) {
-        std::printf("Upscaler: FSR 3.1 available (%s) on scene color: no trigger "
-                    "(GOW3_UPSCALE_BEFORE_CS)\n",
+        std::printf("Upscaler: FSR 3.1 available (%s) on scene color: no trigger\n",
                     Gow3Settings::Get().upscaler != Gow3Settings::UpscalerOff ? "on" : "off");
     } else if (enabled) {
         std::printf("Upscaler: FSR 3.1 available (%s) on scene color before compute shader "
@@ -270,28 +256,6 @@ bool TemporalUpscaler::RasterScaling() const {
 }
 
 bool TemporalUpscaler::OnFrameStart() {
-    // gow3: GOW3_PRESET_FILE=<file> holding a preset number, read about once a second: switches
-    // the preset like the menu does (scripted tests of live preset changes).
-    static const char* preset_file = std::getenv("GOW3_PRESET_FILE");
-    if (preset_file && ++preset_file_frames % 64 == 0) {
-        if (FILE* f = std::fopen(preset_file, "r")) {
-            int value = 0;
-            int output = -1;
-            int provider = -1;
-            const int fields = std::fscanf(f, "%d %d %d", &value, &output, &provider);
-            if (fields >= 1 && value >= 0 &&
-                value < Gow3Settings::PresetCount) {
-                Gow3Settings::Get().preset.store(value);
-            }
-            if (fields >= 2 && output >= 0 && output < Gow3Settings::OutputCount) {
-                Gow3Settings::Get().output_res.store(output);
-            }
-            if (fields == 3 && provider >= 0 && provider < Gow3Settings::UpscalerCount) {
-                Gow3Settings::Get().upscaler.store(provider);
-            }
-            std::fclose(f);
-        }
-    }
     const auto& settings = Gow3Settings::Get();
     // The guest's startup resolution patch remains in effect until restart. Keep the FSR
     // model at the applied preset while the menu saves the requested one for run.sh.
@@ -682,9 +646,7 @@ void TemporalUpscaler::RecordTaa(vk::CommandBuffer cmdbuf, vk::ImageView color,
         std::array<float, 2> jitter;
         u32 reset, pad;
         std::array<std::array<float, 4>, 3> depth;
-    } params{jitter, reset ? 1u : 0u, std::getenv("GOW3_TAA_DIAGNOSTICS") ?
-                 u32(std::clamp(std::atoi(std::getenv("GOW3_TAA_DIAGNOSTICS")),1,3)) : 0u,
-             camera_motion.TaaDepthParameters()};
+    } params{jitter, reset ? 1u : 0u, 0u, camera_motion.TaaDepthParameters()};
     // Optional techniques for A/B in one run (GOW3_TOGGLE_FILE bits 51-54): tonemapped blending,
     // YCoCg clipping, variance clipping, 3x3 reconstruction. Measured in game on 2026-10-02
     // (static and panning camera, interleaved captures): none improved stability beyond run
@@ -823,7 +785,7 @@ void TemporalUpscaler::ExtraSharpen(vk::CommandBuffer cmdbuf, vk::Image target, 
 }
 
 void TemporalUpscaler::OnBlendedSceneDraw() {
-    // The mask is opt-in (menu, GOW3_REACTIVE=1): on thin mist it traded trails for
+    // The mask is opt-in (Gow3Settings::reactive): on thin mist it traded trails for
     // jitter shimmer, which looked worse. Toggle 1 << 27 switches it off.
     if (snapshot_taken || !scene_color || !Active() || !ReactiveOn()) {
         return;
@@ -1141,8 +1103,8 @@ void TemporalUpscaler::Run() {
         info.cameraFar = 3000.0f;
         info.cameraVerticalFovRadians = camera_motion.VerticalFov();
         info.viewSpaceToMeters = 1.0f;
-        // RCAS strength 0..1 (menu, GOW3_FSR_SHARPNESS); jitter at 1:1 softens the image slightly.
-        // AMD's RCAS ends at 1; ExtraSharpen adds the rest of the menu's 0..2.
+        // RCAS strength 0..1 (Gow3Settings::sharpness); jitter at 1:1 softens the image slightly.
+        // AMD's RCAS ends at 1; ExtraSharpen adds the rest of the setting's 0..2.
         info.sharpness = std::min(Gow3Settings::Get().sharpness.load(), 1.0f);
         info.enableSharpening = Gow3Settings::Get().sharpen ? VK_TRUE : VK_FALSE;
         info.reset = reset ? VK_TRUE : VK_FALSE;
@@ -1673,13 +1635,6 @@ void TemporalUpscaler::RunScaled() {
                 DumpImages(instance, scheduler, cmdbuf, dump,
                            {{depth_image, source_width, source_height, 4, "depth", "f32",
                              vk::ImageAspectFlagBits::eDepth}});
-                if (Gow3Settings::Get().upscaler == Gow3Settings::UpscalerTaa &&
-                    std::getenv("GOW3_TAA_DIAGNOSTICS")) {
-                    DumpImages(instance, scheduler, cmdbuf, dump,
-                               {{vk::Image(taa_history[taa_next]),ow,oh,16,
-                                 "previous_history","rgba32f"},
-                                {vk::Image(opaque_image),ow,oh,8,"history_sample","rgba16f"}});
-                }
                 // ObjectMotion's attachment can be in a different resolution from the FSR
                 // inputs: only dump it when it matches, to avoid an out-of-bounds GPU copy.
                 if (const auto object = camera_motion.ObjectMotionImage(w, h); object) {

@@ -10,6 +10,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
+#include <utility>
 #include <vector>
 
 #include <SDL3/SDL.h>
@@ -246,17 +247,6 @@ void SliderRow(const char* label, std::atomic<int>& value, int lo, int hi, const
     ImGui::PopID();
 }
 
-const char* UpscalerLabel(int upscaler) {
-    switch (upscaler) {
-    case Gow3Settings::UpscalerFsr3: return "FSR 3.1";
-    case Gow3Settings::UpscalerFsr4: return "FSR 4";
-    case Gow3Settings::UpscalerFsr411: return "FSR 4.1.1";
-    case Gow3Settings::UpscalerTaa: return "TAA";
-    case Gow3Settings::UpscalerDlss: return "DLSS";
-    default: return "";
-    }
-}
-
 const Vulkan::Instance* overlay_instance = nullptr; // for the overlay's measurements
 
 // The performance overlay's text with the current settings (also the menu's preview).
@@ -270,7 +260,6 @@ std::string OverlayText() {
     P::Sample sample = P::Latest();
     sample.fps = frame_ms_avg > 0.0f ? 1000.0f / frame_ms_avg : 0.0f;
     sample.frame_ms = frame_ms_avg;
-    sample.upscaler = UpscalerLabel(s.upscaler);
     return P::Format(sample, items, s.overlay_layout == 0);
 }
 
@@ -367,12 +356,12 @@ void OverlayTab() {
     ImGui::SeparatorText("What to show");
     if (ImGui::BeginTable("##overlay_items", 2, ImGuiTableFlags_SizingStretchProp)) {
         ImGui::TableNextColumn();
-        static const char* const names[] = {"FPS", "Frametime", "Upscaler", "GPU (name and use)", "CPU (game)",
-                                            "RAM (game / total)", "VRAM (used / available)"};
-        for (unsigned item = 0; item < 7; ++item) {
-            const unsigned bit = 1u << item;
+        static const std::pair<unsigned, const char*> items[] = {
+            {P::Fps, "FPS"}, {P::FrameTime, "Frametime"}, {P::Gpu, "GPU (name and use)"}, {P::Cpu, "CPU (game)"},
+            {P::Ram, "RAM (game / total)"}, {P::Vram, "VRAM (used / available)"}};
+        for (const auto& [bit, name] : items) {
             bool on = (s.overlay_items & bit) != 0;
-            if (ImGui::Checkbox(names[item], &on)) {
+            if (ImGui::Checkbox(name, &on)) {
                 s.overlay_items = on ? (s.overlay_items | bit) : (s.overlay_items & ~bit);
                 dirty = true;
             }

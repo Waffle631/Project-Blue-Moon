@@ -22,7 +22,8 @@ inline bool NativeViewport(float width, float height) {
            std::abs(std::abs(height) - 1080.0f) < 0.5f;
 }
 
-// gow3: a trigger shader is one the user configured (GOW3_UPSCALE_BEFORE_CS, GOW3_UI_TRIGGER_VS).
+// gow3: a trigger shader is a configured hash (TemporalUpscaler::trigger_hash, ui_trigger_vs; none since
+// Spec 7 §10).
 // 0 means no trigger, so a shader whose hash is 0 never fires.
 constexpr bool Trigger(uint64_t hash, uint64_t configured) {
     return configured != 0 && hash == configured;

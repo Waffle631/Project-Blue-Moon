@@ -119,7 +119,7 @@ def main():
     if len(args) >= 2 and args[0] == '--after':
         wait_for(int(args[1]))
         args = args[2:]
-    # As run.sh: relative paths (GOW3_GAME_DIR, GOW3_DATA_DIR, fsr4_shaders/) are from the port.
+    # As run.sh: relative paths (GOW3_GAME_DIR, GOW3_DATA_DIR) are from the port.
     os.chdir(PORT)
     env = os.environ
     data = Path(env.get('GOW3_DATA_DIR', PORT))
@@ -137,8 +137,6 @@ def main():
     if reverted:
         print('Graphics: the last restart never reached the game; previous options restored', flush=True)
     env.update(graphics_options.environment(graphics))
-    if not env.get('GOW3_FSR411_DIR') and not (PORT / 'fsr4_411').is_dir() and (data / 'fsr4_411').is_dir():
-        env['GOW3_FSR411_DIR'] = str(data / 'fsr4_411')
 
     probe = Path(env['GOW3_PROBE']) if env.get('GOW3_PROBE') else find_executable('gow3-probe' + EXE_SUFFIX)
     if not probe or not probe.is_file():
@@ -208,10 +206,6 @@ def main():
             env.setdefault('GOW3_WINDOW_ICON', str(out / 'window_icon.bmp'))
         except (ImportError, OSError):
             pass
-        # The temporal upscalers and motion vectors are not calibrated for this game yet: they stay
-        # off unless the launcher's experimental switch is on (then gow3.ini decides).
-        if env.get('GOW3_EXPERIMENTAL_UPSCALER') != '1':
-            env.setdefault('GOW3_UPSCALER', 'none')
         if profile:
             names = selected_patches(profile[1], profile[2], env.get('GOW3_PATCHES', ''), env.get('GOW3_PATCHES_ONLY') == '1')
             # gow3.ini decides the resolution and frame rate patches (in-game menu, launcher).

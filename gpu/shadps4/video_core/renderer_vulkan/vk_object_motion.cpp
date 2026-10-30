@@ -52,10 +52,10 @@ bool CreateBuffer(const Instance& instance, vk::DeviceSize size, bool host, vk::
 ObjectMotion::ObjectMotion(const Instance& instance_, Scheduler& scheduler_)
     : instance{instance_}, scheduler{scheduler_} {
     // Pipeline selection limits the extra attachment and vertex stores to likely
-    // animated draws. A setting or environment override can still disable the path.
+    // animated draws. Off with the temporal upscaler, which nothing switches on (Spec 7 §10).
     if (!Gow3Settings::Get().object_motion ||
         Gow3Settings::Get().upscaler == Gow3Settings::UpscalerOff) {
-        std::puts("Object motion: off (enable in menu or GOW3_OBJECT_MOTION=1)");
+        std::puts("Object motion: off");
         return;
     }
     const auto& features = instance.GetPhysicalDevice().getFeatures();

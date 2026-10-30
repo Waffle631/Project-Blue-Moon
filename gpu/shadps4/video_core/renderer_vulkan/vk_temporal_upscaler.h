@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// gow3: temporal upscaling of the HDR scene color (docs/upscaler.md). Off for God of War III
-// until its scene color, depth and camera constants are found (run.py). GOW3_UPSCALER=fsr3
-// runs FSR 3.1 (FireBurn/FSR-Vulkan, native Vulkan) on the scene color right before the
+// gow3: temporal upscaling of the HDR scene color (docs/upscaler.md). Parked: it has had no inputs
+// since Spec 1b and nothing switches it on since Spec 7 §10 (Gow3Settings::TemporalUpscalerAvailable).
+// FSR 3.1 (FireBurn/FSR-Vulkan, native Vulkan) ran on the scene color right before the
 // post-processing combine pass, with the scene depth and camera motion vectors, and writes the
 // result back so the game's own post, tonemap and UI continue unchanged (Native AA preset).
 //
@@ -194,12 +194,11 @@ private:
 
     bool enabled = false;
     bool failed = false;
-    // gow3: no trigger by default; the hashes of another game were removed (Spec 1b).
-    // GOW3_UPSCALE_BEFORE_CS and GOW3_UI_TRIGGER_VS set them.
+    // gow3: no trigger; the hashes of another game were removed (Spec 1b), and the variables that
+    // set them (Spec 7 §10).
     u64 trigger_hash = 0;
     VideoCore::ImageId scene_color{};
     bool done_this_frame = false;
-    u32 preset_file_frames = 0; ///< GOW3_PRESET_FILE polling
     int applied_output = -1;
     bool snapshot_taken = false;
     bool opaque_valid = false;

@@ -5,9 +5,9 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
-#include <cstring>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace Gow3Settings {
 
@@ -18,18 +18,18 @@ const char* Path() {
     return env && env[0] ? env : "gow3.ini";
 }
 
-float Clamp(float v, float lo, float hi) {
-    return std::clamp(v, lo, hi);
-}
+namespace P = Gow3PerfStats;
+
+/// The overlay's items in gow3.ini. An old overlay_upscaler key (Spec 7 §10) is ignored.
+constexpr std::pair<const char*, unsigned> OverlayKeys[] = {
+    {"overlay_fps", P::Fps}, {"overlay_frametime", P::FrameTime}, {"overlay_gpu", P::Gpu},
+    {"overlay_cpu", P::Cpu}, {"overlay_ram", P::Ram},             {"overlay_vram", P::Vram},
+};
 
 void Set(Values& v, const std::string& key, const std::string& value) {
-    const float f = float(std::atof(value.c_str()));
     const int i = std::atoi(value.c_str());
-    static const char* const overlay_keys[] = {"overlay_fps", "overlay_frametime", "overlay_upscaler",
-                                               "overlay_gpu", "overlay_cpu", "overlay_ram", "overlay_vram"};
-    for (unsigned item = 0; item < 7; ++item) {
-        if (key == overlay_keys[item]) {
-            const unsigned bit = 1u << item;
+    for (const auto& [name, bit] : OverlayKeys) {
+        if (key == name) {
             v.overlay_items = i ? (v.overlay_items | bit) : (v.overlay_items & ~bit);
             return;
         }
@@ -54,33 +54,7 @@ void Set(Values& v, const std::string& key, const std::string& value) {
         v.menu_tab = i >= 0 && i <= 2 ? i : 0; // gow3_overlay.cpp: Image, Performance, Overlay
         return;
     }
-    if (key == "upscaler") {
-        for (int u = 0; u < UpscalerCount; ++u) {
-            if (value == UpscalerName(u)) {
-                v.upscaler = u;
-            }
-        }
-    } else if (key == "preset") {
-        v.preset = std::clamp(i, 0, PresetCount - 1);
-    } else if (key == "sharpen") {
-        v.sharpen = i != 0;
-    } else if (key == "sharpness") {
-        v.sharpness = Clamp(f, 0.0f, 2.0f);
-    } else if (key == "jitter") {
-        v.jitter = i != 0;
-    } else if (key == "reactive") {
-        v.reactive = i != 0;
-    } else if (key == "object_motion") {
-        v.object_motion = i != 0;
-    } else if (key == "reactive_scale") {
-        v.reactive_scale = Clamp(f, 0.0f, 16.0f);
-    } else if (key == "reactive_threshold") {
-        v.reactive_threshold = Clamp(f, 0.0f, 1.0f);
-    } else if (key == "reactive_max") {
-        v.reactive_max = Clamp(f, 0.0f, 1.0f);
-    } else if (key == "debug_view") {
-        v.debug_view = std::clamp(i, 0, DebugViewCount - 1);
-    } else if (key == "show_fps") {
+    if (key == "show_fps") {
         v.show_fps = i != 0;
     } else if (key == "display_mode") {
         v.display_mode = Gow3Graphics::ParseDisplayMode(value);
@@ -108,18 +82,6 @@ void Set(Values& v, const std::string& key, const std::string& value) {
         v.stale_readback = i != 0;
     } else if (key == "restart_unconfirmed") {
         v.restart_unconfirmed = i != 0;
-    } else if (key == "fsr4_auto_exposure") {
-        v.fsr4_auto_exposure = i != 0;
-    } else if (key == "fsr4_invert_jitter") {
-        v.fsr4_invert_jitter = i != 0;
-    } else if (key == "live_resolution") {
-        v.live_resolution = value == "auto" ? -1 : std::clamp(i, 0, 1);
-    } else if (key == "output_res") {
-        for (int r = 0; r < OutputCount; ++r) {
-            if (value == std::to_string(OutputWidths[r]) + "x" + std::to_string(OutputHeights[r])) {
-                v.output_res = r;
-            }
-        }
     }
 }
 
@@ -147,17 +109,7 @@ void Load() {
         std::printf("Settings: %s\n", Path());
     }
     // Environment overrides (scripts, A/B tests).
-    if (const char* env = std::getenv("GOW3_UPSCALER")) {
-        v.upscaler = UpscalerOff;
-        for (int u = 0; u < UpscalerCount; ++u) {
-            if (std::strcmp(env, UpscalerName(u)) == 0) v.upscaler = u;
-        }
-    }
     const std::pair<const char*, const char*> env_keys[] = {
-        {"GOW3_FSR_SHARPNESS", "sharpness"},        {"GOW3_JITTER", "jitter"},
-        {"GOW3_REACTIVE", "reactive"},              {"GOW3_REACTIVE_SCALE", "reactive_scale"},
-        {"GOW3_REACTIVE_THRESHOLD", "reactive_threshold"}, {"GOW3_REACTIVE_MAX", "reactive_max"},
-        {"GOW3_UPSCALE_PRESET", "preset"},            {"GOW3_OBJECT_MOTION", "object_motion"},
         {"GOW3_ASYNC_SHADERS", "async_shaders"},      {"GOW3_DEFERRED_READBACK", "deferred_readback"},
         {"GOW3_STALE_READBACK", "stale_readback"},     {"GOW3_FSR1", "fsr1"},
         {"GOW3_RCAS", "rcas"},                        {"GOW3_FRAMES_AHEAD", "frames_queued"},
@@ -171,7 +123,6 @@ void Load() {
     v.startup_upscaler = v.upscaler;
     v.startup_object_motion = v.object_motion;
     v.startup_output_res = v.output_res;
-    v.startup_live_resolution = v.live_resolution;
     v.startup_render_resolution = v.render_resolution;
     v.startup_engine_fps = v.engine_fps;
     const char* applied = std::getenv("GOW3_ENGINE_FPS");
@@ -243,26 +194,13 @@ void Save() {
         std::printf("Settings: cannot write %s\n", Path());
         return;
     }
-    std::fprintf(file,
-                 "# gow3 settings (in-game menu: Insert / R3+L2)\n"
-                 "upscaler=%s\npreset=%d\nsharpen=%d\nsharpness=%.2f\njitter=%d\n"
-                 "reactive=%d\nobject_motion=%d\nreactive_scale=%.2f\nreactive_threshold=%.2f\nreactive_max=%.2f\n"
-                 "debug_view=%d\nshow_fps=%d\nfsr4_auto_exposure=%d\nfsr4_invert_jitter=%d\n",
-                 UpscalerName(v.upscaler), v.preset.load(), int(v.sharpen.load()),
-                 v.sharpness.load(), int(v.jitter.load()), int(v.reactive.load()),
-                 int(v.object_motion.load()),
-                 v.reactive_scale.load(), v.reactive_threshold.load(), v.reactive_max.load(),
-                 v.debug_view.load(), int(v.show_fps.load()),
-                 int(v.fsr4_auto_exposure.load()), int(v.fsr4_invert_jitter.load()));
-    std::fprintf(file, "output_res=%dx%d\n", OutputWidths[v.output_res], OutputHeights[v.output_res]);
-    std::fprintf(file,
-                 "overlay_fps=%d\noverlay_frametime=%d\noverlay_upscaler=%d\noverlay_gpu=%d\n"
-                 "overlay_cpu=%d\noverlay_ram=%d\noverlay_vram=%d\noverlay_scale=%d\noverlay_corner=%d\n"
-                 "overlay_opacity=%d\noverlay_layout=%d\nmenu_tab=%d\n",
-                 int(v.overlay_items >> 0 & 1), int(v.overlay_items >> 1 & 1), int(v.overlay_items >> 2 & 1),
-                 int(v.overlay_items >> 3 & 1), int(v.overlay_items >> 4 & 1), int(v.overlay_items >> 5 & 1),
-                 int(v.overlay_items >> 6 & 1), v.overlay_scale.load(), v.overlay_corner.load(),
-                 v.overlay_opacity.load(), v.overlay_layout.load(), v.menu_tab.load());
+    std::fprintf(file, "# gow3 settings (in-game menu: Insert / R3+L2)\nshow_fps=%d\n", int(v.show_fps.load()));
+    for (const auto& [name, bit] : OverlayKeys) {
+        std::fprintf(file, "%s=%d\n", name, (v.overlay_items & bit) ? 1 : 0);
+    }
+    std::fprintf(file, "overlay_scale=%d\noverlay_corner=%d\noverlay_opacity=%d\noverlay_layout=%d\nmenu_tab=%d\n",
+                 v.overlay_scale.load(), v.overlay_corner.load(), v.overlay_opacity.load(),
+                 v.overlay_layout.load(), v.menu_tab.load());
     std::fprintf(file,
                  "display_mode=%s\nvsync=%d\nfps_limit=%d\nasync_shaders=%d\n"
                  "fsr1=%d\nrcas=%d\nrcas_strength=%d\nframes_queued=%d\n"
@@ -274,9 +212,6 @@ void Save() {
                  Gow3Graphics::Resolutions[std::clamp(v.render_resolution.load(), 0, 5)].data(),
                  v.engine_fps.load(), int(v.deferred_readback.load()), int(v.stale_readback.load()),
                  int(v.restart_unconfirmed.load()));
-    // Read by run.sh at start.
-    std::fprintf(file, "live_resolution=%s\n", v.live_resolution < 0 ? "auto"
-                                                  : v.live_resolution ? "1" : "0");
     std::fclose(file);
 }
 

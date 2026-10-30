@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // gow3: camera motion vectors for temporal upscaling (docs/upscaler.md). The scene constants
-// give the camera of each frame; the previous one is kept here. GOW3_DEBUG_MOTION=1 blends the
-// motion vectors as colors into the frame before it is copied to the display.
+// give the camera of each frame; the previous one is kept here. The debug view (debug_overlay) blends
+// the motion vectors as colors into the frame before it is copied to the display; since Spec 7 §10
+// nothing switches it or the tracking on.
 
 #pragma once
 

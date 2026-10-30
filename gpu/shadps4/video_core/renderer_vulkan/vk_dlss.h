@@ -3,8 +3,8 @@
 //
 // gow3: NVIDIA DLSS Super Resolution through the optional gow3_dlss.dll bridge (gpu/
 // dlss_bridge, MIT), loaded at run time from next to gow3-probe.exe together with NVIDIA's
-// nvngx_dlss.dll. The port itself contains no NVIDIA code; without the DLLs, on other GPUs or
-// with GOW3_DLSS=0 nothing changes. Adapted from IFreemz/shadPS4-Bloodborne-DLSS-FSR
+// nvngx_dlss.dll. The port itself contains no NVIDIA code; without the DLLs or on other GPUs
+// nothing changes. Not loaded since Spec 7 §10. Adapted from IFreemz/shadPS4-Bloodborne-DLSS-FSR
 // (vk_dlss_ngx).
 
 #pragma once
@@ -20,7 +20,7 @@ namespace Vulkan {
 
 class Dlss {
 public:
-    /// The process-wide instance, or null when the DLLs are absent or GOW3_DLSS=0.
+    /// The process-wide instance, or null when the DLLs are absent (always since Spec 7 §10).
     static Dlss* Get();
     ~Dlss();
 

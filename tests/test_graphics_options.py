@@ -69,6 +69,14 @@ class GraphicsOptionsTest(unittest.TestCase):
         env = g.environment(g.startup_options({'stale_readback': '0'}))
         self.assertEqual(env, {'GOW3_DEFERRED_READBACK': '1', 'GOW3_STALE_READBACK': '0', 'GOW3_ASYNC_SHADERS': '1'})
 
+    def test_launch_has_no_temporal_upscaler_switch(self):
+        # Spec 7 §10: the temporal upscaler cannot be switched on, so the launch neither reads the
+        # experimental switch nor prepares its variables and FSR 4 assets (main() is one block: read the source).
+        for name in ('run.py', 'run.sh'):
+            text = (paths.ROOT / name).read_text(encoding='utf-8')
+            for word in ('GOW3_EXPERIMENTAL_UPSCALER', 'GOW3_UPSCALER', 'GOW3_FSR411_DIR', 'fsr4_optimize'):
+                self.assertFalse(word in text, f'{name}: {word}')
+
 
 if __name__ == '__main__':
     unittest.main()

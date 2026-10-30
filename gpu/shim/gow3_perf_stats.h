@@ -16,22 +16,21 @@ class Instance;
 
 namespace Gow3PerfStats {
 
-/// Overlay items (Gow3Settings::Values::overlay_items).
+/// Overlay items (Gow3Settings::Values::overlay_items). Bit 2 was the temporal upscaler's name,
+/// removed with the upscaler's options (Spec 7 §10); it stays free so the other bits keep their meaning.
 enum Item : unsigned {
     Fps = 1u << 0,
     FrameTime = 1u << 1,
-    Upscaler = 1u << 2,
     Gpu = 1u << 3,
     Cpu = 1u << 4,
     Ram = 1u << 5,
     Vram = 1u << 6,
-    AllItems = (1u << 7) - 1,
+    AllItems = Fps | FrameTime | Gpu | Cpu | Ram | Vram,
 };
-inline constexpr unsigned DefaultItems = Fps | FrameTime | Upscaler;
+inline constexpr unsigned DefaultItems = Fps | FrameTime;
 
 struct Sample {
     float fps = 0.0f, frame_ms = 0.0f;
-    std::string upscaler;
     std::string gpu_name;
     float gpu_percent = -1.0f, cpu_percent = -1.0f;
     double ram_used_gb = -1.0, ram_total_gb = -1.0, vram_used_gb = -1.0, vram_total_gb = -1.0;
@@ -72,10 +71,6 @@ inline std::string Format(const Sample& s, unsigned mask, bool row) {
         std::snprintf(part, sizeof(part), "%.1f ms", s.frame_ms);
         add();
     }
-    if (mask & Upscaler) {
-        std::snprintf(part, sizeof(part), "%s", s.upscaler.empty() ? "Native" : s.upscaler.c_str());
-        add();
-    }
     if (mask & Gpu) {
         const char* name = s.gpu_name.empty() ? "GPU" : s.gpu_name.c_str();
         if (s.gpu_percent < 0.0f) {
@@ -106,7 +101,7 @@ inline std::string Format(const Sample& s, unsigned mask, bool row) {
 
 /// Starts the sampling thread the first time; later calls do nothing.
 void Start(const Vulkan::Instance& instance);
-/// The latest CPU, RAM, GPU and VRAM values (the caller fills FPS, frametime and upscaler).
+/// The latest CPU, RAM, GPU and VRAM values (the caller fills FPS and frametime).
 Sample Latest();
 
 } // namespace Gow3PerfStats

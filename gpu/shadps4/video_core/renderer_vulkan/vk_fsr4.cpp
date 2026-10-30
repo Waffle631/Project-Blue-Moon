@@ -22,8 +22,7 @@ namespace Vulkan {
 namespace {
 
 std::string AssetDir() {
-    const char* dir = std::getenv("GOW3_FSR4_DIR");
-    return dir && dir[0] ? dir : "fsr4_shaders";
+    return "fsr4_shaders";
 }
 
 bool ReadFile(const std::string& path, std::vector<u8>& data) {
@@ -121,12 +120,10 @@ struct Fsr4Upscaler::Impl {
         std::array<std::vector<u8>, FFX_FSR4_VK_PASS_COUNT> code;
         std::vector<u8> initializer, weights;
         // gow3: tools/fsr4_optimize.sh puts fixed or faster passes into opt/ (post through
-        // shared memory, pass 11 without out-of-bounds writes); GOW3_FSR4_OPT=0 keeps the originals.
-        const char* opt_env = std::getenv("GOW3_FSR4_OPT");
-        const bool use_opt = !(opt_env && opt_env[0] == '0');
+        // shared memory, pass 11 without out-of-bounds writes); without them the originals load.
         u32 optimized = 0;
         const auto load = [&](const char* name, std::vector<u8>& data) {
-            if (use_opt && ReadFile(dir + "opt/" + name, data)) {
+            if (ReadFile(dir + "opt/" + name, data)) {
                 ++optimized;
                 return true;
             }
@@ -237,9 +234,8 @@ struct Fsr4Upscaler::Impl {
             return false;
         }
         if (!fsr411) {
-            const char* env = std::getenv("GOW3_FSR411_DIR");
             fsr411 = std::make_unique<Fsr411::Upscaler>(instance.GetPhysicalDevice(), instance.GetDevice(),
-                                                        env && env[0] ? env : "fsr4_411");
+                                                        "fsr4_411");
         }
         // Its constant ring holds kFramesInFlight frames: the oldest must be done.
         while (fsr411_ticks.size() >= Fsr411::kFramesInFlight) {

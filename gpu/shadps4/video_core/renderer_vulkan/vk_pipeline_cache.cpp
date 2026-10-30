@@ -921,14 +921,6 @@ bool PipelineCache::RefreshGraphicsKey(PipelineSelection& sel) {
                             sel.motion ? "ON " : "off", sizes.c_str());
             }
         }
-        // Keep the old broad path available for visual A/B tests.
-        static const bool all_motion = [] {
-            const char* value = std::getenv("GOW3_OBJECT_MOTION_ALL");
-            return value && value[0] == '1';
-        }();
-        if (all_motion) {
-            sel.motion = true;
-        }
         if (sel.motion && !RefreshGraphicsStages(sel)) {
             return false;
         }

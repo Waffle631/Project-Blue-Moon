@@ -11,6 +11,7 @@
 #include <string_view>
 
 #include "video_core/renderer_vulkan/vk_dlss.h"
+#include "gow3_settings.h"
 
 #ifdef _WIN32
 #ifndef NOMINMAX
@@ -86,8 +87,8 @@ struct Dlss::Impl {
 
 Dlss* Dlss::Get() {
     static Dlss* const dlss = []() -> Dlss* {
-        const char* setting = std::getenv("GOW3_DLSS");
-        if (setting && setting[0] == '0') {
+        // gow3: the temporal upscaler cannot be switched on (Spec 7 §10): the DLLs are not loaded.
+        if (!Gow3Settings::TemporalUpscalerAvailable) {
             return nullptr;
         }
         const auto directory = ExecutableDirectory();
