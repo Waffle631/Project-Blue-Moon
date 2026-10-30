@@ -1,7 +1,7 @@
 /* libScePad on SDL3 gamepads, with a keyboard fallback. SDL events are pumped
  * by the window thread (gpu/shim/window.cpp); here state is only sampled.
  *
- * Default keyboard layout (GOW3_KEY_MAP changes the buttons, see apply_button_map):
+ * Default keyboard layout (TSUKI_KEY_MAP changes the buttons, see apply_button_map):
  *   WASD left stick, arrow keys right stick, Space Cross, LShift Circle,
  *   E Square, Q Triangle, 1 L1, 3 R1, R L2, F R2, Z L3, C R3,
  *   Enter Options, Tab touchpad click, IJKL d-pad (I up, K down, J left, L right).
@@ -90,8 +90,8 @@ static SDL_Gamepad *current_gamepad(void) {
     return gamepad;
 }
 /* Button sources: a host button or key and the PS4 button it presses. The defaults below can be
- * changed per PS4 button with GOW3_PAD_MAP (gamepad) and GOW3_KEY_MAP (keyboard), e.g.
- * GOW3_KEY_MAP="cross=Q,square=Left Shift" or GOW3_PAD_MAP="cross=b,circle=a": comma-separated
+ * changed per PS4 button with TSUKI_PAD_MAP (gamepad) and TSUKI_KEY_MAP (keyboard), e.g.
+ * TSUKI_KEY_MAP="cross=Q,square=Left Shift" or TSUKI_PAD_MAP="cross=b,circle=a": comma-separated
  * <ps4 button>=<SDL key or gamepad button name>. A mapped PS4 button loses its default sources.
  * touchpad, touchpad_left and touchpad_right all name the touchpad click and their entries add
  * up, so a map saved when the two sides were apart keeps both. Sticks, triggers, the real
@@ -128,7 +128,7 @@ static char *trim(char *text) {
     return text;
 }
 
-/* Applies a GOW3_PAD_MAP/GOW3_KEY_MAP value; returns how many entries were used. Bad entries are
+/* Applies a TSUKI_PAD_MAP/TSUKI_KEY_MAP value; returns how many entries were used. Bad entries are
  * logged and skipped, so their PS4 button keeps its default. Of one name the last entry counts;
  * the rest are applied together, so different names of one button add up. */
 static int apply_button_map(ButtonMap *map, const char *spec, bool keyboard) {
@@ -176,8 +176,8 @@ static void load_button_maps(void) {
     static bool loaded;
     if (loaded) return;
     loaded=true;
-    const int pad=apply_button_map(&pad_map,getenv("GOW3_PAD_MAP"),false);
-    const int keys=apply_button_map(&key_map,getenv("GOW3_KEY_MAP"),true);
+    const int pad=apply_button_map(&pad_map,getenv("TSUKI_PAD_MAP"),false);
+    const int keys=apply_button_map(&key_map,getenv("TSUKI_KEY_MAP"),true);
     if (pad || keys) printf("Runtime: pad map: %d gamepad and %d keyboard buttons remapped\n",pad,keys);
 }
 
@@ -230,7 +230,7 @@ static void sample_host(PadData *d) {
     key_axis(&d->right_y,k[SDL_SCANCODE_UP],k[SDL_SCANCODE_DOWN]);
 }
 
-/* GOW3_PAD_FILE=<file>: scripted input for automated runs. The file holds whitespace-separated
+/* TSUKI_PAD_FILE=<file>: scripted input for automated runs. The file holds whitespace-separated
  * tokens, re-read when it changes: button names (cross circle square triangle l1 r1 l2 r2 l3 r3
  * options touchpad touchpad_left touchpad_right up down left right) are held while listed, the
  * three touchpad names being one button; lx= ly= rx= ry= (0..255) override the sticks. An empty
@@ -238,7 +238,7 @@ static void sample_host(PadData *d) {
 static struct { uint32_t buttons; int stick[4]; } injected={0,{-1,-1,-1,-1}};
 static void read_inject(void) {
     static const char *path; static int checked; static uint64_t last_check; static struct timespec mtime;
-    if (!checked) { path=getenv("GOW3_PAD_FILE"); checked=1; }
+    if (!checked) { path=getenv("TSUKI_PAD_FILE"); checked=1; }
     if (!path || !*path) return;
     uint64_t now=now_us();
     if (now-last_check<20000) return;
@@ -267,8 +267,8 @@ static void read_inject(void) {
     printf("Runtime: pad file: buttons 0x%x sticks %d %d %d %d\n",injected.buttons,
            injected.stick[0],injected.stick[1],injected.stick[2],injected.stick[3]);
 }
-/* GOW3_PAD_RECORD=<file> records the pad state (gamepad or keyboard) from the game's first read
- * until F9; GOW3_PAD_REPLAY=<file> plays it back from the first read, so scripted runs repeat a route
+/* TSUKI_PAD_RECORD=<file> records the pad state (gamepad or keyboard) from the game's first read
+ * until F9; TSUKI_PAD_REPLAY=<file> plays it back from the first read, so scripted runs repeat a route
  * the player ran once. The clock is the game's own reads (pad_reads), not the wall clock: an input
  * lands on the same iteration of the game, and the frame captures of two runs line up. Format: a
  * first line "reads", then "<read> <buttons> <lx> <ly> <rx> <ry> <l2> <r2>", written when the state
@@ -309,7 +309,7 @@ static size_t replay_parse(FILE *f, const char *path, PadSample **out) {
 static void record_sample(const PadData *d) {
     static const char *path; static int checked, f9_was_down; static FILE *file; static PadSample last;
     if (!checked) {
-        checked=1; path=getenv("GOW3_PAD_RECORD");
+        checked=1; path=getenv("TSUKI_PAD_RECORD");
         if (path && *path) {
             if ((file=fopen(path,"w"))) {
                 fputs(PAD_REPLAY_HEADER "\n",file); fflush(file);
@@ -337,7 +337,7 @@ static int replay_state; /* 0 not loaded yet, 1 playing, 2 over (or no recording
 static void replay_sample(PadData *d) {
     if (!replay_state) {
         replay_state=2;
-        const char *path=getenv("GOW3_PAD_REPLAY");
+        const char *path=getenv("TSUKI_PAD_REPLAY");
         if (!path || !*path) return;
         FILE *f=fopen(path,"r");
         if (!f) { printf("Runtime: pad replay: cannot open %s\n",path); return; }

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // gow3: user settings changed at run time from the in-game menu (gow3_overlay.h) and kept
-// in gow3.ini (GOW3_CONFIG overrides the path). Environment variables override the file at
+// in gow3.ini (TSUKI_CONFIG overrides the path). Environment variables override the file at
 // start. Readers load the atomics every frame; writers are the menu and Load().
 // The temporal upscaler's settings (upscaler, preset, jitter, reactive*, object_motion, debug_view,
 // output_res, sharpen, sharpness, fsr4_*) keep their defaults: neither the file, the environment nor
@@ -75,7 +75,7 @@ struct Values {
     /// restores the previous startup options when a launch never cleared it.
     std::atomic<bool> restart_unconfirmed{false};
     int startup_render_resolution = 0, startup_engine_fps = 120;
-    /// The engine rate this launch really runs at (run.py's GOW3_ENGINE_FPS): 60 when the frame
+    /// The engine rate this launch really runs at (run.py's TSUKI_ENGINE_FPS): 60 when the frame
     /// rate patch does not apply to this game build.
     std::atomic<int> applied_engine_fps{120};
     bool startup_deferred_readback = true, startup_stale_readback = true;
@@ -91,7 +91,7 @@ struct Values {
     std::atomic<bool> dlss_supported{false};
     std::atomic<const char*> dlss_problem{nullptr};
 
-    /// Startup settings for the explicit GOW3_RENDER_RES compatibility patch only.
+    /// Startup settings for the explicit TSUKI_RENDER_RES compatibility patch only.
     int startup_preset = NativeAA;
     int startup_upscaler = UpscalerOff;
     bool startup_object_motion = true;

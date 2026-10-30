@@ -292,9 +292,10 @@ private:
     static void RunTextureTask(void* rasterizer);
     static void JoinBindHelper(void* rasterizer);
 
-    /// Display pass: counts the frame (Gow3Stats::gpu_frames) and, with GOW3_BUFFER_STATS, the lag.
+    /// Display pass: counts the frame (Gow3Stats::gpu_frames) and, with TSUKI_BUFFER_STATS, the
+    /// lag.
     void NoteFrameStart();
-    /// GOW3_GPU_PROFILE: a timestamp where a render pass starts (vk_gpu_profiler.h).
+    /// TSUKI_GPU_PROFILE: a timestamp where a render pass starts (vk_gpu_profiler.h).
     void MarkPass(const GraphicsPipeline* pipeline, const RenderState& state);
     void BindVertexBuffers(const GraphicsPipeline* pipeline,
                            const PreparedDraw* prepared = nullptr);
@@ -345,7 +346,7 @@ private:
     boost::container::static_vector<vk::DescriptorImageInfo, Shader::NUM_IMAGES> image_infos;
     boost::container::static_vector<vk::DescriptorBufferInfo, Shader::NUM_BUFFERS> buffer_infos;
     boost::container::static_vector<VideoCore::ImageId, Shader::NUM_IMAGES> bound_images;
-    /// gow3 diagnostics (GOW3_DIAG_IMAGES=1, draw pipe off): while a frame capture records, the
+    /// gow3 diagnostics (TSUKI_DIAG_IMAGES=1, draw pipe off): while a frame capture records, the
     /// color targets of a pass are written to files when the next pass or dispatch begins.
     void DiagPassBoundary(bool force);
     std::array<VAddr, 8> diag_addresses{};
@@ -465,7 +466,7 @@ private:
         u32 completed = 0; ///< stages the helper bound; the rest are bound after the join
         bool barrier = false;
     } texture_task;
-    /// Draws whose textures the helper bound completely, partly or not at all (GOW3_FRAME_STATS).
+    /// Draws whose textures the helper bound completely, partly or not at all (TSUKI_FRAME_STATS).
     u64 helper_full = 0, helper_partial = 0, helper_serial = 0;
     /// The memoized cache entry of each image binding (FindImage memo taken), else null.
     boost::container::static_vector<ImageDescCacheEntry*, Shader::NUM_IMAGES> image_binding_entries;
@@ -497,7 +498,7 @@ private:
     u32 pending_checks = 0;
     u64 proxy_samples = 0; ///< texture bindings that read a scene proxy (statistics)
     float sampler_lod_bias = 0.0f; ///< gow3: extra bias of this draw's samplers
-    bool scene_debug_frame = false; ///< GOW3_SCENE_DEBUG: this frame's passes are printed
+    bool scene_debug_frame = false; ///< TSUKI_SCENE_DEBUG: this frame's passes are printed
     bool PendingWriteOverlaps(VAddr address, u64 size);
     /// Stage B: the ring bindings of the stages of the packet being recorded.
     struct RingStage {

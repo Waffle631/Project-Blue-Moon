@@ -343,8 +343,8 @@ progreso, sin el prólogo.*
 ### 1.10 Lo observado en la ejecución (tarea 7, 2026-10-21)
 
 La ejecución `a2` duró 12 min 13 s. Arrancó con la partida con progreso, así que fue directa al menú de
-título; el usuario jugó hasta el título del capítulo 1. Se lanzó con `GOW3_TRACE_AUDIODEC=2` (cada
-llamada, sin tope) y `GOW3_AUDIODEC_AU_DUMP`.
+título; el usuario jugó hasta el título del capítulo 1. Se lanzó con `TSUKI_TRACE_AUDIODEC=2` (cada
+llamada, sin tope) y `TSUKI_AUDIODEC_AU_DUMP`.
 
 - Log: `out/run-audiodec-a2.log` (498 MB).
 - Volcados: `out/audiodec-au-a2/`.
@@ -447,7 +447,7 @@ sin versionar, porque el runtime no necesita MZX.
   - El corte no sale exacto de las muestras y el retardo del bloque `fact`: se desvía una trama arriba
     o abajo según la voz.
   - **[H]** Es el corte propio del juego, como en los efectos (1.6). No hay ningún error.
-- **Ejecuciones de la tarea 8,** las dos con `GOW3_TRACE_AUDIODEC=1` y `GOW3_AUDIODEC_AU_DUMP`. Ninguna
+- **Ejecuciones de la tarea 8,** las dos con `TSUKI_TRACE_AUDIODEC=1` y `TSUKI_AUDIODEC_AU_DUMP`. Ninguna
   tiene `STOP:`, `Fault:`, búferes rechazados ni desfase distinto de 0.
 
   | Ejecución | Quién y cuánto | Log | Volcados | Decodificadores | Tramas | Errores |
@@ -455,7 +455,7 @@ sin versionar, porque el runtime no necesita MZX.
   | `a4` | el usuario, escenas con voces, unos 3 min | `out/run-audiodec-a4.log` | `out/audiodec-au-a4/` | 62 | 59 453 | 0 |
   | `a5` | menú de título, cerrada con `SIGTERM` tras la música | `out/run-audiodec-a5.log` | `out/audiodec-replay/` | 10 | 14 405 | 0 |
 
-**Reproducción offline.** Desde la tarea 8, `GOW3_AUDIODEC_AU_DUMP=<dir>` escribe dos archivos por
+**Reproducción offline.** Desde la tarea 8, `TSUKI_AUDIODEC_AU_DUMP=<dir>` escribe dos archivos por
 decodificador:
 - `dec<id>.au`, lo consumido;
 - `dec<id>.txt`, con una línea `config <hex>` y una línea `clear <n>` por cada `ClearContext`, donde
@@ -614,7 +614,7 @@ Fuentes:
 - el desensamblado de la preparación (`+0x1155b0`), la decodificación (`+0x115880`), el arranque de la
   voz (`+0x115cc0`) y el mezclador (`+0x115e80`);
 - las 19 entradas de `vag.mrg`;
-- una ejecución trazada, `out/run-audiodec-b1.log` (`GOW3_TRACE_AUDIODEC=2`, partida actual, menú de
+- una ejecución trazada, `out/run-audiodec-b1.log` (`TSUKI_TRACE_AUDIODEC=2`, partida actual, menú de
   título, cerrada con `SIGTERM` 60 s después de abrirse la ventana). El análisis es
   `out/spec4-t10/analyze.py` → `out/spec4-t10/b1-analysis.txt` (sin versionar).
 
@@ -770,7 +770,7 @@ libera él (2.1).
   tiene la marca: `API_FAIL`. Un puntero mapeado solo en parte cuenta como no mapeado. No se lee ni se
   escribe fuera de lo comprobado.
 - **El registro** es el de libSceAudiodec: la primera llamada y el primer error de cada función, o
-  todas con `GOW3_TRACE_AUDIODEC`, con una línea `before:` y otra con el resultado y `after:` (bsi,
+  todas con `TSUKI_TRACE_AUDIODEC`, con una línea `before:` y otra con el resultado y `after:` (bsi,
   descriptores, recurso, memoria de trabajo y 16 bytes del PCM). Tiene su propio tope de 400 líneas.
 - **Contador:** `Runtime: AudiodecCpu decoders=…, frames=…, errors=…`. `decoders` son los
   `InitDecoder` correctos (uno por voz) y `frames` los `Decode` que dan PCM; el de la cabecera no
@@ -778,7 +778,7 @@ libera él (2.1).
 
 #### Lo que se vio en el juego (ejecución b2)
 
-`out/run-audiodec-b2.log` (sin versionar): partida actual, `GOW3_TRACE_AUDIODEC=1`, menú de título,
+`out/run-audiodec-b2.log` (sin versionar): partida actual, `TSUKI_TRACE_AUDIODEC=1`, menú de título,
 unos 154 s (9 261 *flips*), ventana cerrada por el usuario.
 
 - **[V]** `QueryMemSize` da `0x20` y la memoria que pasa el juego es la del flujo (`0x1007…`).

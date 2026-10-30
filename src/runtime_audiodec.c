@@ -4,8 +4,8 @@
  * Vita's libSceAudiodec ones (0x807F00xx, vitasdk psp2/audiodec.h); libSceAudiodecCpu uses 0x80F700xx
  * (shadPS4 PR 5289). Any error stops the game's track without a message (docs/audiodec.md 1.6), so
  * each one is logged with its cause: the first call and the first error of each function, or every
- * call with GOW3_TRACE_AUDIODEC=1 (400 lines; =2 has no cap), with the structures before and after.
- * GOW3_AUDIODEC_AU_DUMP=<dir> writes what each decoder consumed to <dir>/dec<id>.au and, for an offline
+ * call with TSUKI_TRACE_AUDIODEC=1 (400 lines; =2 has no cap), with the structures before and after.
+ * TSUKI_AUDIODEC_AU_DUMP=<dir> writes what each decoder consumed to <dir>/dec<id>.au and, for an offline
  * replay (tests/test_audiodec.c), its config and where each ClearContext fell to <dir>/dec<id>.txt. */
 #define _GNU_SOURCE
 #include "runtime.h"
@@ -70,7 +70,7 @@ static size_t calls[FUNCTIONS], failures[FUNCTIONS];
 static size_t trace_lines; static int drift_logged;
 /* 0 off, 1 capped at TRACE_LINES, 2 every call. */
 static int tracing(void) {
-    const char *v=getenv("GOW3_TRACE_AUDIODEC");
+    const char *v=getenv("TSUKI_TRACE_AUDIODEC");
     return !v || !*v || !strcmp(v,"0") ? 0 : strcmp(v,"2") ? 1 : 2;
 }
 /* Whether one more traced line may be printed; the first one over the cap says so instead. */
@@ -78,7 +78,7 @@ static int trace_line(void) {
     int level=tracing();
     if (level!=1) return level;
     pthread_mutex_lock(&lock); size_t n=++trace_lines; pthread_mutex_unlock(&lock);
-    if (n==TRACE_LINES+1) printf("Runtime: Audiodec trace stops after %d lines; GOW3_TRACE_AUDIODEC=2 has no cap\n",TRACE_LINES);
+    if (n==TRACE_LINES+1) printf("Runtime: Audiodec trace stops after %d lines; TSUKI_TRACE_AUDIODEC=2 has no cap\n",TRACE_LINES);
     return n<=TRACE_LINES;
 }
 /* Logs the call when it is the first one or the first error of f, or when traced. text is the cause
@@ -260,7 +260,7 @@ static const char *read_decode(const void *control, const Decoder *d, uint32_t p
 static FILE *dump_file(const char *dir, int32_t id, const char *kind) {
     char path[1024]; snprintf(path,sizeof path,"%s/dec%d.%s",dir,id,kind);
     FILE *f=fopen(path,"wb");
-    if (!f) printf("Runtime: GOW3_AUDIODEC_AU_DUMP: cannot write %s\n",path);
+    if (!f) printf("Runtime: TSUKI_AUDIODEC_AU_DUMP: cannot write %s\n",path);
     return f;
 }
 /* One frame (d->lock held). Writes nothing to the guest unless it succeeds; after a LibAtrac9 error
@@ -275,7 +275,7 @@ static int32_t decode_frame(Decoder *d, void *control, char *why, size_t why_siz
     long long drift=(long long)au.bytes-(long long)d->superframe_remain;
     if (drift) {
         pthread_mutex_lock(&lock); int first=!drift_logged; drift_logged=1; pthread_mutex_unlock(&lock);
-        if (first) printf("Runtime: sceAudiodecDecode(id %d): the AU has %u bytes and LibAtrac9 has %u left in the superframe (drift %lld); later drifts only with GOW3_TRACE_AUDIODEC\n",
+        if (first) printf("Runtime: sceAudiodecDecode(id %d): the AU has %u bytes and LibAtrac9 has %u left in the superframe (drift %lld); later drifts only with TSUKI_TRACE_AUDIODEC\n",
                           d->id,au.bytes,d->superframe_remain,drift);
     }
     memcpy(d->au,au.data,au.bytes);
@@ -291,7 +291,7 @@ static int32_t decode_frame(Decoder *d, void *control, char *why, size_t why_siz
         if (frame==frames) consumed=au.bytes, d->frames=0, d->superframe_remain=(uint32_t)d->info.superframeSize;
         else d->frames=frame;
         if (!d->dump_opened) {
-            const char *dir=getenv("GOW3_AUDIODEC_AU_DUMP"); d->dump_opened=1;
+            const char *dir=getenv("TSUKI_AUDIODEC_AU_DUMP"); d->dump_opened=1;
             if (dir && *dir && (d->dump=dump_file(dir,d->id,"au")) && (d->notes=dump_file(dir,d->id,"txt")))
                 fprintf(d->notes,"config %02x%02x%02x%02x\n",d->config[0],d->config[1],d->config[2],d->config[3]);
         }

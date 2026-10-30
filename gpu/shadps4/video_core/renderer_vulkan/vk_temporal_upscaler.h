@@ -9,7 +9,7 @@
 // Guest targets stay at 1920x1080. Host scene targets use output/preset dimensions,
 // resized at frame boundaries. At 1080p HDR reconstruction precedes post; other outputs
 // reconstruct tonemapped scene proxies before output-size UI/display composition.
-// GOW3_RENDER_RES retains the older startup-patched guest-resolution path.
+// TSUKI_RENDER_RES retains the older startup-patched guest-resolution path.
 
 #pragma once
 
@@ -165,7 +165,7 @@ private:
     void CreatePipelines();
     /// Records the reactive mask pass; false when there is no snapshot this frame.
     bool RecordReactive(vk::ImageView color_view);
-    /// FSR 4 is selected, possible in this session (not GOW3_RENDER_RES) and has not failed.
+    /// FSR 4 is selected, possible in this session (not TSUKI_RENDER_RES) and has not failed.
     [[nodiscard]] bool UseFsr4() const;
     /// gow3: DLSS selected and the bridge is ready (NVIDIA RTX, gow3_dlss.dll).
     [[nodiscard]] bool UseDlss() const;

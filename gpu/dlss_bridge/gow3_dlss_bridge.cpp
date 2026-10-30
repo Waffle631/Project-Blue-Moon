@@ -239,7 +239,7 @@ void Shutdown() {
     }
 }
 
-const Gow3DlssApi api{GOW3_DLSS_BRIDGE_ABI, Configure,      InstanceExtensions, DeviceExtensions,
+const Gow3DlssApi api{TSUKI_DLSS_BRIDGE_ABI, Configure,      InstanceExtensions, DeviceExtensions,
                     Initialize,             CreateFeature,  Evaluate,           ReleaseFeature,
                     Shutdown};
 

@@ -256,13 +256,13 @@ public:
         return vk13_features.subgroupSizeControl && vk13_props.maxSubgroupSize >= 64;
     }
 
-    /// gow3: VK_KHR_pipeline_executable_properties is on (GOW3_WAVE_STATS=1, vk_wave_stats.h).
+    /// gow3: VK_KHR_pipeline_executable_properties is on (TSUKI_WAVE_STATS=1, vk_wave_stats.h).
     bool IsPipelineExecutableInfoEnabled() const {
         return pipeline_executable_properties &&
                pipeline_executable_features.pipelineExecutableInfo;
     }
 
-    /// gow3: VK_AMD_shader_info is on (statistics and ISA per stage, GOW3_WAVE_STATS=1).
+    /// gow3: VK_AMD_shader_info is on (statistics and ISA per stage, TSUKI_WAVE_STATS=1).
     bool IsAmdShaderInfoEnabled() const {
         return amd_shader_info;
     }
@@ -585,7 +585,7 @@ private:
     bool image_2d_view_of_3d{};
     bool image_view_min_lod{};
     bool shader_clock{};
-    bool pipeline_executable_properties{}; // gow3: GOW3_WAVE_STATS=1 (vk_wave_stats.h)
+    bool pipeline_executable_properties{}; // gow3: TSUKI_WAVE_STATS=1 (vk_wave_stats.h)
     bool amd_shader_info{};                // gow3: with it, VK_AMD_shader_info when present
     bool compute_shader_derivatives{};
     bool mixed_float_dot_product{}; // gow3: VK_VALVE_shader_mixed_float_dot_product (FSR 4.1.1)

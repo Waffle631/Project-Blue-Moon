@@ -225,7 +225,7 @@ public:
         auto& image = slot_images[id];
         return !uid || image.image_uid == uid ? &image : nullptr;
     }
-    /// gow3 diagnostics: writes level 0 of a color image to GOW3_DIAG_DIR as raw pixels
+    /// gow3 diagnostics: writes level 0 of a color image to TSUKI_DIAG_DIR as raw pixels
     /// (<seq>_<tag>_<address>_<w>x<h>_p<pitch>_b<bytes per pixel>_f<vk format>.raw). Waits for
     /// the GPU.
     void DiagDumpImage(ImageId image_id, const char* tag);
@@ -449,14 +449,14 @@ private:
     Common::LeastRecentlyUsedCache<u64, u64> sampler_lru_cache;
     const bool readback_linear_images;
     const bool deferred_readbacks = [] {
-        const char* value = std::getenv("GOW3_DEFERRED_READBACK");
+        const char* value = std::getenv("TSUKI_DEFERRED_READBACK");
         return value && value[0] == '1';
     }();
-    /// gow3: GOW3_STALE_READBACK=1 (needs deferred readbacks). A pending copy only blocks CPU
+    /// gow3: TSUKI_STALE_READBACK=1 (needs deferred readbacks). A pending copy only blocks CPU
     /// writes: CPU reads see the version the GPU published last (one frame late) instead of
     /// waiting for the GPU. Writes still wait, so no byte is lost.
     const bool stale_readbacks = deferred_readbacks && [] {
-        const char* value = std::getenv("GOW3_STALE_READBACK");
+        const char* value = std::getenv("TSUKI_STALE_READBACK");
         return value && value[0] == '1';
     }();
     template <bool track>

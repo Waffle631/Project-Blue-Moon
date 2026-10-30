@@ -350,7 +350,7 @@ void TextureCache::DiagDumpImage(ImageId image_id, const char* tag) {
     scheduler.Finish();
     download.Invalidate();
     static int sequence = 0;
-    const char* dir = std::getenv("GOW3_DIAG_DIR");
+    const char* dir = std::getenv("TSUKI_DIAG_DIR");
     const char* dir_path = dir && *dir ? dir : "out/diag";
     std::error_code ec;
     std::filesystem::create_directories(dir_path, ec);
@@ -1441,9 +1441,9 @@ void TextureCache::GarbageCollectImages() {
         // ~1 GB after its 8 GB system reserve: usage stayed above the critical mark, so the
         // collector evicted images used two or three frames ago on every submission and wrote
         // GPU-written ones back. Compare with the driver's current budget instead.
-        // GOW3_GC_BUDGET_MB=N: this rule with a fixed budget on any GPU (tests on a desktop).
+        // TSUKI_GC_BUDGET_MB=N: this rule with a fixed budget on any GPU (tests on a desktop).
         static const u64 forced_budget = [] {
-            const char* env = std::getenv("GOW3_GC_BUDGET_MB");
+            const char* env = std::getenv("TSUKI_GC_BUDGET_MB");
             return env ? std::strtoull(env, nullptr, 10) << 20 : 0;
         }();
         if (instance.IsIntegrated() || forced_budget) {
@@ -1520,7 +1520,7 @@ void TextureCache::GarbageCollectImages() {
         configure(true);
         lru_cache.ForEachItemBelow(gc_tick - ticks_to_destroy, clean_up);
     }
-    // gow3: evictions under memory pressure, at most every 5 s (GOW3_FRAME_STATS or not).
+    // gow3: evictions under memory pressure, at most every 5 s (TSUKI_FRAME_STATS or not).
     if (pressured || gc_downloads != 0) {
         const auto now = std::chrono::steady_clock::now();
         if (now - gc_report_time >= std::chrono::seconds(5)) {

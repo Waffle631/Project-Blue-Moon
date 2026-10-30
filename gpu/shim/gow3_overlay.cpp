@@ -34,7 +34,7 @@ asm(".section .rdata,\"dr\"\n"
     ".balign 16\n"
     ".global gow3_font_ttf\n"
     "gow3_font_ttf:\n"
-    ".incbin \"" GOW3_FONT_PATH "\"\n"
+    ".incbin \"" TSUKI_FONT_PATH "\"\n"
     ".global gow3_font_ttf_end\n"
     "gow3_font_ttf_end:\n"
     ".text\n");
@@ -44,7 +44,7 @@ asm(".section .rodata\n"
     ".hidden gow3_font_ttf\n"
     ".global gow3_font_ttf\n"
     "gow3_font_ttf:\n"
-    ".incbin \"" GOW3_FONT_PATH "\"\n"
+    ".incbin \"" TSUKI_FONT_PATH "\"\n"
     ".hidden gow3_font_ttf_end\n"
     ".global gow3_font_ttf_end\n"
     "gow3_font_ttf_end:\n"
@@ -481,7 +481,7 @@ void Menu() {
         ImGui::TextColored(ImVec4(0.85f, 0.72f, 0.45f, 1.0f), "%d change%s need%s a restart (unsaved progress is lost).",
                            changes, changes == 1 ? "" : "s", changes == 1 ? "s" : "");
         ImGui::SameLine();
-        ImGui::BeginDisabled(!std::getenv("GOW3_RESTART_COMMAND"));
+        ImGui::BeginDisabled(!std::getenv("TSUKI_RESTART_COMMAND"));
         if (ImGui::Button("Apply and restart")) {
             // The new launch confirms the options once the game shows; run.py restores the
             // previous ones if it never does (restart_unconfirmed).
@@ -835,7 +835,7 @@ bool HandleEvent(const SDL_Event& event) {
     case SDL_EVENT_KEY_UP: {
         const bool down = event.type == SDL_EVENT_KEY_DOWN;
         static const bool capture_key = [] {
-            const char* env = std::getenv("GOW3_FRAME_CAPTURE_KEY");
+            const char* env = std::getenv("TSUKI_FRAME_CAPTURE_KEY");
             return env && *env == '1';
         }();
         if (down && !event.key.repeat && capture_key && event.key.key == SDLK_F11) {

@@ -45,17 +45,17 @@ static void schedule() {
 }
 
 static void environment() {
-    setenv("GOW3_SCREENSHOT_AT", "2,4", 1);
+    setenv("TSUKI_SCREENSHOT_AT", "2,4", 1);
     Schedule& global = Global();
     assert(&global == &Global() && global.Frames() == std::set<std::uint64_t>({2, 4}));
-    setenv("GOW3_SCREENSHOT_AT", "9", 1); // read once: later changes do not apply
+    setenv("TSUKI_SCREENSHOT_AT", "9", 1); // read once: later changes do not apply
     assert(!Global().ShouldCapture(9) && Global().ShouldCapture(4));
 
-    unsetenv("GOW3_SCREENSHOT_DIR");
+    unsetenv("TSUKI_SCREENSHOT_DIR");
     assert(OutputDirectory() == std::filesystem::path("out/baseline"));
-    setenv("GOW3_SCREENSHOT_DIR", "", 1);
+    setenv("TSUKI_SCREENSHOT_DIR", "", 1);
     assert(OutputDirectory() == std::filesystem::path("out/baseline"));
-    setenv("GOW3_SCREENSHOT_DIR", "captures/a", 1);
+    setenv("TSUKI_SCREENSHOT_DIR", "captures/a", 1);
     assert(OutputDirectory() == std::filesystem::path("captures/a"));
 
     assert(FileName(120, 1920, 1080) == "frame_000120_1920x1080.png");

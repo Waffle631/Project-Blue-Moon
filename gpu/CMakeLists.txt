@@ -11,14 +11,14 @@ endif()
 # Frame pointers keep the loader's thread dumps (watchdog, SIGUSR2 sampling) walkable.
 add_compile_options(-fno-omit-frame-pointer)
 
-# gow3: link-time optimization (GOW3_LTO, default on) and profile-guided optimization
-# (GOW3_PGO: off, generate = instrumented build writing into GOW3_PGO_DIR, use = build with that
+# gow3: link-time optimization (TSUKI_LTO, default on) and profile-guided optimization
+# (TSUKI_PGO: off, generate = instrumented build writing into TSUKI_PGO_DIR, use = build with that
 # profile). Covers gow3gpu and the static libraries linked into it. No -march: the same build
 # runs on the Steam Deck.
-option(GOW3_LTO "Link-time optimization of gow3gpu" ON)
-set(GOW3_PGO "off" CACHE STRING "Profile-guided optimization: off, generate, use")
-set(GOW3_PGO_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../pgo" CACHE PATH "Profile directory")
-if (GOW3_LTO)
+option(TSUKI_LTO "Link-time optimization of gow3gpu" ON)
+set(TSUKI_PGO "off" CACHE STRING "Profile-guided optimization: off, generate, use")
+set(TSUKI_PGO_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../pgo" CACHE PATH "Profile directory")
+if (TSUKI_LTO)
     include(CheckIPOSupported)
     check_ipo_supported(RESULT gow3_ipo_ok OUTPUT gow3_ipo_error)
     if (gow3_ipo_ok)
@@ -27,16 +27,16 @@ if (GOW3_LTO)
         message(WARNING "LTO unavailable: ${gow3_ipo_error}")
     endif()
 endif()
-if (GOW3_PGO STREQUAL "generate")
+if (TSUKI_PGO STREQUAL "generate")
     # Atomic counters: the GPU, recording, preparation and copy threads run the same code.
-    add_compile_options(-fprofile-generate=${GOW3_PGO_DIR} -fprofile-update=atomic)
-    add_link_options(-fprofile-generate=${GOW3_PGO_DIR})
-    add_compile_definitions(GOW3_PGO_GENERATE)
-elseif (GOW3_PGO STREQUAL "use")
+    add_compile_options(-fprofile-generate=${TSUKI_PGO_DIR} -fprofile-update=atomic)
+    add_link_options(-fprofile-generate=${TSUKI_PGO_DIR})
+    add_compile_definitions(TSUKI_PGO_GENERATE)
+elseif (TSUKI_PGO STREQUAL "use")
     # Partial training keeps unprofiled code optimized normally; counters from concurrent
     # threads can be slightly inconsistent (correction). Functions changed since the profile
     # (or built differently for it, gow3gpu_init) are compiled without it.
-    add_compile_options(-fprofile-use=${GOW3_PGO_DIR} -fprofile-partial-training
+    add_compile_options(-fprofile-use=${TSUKI_PGO_DIR} -fprofile-partial-training
                         -fprofile-correction -Wno-missing-profile -Wno-coverage-mismatch)
 endif()
 
@@ -151,11 +151,11 @@ file(GLOB SHIM_SOURCES CONFIGURE_DEPENDS shim/*.cpp shim/*/*.cpp)
 # Windows: a DLL cannot leave the runtime_* symbols for gow3-probe.exe to resolve, so the
 # library is static there and linked into the executable.
 if (WIN32)
-    set(GOW3GPU_KIND STATIC)
+    set(TSUKIGPU_KIND STATIC)
 else()
-    set(GOW3GPU_KIND SHARED)
+    set(TSUKIGPU_KIND SHARED)
 endif()
-add_library(gow3gpu ${GOW3GPU_KIND} ${VIDEO_CORE} ${RECOMPILER} ${COMMON} ${SHIM_SOURCES}
+add_library(gow3gpu ${TSUKIGPU_KIND} ${VIDEO_CORE} ${RECOMPILER} ${COMMON} ${SHIM_SOURCES}
     shadps4/core/libraries/gnmdriver/gnmdriver.cpp
     shadps4/core/libraries/videoout/driver.cpp shadps4/core/libraries/videoout/video_out.cpp
     shadps4/core/libraries/kernel/equeue.cpp ${AVPLAYER}
@@ -168,7 +168,7 @@ target_sources(gow3gpu PRIVATE third_party/imgui/imgui.cpp third_party/imgui/img
     third_party/imgui/backends/imgui_impl_vulkan.cpp)
 target_include_directories(gow3gpu PRIVATE third_party/imgui third_party/imgui/backends)
 target_compile_definitions(gow3gpu PRIVATE IMGUI_IMPL_VULKAN_NO_PROTOTYPES
-    GOW3_FONT_PATH="${CMAKE_CURRENT_SOURCE_DIR}/third_party/fonts/DejaVuSans.ttf")
+    TSUKI_FONT_PATH="${CMAKE_CURRENT_SOURCE_DIR}/third_party/fonts/DejaVuSans.ttf")
 set_source_files_properties(shim/gow3_overlay.cpp PROPERTIES
     OBJECT_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/fonts/DejaVuSans.ttf)
 target_include_directories(gow3gpu PRIVATE shim shadps4 ${SHADER_INCLUDE} third_party/gcn/include third_party/half/include)
@@ -196,12 +196,12 @@ endif()
 # linked here, where CMake knows its dependencies (build.sh builds them with ninja).
 if (WIN32)
     enable_language(RC)
-    file(GLOB GOW3_RUNTIME CONFIGURE_DEPENDS ../src/runtime*.c)
-    file(GLOB GOW3_ATRAC9 CONFIGURE_DEPENDS ../third_party/LibAtrac9/C/src/*.c)
-    add_library(atrac9 STATIC ${GOW3_ATRAC9})
+    file(GLOB TSUKI_RUNTIME CONFIGURE_DEPENDS ../src/runtime*.c)
+    file(GLOB TSUKI_ATRAC9 CONFIGURE_DEPENDS ../third_party/LibAtrac9/C/src/*.c)
+    add_library(atrac9 STATIC ${TSUKI_ATRAC9})
     target_compile_options(atrac9 PRIVATE -w)
     set_target_properties(atrac9 PROPERTIES C_STANDARD 99 INTERPROCEDURAL_OPTIMIZATION OFF)
-    add_executable(gow3-probe ../src/probe.c ${GOW3_RUNTIME} ../src/compat_win.c ../src/cpu_check.c ../src/vulkan_smoke.c
+    add_executable(gow3-probe ../src/probe.c ${TSUKI_RUNTIME} ../src/compat_win.c ../src/cpu_check.c ../src/vulkan_smoke.c
         ../src/isa_rewrite.c ../src/isa_emulate.c ../third_party/vgmstream_hevag/hevag.c
         ../packaging/windows/gow3-probe.rc)
     set_target_properties(gow3-probe PROPERTIES C_STANDARD 11 C_EXTENSIONS OFF)

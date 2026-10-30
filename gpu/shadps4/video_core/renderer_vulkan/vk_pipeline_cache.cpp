@@ -374,9 +374,9 @@ PipelineCache::PipelineCache(const Instance& instance_, Scheduler& scheduler_,
         .supports_shader_subgroup_clock = instance_.IsShaderSubgroupClockSupported(),
         .needs_manual_interpolation = instance.IsFragmentShaderBarycentricSupported() &&
                                       instance.GetDriverID() == vk::DriverId::eNvidiaProprietary,
-        // gow3: older NVIDIA (Pascal) has no barycentrics; GOW3_INTERP_INT_FIX=0/1 overrides.
+        // gow3: older NVIDIA (Pascal) has no barycentrics; TSUKI_INTERP_INT_FIX=0/1 overrides.
         .needs_integer_interpolation_fix = [&] {
-            if (const char* env = std::getenv("GOW3_INTERP_INT_FIX")) {
+            if (const char* env = std::getenv("TSUKI_INTERP_INT_FIX")) {
                 return env[0] == '1';
             }
             return !instance.IsFragmentShaderBarycentricSupported() &&
@@ -396,7 +396,7 @@ PipelineCache::PipelineCache(const Instance& instance_, Scheduler& scheduler_,
                vk::to_string(cache_result));
     pipeline_cache = std::move(cache);
     // gow3: the compiler threads always exist; the in-game menu switches async compilation live
-    // (Gow3Settings::async_shaders, GOW3_ASYNC_SHADERS at start).
+    // (Gow3Settings::async_shaders, TSUKI_ASYNC_SHADERS at start).
     {
         const auto count = std::clamp(Gow3Threads::Available() / 2, 1u, 6u);
         const auto capture_count = std::min(2u, std::max(1u, Gow3Threads::Available() / 4));
@@ -423,7 +423,7 @@ PipelineCache::~PipelineCache() {
     FinishCompilations();
 }
 
-// gow3: shader/pipeline compile time on the GPU thread, reported by GOW3_FRAME_STATS.
+// gow3: shader/pipeline compile time on the GPU thread, reported by TSUKI_FRAME_STATS.
 std::atomic<u64> g_gow3_compile_ns;
 std::atomic<u32> g_gow3_compiles;
 std::atomic<u64> g_gow3_capture_ns, g_gow3_async_ns, g_gow3_compile_wait_ns;
@@ -899,10 +899,10 @@ bool PipelineCache::RefreshGraphicsKey(PipelineSelection& sel) {
                 }
             }
         }
-        // GOW3_MOTION_SELECT_LOG=1: each G-buffer vertex shader once, with its buffer sizes
+        // TSUKI_MOTION_SELECT_LOG=1: each G-buffer vertex shader once, with its buffer sizes
         // and the selection, to find animated models that the size rule leaves out.
         static const bool select_log = [] {
-            const char* value = std::getenv("GOW3_MOTION_SELECT_LOG");
+            const char* value = std::getenv("TSUKI_MOTION_SELECT_LOG");
             return value && value[0] == '1';
         }();
         if (select_log && vs) {

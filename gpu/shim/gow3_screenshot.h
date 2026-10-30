@@ -2,8 +2,8 @@
 // gow3: PNG captures of presented frames, for before/after comparisons of rendering changes
 // (docs/specs/2026-10-14-hito-primer-fotograma.md, H3). No Vulkan here: the presenter copies the
 // image to host memory and hands the pixels to SavePng.
-//   GOW3_SCREENSHOT_AT=120,600  frames to capture (presentation frame numbers)
-//   GOW3_SCREENSHOT_DIR=<dir>   output directory (default out/baseline, created on first capture)
+//   TSUKI_SCREENSHOT_AT=120,600  frames to capture (presentation frame numbers)
+//   TSUKI_SCREENSHOT_DIR=<dir>   output directory (default out/baseline, created on first capture)
 // F12 asks for a capture of the next frame (RequestNow).
 
 #pragma once
@@ -44,10 +44,10 @@ private:
     std::atomic<bool> requested_{false};
 };
 
-/// The process schedule, built from GOW3_SCREENSHOT_AT on first use. A malformed list is
+/// The process schedule, built from TSUKI_SCREENSHOT_AT on first use. A malformed list is
 /// reported on stderr and captures nothing (never a guess at what was meant).
 Schedule& Global();
-/// GOW3_SCREENSHOT_DIR, or out/baseline when unset or empty.
+/// TSUKI_SCREENSHOT_DIR, or out/baseline when unset or empty.
 std::filesystem::path OutputDirectory();
 /// frame_<NNNNNN>_<w>x<h>.png
 std::string FileName(std::uint64_t frame, std::uint32_t width, std::uint32_t height);

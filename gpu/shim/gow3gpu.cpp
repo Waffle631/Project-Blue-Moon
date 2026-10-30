@@ -191,10 +191,10 @@ u32 Gow3DisplayRefreshHz() {
     return hz;
 }
 
-#ifdef GOW3_PGO_GENERATE
+#ifdef TSUKI_PGO_GENERATE
 extern "C" void __gcov_dump(void);
 extern "C" void __gcov_reset(void);
-// Instrumented build (GOW3_PGO=generate): the game often ends through _exit (watchdog, guest
+// Instrumented build (TSUKI_PGO=generate): the game often ends through _exit (watchdog, guest
 // exit), which skips the profile write at exit. Write every 30 s and reset: the files sum the
 // intervals.
 static void StartProfileWriter() {
@@ -212,14 +212,14 @@ static void StartProfileWriter() {
 
 extern "C" int gow3gpu_init(const Gow3GpuConfig* config) {
     Gow3Settings::Load();
-#ifdef GOW3_PGO_GENERATE
+#ifdef TSUKI_PGO_GENERATE
     StartProfileWriter();
 #endif
     g_sdk_version = config->sdk_version;
 #ifdef _WIN32
-    if (config->user_dir && !std::getenv("GOW3_GPU_USER_DIR")) _putenv_s("GOW3_GPU_USER_DIR", config->user_dir);
+    if (config->user_dir && !std::getenv("TSUKI_GPU_USER_DIR")) _putenv_s("TSUKI_GPU_USER_DIR", config->user_dir);
 #else
-    if (config->user_dir) setenv("GOW3_GPU_USER_DIR", config->user_dir, 0);
+    if (config->user_dir) setenv("TSUKI_GPU_USER_DIR", config->user_dir, 0);
 #endif
     Core::Emulator::FillElfInfo(*config);
     const std::string title = config->title ? config->title : "";

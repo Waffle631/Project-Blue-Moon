@@ -3,7 +3,7 @@
 # its scripts and the launcher, bundled with their Nix closure (nix-appimage: the AppImage mounts
 # its /nix/store with user namespaces, available on SteamOS and most desktops).
 # Running it opens the launcher; `--play` starts the game with the launcher's saved settings.
-# Data (generated files, saves, gow3.ini): ~/.local/share/gow3 (GOW3_DATA_DIR).
+# Data (generated files, saves, gow3.ini): ~/.local/share/gow3 (TSUKI_DATA_DIR).
 set -euo pipefail
 cd -- "$(dirname -- "$0")/.."
 [[ -f out/gow3-probe && -f out/gpu/libgow3gpu.so ]] || { echo 'Build first: bash build.sh' >&2; exit 1; }

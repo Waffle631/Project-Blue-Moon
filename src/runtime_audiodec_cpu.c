@@ -6,7 +6,7 @@
  * itself. The first Decode after InitDecoder consumes the VAGp header; each later one decodes one
  * frame per channel. The error values are PR 5289's (all [H]). Logged like libSceAudiodec's
  * (runtime_audiodec.c): the first call and the first error of each function, or every call with
- * GOW3_TRACE_AUDIODEC=1 with the structures before and after it (its own 400 lines, so that the hevag
+ * TSUKI_TRACE_AUDIODEC=1 with the structures before and after it (its own 400 lines, so that the hevag
  * thread does not use up the ATRAC9 trace; =2 has no cap). The game ignores the three results
  * (docs/audiodec.md 2.3), so an error also leaves in the block what stops the voice: no work memory
  * from QueryMemSize, and from Decode no PCM and flag 7 (the end of the voice). */
@@ -59,14 +59,14 @@ static const size_t ctrl_sizes[FUNCTIONS]={8,0x10,0x20};
 static pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER;
 static size_t calls[FUNCTIONS], failures[FUNCTIONS], decoders, frames_decoded, errors, trace_lines;
 static int tracing(void) {
-    const char *v=getenv("GOW3_TRACE_AUDIODEC");
+    const char *v=getenv("TSUKI_TRACE_AUDIODEC");
     return !v || !*v || !strcmp(v,"0") ? 0 : strcmp(v,"2") ? 1 : 2;
 }
 static int trace_line(void) {
     int level=tracing();
     if (level!=1) return level;
     pthread_mutex_lock(&lock); size_t n=++trace_lines; pthread_mutex_unlock(&lock);
-    if (n==TRACE_LINES+1) printf("Runtime: AudiodecCpu trace stops after %d lines; GOW3_TRACE_AUDIODEC=2 has no cap\n",TRACE_LINES);
+    if (n==TRACE_LINES+1) printf("Runtime: AudiodecCpu trace stops after %d lines; TSUKI_TRACE_AUDIODEC=2 has no cap\n",TRACE_LINES);
     return n<=TRACE_LINES;
 }
 /* Logs the call when it is the first one or the first error of f, or when traced. text is the cause

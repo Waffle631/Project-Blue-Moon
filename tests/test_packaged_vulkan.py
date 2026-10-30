@@ -20,8 +20,8 @@ class PackagedVulkanTests(unittest.TestCase):
         self.libs = self.root / "host-libs"
         self.icds.mkdir()
         self.libs.mkdir()
-        self.env = {"GOW3_DATA_DIR": str(self.root / "data"),
-                    "GOW3_BUNDLED_VK_DRIVER_FILES": "/bundled/radeon.json:/bundled/intel.json",
+        self.env = {"TSUKI_DATA_DIR": str(self.root / "data"),
+                    "TSUKI_BUNDLED_VK_DRIVER_FILES": "/bundled/radeon.json:/bundled/intel.json",
                     "LD_LIBRARY_PATH": "/bundled/lib"}
 
     def library(self, name, bits=64):
@@ -41,7 +41,7 @@ class PackagedVulkanTests(unittest.TestCase):
 
     def test_amd_intel_keep_bundled_drivers(self):
         self.configure()
-        self.assertEqual(self.env["VK_DRIVER_FILES"], self.env["GOW3_BUNDLED_VK_DRIVER_FILES"])
+        self.assertEqual(self.env["VK_DRIVER_FILES"], self.env["TSUKI_BUNDLED_VK_DRIVER_FILES"])
         self.assertEqual(self.env["LD_LIBRARY_PATH"], "/bundled/lib")
         self.assertFalse((self.root / "data").exists())
 
@@ -61,7 +61,7 @@ class PackagedVulkanTests(unittest.TestCase):
         self.library("libc.so.6")
         self.manifest()
         self.assertIn("host NVIDIA", self.configure())
-        bundled = self.env["GOW3_BUNDLED_VK_DRIVER_FILES"]
+        bundled = self.env["TSUKI_BUNDLED_VK_DRIVER_FILES"]
         driver_json = Path(self.env["VK_DRIVER_FILES"].removesuffix(":" + bundled))  # a drive letter holds a colon too
         data = json.loads(driver_json.read_text())
         self.assertEqual(data["ICD"]["api_version"], "1.3.0")
@@ -90,7 +90,7 @@ class PackagedVulkanTests(unittest.TestCase):
         self.manifest()
         (self.icds / "broken_nvidia.json").write_text("not JSON")
         self.configure()
-        self.assertEqual(self.env["VK_DRIVER_FILES"], self.env["GOW3_BUNDLED_VK_DRIVER_FILES"])
+        self.assertEqual(self.env["VK_DRIVER_FILES"], self.env["TSUKI_BUNDLED_VK_DRIVER_FILES"])
 
     def test_additional_user_icds_are_not_lost(self):
         self.env["VK_ADD_DRIVER_FILES"] = "/user/extra.json"
@@ -101,6 +101,6 @@ class PackagedVulkanTests(unittest.TestCase):
     def test_host_driver_can_be_supplied_outside_hidden_nix_store(self):
         self.library("libGLX_nvidia.so.0")
         self.manifest("/nix/store/hidden/lib/libGLX_nvidia.so.0")
-        self.env["GOW3_NVIDIA_LIB_DIR"] = str(self.libs)
+        self.env["TSUKI_NVIDIA_LIB_DIR"] = str(self.libs)
         vulkan.configure(self.env, (self.icds,), ())
         self.assertIn("nvidia_icd.json", self.env["VK_DRIVER_FILES"])

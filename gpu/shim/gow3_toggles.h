@@ -1,4 +1,4 @@
-// gow3: optimizations that can be switched off while the game runs (GOW3_TOGGLE_FILE,
+// gow3: optimizations that can be switched off while the game runs (TSUKI_TOGGLE_FILE,
 // see runtime_memory.c), to find which one changes rendering without restarting.
 #pragma once
 #include <atomic>
@@ -80,7 +80,7 @@ namespace Gow3Stats {
 /// Guest writes caught by page protection, and pages currently left unprotected as hot.
 inline std::atomic<std::uint64_t> tracker_faults{0};
 inline std::atomic<std::int64_t> hot_pages{0};
-/// Stall diagnostics (GOW3_FRAME_STATS): per-frame deltas printed for frames over 40 ms.
+/// Stall diagnostics (TSUKI_FRAME_STATS): per-frame deltas printed for frames over 40 ms.
 inline std::atomic<std::uint64_t> images_registered{0};
 inline std::atomic<std::uint64_t> image_upload_bytes{0};
 inline std::atomic<std::uint64_t> buffer_upload_bytes{0};
@@ -96,9 +96,9 @@ inline std::atomic<std::uint64_t> gpu_frames{0};
 inline std::atomic<std::uint64_t> t_resident{0}, t_protect{0}, t_image_create{0}, t_refresh{0},
     t_staging{0}, t_host_wait{0}, t_copy{0}, copy_bytes{0}, t_read_faults{0}, read_faults{0},
     t_write_faults{0}, t_copy_cpu{0}, copy_sys_us{0}, copy_minflt{0}, t_gc{0}, t_readback_wait{0};
-/// Diagnostics are collected only with GOW3_FRAME_STATS=1.
+/// Diagnostics are collected only with TSUKI_FRAME_STATS=1.
 inline const bool enabled = [] {
-    const char* env = std::getenv("GOW3_FRAME_STATS");
+    const char* env = std::getenv("TSUKI_FRAME_STATS");
     return env && env[0] == '1';
 }();
 struct Timer {

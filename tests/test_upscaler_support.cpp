@@ -10,7 +10,7 @@
 
 int main() {
     using namespace Gow3Settings;
-    unsetenv("GOW3_RENDER_RES");
+    unsetenv("TSUKI_RENDER_RES");
     auto& s = Get();
     assert(s.upscaler == UpscalerOff && !TemporalUpscalerAvailable);
     s.upscaler = UpscalerTaa;
@@ -41,7 +41,7 @@ int main() {
     s.upscaler = UpscalerFsr3;
     s.preset = Performance;
     assert(RenderPreset() == Performance && !ResolutionNeedsRestart());
-    setenv("GOW3_RENDER_RES", "1706x960", 1);
+    setenv("TSUKI_RENDER_RES", "1706x960", 1);
     assert(RenderPreset() == Quality && ResolutionNeedsRestart());
     s.preset = Quality;
     assert(!ResolutionNeedsRestart());
@@ -56,8 +56,8 @@ int main() {
     s.output_res = (output + 1) % OutputCount;
     assert(ResolutionNeedsRestart());
     s.output_res = output;
-    setenv("GOW3_RENDER_RES", "", 1);
+    setenv("TSUKI_RENDER_RES", "", 1);
     assert(!FixedRenderSession() && !ResolutionNeedsRestart());
-    unsetenv("GOW3_RENDER_RES");
+    unsetenv("TSUKI_RENDER_RES");
     std::puts("Upscaler support: FSR 3.1 fallback PASS");
 }

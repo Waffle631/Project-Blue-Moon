@@ -82,7 +82,7 @@ static ABI int32_t ef_wait(uint64_t id,uint64_t bits,uint32_t mode,uint64_t *out
     else if (met(f->pattern,bits,mode)) { if (out) *out=f->pattern; clear(f,bits,mode); ++waits; }
     else if (timeout && !*timeout) { if (out) *out=f->pattern; result=ERR(60); ++timed_out; }
     else {
-        if (getenv("GOW3_TRACE_EVENTFLAG")) /* deadlock diagnosis */
+        if (getenv("TSUKI_TRACE_EVENTFLAG")) /* deadlock diagnosis */
             fprintf(stderr,"Runtime: blocking wait on event flag %" PRIu64 " '%s' (bits 0x%" PRIx64 ", mode 0x%x, pattern 0x%" PRIx64 ")\n",
                     id,f->name,bits,mode,f->pattern);
         Waiter w={.bits=bits,.mode=mode};

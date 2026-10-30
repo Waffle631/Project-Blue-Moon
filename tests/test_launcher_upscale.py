@@ -22,11 +22,11 @@ class UpscalerSettingsTest(unittest.TestCase):
     def test_launch_sends_no_upscaler_variable(self):
         # An old settings.json can still hold the switch: it is ignored.
         with mock.patch.dict(os.environ, {}, clear=False):
-            for name in ('GOW3_EXPERIMENTAL_UPSCALER', 'GOW3_FSR4_DIR'):
+            for name in ('TSUKI_EXPERIMENTAL_UPSCALER', 'TSUKI_FSR4_DIR'):
                 os.environ.pop(name, None)
             env = launcher.game_environment({**launcher.APP_DEFAULTS, 'experimental_upscaler': True})
-        self.assertNotIn('GOW3_EXPERIMENTAL_UPSCALER', env)
-        self.assertNotIn('GOW3_FSR4_DIR', env)
+        self.assertNotIn('TSUKI_EXPERIMENTAL_UPSCALER', env)
+        self.assertNotIn('TSUKI_FSR4_DIR', env)
 
     def test_no_upscaler_texts_left_to_translate(self):
         for text in ('Upscaler', 'Upscaling', 'Quality preset', 'Download FSR 4 assets', 'FSR 3.1 (every GPU)'):

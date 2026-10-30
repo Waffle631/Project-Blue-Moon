@@ -200,7 +200,7 @@ static LONG CALLBACK vectored_fault(EXCEPTION_POINTERS *info) {
                  !module;
         if (ours) return fatal_exception(info);
     }
-    /* GOW3_STRICT_HANDLES=1: a closed or invalid handle used anywhere is reported (diagnostics). */
+    /* TSUKI_STRICT_HANDLES=1: a closed or invalid handle used anywhere is reported (diagnostics). */
     if (code==0xC0000008 /* STATUS_INVALID_HANDLE */) return fatal_exception(info);
     return EXCEPTION_CONTINUE_SEARCH;
 }
@@ -417,10 +417,10 @@ static void apply_patches(const char *path, Segment *segments, uint64_t ns, cons
 void runtime_restart(void) {
     fflush(NULL);
 #ifdef _WIN32
-    /* run.py sets GOW3_RESTART_COMMAND: the launch command line, started again (new patches). */
-    const char *command=getenv("GOW3_RESTART_COMMAND");
+    /* run.py sets TSUKI_RESTART_COMMAND: the launch command line, started again (new patches). */
+    const char *command=getenv("TSUKI_RESTART_COMMAND");
     puts("Runtime: restarting through run.py");
-    if (!command || !*command) { fputs("runtime_restart: GOW3_RESTART_COMMAND is not set\n",stderr); _exit(1); }
+    if (!command || !*command) { fputs("runtime_restart: TSUKI_RESTART_COMMAND is not set\n",stderr); _exit(1); }
     char *line=_strdup(command);
     /* Same output handles: a launcher reading the game's log keeps reading the new launch. */
     STARTUPINFOA startup={.cb=sizeof(startup),.dwFlags=STARTF_USESTDHANDLES,
@@ -434,10 +434,10 @@ void runtime_restart(void) {
     /* The new launch waits for this process's GPU device to go away (run.py --after). */
     TerminateProcess(GetCurrentProcess(),0);
 #else
-    const char *command = getenv("GOW3_RESTART_COMMAND");
+    const char *command = getenv("TSUKI_RESTART_COMMAND");
     syscall(SYS_close_range, 3u, ~0u, 0u);
     if (command && *command) {
-        puts("Runtime: restarting through GOW3_RESTART_COMMAND");
+        puts("Runtime: restarting through TSUKI_RESTART_COMMAND");
         execl("/bin/sh", "sh", "-c", command, (char *)NULL);
     } else {
         puts("Runtime: restarting through run.sh");
@@ -448,12 +448,12 @@ void runtime_restart(void) {
 #endif
 }
 
-/* The guest code needs the PS4's instruction sets (#33, #66); GOW3_CPU_CHECK=0 skips this. A
+/* The guest code needs the PS4's instruction sets (#33, #66); TSUKI_CPU_CHECK=0 skips this. A
  * missing fatal set prints STOP and returns 0; the rewritable ones go to cpu_missing_sets, named
  * in missing. */
 static int cpu_supported(char *missing, size_t size) {
     missing[0] = 0;
-    const char *check = getenv("GOW3_CPU_CHECK");
+    const char *check = getenv("TSUKI_CPU_CHECK");
     if (check && !strcmp(check, "0")) return 1;
     const CpuFeatureWords words = cpu_feature_words();
     if (cpu_missing_fatal(words, missing, size)) {
@@ -508,11 +508,11 @@ int main(int argc, char **argv) {
     }
     if (!cpu_supported(missing, sizeof missing)) return 20;
     if (cpu_missing_sets) printf("CPU: missing %s\n", missing);
-    /* GOW3_ISA_REWRITE=0 never rewrites, =1 rewrites every site; by default the sets the CPU lacks. */
-    const char *policy = getenv("GOW3_ISA_REWRITE");
+    /* TSUKI_ISA_REWRITE=0 never rewrites, =1 rewrites every site; by default the sets the CPU lacks. */
+    const char *policy = getenv("TSUKI_ISA_REWRITE");
     unsigned isa_sets = policy && !strcmp(policy, "1") ? 0xffffffffu : policy && !strcmp(policy, "0") ? 0 : cpu_missing_sets;
     if (cpu_missing_sets && !isa_sets) {
-        printf("STOP: this CPU lacks %s and the rewrite is disabled (GOW3_ISA_REWRITE=0)\n", missing);
+        printf("STOP: this CPU lacks %s and the rewrite is disabled (TSUKI_ISA_REWRITE=0)\n", missing);
         return 20;
     }
     if (cpu_missing_sets && !isa_file) {
@@ -545,12 +545,12 @@ int main(int argc, char **argv) {
     SYSTEM_INFO system_info; GetSystemInfo(&system_info); page_size = system_info.dwPageSize;
     AddVectoredExceptionHandler(1, vectored_fault);
     SetUnhandledExceptionFilter(unhandled_fault);
-    if (getenv("GOW3_STRICT_HANDLES")) {
+    if (getenv("TSUKI_STRICT_HANDLES")) {
         PROCESS_MITIGATION_STRICT_HANDLE_CHECK_POLICY strict={0};
         strict.RaiseExceptionOnInvalidHandleReference=1;
         strict.HandleExceptionsPermanentlyEnabled=1;
         if (!SetProcessMitigationPolicy(ProcessStrictHandleCheckPolicy,&strict,sizeof(strict)))
-            fprintf(stderr,"GOW3_STRICT_HANDLES: policy not set (%lu)\n",GetLastError());
+            fprintf(stderr,"TSUKI_STRICT_HANDLES: policy not set (%lu)\n",GetLastError());
     }
     (void)timeout_seconds; /* no watchdog on Windows */
 #else
@@ -748,7 +748,7 @@ int main(int argc, char **argv) {
             fflush(NULL);
             _exit(20); /* no destructors: GPU threads are running */
         }
-        if (isa_sets == 0xffffffffu) printf("ISA: forced rewrite of all %u sites (GOW3_ISA_REWRITE=1), %u skipped\n", r.rewritten, r.skipped);
+        if (isa_sets == 0xffffffffu) printf("ISA: forced rewrite of all %u sites (TSUKI_ISA_REWRITE=1), %u skipped\n", r.rewritten, r.skipped);
         else printf("ISA: CPU lacks %s: %u sites rewritten (%u jmp, %u relocated, %u int3), %u skipped\n",
                     missing, r.rewritten, r.jmp, r.relocated, r.int3, r.skipped);
         runtime_set_report_hook(isa_report_hook);

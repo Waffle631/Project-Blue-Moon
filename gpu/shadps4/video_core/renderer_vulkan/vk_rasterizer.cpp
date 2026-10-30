@@ -367,7 +367,7 @@ constexpr u32 AlignPacket(u32 size) {
 }
 u32 VerifyInterval() {
     static const u32 interval = [] {
-        const char* env = std::getenv("GOW3_PIPE_VERIFY");
+        const char* env = std::getenv("TSUKI_PIPE_VERIFY");
         return env ? static_cast<u32>(std::strtoul(env, nullptr, 10)) : 0u;
     }();
     return interval;
@@ -375,7 +375,7 @@ u32 VerifyInterval() {
 } // namespace
 
 bool Rasterizer::DrawPipeWanted() {
-    const char* env = std::getenv("GOW3_DRAW_PIPE");
+    const char* env = std::getenv("TSUKI_DRAW_PIPE");
     if (env && env[0]) {
         return env[0] == '1';
     }
@@ -400,7 +400,7 @@ bool Rasterizer::OnStageA() const {
 }
 
 namespace {
-/// Stage A: cycles waited per drain site (GOW3_FRAME_STATS), keyed by function name and line.
+/// Stage A: cycles waited per drain site (TSUKI_FRAME_STATS), keyed by function name and line.
 std::unordered_map<const char*, std::unordered_map<u32, u64>> drain_sites;
 } // namespace
 
@@ -408,7 +408,7 @@ void Rasterizer::DrainDrawPipe(u32 reason, u32 line, const char* function) {
     if (!draw_pipe || !OnStageA()) {
         return;
     }
-    static const bool stats = std::getenv("GOW3_FRAME_STATS") != nullptr;
+    static const bool stats = std::getenv("TSUKI_FRAME_STATS") != nullptr;
     if (!stats) {
         draw_pipe->Drain(reason);
         return;
@@ -828,7 +828,7 @@ void Rasterizer::RunDrawPacket(void* context, const u8* data, u32 size) {
 }
 
 void Rasterizer::PrintPipeStats() {
-    static const bool stats = std::getenv("GOW3_FRAME_STATS") != nullptr;
+    static const bool stats = std::getenv("TSUKI_FRAME_STATS") != nullptr;
     if (!stats || (draw_pipe->packets & 1023) != 0) {
         return;
     }
@@ -945,7 +945,7 @@ void Rasterizer::Draw(bool is_indexed, u32 index_offset, const PreparedDraw* pre
 
 void Rasterizer::DiagPassBoundary(bool force) {
     static const bool enabled = [] {
-        const char* env = std::getenv("GOW3_DIAG_IMAGES");
+        const char* env = std::getenv("TSUKI_DIAG_IMAGES");
         return env && *env == '1';
     }();
     if (!enabled) {
@@ -994,7 +994,7 @@ void Rasterizer::DrawRecord(const GraphicsPipeline* pipeline, const PreparedDraw
         camera_motion->SetJitter(upscaler->Jitter());
         object_motion->OnFrameStart();
         NoteFrameStart();
-        static const char* scene_debug = std::getenv("GOW3_SCENE_DEBUG");
+        static const char* scene_debug = std::getenv("TSUKI_SCENE_DEBUG");
         scene_debug_frame = scene_debug && std::remove(scene_debug) == 0;
         scene_targets->debug = scene_debug_frame;
     }
@@ -1375,10 +1375,10 @@ void Rasterizer::DispatchRecord(const ComputePipeline* pipeline) {
     });
     DebugState.IncDispatch();
 
-    // gow3 diagnostics: GOW3_DIAG_IMAGES=1 writes the images a dispatch read and wrote, after
-    // it, while a frame capture records (GOW3_CAPTURE_TRIGGER).
+    // gow3 diagnostics: TSUKI_DIAG_IMAGES=1 writes the images a dispatch read and wrote, after
+    // it, while a frame capture records (TSUKI_CAPTURE_TRIGGER).
     static const bool diag_images = [] {
-        const char* env = std::getenv("GOW3_DIAG_IMAGES");
+        const char* env = std::getenv("TSUKI_DIAG_IMAGES");
         return env && *env == '1';
     }();
     if (diag_images && FrameCapture::IsRecording()) {
@@ -1494,7 +1494,7 @@ const PreparedStage* Rasterizer::FindPreparedStage(const Shader::Info& stage) co
 
 bool Rasterizer::BindHelperWanted() {
     // A spinning helper pays off only with cores to spare (the recording thread spins too).
-    const char* env = std::getenv("GOW3_TEXTURE_HELPER");
+    const char* env = std::getenv("TSUKI_TEXTURE_HELPER");
     if (env && env[0]) {
         return env[0] == '1';
     }
@@ -1615,7 +1615,7 @@ bool Rasterizer::BindResources(const Pipeline* pipeline) {
 
     bool uses_dma = false;
 
-    static const bool stats = std::getenv("GOW3_FRAME_STATS") != nullptr;
+    static const bool stats = std::getenv("TSUKI_FRAME_STATS") != nullptr;
     if (stats && ((helper_full + helper_partial + helper_serial) & 1023) == 0) {
         static auto window = std::chrono::steady_clock::now();
         const auto now = std::chrono::steady_clock::now();
@@ -2278,7 +2278,7 @@ void Rasterizer::BindTextures(const Shader::Info& stage, const PreparedStage* pr
         const auto tsharp =
             prepared ? prepared->image_sharps[image_index] : image_desc.GetSharp(stage);
         // gow3: a hash lookup per texture per draw for a diagnostic only.
-        static const bool warn_meta = std::getenv("GOW3_WARN_META_TEXTURE") != nullptr;
+        static const bool warn_meta = std::getenv("TSUKI_WARN_META_TEXTURE") != nullptr;
         if (warn_meta && texture_cache.IsMeta(tsharp.Address())) {
             LOG_WARNING(Render_Vulkan, "Unexpected metadata read by a shader (texture)");
         }
@@ -2320,7 +2320,7 @@ void Rasterizer::BindTextures(const Shader::Info& stage, const PreparedStage* pr
         auto& desc_entry =
             prepared ? CachedImageDescEntry(tsharp, image_desc, prepared->image_hashes[image_index])
                      : CachedImageDescEntry(tsharp, image_desc);
-        // GOW3_SCENE_DEBUG: proxied scene targets this binding reads at the native size, and why.
+        // TSUKI_SCENE_DEBUG: proxied scene targets this binding reads at the native size, and why.
         const auto debug_native = [&](const VideoCore::Image& image) {
             if (!scene_debug_frame || proxy_candidate || !image.scene_proxy) return;
             std::printf("Scene native read: %s %016llx %s %ux%u needs_native %d written %d "
@@ -2740,7 +2740,7 @@ RenderState Rasterizer::BeginRenderingFull(const GraphicsPipeline* pipeline) {
     // A proxy attachment cannot represent MSAA or a feedback loop that reads the
     // same image through the guest's native descriptor during this draw.
     bool reduced = scene_started && upscaler->RasterScaling() && key.num_samples == 1;
-    // GOW3_SCENE_DEBUG=<file>: once the file exists, why the passes of one frame keep the
+    // TSUKI_SCENE_DEBUG=<file>: once the file exists, why the passes of one frame keep the
     // native size (see NoteFrameStart).
     const bool debug_pass = scene_debug_frame && scene_started;
     std::string why;
@@ -3410,7 +3410,7 @@ void Rasterizer::UpdateViewportScissorState() const {
 vk::Pipeline Rasterizer::SquarePass(const GraphicsPipeline& pipeline) const {
     const vk::Pipeline square = pipeline.SquarePassHandle();
     static const bool enabled = [] {
-        const char* env = std::getenv("GOW3_SQUARE_PASS");
+        const char* env = std::getenv("TSUKI_SQUARE_PASS");
         return !env || env[0] != '0';
     }();
     if (!square || !enabled) [[likely]] {
@@ -3455,7 +3455,7 @@ void Rasterizer::UpdateDepthStencilState() const {
     dynamic_state.SetDepthBiasEnabled(depth_bias_enabled);
     if (depth_bias_enabled) {
         const bool front = regs.polygon_control.enable_polygon_offset_front;
-        // gow3: GOW3_LIGHTING_TEST=bias passes the slope scale as the guest gives it.
+        // gow3: TSUKI_LIGHTING_TEST=bias passes the slope scale as the guest gives it.
         const float slope = front ? regs.poly_offset.front_scale : regs.poly_offset.back_scale;
         dynamic_state.SetDepthBias(
             front ? regs.poly_offset.front_offset : regs.poly_offset.back_offset,
@@ -3670,10 +3670,10 @@ void Rasterizer::NoteFrameStart() {
         profiler->BeginFrame();
     }
     const u64 frame = Gow3Stats::gpu_frames.fetch_add(1, std::memory_order_relaxed) + 1;
-    // GOW3_BUFFER_STATS=1: how many earlier frames the GPU has not finished when the GPU thread
+    // TSUKI_BUFFER_STATS=1: how many earlier frames the GPU has not finished when the GPU thread
     // starts a frame — the lag that decides whether guest memory can be read in place.
     static const bool stats = [] {
-        const char* value = std::getenv("GOW3_BUFFER_STATS");
+        const char* value = std::getenv("TSUKI_BUFFER_STATS");
         return value && value[0] == '1';
     }();
     if (!stats) {

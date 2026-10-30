@@ -100,7 +100,7 @@ distrobox stop ps4dev && distrobox rm ps4dev
 ```bash
 bash build.sh                      # out/gpu/libgow3gpu.so + out/gow3-probe (LTO activado)
 bash build.sh --test               # además compila y ejecuta los tests en C
-GOW3_LTO=OFF bash build.sh         # sin LTO (menos RAM y enlace más rápido)
+TSUKI_LTO=OFF bash build.sh         # sin LTO (menos RAM y enlace más rápido)
 ninja -C out/gpu <target>          # un target concreto, p. ej. frame-capture-test
 ninja -C out/gpu -j6 gow3gpu       # limitar hilos si falta RAM
 tail -40 out/gpu-build.log         # log completo del build de la biblioteca GPU
@@ -146,8 +146,8 @@ python3 scripts/link_modules.py Tsukihime/CUSA47999 --out out  # → out/boot-li
 out/gow3-probe out/boot-linked.bin --app0 Tsukihime/CUSA47999 --check-imports   # una línea MISSING por import; sale con 1 si falta alguno
 
 # Ejecutar el juego completo (run.py hace todo el pipeline)
-GOW3_GAME_DIR=Tsukihime/CUSA47999 python3 run.py
-GOW3_GAME_DIR=Tsukihime/CUSA47999 python3 run.py --software   # lavapipe (sin GPU)
+TSUKI_GAME_DIR=Tsukihime/CUSA47999 python3 run.py
+TSUKI_GAME_DIR=Tsukihime/CUSA47999 python3 run.py --software   # lavapipe (sin GPU)
 out/gow3-probe out/boot-linked.bin --app0 Tsukihime/CUSA47999 --timeout 60   # watchdog: vuelca las pilas a los 60 s
 ```
 
@@ -162,18 +162,18 @@ dispositivos y `MESA_VK_DEVICE_SELECT=<vendor:device>` fuerza uno.
   `python3 tools/got_import.py [--linked] <offset>` dice qué import está enlazado a un slot de la GOT
   (`--linked`: lee `out/boot-linked.bin`, que incluye `libc.prx`).
 - `--timeout N` arma el watchdog; `kill -USR2 <tid>` vuelca la pila de un hilo.
-- `GOW3_FRAME_CAPTURE_KEY=1` + F11 — escribe la lista de pasos de un fotograma en texto
+- `TSUKI_FRAME_CAPTURE_KEY=1` + F11 — escribe la lista de pasos de un fotograma en texto
   (`frame_<fecha>_<n>.txt`); no es una imagen.
 - Capturas PNG del fotograma presentado (sin el overlay de ImGui): F12 captura el siguiente, y
-  `GOW3_SCREENSHOT_AT=120,600` los fotogramas de presentación indicados (el primero es el 1). Van a
-  `GOW3_SCREENSHOT_DIR` (por defecto `out/baseline/`, sin versionar) como
+  `TSUKI_SCREENSHOT_AT=120,600` los fotogramas de presentación indicados (el primero es el 1). Van a
+  `TSUKI_SCREENSHOT_DIR` (por defecto `out/baseline/`, sin versionar) como
   `frame_<NNNNNN>_<ancho>x<alto>.png`, y cada una deja `Screenshot: <ruta> (frame N)` en el log. El
-  tamaño es el de la ventana: para comparar ejecuciones, usar siempre `GOW3_FULLSCREEN=1`
-  (1920×1080 en este monitor). Con `run.py`, `GOW3_TIMEOUT=N` arma el watchdog.
+  tamaño es el de la ventana: para comparar ejecuciones, usar siempre `TSUKI_FULLSCREEN=1`
+  (1920×1080 en este monitor). Con `run.py`, `TSUKI_TIMEOUT=N` arma el watchdog.
 
   ```bash
-  GOW3_GAME_DIR=Tsukihime/CUSA47999 GOW3_FULLSCREEN=1 GOW3_TIMEOUT=40 \
-    GOW3_SCREENSHOT_AT=300,1500 python3 run.py > out/run-capturas.log 2>&1
+  TSUKI_GAME_DIR=Tsukihime/CUSA47999 TSUKI_FULLSCREEN=1 TSUKI_TIMEOUT=40 \
+    TSUKI_SCREENSHOT_AT=300,1500 python3 run.py > out/run-capturas.log 2>&1
   ```
 - `tools/compare_captures.sh a.png b.png` compara dos capturas píxel a píxel (filtro `psnr` de
   ffmpeg, sin tolerancia): `idéntico` (sale 0) o `diferente: PSNR=<dB>` (sale 1). Un archivo que
@@ -191,12 +191,12 @@ dispositivos y `MESA_VK_DEVICE_SELECT=<vendor:device>` fuerza uno.
   `out/route/<nombre>/` y cierra el juego al acabar. Desde el host vuelve a entrar en el distrobox.
 - Para ver qué teclas recibe el juego: `SDL_EVENT_LOGGING=1 SDL_LOGGING='*=info'` escribe cada evento
   de SDL en el log (`SDL EVENT: SDL_EVENT_KEY_DOWN …`).
-- `GOW3_PAD_FILE` (botones y ejes por guion), `GOW3_PAD_RECORD=<archivo>` / `GOW3_PAD_REPLAY=<archivo>`
+- `TSUKI_PAD_FILE` (botones y ejes por guion), `TSUKI_PAD_RECORD=<archivo>` / `TSUKI_PAD_REPLAY=<archivo>`
   (graba y repite un recorrido). Las dos empiezan en la primera lectura del mando del juego, y F9 solo para la
   grabación. El reloj son las lecturas del juego, no los ms: el archivo empieza con la línea `reads` y sigue con
   `<lectura> <botones> <lx> <ly> <rx> <ry> <l2> <r2>`. Un archivo del formato antiguo (ms, sin cabecera) no se
   repite. La repetición acaba 30 lecturas después de la última línea (`Runtime: pad replay finished at read <r>`).
-- `GOW3_MOUSE=0` — el juego no ve ningún ratón; el recorrido no graba el ratón y el puntero movería su cursor.
+- `TSUKI_MOUSE=0` — el juego no ve ningún ratón; el recorrido no graba el ratón y el puntero movería su cursor.
 - `gdb --args out/gow3-probe out/boot-linked.bin --app0 Tsukihime/CUSA47999` — `gdb` viene en el
   bloque `dnf`.
 

@@ -1,12 +1,12 @@
 # AvPlayer en Tsukihime (CUSA47999)
 
 Cómo usa el juego `libSceAvPlayer` para los vídeos de `image/movie/`, medido con el trazador
-`GOW3_TRACE_AVPLAYER=1` (`gpu/shadps4/core/libraries/avplayer/avplayer_trace.h`). La spec es
+`TSUKI_TRACE_AVPLAYER=1` (`gpu/shadps4/core/libraries/avplayer/avplayer_trace.h`). La spec es
 `docs/specs/2026-10-14-spec-5-avplayer.md`.
 
 Marcas: **[V]** comprobado en una ejecución con traza; **[H]** hipótesis pendiente.
 
-**Cómo se reproduce.** `GOW3_GAME_DIR=Tsukihime/CUSA47999 GOW3_TRACE_AVPLAYER=1 GOW3_GPU_LOG=info
+**Cómo se reproduce.** `TSUKI_GAME_DIR=Tsukihime/CUSA47999 TSUKI_TRACE_AVPLAYER=1 TSUKI_GPU_LOG=info
 python3 run.py > out/run-x.log 2>&1`. Cada llamada deja `AvTrace +<ms> t<tid>: …` en stderr; `+0` es la
 primera llamada, cuya hora da la primera línea. Los `t<tid>` se nombran con `/proc/<pid>/task/<tid>/comm`
 durante la ejecución. `GetVideoData`, `GetAudioData`, `IsActive` y `CurrentTime` se sondean cada
@@ -111,7 +111,7 @@ adelante los títulos (guiones de `allscr.mrg`, descomprimidos con `out/tsuki-sc
 En `out/run-t1-trace.log` el título del capítulo 1 (solo vídeo, 5 005 ms) entrega sus 150 fotogramas.
 El último tiene marca 4 972. En ese mismo milisegundo (+34 423) `IsActive` pasa a falso y el juego llama
 a `Stop`. El controlador emite `StateStop` a +34 426, y `Stop` no vuelve hasta +51 558 (17 135 ms).
-Vuelve justo después de que el watchdog (`GOW3_TIMEOUT=60`) vuelque las pilas.
+Vuelve justo después de que el watchdog (`TSUKI_TIMEOUT=60`) vuelque las pilas.
 
 La pila de `task_game` en el volcado es la misma que en `a3` (spec §2): eboot `+0x10225f` →
 `sceAvPlayerStop` → `AvPlayer::Stop` → `AvPlayerState::Stop` → `std::thread::join` → `pthread_join`, con

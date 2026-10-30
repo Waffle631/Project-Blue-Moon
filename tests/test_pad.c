@@ -43,7 +43,7 @@ static size_t parse_file(const char *path, PadSample **samples) {
 /* The replay loads at the first read of the process; each case starts that process over. */
 static void start_replay(const char *path, const char *text) {
     write_file(path,text);
-    setenv("GOW3_PAD_REPLAY",path,1);
+    setenv("TSUKI_PAD_REPLAY",path,1);
     free(replay); replay=NULL; replay_count=replay_next=0; replay_state=0; pad_reads=0;
 }
 static void set_button(SDL_Joystick *joystick, SDL_GamepadButton button, bool down) {
@@ -118,8 +118,8 @@ int main(void) {
     int fd=mkstemp(path);
     assert(fd>=0);
     close(fd);
-    setenv("GOW3_PAD_FILE",path,1);
-    setenv("GOW3_PAD_MAP","touchpad=misc1",1); /* the real touchpad click stays */
+    setenv("TSUKI_PAD_FILE",path,1);
+    setenv("TSUKI_PAD_MAP","touchpad=misc1",1); /* the real touchpad click stays */
     setenv("SDL_VIDEODRIVER","dummy",1);
     /* Only the virtual test controller is a gamepad, whatever is plugged in. */
     SDL_SetHint(SDL_HINT_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT,"0x1d50/0x6189");
@@ -184,7 +184,7 @@ int main(void) {
     data=read_pad();
     assert(data.buttons==BTN_TOUCHPAD && data.touch_count==0);
     assert(SDL_SetJoystickVirtualButton(joystick,SDL_GAMEPAD_BUTTON_TOUCHPAD,false));
-    /* GOW3_PAD_MAP adds misc1 as a source. */
+    /* TSUKI_PAD_MAP adds misc1 as a source. */
     assert(SDL_SetJoystickVirtualButton(joystick,SDL_GAMEPAD_BUTTON_MISC1,true));
     pump();
     data=read_pad();

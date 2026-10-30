@@ -246,22 +246,22 @@ static void term_invalidates_ids_and_init_again_creates(void) {
     int32_t d=api.create(&b->params,1);
     assert(d>c && b->channels==2 && objects==1 && api.remove(d)==0);
 }
-/* Spec 3: without GOW3_TRACE_AUDIODEC, only the first call and the first error of each function
+/* Spec 3: without TSUKI_TRACE_AUDIODEC, only the first call and the first error of each function
    are logged; with it, every call, and CreateDecoder adds a line with the structures before it. */
 static GameBlock *log_block,*log_bad;
 static void create_good(void) { assert(api.remove(api.create(&log_block->params,1))==0); }
 static void create_bad(void) { assert(api.create(&log_bad->params,1)<0); }
 static void logs_first_call_and_first_error_only(void) {
     log_block=block(0xfe740ff0); log_bad=block(0x00740ff0);
-    unsetenv("GOW3_TRACE_AUDIODEC");
+    unsetenv("TSUKI_TRACE_AUDIODEC");
     memset(calls,0,sizeof calls); memset(failures,0,sizeof failures);
     assert(printed_lines(create_good)==2); /* first Create, first Delete */
     assert(printed_lines(create_good)==0);
     assert(printed_lines(create_bad)==1);
     assert(printed_lines(create_bad)==0);
-    setenv("GOW3_TRACE_AUDIODEC","1",1); trace_lines=0;
+    setenv("TSUKI_TRACE_AUDIODEC","1",1); trace_lines=0;
     assert(printed_lines(create_good)==3 && printed_lines(create_bad)==2);
-    unsetenv("GOW3_TRACE_AUDIODEC");
+    unsetenv("TSUKI_TRACE_AUDIODEC");
 }
 /* A success line carries no error cause: a traced success is followed by what the trace shows. */
 static GameBlock *lifecycle_block; static int32_t lifecycle_id;
@@ -516,7 +516,7 @@ static void bad_descriptor_sizes_error(void) {
     assert(api.remove(id)==0);
 }
 /* ---- Golden blocks (plan task 7): the control block as the game built it, not as fill() lays it out ----
-   tests/data/audiodec_ctrl_<kind>.bin comes from the GOW3_TRACE_AUDIODEC=2 run of 2026-10-21
+   tests/data/audiodec_ctrl_<kind>.bin comes from the TSUKI_TRACE_AUDIODEC=2 run of 2026-10-21
    (docs/audiodec.md 1.10): u64 ctrl address in the game, then four 0x80-byte copies of the block from
    ctrl (+0x08...+0x88), before and after CreateDecoder and before and after the decoder's first Decode.
    Structures only: the AU is the first superframe of the clip with the same configuration, so after
@@ -573,7 +573,7 @@ static void trace_short_by_one(void) {
 static void trace_dumps_structures_and_drift(void) {
     const Clip *c=need("vse_mono_small",__func__); if (!c) return;
     open_stream(&trace_stream,c); GameBlock *b=trace_stream.b;
-    setenv("GOW3_TRACE_AUDIODEC","1",1); trace_lines=0;
+    setenv("TSUKI_TRACE_AUDIODEC","1",1); trace_lines=0;
     assert(printed_lines(trace_one)==2 && strstr(captured,"sceAudiodecDecode(id ") && strstr(captured,"before:") && strstr(captured,"after:"));
     /* Before: the AU descriptor as the game filled it; after: what Decode wrote back. */
     GameBuffer au={0x18,0,stream_input,c->block,0}; char text[160]; hexof(text,&au,sizeof au);
@@ -583,35 +583,35 @@ static void trace_dumps_structures_and_drift(void) {
     hexof(text,stream_pcm,16); assert(strstr(captured,text)); /* and of the PCM */
     assert(strstr(captured,"frame 1/4") && strstr(captured,"drift 0"));
     /* A drift is logged once without the variable (the capped trace could miss it), always with it. */
-    unsetenv("GOW3_TRACE_AUDIODEC"); drift_logged=0;
+    unsetenv("TSUKI_TRACE_AUDIODEC"); drift_logged=0;
     assert(printed_lines(trace_short_by_one)==1 && strstr(captured,"drift -1"));
     assert(printed_lines(trace_short_by_one)==0);
-    setenv("GOW3_TRACE_AUDIODEC","1",1);
+    setenv("TSUKI_TRACE_AUDIODEC","1",1);
     assert(printed_lines(trace_short_by_one)==2 && strstr(captured,"drift -1") && strstr(captured,"frame 4/4"));
-    unsetenv("GOW3_TRACE_AUDIODEC");
+    unsetenv("TSUKI_TRACE_AUDIODEC");
     assert(api.remove(trace_stream.id)==0);
 }
-/* GOW3_TRACE_AUDIODEC=1 stops after 400 lines (as ajm_trace in runtime_ajm.c) and says so; =2 has no cap. */
+/* TSUKI_TRACE_AUDIODEC=1 stops after 400 lines (as ajm_trace in runtime_ajm.c) and says so; =2 has no cap. */
 static void trace_caps_at_400_lines_unless_level_2(void) {
     const Clip *c=need("vse_mono",__func__); if (!c) return;
     open_stream(&trace_stream,c);
     trace_one(); /* not the first Decode, which is logged apart from the cap */
-    setenv("GOW3_TRACE_AUDIODEC","1",1); trace_lines=0;
-    assert(printed_lines(trace_250)==401 && strstr(captured,"GOW3_TRACE_AUDIODEC=2"));
-    setenv("GOW3_TRACE_AUDIODEC","2",1);
+    setenv("TSUKI_TRACE_AUDIODEC","1",1); trace_lines=0;
+    assert(printed_lines(trace_250)==401 && strstr(captured,"TSUKI_TRACE_AUDIODEC=2"));
+    setenv("TSUKI_TRACE_AUDIODEC","2",1);
     assert(printed_lines(trace_250)==500);
-    unsetenv("GOW3_TRACE_AUDIODEC");
+    unsetenv("TSUKI_TRACE_AUDIODEC");
     assert(api.remove(trace_stream.id)==0);
 }
-/* GOW3_AUDIODEC_AU_DUMP=<dir>: <dir>/dec<id>.au holds the stream as the game fed it, what each
+/* TSUKI_AUDIODEC_AU_DUMP=<dir>: <dir>/dec<id>.au holds the stream as the game fed it, what each
    Decode consumed one after another; for a whole superframe, the clip's bytes. */
 static void au_dump_writes_the_consumed_stream(void) {
     const Clip *c=need("vse_mono_small",__func__); if (!c) return;
     char dir[]="/tmp/audiodec-au-XXXXXX"; assert(mkdtemp(dir));
-    setenv("GOW3_AUDIODEC_AU_DUMP",dir,1);
+    setenv("TSUKI_AUDIODEC_AU_DUMP",dir,1);
     Stream s; open_stream(&s,c);
     for (int n=0;n<12;++n) assert(game_decode(&s)==0);
-    assert(api.remove(s.id)==0); unsetenv("GOW3_AUDIODEC_AU_DUMP");
+    assert(api.remove(s.id)==0); unsetenv("TSUKI_AUDIODEC_AU_DUMP");
     char path[64]; snprintf(path,sizeof path,"%s/dec%d.au",dir,s.id);
     FILE *f=fopen(path,"rb"); assert(f);
     uint8_t got[0x1000]; size_t n=fread(got,1,sizeof got,f); fclose(f);
@@ -623,20 +623,20 @@ static void au_dump_writes_the_consumed_stream(void) {
 static void au_dump_notes_config_and_clears(void) {
     const Clip *c=need("vse_mono_small",__func__); if (!c) return;
     char dir[]="/tmp/audiodec-au-XXXXXX"; assert(mkdtemp(dir));
-    setenv("GOW3_AUDIODEC_AU_DUMP",dir,1);
+    setenv("TSUKI_AUDIODEC_AU_DUMP",dir,1);
     Stream s; open_stream(&s,c); uint32_t dumped=0;
     for (int n=0;n<6;++n) { assert(game_decode(&s)==0); dumped+=s.b->au_desc.bytes; }
     assert(api.clear(s.id)==0); seek_stream(&s,0);
     for (int n=0;n<4;++n) assert(game_decode(&s)==0);
     assert(api.clear(s.id)==0);
-    assert(api.remove(s.id)==0); unsetenv("GOW3_AUDIODEC_AU_DUMP");
+    assert(api.remove(s.id)==0); unsetenv("TSUKI_AUDIODEC_AU_DUMP");
     char path[64],expected[64],got[64]={0}; snprintf(path,sizeof path,"%s/dec%d.txt",dir,s.id);
     snprintf(expected,sizeof expected,"config fe7004f0\nclear %u\nclear %u\n",dumped,dumped+c->block);
     FILE *f=fopen(path,"rb"); assert(f); size_t n=fread(got,1,sizeof got-1,f); fclose(f);
     assert(n && !strcmp(got,expected));
     assert(!unlink(path)); snprintf(path,sizeof path,"%s/dec%d.au",dir,s.id); assert(!unlink(path) && !rmdir(dir));
 }
-/* ---- Replay (task 8): the streams of a game run, from GOW3_AUDIODEC_AU_DUMP ---- */
+/* ---- Replay (task 8): the streams of a game run, from TSUKI_AUDIODEC_AU_DUMP ---- */
 /* Every dec<id>.au with its dec<id>.txt in dir (argv[2] or out/audiodec-replay): voices, vse and bgm go
    through the API as the game fed them and through LibAtrac9 straight, both back to a new decoder at
    each ClearContext. Same PCM on every frame, and the API consumes exactly the dumped bytes. The dumps
@@ -646,7 +646,7 @@ static void replay_fails(const char *dump, size_t frame, const char *why) {
 }
 static void voice_stream_replay_matches_libatrac9(const char *dir) {
     DIR *listing=opendir(dir);
-    if (!listing) { printf("SKIP: %s: no %s (a game run with GOW3_AUDIODEC_AU_DUMP=%s makes it)\n",__func__,dir,dir); return; }
+    if (!listing) { printf("SKIP: %s: no %s (a game run with TSUKI_AUDIODEC_AU_DUMP=%s makes it)\n",__func__,dir,dir); return; }
     GameBlock *b=block(0); size_t streams=0,frames=0,clears=0; struct dirent *e;
     while ((e=readdir(listing))) {
         int id,end=0; char path[1024],name[32];
@@ -711,11 +711,11 @@ static void report_counts(void) {
 static void au_dump_is_on_disk_after_the_report(void) {
     const Clip *c=need("vse_mono_small",__func__); if (!c) return;
     char dir[]="/tmp/audiodec-au-XXXXXX"; assert(mkdtemp(dir));
-    setenv("GOW3_AUDIODEC_AU_DUMP",dir,1);
+    setenv("TSUKI_AUDIODEC_AU_DUMP",dir,1);
     Stream s; open_stream(&s,c);
     for (int n=0;n<4;++n) assert(game_decode(&s)==0);
     assert(api.clear(s.id)==0); seek_stream(&s,0); assert(game_decode(&s)==0);
-    unsetenv("GOW3_AUDIODEC_AU_DUMP"); printed_lines(report);
+    unsetenv("TSUKI_AUDIODEC_AU_DUMP"); printed_lines(report);
     char path[64],notes[64]={0},expected[64]; uint8_t got[0x1000];
     snprintf(path,sizeof path,"%s/dec%d.au",dir,s.id); FILE *f=fopen(path,"rb"); assert(f);
     size_t n=fread(got,1,sizeof got,f); fclose(f);
@@ -996,7 +996,7 @@ static void cpu_resolves_all_three(void) {
     cpu.decode=GET(CpuCall,"lSVTiWV5wLc#libSceAudiodecCpu");
     assert(cpu.query && cpu.init && cpu.decode);
 }
-/* Logged like libSceAudiodec (spec 3): without GOW3_TRACE_AUDIODEC, the first call of each function and
+/* Logged like libSceAudiodec (spec 3): without TSUKI_TRACE_AUDIODEC, the first call of each function and
    its first error, with the cause; with it, a line with the structures before each call and one with
    its result and the structures after. Runs before any other AudiodecCpu call of this process. */
 static HevagBlock *cpu_log_block; static uint8_t *cpu_log_work;
@@ -1013,13 +1013,13 @@ static void cpu_decode_without_work(void) {
 static void cpu_logs_first_call_only_unless_traced(void) {
     uint8_t *vag=hevag_effect(1,1,0); HevagBlock *b=cpu_log_block=hevag_block(vag);
     cpu_log_work=hevag_alloc(0x100); b->au_desc.data=vag; b->pcm_desc.data=hevag_alloc(0x380);
-    unsetenv("GOW3_TRACE_AUDIODEC");
+    unsetenv("TSUKI_TRACE_AUDIODEC");
     assert(printed_lines(cpu_each)==3 && strstr(captured,"sceAudiodecCpuQueryMemSize(") && strstr(captured,"sceAudiodecCpuInitDecoder(") &&
            strstr(captured,"sceAudiodecCpuDecode(") && strstr(captured,"codec 0x1008) = 0\n"));
     assert(printed_lines(cpu_each)==0);
     assert(printed_lines(cpu_decode_without_work)==1 && strstr(captured,"sceAudiodecCpuDecode(") && strstr(captured,") = 0x80f70011: work memory"));
     assert(printed_lines(cpu_decode_without_work)==0);
-    setenv("GOW3_TRACE_AUDIODEC","1",1);
+    setenv("TSUKI_TRACE_AUDIODEC","1",1);
     assert(printed_lines(cpu_each)==6 && strstr(captured,"sceAudiodecCpuDecode(") && strstr(captured,"before:") && strstr(captured,"after:"));
     char text[0x100]; hexof(text,&b->params_size,0x40); assert(strstr(captured,text)); /* params */
     hexof(text,&b->bsi_size,0x30); assert(strstr(captured,text));
@@ -1028,21 +1028,21 @@ static void cpu_logs_first_call_only_unless_traced(void) {
     hexof(text,cpu_log_work,b->resource.bytes); assert(strstr(captured,text)); /* the decoder's state */
     /* The first bytes of the AU, the VAGp header (params +4 hold most of it too). */
     char au_data[0x120]="au.data "; hexof(au_data+8,vag,16); assert(strstr(captured,au_data));
-    unsetenv("GOW3_TRACE_AUDIODEC");
+    unsetenv("TSUKI_TRACE_AUDIODEC");
 }
 /* Its own 400-line cap: the hevag thread's frames do not use up libSceAudiodec's trace, nor the
    other way round; =2 has no cap. */
 static void cpu_decode_250(void) { for (int n=0;n<250;++n) cpu.decode(&cpu_log_block->params,&cpu_log_block->resource,HEVAG); }
 static void cpu_trace_has_its_own_cap(void) {
-    unsetenv("GOW3_TRACE_AUDIODEC");
+    unsetenv("TSUKI_TRACE_AUDIODEC");
     cpu.decode(&cpu_log_block->params,&cpu_log_block->resource,HEVAG); /* not the first Decode, logged apart from the cap */
-    setenv("GOW3_TRACE_AUDIODEC","1",1); trace_lines=TRACE_LINES+1;
+    setenv("TSUKI_TRACE_AUDIODEC","1",1); trace_lines=TRACE_LINES+1;
     int lines=printed_lines(cpu_decode_250);
     assert(lines>300 && lines<=TRACE_LINES+1 && strstr(captured,"AudiodecCpu trace stops after 400 lines"));
     assert(printed_lines(cpu_decode_250)==0);
-    setenv("GOW3_TRACE_AUDIODEC","2",1);
+    setenv("TSUKI_TRACE_AUDIODEC","2",1);
     assert(printed_lines(cpu_decode_250)==500);
-    unsetenv("GOW3_TRACE_AUDIODEC"); trace_lines=0;
+    unsetenv("TSUKI_TRACE_AUDIODEC"); trace_lines=0;
 }
 static void cpu_query_unknown(void) { HevagBlock *b=hevag_block(hevag_effect(1,1,0)); cpu.query(&b->params,&b->resource,0x1001); }
 static void cpu_init_unknown(void) { HevagBlock *b=hevag_block(hevag_effect(1,1,0)); cpu.init(&b->params,&b->resource,1); }

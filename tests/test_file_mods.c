@@ -19,8 +19,8 @@ static int traced_open(const char *path,char *out,size_t size) {
 }
 static int lines_of(const char *text) { int n=0; for (; *text; ++text) n+=*text=='\n'; return n; }
 int main(void) {
-    setenv("GOW3_FILE_TRACE","1",1); /* read once, so before the first open */
-    unsetenv("GOW3_AUDIO_TRACE");
+    setenv("TSUKI_FILE_TRACE","1",1); /* read once, so before the first open */
+    unsetenv("TSUKI_AUDIO_TRACE");
     char root[]="/tmp/gow3-mod-files-XXXXXX";
     assert(mkdtemp(root));
     char game[512],user[512],source[512],link[512];
@@ -44,7 +44,7 @@ int main(void) {
         assert(path_op(path,2,0)==-EROFS);
         assert(do_rename(path,"/data/moved")==-EROFS);
     }
-    /* GOW3_FILE_TRACE logs every open: path, descriptor and size; failures with their errno (not only ENOENT). */
+    /* TSUKI_FILE_TRACE logs every open: path, descriptor and size; failures with their errno (not only ENOENT). */
     char log[1024];
     int traced=traced_open("/app0/asset.dcx",log,sizeof(log)); assert(traced>=3 && lines_of(log)==1);
     assert(!strncmp(log,"File trace: open(/app0/asset.dcx) -> fd ",40));

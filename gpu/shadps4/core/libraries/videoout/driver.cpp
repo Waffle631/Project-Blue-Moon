@@ -73,7 +73,7 @@ VideoOutDriver::VideoOutDriver(u32 width, u32 height) {
     main_port.resolution.full_height = height;
     main_port.resolution.pane_width = width;
     main_port.resolution.pane_height = height;
-    const char* separate = std::getenv("GOW3_PRESENT_THREAD");
+    const char* separate = std::getenv("TSUKI_PRESENT_THREAD");
     separate_swap = !(separate && separate[0] == '0');
     if (separate_swap) {
         swap_thread = std::jthread([&](std::stop_token token) { SwapThread(token); });
@@ -309,8 +309,8 @@ void VideoOutDriver::Flip(const Request& req) {
     Vulkan::FrameCapture::OnFlip(req.index >= 0 ? req.port->buffer_slots[req.index].address_left
                                                 : 0);
 
-    // gow3: GOW3_FRAME_STATS=1 prints flip rate and frame time spread every 5 seconds.
-    static const bool frame_stats = EmulatorSettingsImpl::Flag("GOW3_FRAME_STATS", false);
+    // gow3: TSUKI_FRAME_STATS=1 prints flip rate and frame time spread every 5 seconds.
+    static const bool frame_stats = EmulatorSettingsImpl::Flag("TSUKI_FRAME_STATS", false);
     if (frame_stats) {
         using Clock = std::chrono::steady_clock;
         static Clock::time_point window_start = Clock::now(), last = window_start;
@@ -657,9 +657,9 @@ void VideoOutDriver::PresentThread(std::stop_token token) {
 
     // gow3: frame limit (see EmulatorSettings::GetFrameLimit). A request waits in the queue
     // until its slot; slots advance by one period (no drift) but never lag behind by more.
-    // gow3: the in-game menu changes the limit live (Gow3Settings::fps_limit); GOW3_FPS_LIMIT
+    // gow3: the in-game menu changes the limit live (Gow3Settings::fps_limit); TSUKI_FPS_LIMIT
     // and the uncapped presets keep their fixed limit.
-    const bool fixed_limit = std::getenv("GOW3_FPS_LIMIT") || EmulatorSettings.GetVblankFrequency() == 480;
+    const bool fixed_limit = std::getenv("TSUKI_FPS_LIMIT") || EmulatorSettings.GetVblankFrequency() == 480;
     const auto current_limit = [&] {
         const auto& s = Gow3Settings::Get();
         return fixed_limit ? EmulatorSettings.GetFrameLimit()

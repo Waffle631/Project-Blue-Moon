@@ -38,7 +38,7 @@ import save_backup  # noqa: E402  (scripts/)
 import steam_shortcut  # noqa: E402  (scripts/)
 from patches import game_profile, game_sfo  # noqa: E402  (scripts/)
 from prepare import load_sfo  # noqa: E402  (scripts/)
-DATA_DIR = Path(os.environ.get('GOW3_DATA_DIR', PORT_DIR))
+DATA_DIR = Path(os.environ.get('TSUKI_DATA_DIR', PORT_DIR))
 CONFIG_DIR = (Path(os.environ.get('APPDATA', Path.home())) if WINDOWS else
               Path(os.environ.get('XDG_CONFIG_HOME') or Path.home() / '.config')) / 'gow3-launcher'
 CONFIG_FILE = CONFIG_DIR / 'settings.json'
@@ -112,7 +112,7 @@ def find_tool(name):
 def parse_gpu_list(text):
     """One tuple per line of `gow3-gpu-capabilities --list`: index, name, type and, from the tools
     that print them, the game's multisampling default on that driver ('off' or 'on') and '1' on
-    the GPU the game picks without GOW3_GPU_ID. Other lines are skipped."""
+    the GPU the game picks without TSUKI_GPU_ID. Other lines are skipped."""
     rows = [line.split('\t') for line in text.splitlines()]
     return [tuple(row) for row in rows if len(row) >= 3 and row[0].isdigit()]
 
@@ -284,7 +284,7 @@ FPS_LIMITS = [('30', ('30',)), ('60', ('60',)), ('120', ('120',)), ('240', ('240
 # The sidebar's pages, top to bottom, and the methods that refresh a page's lists when it is shown.
 PAGES = ('home', 'graphics', 'performance', 'game', 'advanced')
 PAGE_REFRESH = {'home': ('refresh_status',), 'game': ('refresh_lists', 'refresh_game_patches')}
-APP_DEFAULTS = {'ui_language': 'en', 'game_dir': os.environ.get('GOW3_GAME_DIR', str(PORT_DIR.parent / 'CUSA47999') if WINDOWS else ''), 'update_dir': '',
+APP_DEFAULTS = {'ui_language': 'en', 'game_dir': os.environ.get('TSUKI_GAME_DIR', str(PORT_DIR.parent / 'CUSA47999') if WINDOWS else ''), 'update_dir': '',
                 'video_backend': 'auto', 'gamemode': False, 'mangohud': False, 'desktop_integration': True, 'user_dir': '',
                 'mods_dir': '', 'mods_enabled': True, 'patches_dir': '', 'language': '1',
                 'player_name': '', 'hdr': False, 'draw_pipe': '', 'readbacks': '', 'no_msaa': '', 'stream_memory': 'cached',
@@ -342,7 +342,7 @@ def control_values(controls, kind):
 
 
 def control_map(controls, kind):
-    """GOW3_KEY_MAP/GOW3_PAD_MAP value: 'cross=Q,circle=Left Shift' for the changed buttons."""
+    """TSUKI_KEY_MAP/TSUKI_PAD_MAP value: 'cross=Q,circle=Left Shift' for the changed buttons."""
     chosen = control_values(controls, kind)
     return ','.join(f'{button}={chosen[button].strip()}' for button, _key, _pad in CONTROLS
                     if button in chosen and not set(chosen[button]) & set(',='))
@@ -354,7 +354,7 @@ DRAW_PIPE = [('', ('Auto (8+ threads)', 'Авто (8+ потоков)')), ('1', 
              ('0', ('Off (more stable)', 'Выключен (стабильнее)'))]
 READBACKS = [('', ('Relaxed (default)', 'Relaxed (по умолчанию)')), ('0', ('Off', 'Выключены')),
              ('2', ('Precise',))]
-# GOW3_NO_MSAA: '' leaves the game's own default, off on AMD's and Intel's Windows drivers
+# TSUKI_NO_MSAA: '' leaves the game's own default, off on AMD's and Intel's Windows drivers
 # (video_core/amdgpu/gow3_msaa_default.h); no_msaa_options names the chosen card in Automatic.
 NO_MSAA = [('', ('Automatic',)), ('1', ('Off (fixes black lines)',)), ('0', ('On',))]
 NO_MSAA_HINT = ("The game's 2-sample depth buffer, read as a texture by its lighting. AMD's and Intel's Windows "
@@ -375,7 +375,7 @@ def load_json(path, default):
 
 
 def ini_path():
-    return Path(os.environ.get('GOW3_CONFIG', DATA_DIR / 'gow3.ini'))
+    return Path(os.environ.get('TSUKI_CONFIG', DATA_DIR / 'gow3.ini'))
 
 
 def load_ini():
@@ -664,53 +664,53 @@ def game_profile_of(folder):
 
 def game_environment(s):
     env = dict(os.environ)
-    env['GOW3_GAME_DIR'] = s['game_dir']
-    env.pop('GOW3_PATCH_DIR', None)
+    env['TSUKI_GAME_DIR'] = s['game_dir']
+    env.pop('TSUKI_PATCH_DIR', None)
     if s.get('update_dir'):
-        env['GOW3_PATCH_DIR'] = s['update_dir']
+        env['TSUKI_PATCH_DIR'] = s['update_dir']
     if not WINDOWS:
         backend = s.get('video_backend', 'auto')
         if backend in ('wayland', 'x11'):
             env['SDL_VIDEO_DRIVER'] = env['SDL_VIDEODRIVER'] = backend
-        env['GOW3_GAMEMODE'] = '1' if s.get('gamemode') else '0'
-        env['GOW3_MANGOHUD'] = '1' if s.get('mangohud') else '0'
+        env['TSUKI_GAMEMODE'] = '1' if s.get('gamemode') else '0'
+        env['TSUKI_MANGOHUD'] = '1' if s.get('mangohud') else '0'
     # The launcher's patch selection is the whole list (run.py, patches.py).
     title_id, profile = game_profile_of(meta_folder(s['game_dir'], s.get('update_dir')))
     chosen = s.get('game_patches', {}).get(title_id) if title_id else None
     if profile and chosen is not None:
-        env['GOW3_PATCHES'] = ';'.join(chosen)
-        env['GOW3_PATCHES_ONLY'] = '1'
+        env['TSUKI_PATCHES'] = ';'.join(chosen)
+        env['TSUKI_PATCHES_ONLY'] = '1'
     if s['user_dir']:
-        env['GOW3_USER_DIR'] = s['user_dir']
-    env['GOW3_MODS_DIR'] = s['mods_dir'] or str(DATA_DIR / 'mods')
-    env['GOW3_MODS_CONFIG'] = str(DATA_DIR / 'mods.json')
-    env['GOW3_MODS_ENABLED'] = '1' if s['mods_enabled'] else '0'
-    env['GOW3_PATCHES_DIR'] = s['patches_dir'] or str(DATA_DIR / 'patches')
-    env['GOW3_PATCHES_CONFIG'] = str(DATA_DIR / 'patches.json')
-    env['GOW3_LANGUAGE'] = s['language']
+        env['TSUKI_USER_DIR'] = s['user_dir']
+    env['TSUKI_MODS_DIR'] = s['mods_dir'] or str(DATA_DIR / 'mods')
+    env['TSUKI_MODS_CONFIG'] = str(DATA_DIR / 'mods.json')
+    env['TSUKI_MODS_ENABLED'] = '1' if s['mods_enabled'] else '0'
+    env['TSUKI_PATCHES_DIR'] = s['patches_dir'] or str(DATA_DIR / 'patches')
+    env['TSUKI_PATCHES_CONFIG'] = str(DATA_DIR / 'patches.json')
+    env['TSUKI_LANGUAGE'] = s['language']
     if str(s['player_name']).strip():
-        env['GOW3_USER_NAME'] = str(s['player_name']).strip()
+        env['TSUKI_USER_NAME'] = str(s['player_name']).strip()
     if s['hdr']:
-        env['GOW3_HDR'] = '1'
-    for key, name in (('draw_pipe', 'GOW3_DRAW_PIPE'), ('readbacks', 'GOW3_READBACKS'), ('no_msaa', 'GOW3_NO_MSAA')):
+        env['TSUKI_HDR'] = '1'
+    for key, name in (('draw_pipe', 'TSUKI_DRAW_PIPE'), ('readbacks', 'TSUKI_READBACKS'), ('no_msaa', 'TSUKI_NO_MSAA')):
         if s.get(key):
             env[name] = s[key]
     # The saved UI choice wins over inherited diagnostic overrides, including when reverting.
     stream_memory = s.get('stream_memory', APP_DEFAULTS['stream_memory'])
-    env['GOW3_STREAM_MEMORY'] = stream_memory if stream_memory in ('cached', 'host', 'device') else 'cached'
+    env['TSUKI_STREAM_MEMORY'] = stream_memory if stream_memory in ('cached', 'host', 'device') else 'cached'
     gpu_id = str(s.get('gpu_id', ''))
-    env.pop('GOW3_GPU_ID', None)
+    env.pop('TSUKI_GPU_ID', None)
     if gpu_id.isdigit():
-        env['GOW3_GPU_ID'] = gpu_id
-    env['GOW3_BACKGROUND_WARMUP'] = '1' if s.get('background_warmup', True) else '0'
-    env['GOW3_PARALLEL_WARMUP'] = '1' if s.get('parallel_warmup', True) else '0'
-    env['GOW3_PIPELINE_BINARIES'] = '1' if s.get('pipeline_binary_cache', True) else '0'
-    env['GOW3_PERF_DIAG'] = '1' if s.get('perf_diag', False) else '0'
-    for key, name in (('frame_stats', 'GOW3_FRAME_STATS'), ('gpu_profile', 'GOW3_GPU_PROFILE'),
-                      ('vk_validation', 'GOW3_VK_VALIDATION'), ('frame_capture_key', 'GOW3_FRAME_CAPTURE_KEY')):
+        env['TSUKI_GPU_ID'] = gpu_id
+    env['TSUKI_BACKGROUND_WARMUP'] = '1' if s.get('background_warmup', True) else '0'
+    env['TSUKI_PARALLEL_WARMUP'] = '1' if s.get('parallel_warmup', True) else '0'
+    env['TSUKI_PIPELINE_BINARIES'] = '1' if s.get('pipeline_binary_cache', True) else '0'
+    env['TSUKI_PERF_DIAG'] = '1' if s.get('perf_diag', False) else '0'
+    for key, name in (('frame_stats', 'TSUKI_FRAME_STATS'), ('gpu_profile', 'TSUKI_GPU_PROFILE'),
+                      ('vk_validation', 'TSUKI_VK_VALIDATION'), ('frame_capture_key', 'TSUKI_FRAME_CAPTURE_KEY')):
         if s[key]:
             env[name] = '1'
-    for kind, name in (('key', 'GOW3_KEY_MAP'), ('pad', 'GOW3_PAD_MAP')):
+    for kind, name in (('key', 'TSUKI_KEY_MAP'), ('pad', 'TSUKI_PAD_MAP')):
         if value := control_map(s.get('controls', {}), kind):
             env[name] = value
     env['PYTHONUNBUFFERED'] = '1'
@@ -1343,8 +1343,8 @@ class Launcher:
             row=self.next_row(f), column=0, sticky='w', pady=(14, 0))
 
     def build_controls(self, f):
-        """Remapping of the PS4 buttons, on the Game page (run.py passes GOW3_KEY_MAP and
-        GOW3_PAD_MAP to the game)."""
+        """Remapping of the PS4 buttons, on the Game page (run.py passes TSUKI_KEY_MAP and
+        TSUKI_PAD_MAP to the game)."""
         tk, ttk = self.tk, self.ttk
         self.section(f, _('Controls', 'Управление'))
         self.note(f, _('Which key or gamepad button presses each button of the game.'), top=4)

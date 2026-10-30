@@ -70,7 +70,7 @@ int main() {
 
     const auto dir = std::filesystem::temp_directory_path() / "gow3-frame-capture-test";
     std::filesystem::remove_all(dir);
-    setenv("GOW3_CAPTURE_DIR", dir.c_str(), 1);
+    setenv("TSUKI_CAPTURE_DIR", dir.c_str(), 1);
     const std::string text = Capture(dir);
     std::filesystem::remove_all(dir);
     std::fputs(text.c_str(), stdout);

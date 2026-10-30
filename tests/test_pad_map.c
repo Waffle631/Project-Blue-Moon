@@ -1,4 +1,4 @@
-/* GOW3_PAD_MAP / GOW3_KEY_MAP parsing (src/runtime_pad.c). */
+/* TSUKI_PAD_MAP / TSUKI_KEY_MAP parsing (src/runtime_pad.c). */
 #define _GNU_SOURCE
 #include <assert.h>
 #include "../src/runtime_pad.c"

@@ -42,8 +42,8 @@ static constexpr u32 PipelineKeyVersion = 5u; // gow3: Info layout (ImageResourc
 namespace Vulkan {
 
 namespace {
-// gow3: the test knobs that change recompiled SPIR-V (GOW3_LIGHTING_TEST=dref,
-// GOW3_AMD_PATHS_OFF=shaderext) get their own shader binary cache version.
+// gow3: the test knobs that change recompiled SPIR-V (TSUKI_LIGHTING_TEST=dref,
+// TSUKI_AMD_PATHS_OFF=shaderext) get their own shader binary cache version.
 u32 CurrentShaderBinaryVersion() {
     return LightingTest::ShaderBinaryVersion(
         Serialization::ShaderBinaryVersion,
@@ -458,7 +458,7 @@ vk::ResultValue<vk::UniquePipeline> CreateCachedGraphicsPipeline(
     return result;
 }
 
-// gow3: GOW3_PARALLEL_WARMUP=1. The cache store is still read and the shader modules created in
+// gow3: TSUKI_PARALLEL_WARMUP=1. The cache store is still read and the shader modules created in
 // order on the calling thread (program_cache and its permutation checks are not thread-safe);
 // only the pipeline objects, the slow part, are built here. The runtime compiler builds
 // pipelines on worker threads the same way (vk_pipeline_cache.cpp).
@@ -513,7 +513,7 @@ struct PipelineCache::WarmupPool {
         return jobs.empty() && !running;
     }
     static u32 Threads() {
-        const char* env = std::getenv("GOW3_PARALLEL_WARMUP");
+        const char* env = std::getenv("TSUKI_PARALLEL_WARMUP");
         if (!env || !*env || *env == '0') {
             return 0;
         }

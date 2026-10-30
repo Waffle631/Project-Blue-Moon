@@ -3,7 +3,7 @@
 Objetivo: eliminar el cuello de botella de un solo núcleo del procesador de comandos de GPU emulado
 (`shadPS4:GpuCommandProcessor`, ~100 % de un núcleo mientras el resto de la CPU está ocioso).
 
-## Mediciones (el juego original del port base, escena de prueba, ~70 FPS, `GOW3_DCB_STATS=1`)
+## Mediciones (el juego original del port base, escena de prueba, ~70 FPS, `TSUKI_DCB_STATS=1`)
 
 | | |
 |---|---|
@@ -47,7 +47,7 @@ sharp fetches), binding de buffers ~14 %, render targets ~8 %, decodificación P
 3. **Grabación Vulkan en paralelo.** Cada worker graba su propio command buffer; se
    ejecutan en orden de envío con barreras en las uniones.
 
-Cada paso conserva un bit de `GOW3_TOGGLE_FILE` para poder desactivarlo en tiempo de ejecución y
+Cada paso conserva un bit de `TSUKI_TOGGLE_FILE` para poder desactivarlo en tiempo de ejecución y
 compararlo mediante capturas y tasa de fotogramas.
 
 ## Portabilidad
@@ -70,13 +70,13 @@ El hilo de comandos de GPU vuelve a estar en ~100 %: es de nuevo el límite.
 
 Descartado: "hot pages" (no volver a proteger nunca las páginas escritas repetidamente, subirlas en cada
 binding) — el conjunto creció hasta ~14k páginas, las resubidas bajaron la tasa de fotogramas a 33 FPS y siguió un timeout
-del ring de la GPU. Queda opt-in tras GOW3_HOT_PAGES=1.
+del ring de la GPU. Queda opt-in tras TSUKI_HOT_PAGES=1.
 
 Caché de descripciones de texturas 2-way/4096, ruta rápida de mismo objetivo, omisión del LRU touch, sin
 búsqueda de meta por textura: otra vista exterior, 93.9 FPS; con los memos de texturas apagados (máscara 1056) 65.6 FPS.
 Cerca del tope de 100 Hz de la pantalla (ritmo por vblank), por lo que más ganancias requieren una prueba sin límite.
 
-## Stutter de streaming (líneas "Stall:" de GOW3_FRAME_STATS)
+## Stutter de streaming (líneas "Stall:" de TSUKI_FRAME_STATS)
 
 Correr por áreas nuevas daba fotogramas de 60–170 ms (también en shadPS4). El hilo de GPU estaba ocupado
 todo el fotograma, sobre todo en el kernel, subiendo 50–400 MB de texturas y buffers por fotograma.
@@ -90,9 +90,9 @@ Hallazgos, en el orden en que se corrigieron:
 2. Entonces las copias iban a 0.2–0.4 GB/s por hilo, casi todo en el kernel: el primer acceso de CPU
    a un nuevo bloque de staging hace que el kernel lo reserve y lo ponga a cero (~2 ms por 16 MiB), y el
    pool de staging liberaba bloques tras 3 s de inactividad, entre ráfagas de streaming. Ahora conserva 512 MiB
-   (`GOW3_STAGING_KEEP_MB`), libera el resto tras 30 s y puebla 128 MiB al inicio.
-3. Faults de escritura: una ventana de desprotección de 256 KiB (`GOW3_FAULT_WINDOW`) los reduce a la mitad otra vez.
-   `GOW3_UFFD=1` rastrea escrituras con la protección de escritura de userfaultfd en lugar de mprotect (sin
+   (`TSUKI_STAGING_KEEP_MB`), libera el resto tras 30 s y puebla 128 MiB al inicio.
+3. Faults de escritura: una ventana de desprotección de 256 KiB (`TSUKI_FAULT_WINDOW`) los reduce a la mitad otra vez.
+   `TSUKI_UFFD=1` rastrea escrituras con la protección de escritura de userfaultfd en lugar de mprotect (sin
    write lock del espacio de direcciones, sin divisiones de mapeos); la protección de lectura para los readbacks sigue usando
    mprotect. Elimina el tiempo de mprotect pero no cambió los stalls de forma medible; opt-in.
 4. Las lecturas de archivo hacia páginas del guest protegidas contra escritura fallaban con EFAULT (las copias del kernel no llegan
@@ -110,7 +110,7 @@ los usa cuando `PipelineCache::UsedPrepared()` indica que el pipeline del draw v
 draw preparado — los datos aplanados se compararon entonces palabra por palabra, y los sharps no dependen
 de nada más. Los tamaños de las listas de recursos se comprueban por stage. El toggle 4096 lo apaga.
 
-A/B en una misma ejecución, quieto, `GOW3_FPS_LIMIT=0`, FSR 4, fases de 20 s: 69–70 FPS con los
+A/B en una misma ejecución, quieto, `TSUKI_FPS_LIMIT=0`, FSR 4, fases de 20 s: 69–70 FPS con los
 sharps preparados, 66.5–67 sin ellos (+3 %), misma imagen.
 
 Costes del upscaler retirados del hilo de GPU antes de esto (perf, grafos de llamadas DWARF): consultas
@@ -141,7 +141,7 @@ por debajo de 12 hilos de hardware (Steam Deck: sin workers). Ahora:
   supera 64 buffers, en lugar de encolar sin límite (`scanner rebases` en las estadísticas).
 - Los hilos de copia usan el mismo recuento de afinidad (camino crítico, prioridad normal).
 
-A/B en una misma ejecución (toggle 8192, quieto, `GOW3_FPS_LIMIT=0`, FSR 4), ~98 % de los draws directos
+A/B en una misma ejecución (toggle 8192, quieto, `TSUKI_FPS_LIMIT=0`, FSR 4), ~98 % de los draws directos
 preparados, sin rebases:
 
 | CPU | con preparación | sin |
@@ -161,7 +161,7 @@ de GPU solo obtiene los buffers de los rangos fusionados y graba los bindings. S
 pipeline del draw preparado, el número de atributos coincide con el fetch shader del pipeline
 y no hay una captura de fotograma en curso; el toggle 4096 lo apaga junto con los sharps.
 
-A/B (quieto, `GOW3_FPS_LIMIT=0`, FSR 4, 16 hilos): ~69.3 FPS activado, ~65.7 desactivado (+5.5 %;
+A/B (quieto, `TSUKI_FPS_LIMIT=0`, FSR 4, 16 hilos): ~69.3 FPS activado, ~65.7 desactivado (+5.5 %;
 los sharps solos daban +3 %). Capturas idénticas.
 
 Se examinaron los render targets y se dejaron en el hilo de GPU: sus descripciones ya están
@@ -174,7 +174,7 @@ proxies de resolución reducida — todo sobre estado mutable compartido.
 - El eboot medido no tiene símbolos pero enlaza el Gnmx de Sony (`sdk\target\src\gnmx\gfxcontext.cpp`,
   `lwgfxcontext.cpp`); el motor propio del juego se apoya encima, con middleware para el
   postprocesado.
-- `GOW3_BUFFER_STATS=1` (buffer_cache.cpp) imprime los bindings de buffers por región del guest cada 5 s.
+- `TSUKI_BUFFER_STATS=1` (buffer_cache.cpp) imprime los bindings de buffers por región del guest cada 5 s.
   Casi todo el tráfico viene del frame ring del motor, ~0x1043400000–0x1049xxxxxx dentro de la
   reserva directa de 2.4 GB en 0x1042c00000: ~400k copias pequeñas de constantes/s (~190 MB/s) y
   ~850 MB/s de resubidas de arena tras escrituras de la CPU (~13 MB por fotograma).
@@ -186,7 +186,7 @@ proxies de resolución reducida — todo sobre estado mutable compartido.
   por el pool de fotogramas del presenter (`present_frames`, número de imágenes del swapchain). Siguiente: medir
   el periodo de vuelta del ring por fotograma y el retraso real de la GPU, luego prototipar la importación tras un toggle.
 
-### Mediciones para la ventana de datos de fotograma (GOW3_BUFFER_STATS=1)
+### Mediciones para la ventana de datos de fotograma (TSUKI_BUFFER_STATS=1)
 
 - Distancia de reutilización de bloques de 64 KiB en 0x104xxxxxxx: abrumadoramente 1 fotograma (luego 2). El motor
   reescribe la misma memoria en cada fotograma; no hay un ring largo.
@@ -210,9 +210,9 @@ cambiaba en cada entrada y reanudación de tarea, de modo que un chunk solo serv
 A/B en una misma ejecución, quieto: chunks de 32 KiB 82/82/79 FPS frente a 85/84/84 sin ellos (más lento: los
 bytes extra copiados cuestan más que las operaciones ahorradas); chunks de 8 KiB 85/85/85 frente a 85/83/85
 (sin diferencia). Las copias de constantes por binding no son lo que limita el fotograma; el cambio
-se eliminó. `GOW3_BUFFER_STATS=1` (bindings por región, distancia de reutilización, retraso de GPU) se mantiene.
+se eliminó. `TSUKI_BUFFER_STATS=1` (bindings por región, distancia de reutilización, retraso de GPU) se mantiene.
 
-Estado tras este trabajo, quieto, `GOW3_FPS_LIMIT=0`, FSR 4: 82–85 FPS; hilo de comandos de GPU
+Estado tras este trabajo, quieto, `TSUKI_FPS_LIMIT=0`, FSR 4: 82–85 FPS; hilo de comandos de GPU
 ~90 % de un núcleo, hilo de grabación ~92 % (sobre todo su spin), GPU ~70 % ocupada.
 
 ### Binding de texturas: sets repetidos y la ruta rápida de UpdateImage
@@ -235,10 +235,10 @@ en ella) y, cuando `pgo/` contiene un perfil, con `-fprofile-use` (`-fprofile-pa
 -fprofile-correction`; las funciones modificadas desde el perfil se compilan sin él). Sin `-march`:
 la misma build funciona en la Steam Deck.
 
-Recoger un perfil: `GOW3_PGO=generate bash run.sh` compila una biblioteca instrumentada
+Recoger un perfil: `TSUKI_PGO=generate bash run.sh` compila una biblioteca instrumentada
 (`-fprofile-generate -fprofile-update=atomic`) que escribe `pgo/` cada 30 s (hilo `bb:pgo`:
 `__gcov_dump` + `__gcov_reset`, ya que el juego suele terminar mediante `_exit`); juega unos minutos
-de gameplay normal. La siguiente build normal lo usa. `GOW3_PGO=off` / `GOW3_LTO=OFF` los desactivan.
+de gameplay normal. La siguiente build normal lo usa. `TSUKI_PGO=off` / `TSUKI_LTO=OFF` los desactivan.
 Regenera el perfil tras cambios de código mayores.
 
 Comparación, tres ejecuciones en el juego (mediana de ventanas de 5 s dentro del juego, >800 draws/fotograma), con el nuevo
@@ -253,7 +253,7 @@ tolera mejor las pequeñas diferencias de escena que los FPS):
 
 ## Segundo pase: adónde va el tiempo del hilo de GPU, y un helper de texturas (2026-09-30)
 
-De pie en la escena de prueba, FSR 4, `GOW3_FPS_LIMIT=0`, ~85 FPS, ~1610 draws/fotograma.
+De pie en la escena de prueba, FSR 4, `TSUKI_FPS_LIMIT=0`, ~85 FPS, ~1610 draws/fotograma.
 
 **Perfil on-CPU** (perf, hijos directos): `Draw` 74 % — `BindResources` 32 % (texturas 16 %,
 buffers 13 %), `BeginRendering` 8 %, `GetGraphicsPipeline` 5 %, `BindVertexBuffers` 4.5 %,
@@ -268,7 +268,7 @@ encoladas en el stream de grabación, es decir, hasta que el hilo de grabación 
 comandos anteriores, más ~4 % por los hilos de copia (`Gow3Copy::WaitAsync`). El propio hilo de grabación
 trabaja ~40 % (el resto es su spin); no es el límite.
 
-### Binding de texturas en un hilo auxiliar (opt-in: `GOW3_TEXTURE_HELPER=1`, toggle 1 << 22)
+### Binding de texturas en un hilo auxiliar (opt-in: `TSUKI_TEXTURE_HELPER=1`, toggle 1 << 22)
 
 `bb:TexBind` enlaza las texturas de un draw mientras el hilo de GPU enlaza sus buffers y resuelve sus
 vertex/index buffers (dividido en Resolve/Emit, toggle 1 << 23); el hilo de GPU hace join antes de
@@ -359,9 +359,9 @@ de movimiento.
   de GPU vacía la etapa B antes de manejar uno en línea. Con userfaultfd, los faults del hilo de GPU
   toman la ruta con lock de los hilos del guest.
 - `DmaData` a 0x3022C (omitido por el manejador; ~70k/s) no vacía.
-- `GOW3_PIPE_VERIFY=N`: cada N-ésimo paquete lleva también el archivo de registros completo y la etapa B informa de
+- `TSUKI_PIPE_VERIFY=N`: cada N-ésimo paquete lleva también el archivo de registros completo y la etapa B informa de
   las palabras en que su copia difiere (ninguna vista en el juego, menús incluidos).
-- `GOW3_DRAW_PIPE=0/1` anula el valor predeterminado (activado con 8+ hilos de hardware). La máscara de toggles es ahora de 64
+- `TSUKI_DRAW_PIPE=0/1` anula el valor predeterminado (activado con 8+ hilos de hardware). La máscara de toggles es ahora de 64
   bits (los bits 20-29 son toggles de depuración sin procesar de los vectores de movimiento y el upscaler, que las
   primeras mediciones de abajo también alternaron): 1 << 37 todo el pipeline, 1 << 38 fences en la etapa B,
   1 << 39 WaitRegMem sobre fences pendientes, 1 << 40 dispatches, 1 << 41 fences señalizados por el hilo de
@@ -369,7 +369,7 @@ de movimiento.
   ring. `Frame stats` añade una línea `Draw pipe`: draws, vaciados que esperaron y por qué, etapa A esperando,
   etapa B ocupada.
 
-Resultados (escena de prueba, quieto, FSR 4, `GOW3_FPS_LIMIT=0`, A/B en una misma ejecución):
+Resultados (escena de prueba, quieto, FSR 4, `TSUKI_FPS_LIMIT=0`, A/B en una misma ejecución):
 
 | | pipeline activado | desactivado |
 |---|---|---|
@@ -398,7 +398,7 @@ trivial, draws indirectos. Siguiente: mover trabajo de la etapa B a la A — el 
   draw ha terminado (la etapa B sella los paquetes con el tick del envío). Los buffers que se solapan con
   memoria del guest que el trabajo encolado escribirá (storage buffers, DMA, WriteData, fences:
   `NotePendingGpuWrite`) o con memoria modificada por la GPU se quedan en la etapa B.
-- `GOW3_PIPE_VERIFY` también recorre de nuevo las tablas de recursos de cada stage en la etapa B y las compara con
+- `TSUKI_PIPE_VERIFY` también recorre de nuevo las tablas de recursos de cada stage en la etapa B y las compara con
   el snapshot de la etapa A (protegido contra faults: los punteros pueden estar obsoletos para entonces). Se omiten los pixel shaders
   cuyo `Info` la selección de pipeline no refresca (sin user data).
 
@@ -423,7 +423,7 @@ preset (shadow maps, postprocesado y UI a resolución completa, el propio FSR �
 ~1.1-1.4 ms más que FSR 3 — y la sobrecarga de emulación: barreras, copias, remuestreo). FSR 4 en
 Native AA no arranca ("no free provider frame").
 
-### Perfil de GPU (`GOW3_GPU_PROFILE=1`, `vk_gpu_profiler.h`)
+### Perfil de GPU (`TSUKI_GPU_PROFILE=1`, `vk_gpu_profiler.h`)
 
 Timestamps donde empieza cada render pass, dispatch, ejecución del upscaler y fin de envío; el tiempo hasta
 el siguiente se le carga a él (incluidas las barreras y copias intermedias; "between submissions"
@@ -476,7 +476,7 @@ sin retroalimentación de render targets y sin redirección del upscaler; entonc
 ### Distancia de fusión del copy shader
 
 El HLE fusionaba copias cuyos rangos cabían en 64 MiB, y cada lote fusionado sincroniza todo su rango de
-origen y destino. Con 64 KiB (`GOW3_COPY_MERGE_KB`): el tiempo de GPU del copy shader
+origen y destino. Con 64 KiB (`TSUKI_COPY_MERGE_KB`): el tiempo de GPU del copy shader
 1.5 -> 0.6 ms/fotograma (profiler), GPU ocupada 85 % -> ~77 %, tasa de fotogramas no inferior
 (los reinicios varían 125-142 FPS; 16 KiB y 256 KiB similares).
 
@@ -530,12 +530,12 @@ render nativo sin upscaler. Hallado de paso:
   los targets de pases anteriores — en los pases de iluminación las imágenes del G-buffer que muestrean. Los pases de acumulación de
   luz se quedaban a 1920x1080 en cualquier preset. Corregido (el toggle 1 << 47 lo restaura).
 - Cada pase que muestreaba un target reducido hacía que el proxy se remuestreara primero al tamaño nativo
-  (~25 resolves por fotograma, 0.4 ms; `GOW3_GPU_PROFILE` ahora etiqueta resolves, fills, subidas y
+  (~25 resolves por fotograma, 0.4 ms; `TSUKI_GPU_PROFILE` ahora etiqueta resolves, fills, subidas y
   descargas de imágenes). El recompiler marca las imágenes leídas por cualquier cosa distinta del muestreo normalizado
   sin offsets (`ImageResource::needs_native`); los demás bindings muestreados leen el proxy directamente
   (toggle 1 << 48): GPU ocupada 5.02 -> 4.86 ms, capturas idénticas. Cambia el layout de `Info`:
   versión de meta de shader 7, versión de clave de pipeline 5 (las cachés se reconstruyen una vez).
-- `GOW3_SCENE_DEBUG=<archivo>`: al tocar el archivo se imprimen los pases de escena del siguiente fotograma con el motivo por el que
+- `TSUKI_SCENE_DEBUG=<archivo>`: al tocar el archivo se imprimen los pases de escena del siguiente fotograma con el motivo por el que
   cada uno conserva el tamaño nativo. Lo que queda nativo antes del upscaler: los pases a media resolución
   (960x540), que `SceneTargets::Eligible` no maneja.
 
@@ -553,7 +553,7 @@ decodificado todos los envíos, mientras los fences end-of-pipe diferidos al hil
 (RecorderFences) seguían pendientes; el guest liberaba los objetos que contenían esas etiquetas mientras
 otro de sus hilos aún las actualizaba. Ahora la etapa A vacía el pipe y espera las señales
 diferidas antes del GPU idle (y antes de WriteData/ReleaseMem de la cola compute). Encontrado con
-`GOW3_WRITE_LOG=2` (objetivos de fences registrados en el momento de la decodificación, fuera de la ruta de la carrera). Las notas de abajo
+`TSUKI_WRITE_LOG=2` (objetivos de fences registrados en el momento de la decodificación, fuera de la ruta de la carrera). Las notas de abajo
 son la investigación.
 
 #### Notas de investigación
@@ -562,7 +562,7 @@ Tras ~2-15 min en el nivel (cámara girando, nadie moviéndose) el guest falla e
 `0x263b8e7`: un pop de la free-list en un allocator del guest lee el siguiente puntero `0x0000005300000000`
 de un bloque liberado, así que algo escribió en memoria que el juego ya había liberado. Ejecuciones de resistencia de
 15-20 min: con el pipeline de draws 3 de 4 se cayeron (a los 863, 844 s y una antes), con
-`GOW3_DRAW_PIPE=0` 0 de 2. Con `GOW3_WRITE_LOG=1` (descargas más lentas) una ejecución sobrevivió 20 min.
+`TSUKI_DRAW_PIPE=0` 0 de 2. Con `TSUKI_WRITE_LOG=1` (descargas más lentas) una ejecución sobrevivió 20 min.
 
 Descartado / hecho hasta ahora:
 - escrituras visibles para el guest que adelantan a los fences diferidos (ahora ordenadas: `WaitDeferredSignals`, toggle
@@ -573,6 +573,6 @@ Candidatos: escrituras tardías en memoria del guest que el pipeline retrasa aú
 de imágenes (`TextureCache::DownloadImageMemory`, diferidas hasta que la GPU termina, imagen completa),
 descargas de buffers en page faults, y el manejo de faults cuando el hilo de comandos de GPU (etapa A), que
 ahora lee memoria del guest para el constant ring, no se trata como un hilo del lado de la GPU
-(`IsGpuSideThreadId` acepta solo la etapa B). Siguiente: una ejecución con `GOW3_WRITE_LOG=1` que falle
+(`IsGpuSideThreadId` acepta solo la etapa B). Siguiente: una ejecución con `TSUKI_WRITE_LOG=1` que falle
 imprime qué escritura registrada cayó cerca del bloque corrupto; bisecar los toggles del pipeline
 (38 tareas, 39 esperas de fences pendientes, 41 fences del recorder, 42 escrituras de memoria, 36 constant ring).

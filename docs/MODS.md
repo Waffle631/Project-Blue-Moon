@@ -32,14 +32,14 @@ Los archivos del juego nunca se modifican. En cada inicio se monta un árbol de 
 de lectura; los saves siguen en la carpeta de siempre.
 
 No se admiten mods que reemplacen `eboot.bin`, `sce_module` o `sce_sys`, inyectores de DLL ni plugins de script.
-Los parches de código van en `patches/` / `GOW3_PATCHES`. Los enlaces simbólicos dentro
+Los parches de código van en `patches/` / `TSUKI_PATCHES`. Los enlaces simbólicos dentro
 del mod se rechazan.
 
 Desde la terminal:
 
 ```sh
-GOW3_GAME_DIR=/ruta/CUSA47999 GOW3_MODS_DIR=/ruta/mods python run.py
-GOW3_GAME_DIR=/ruta/CUSA47999 GOW3_MODS_ENABLED=0 python run.py
+TSUKI_GAME_DIR=/ruta/CUSA47999 TSUKI_MODS_DIR=/ruta/mods python run.py
+TSUKI_GAME_DIR=/ruta/CUSA47999 TSUKI_MODS_ENABLED=0 python run.py
 ```
 
 El orden y las desactivaciones se guardan en `mods.json` en el directorio de datos:
@@ -48,7 +48,7 @@ El orden y las desactivaciones se guardan en `mods.json` en el directorio de dat
 {"order": ["Primero", "Segundo"], "disabled": ["Primero"]}
 ```
 
-Las carpetas nuevas entran activadas, al final de la lista, en orden alfabético. `GOW3_MODS_CONFIG` cambia la
+Las carpetas nuevas entran activadas, al final de la lista, en orden alfabético. `TSUKI_MODS_CONFIG` cambia la
 ruta de ese archivo.
 
 # Parches de terceros (XML de shadPS4)
@@ -66,4 +66,4 @@ se ignoran. La activación predeterminada viene del `isEnabled` del archivo; la 
 Tipos de línea aceptados: `bytes`, `bytes16/32/64`, `float32/64`, `utf8`, `utf16`. Un parche con
 líneas `mask` (búsqueda por patrón) o con una dirección fuera del eboot se ignora por completo, con aviso en el
 log. Los parches de terceros se aplican después de los integrados: donde ambos escriben, gana el de
-terceros. Desde la terminal: `GOW3_PATCHES_DIR=/ruta GOW3_PATCHES_CONFIG=/ruta/patches.json python run.py`.
+terceros. Desde la terminal: `TSUKI_PATCHES_DIR=/ruta TSUKI_PATCHES_CONFIG=/ruta/patches.json python run.py`.

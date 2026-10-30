@@ -4,10 +4,10 @@
 #   save/       fixed copy of a save (save/savedata/...); every run starts from it in a fresh user/, so neither
 #               the user's own user/ nor its user/savedata_backups/ is touched
 #   gow3.ini    the route's settings: the defaults, except async_shaders=0 (a shader still compiling would skip a draw)
-#   pad.txt     the recording (GOW3_PAD_RECORD, clocked in pad reads: src/runtime_pad.c)
+#   pad.txt     the recording (TSUKI_PAD_RECORD, clocked in pad reads: src/runtime_pad.c)
 #   frames.txt  how each frame is compared (tools/compare_route.sh); record writes it from the F12 captures
 #   record/, <name>/, <name>.log   the captures and the log of each run
-# record: the user plays (pad or keyboard, no mouse: GOW3_MOUSE=0) and presses F12 on each scene for the
+# record: the user plays (pad or keyboard, no mouse: TSUKI_MOUSE=0) and presses F12 on each scene for the
 # reference, then closes the window (F9 cuts the recording: only after the last F12); a recording with nothing
 # pressed or cut before a capture is moved to failed-<time>/. replay <name>: plays pad.txt back, captures every
 # frame of frames.txt into <name>/ and closes the game once the replay is over. Exit 0, 1 when the game stops (STOP:/Fault:) or a capture is
@@ -28,7 +28,7 @@ case ${1:-} in
     *) usage ;;
 esac
 [[ -d $R/save ]] || { echo "error: no existe $R/save/: copia ahí la partida fija (cp -a user/savedata $R/save/)" >&2; exit 2; }
-# frames.txt's frame numbers, comma-separated for GOW3_SCREENSHOT_AT.
+# frames.txt's frame numbers, comma-separated for TSUKI_SCREENSHOT_AT.
 frame_list() { awk '{ sub(/#.*/, ""); if (NF) { if ($1 !~ /^[0-9]+$/) exit 1; print $1 + 0 } }' "$R/frames.txt" | paste -sd,; }
 missing() { local n; for n in ${1//,/ }; do compgen -G "$R/$name/frame_$(printf '%06d' "$n")_*.png" > /dev/null || echo "$n"; done; }
 
@@ -37,15 +37,15 @@ rm -rf "$R/user" && mkdir -p "$R/user" && cp -a "$R/save/." "$R/user/" || { echo
     render_resolution=native engine_fps=120 deferred_readback=1 stale_readback=1 async_shaders=0 > "$R/gow3.ini"
 log=$R/$name.log; extra=()
 if [[ $name == record ]]; then
-    extra=(GOW3_PAD_RECORD="$R/pad.txt" GOW3_SCREENSHOT_DIR="$R/record")
+    extra=(TSUKI_PAD_RECORD="$R/pad.txt" TSUKI_SCREENSHOT_DIR="$R/record")
 else
     frames=$(frame_list) || { echo "error: $R/frames.txt tiene un fotograma que no es un número" >&2; exit 2; }
-    rm -rf "${R:?}/$name"; extra=(GOW3_PAD_REPLAY="$R/pad.txt" GOW3_SCREENSHOT_DIR="$R/$name" GOW3_SCREENSHOT_AT="$frames")
+    rm -rf "${R:?}/$name"; extra=(TSUKI_PAD_REPLAY="$R/pad.txt" TSUKI_SCREENSHOT_DIR="$R/$name" TSUKI_SCREENSHOT_AT="$frames")
 fi
 # Nothing scripted from the caller's shell gets in: only this run's input reaches the game.
-env -u GOW3_PAD_FILE -u GOW3_PAD_RECORD -u GOW3_PAD_REPLAY -u GOW3_SCREENSHOT_AT -u GOW3_SCREENSHOT_DIR \
-    GOW3_GAME_DIR=Tsukihime/CUSA47999 GOW3_FULLSCREEN=1 GOW3_MOUSE=0 GOW3_USER_DIR="$R/user" GOW3_CONFIG="$R/gow3.ini" \
-    GOW3_FILE_TRACE=1 "${extra[@]}" python3 run.py > "$log" 2>&1 &
+env -u TSUKI_PAD_FILE -u TSUKI_PAD_RECORD -u TSUKI_PAD_REPLAY -u TSUKI_SCREENSHOT_AT -u TSUKI_SCREENSHOT_DIR \
+    TSUKI_GAME_DIR=Tsukihime/CUSA47999 TSUKI_FULLSCREEN=1 TSUKI_MOUSE=0 TSUKI_USER_DIR="$R/user" TSUKI_CONFIG="$R/gow3.ini" \
+    TSUKI_FILE_TRACE=1 "${extra[@]}" python3 run.py > "$log" 2>&1 &
 game=$!
 # SIGTERM is the window close (report and exit); never pkill -f, which would match this script too.
 close() { pkill -TERM -x gow3-probe; wait "$game"; }

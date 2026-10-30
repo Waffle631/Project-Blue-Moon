@@ -16,7 +16,7 @@ namespace Libraries::AvPlayer {
 
 namespace {
 
-// gow3: GOW3_TRACE_AVPLAYER (avplayer_trace.h). The game polls GetVideoData(Ex), GetAudioData,
+// gow3: TSUKI_TRACE_AVPLAYER (avplayer_trace.h). The game polls GetVideoData(Ex), GetAudioData,
 // IsActive and CurrentTime every frame, so those are counted per player and only their useful
 // calls are traced: frames delivered, IsActive changes, CurrentTime once a second. Close prints the
 // totals.

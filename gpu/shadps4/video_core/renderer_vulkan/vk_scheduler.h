@@ -701,7 +701,7 @@ public:
     /// Ends current rendering scope.
     void EndRendering();
 
-    /// gow3: GOW3_FULL_BARRIERS=1 records a full memory barrier around every render pass and
+    /// gow3: TSUKI_FULL_BARRIERS=1 records a full memory barrier around every render pass and
     /// every compute dispatch, to tell a missing barrier from everything else.
     static bool FullBarriers();
     static void RecordFullBarrier(vk::CommandBuffer cmdbuf);
@@ -735,7 +735,7 @@ public:
         return current_cmdbuf;
     }
 
-    /// GOW3_RECORDER_TRACE=1: prints the most frequent CommandBuffer() callers every 2000 calls.
+    /// TSUKI_RECORDER_TRACE=1: prints the most frequent CommandBuffer() callers every 2000 calls.
     static void TraceDirectRecording(void* caller);
 
     /// Records `func(vk::CommandBuffer)` in order with other commands. The closure must own
@@ -839,7 +839,7 @@ public:
         return !(is_rendering && render_state == state);
     }
 
-    /// CommandBuffer() calls that waited for a recording thread (GOW3_FRAME_STATS).
+    /// CommandBuffer() calls that waited for a recording thread (TSUKI_FRAME_STATS).
     static inline std::atomic<u64> direct_recordings{0};
 
     /// Returns the current command buffer tick.

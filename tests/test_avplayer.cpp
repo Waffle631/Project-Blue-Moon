@@ -29,7 +29,7 @@
 //        avplayer-test --movie-dir <dir> [--seconds N] [file.mp4 ...]   plays each video of <dir>
 //        (Tsukihime/CUSA47999/image/movie) for N s, 3 by default, each in its own child (Sweep).
 // AVPLAYER_TEST_GDB=1 adds gdb's stacks of a hung child to the report; AVPLAYER_TEST_KEEP=<dir> keeps
-// each case's stderr in <dir>/<case>.stderr (run with GOW3_TRACE_AVPLAYER=1 to see every call).
+// each case's stderr in <dir>/<case>.stderr (run with TSUKI_TRACE_AVPLAYER=1 to see every call).
 #include <algorithm>
 #include <atomic>
 #include <chrono>

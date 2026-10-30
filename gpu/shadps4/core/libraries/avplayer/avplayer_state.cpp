@@ -466,8 +466,8 @@ std::optional<bool> AvPlayerState::OnBufferingCheckEvent(u32 num_frames) {
 // Called inside CONTROLLER thread
 void AvPlayerState::EmitEvent(AvPlayerEvents event_id, void* event_data) {
     LOG_INFO(Lib_AvPlayer, "Sending event to the game: id = {}", magic_enum::enum_name(event_id));
-    // gow3: GOW3_TRACE_AVPLAYER (avplayer_trace.h). game_obj is the event object the game passed to
-    // Init/InitEx, which ties the event to its player. With auto_start, StateReady stays here.
+    // gow3: TSUKI_TRACE_AVPLAYER (avplayer_trace.h). game_obj is the event object the game passed
+    // to Init/InitEx, which ties the event to its player. With auto_start, StateReady stays here.
     if (AvTraceEnabled()) {
         const auto name = magic_enum::enum_name(event_id);
         const bool to_game = m_event_replacement.event_callback != nullptr &&

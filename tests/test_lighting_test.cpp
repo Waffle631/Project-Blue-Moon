@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// GOW3_LIGHTING_TEST=shading,msdepth,dref,bias (vk_lighting_test.h): the four changes of the
+// TSUKI_LIGHTING_TEST=shading,msdepth,dref,bias (vk_lighting_test.h): the four changes of the
 // "lighting and scanline" build named there, each behind its own token so a tester can bisect
 // them. No game or Vulkan device required.
 #include <cassert>

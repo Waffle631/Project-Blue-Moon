@@ -28,7 +28,7 @@ hooks/patches early; a "first frame" milestone gates Spec 1b, which deletes the 
 with before/after captures; the rename to `tsuki` is Spec 7, done last).
 
 - Dump: `Tsukihime/CUSA47999/` (untracked, ~45 GB — never `git add` it). Run with
-  `GOW3_GAME_DIR=Tsukihime/CUSA47999`. Game data is in `image/` (`allpac*.hed/.mrg/.nam`,
+  `TSUKI_GAME_DIR=Tsukihime/CUSA47999`. Game data is in `image/` (`allpac*.hed/.mrg/.nam`,
   `bgm.*`, `allscr.mrg`) plus `data/`; it is a visual novel, so 2D/video/audio paths matter more
   than the 3D heuristics.
 - `prepare.py` parses the eboot cleanly: 34 MB image, entry `0xef390`, 337 imports, relocation
@@ -60,14 +60,14 @@ with before/after captures; the rename to `tsuki` is Spec 7, done last).
   that run: `out/savedata-sin-progreso/` (untracked) holds a copy, because `run.py` backs up
   `user/savedata` into `user/savedata_backups/` on every start and keeps only the last 10
   (`scripts/save_backup.py`).
-- Boot frames with the current save (rechecked 2026-10-25; fullscreen `GOW3_FULLSCREEN=1`, so captures are
+- Boot frames with the current save (rechecked 2026-10-25; fullscreen `TSUKI_FULLSCREEN=1`, so captures are
   1920×1080): 120–420 the autosave notice, whose spinning "Saving…" icon (box x 1750–1829, y 955–1034) differs
   from run to run; 900–1020 the `TM_CI.mp4` logo video (not deterministic); 1080–1560 the legal warning,
   pixel-identical from 1140 to 1500; then the title menu. Pixel oracle frames: 120/300/420 with the icon box
   masked, and 1320 whole. `out/spec1b-t2/compare-oracle.sh <before>/ <after>/` (untracked, runs inside the
   distrobox) compares them; the reference is `out/baseline/1b/antes/`. Since Spec 6 the user's save changed and
   the game sees a mouse, so retakes use `out/spec1b-t3/run-oracle.sh <take> [VAR=value…]` (untracked, run from the
-  host): the fixed save `out/savedata-usuario-1b/` in its own `GOW3_USER_DIR`, `GOW3_MOUSE=0`, 40 s fullscreen.
+  host): the fixed save `out/savedata-usuario-1b/` in its own `TSUKI_USER_DIR`, `TSUKI_MOUSE=0`, 40 s fullscreen.
 - Spec 1b (GPU heuristics) is closed (2026-10-28; branch `tsuki/spec-1b-cierre`, fast-forward merged into `tsuki/main` the same day).
   For Tsukihime none of the heuristics was needed or in the way; the delete-don't-disable rule above is why they went.
   A temporary counter with them switched on (the experimental upscaler switch, gone since Spec 7 §10) found 0
@@ -77,10 +77,10 @@ with before/after captures; the rename to `tsuki` is Spec 7, done last).
   - deleted: `gbuffer_draw` and the 864-byte constant (task 3), and the temporal upscaler's hard-coded shader
     hashes from another game (task 3b). After that the upscaler had no trigger by default, and Spec 7 §10 removed
     the variables that could give `UiComposition::Trigger` one;
-  - linear readback: only the `GOW3_READBACK_LINEAR=1` default in `run.py` went (task 4, done). With it on,
+  - linear readback: only the `TSUKI_READBACK_LINEAR=1` default in `run.py` went (task 4, done). With it on,
     Tsukihime put no image in `download_images`, either at boot or in the novel, so it did nothing for this
     game. `readback_linear_images` is a shadPS4 option and stays: off by default, and
-    `GOW3_READBACK_LINEAR=1` still turns it on;
+    `TSUKI_READBACK_LINEAR=1` still turns it on;
   - **not deleted:** the vendor-based guest MSAA decision, which is a Windows driver workaround and cannot be
     tested on RADV, and the 1920×1080 scaling, which is the project's base resolution.
 
@@ -96,7 +96,7 @@ with before/after captures; the rename to `tsuki` is Spec 7, done last).
     `out/baseline/6a/` became a Spec 1b criterion, met on 2026-10-28; Spec 7 is unblocked.
   - Recorded route: `tools/route.sh record | replay <name>` (inside the distrobox; it re-enters it from the host).
     Everything lives in `out/route/` (untracked):
-    - every run starts from the fixed save copy `out/route/save/` in its own `GOW3_USER_DIR`, so `user/` is never
+    - every run starts from the fixed save copy `out/route/save/` in its own `TSUKI_USER_DIR`, so `user/` is never
       touched;
     - `out/route/gow3.ini` sets `async_shaders=0`; runs are fullscreen with no mouse;
     - `pad.txt` is the user's recording (pad reads); `frames.txt` says how each frame is compared.
@@ -116,7 +116,7 @@ with before/after captures; the rename to `tsuki` is Spec 7, done last).
     `SetParam` or `DirNameSearch`. The runtime logs mount, param, icon and unmount.
 - Target language: **English**. The game ships ja/en/zc/zt (`ft_*.mrg` fonts, `*_en.mp4` videos)
   and picks it from the system language (`sceSystemServiceParamGetInt`); `runtime_services.c`
-  already reports 1 = English (US) unless `GOW3_LANGUAGE` overrides it, and logs the first query. Japanese
+  already reports 1 = English (US) unless `TSUKI_LANGUAGE` overrides it, and logs the first query. Japanese
   and the other languages are not a goal. `image/ft_ja.mrg` is opened at boot whatever the language is, so
   that open alone does not mean the game picked Japanese.
 - Roadmap (Spanish): `docs/tsuki/ROADMAP.md` — stages, specs and the full missing-API table.
@@ -137,7 +137,7 @@ Linux (deps via pkg-config: vulkan, sdl3, ffmpeg; `shell.nix` on NixOS, re-enter
 ```bash
 bash build.sh            # out/gpu/libgow3gpu.so (CMake/Ninja, LTO on, PGO if pgo/ has profiles) + out/gow3-probe
 bash build.sh --test     # also builds and runs the C tests (runtime, pad, sema, mp3, videodec, services, isa...)
-GOW3_GAME_DIR=Tsukihime/CUSA47999 python3 run.py    # or: bash run.sh (builds first); --software uses lavapipe
+TSUKI_GAME_DIR=Tsukihime/CUSA47999 python3 run.py    # or: bash run.sh (builds first); --software uses lavapipe
 ```
 
 Windows: MSYS2 CLANG64 shell (packages in `packaging/windows/README.md`), same `bash build.sh`;
@@ -181,7 +181,7 @@ PS4 import with no implementation without starting the game; `--cpu-features`, `
    `src/isa_emulate.c` (runs inside guest code: `-mgeneral-regs-only`, no XMM).
 5. `content_profile.py`, `patches.py` (XML → `patches.bin`), graphics options from `gow3.ini`.
 6. Starts `gow3-probe` with those files. The in-game "Apply and restart" re-runs `run.py` via
-   `GOW3_RESTART_COMMAND`.
+   `TSUKI_RESTART_COMMAND`.
 
 `src/probe.c` (loader): maps the image below 1 TiB (GPU descriptors hold 40-bit addresses, so all
 guest-visible memory, stacks and host objects handed to the guest must stay low), resolves each
@@ -206,7 +206,7 @@ NID strings. `libScePosix` imports are canonicalized to `libkernel`. Pair new AP
 (e.g. `tests/test_services.c`) and add it to `build.sh --test` and/or CMake.
 
 Notable modules: `runtime_memory.c` (direct pool backed by one memfd / Windows section, flexible
-memory, PS4 16 KiB pages, GPU page-protection hooks; `GOW3_DMEM_MB`), `runtime_file.c` (guest
+memory, PS4 16 KiB pages, GPU page-protection hooks; `TSUKI_DMEM_MB`), `runtime_file.c` (guest
 mounts `/app0`, `/temp0`, `/download0`, `/data`, `/savedataN`; `..` rejected; mod overlay),
 `runtime_services.c` (offline single-user console: user 1, no PSN, no network, PlayGo fully
 installed, dialogs through the GPU overlay), `runtime_thread.c` (guest TCB via GS on Linux and a
@@ -221,11 +221,11 @@ TEB TLS slot on Windows, patched by `patch_tcb_loads`).
   `gow3.ini`).
 - `gpu/gow3gpu.h` — the C interface between loader/runtime and the GPU library.
 - Linux: `libgow3gpu.so` loaded via rpath `$ORIGIN/gpu`; Windows: static, linked into `gow3-probe.exe`.
-- Many behaviours are toggled by `GOW3_*` environment variables (diagnostics, readbacks,
+- Many behaviours are toggled by `TSUKI_*` environment variables (diagnostics, readbacks,
   multisampling); `run.py` and `scripts/graphics_options.py` derive them from the
   launcher/`gow3.ini`. Temporal upscalers/motion vectors cannot be switched on (Spec 7 §10).
-  `run.py` turns on deferred and stale image readback by default (`GOW3_DEFERRED_READBACK`,
-  `GOW3_STALE_READBACK`, `scripts/graphics_options.py:14-15`), so CPU reads of GPU-written images use the
+  `run.py` turns on deferred and stale image readback by default (`TSUKI_DEFERRED_READBACK`,
+  `TSUKI_STALE_READBACK`, `scripts/graphics_options.py:14-15`), so CPU reads of GPU-written images use the
   previous frame's copy.
 
 ## Game-specific surface (the previous game's code, deleted; what any other title would need)
@@ -239,7 +239,7 @@ TEB TLS slot on Windows, patched by `patch_tcb_loads`).
     classifier in `motion_history.h:45` stays, with the now unreachable `CameraMotion`/`ObjectMotion`.
   - ~~The temporal upscaler's hard-coded shader hashes (`UiComposition::MovieShader`, `trigger_hash`,
     `ui_trigger_vs`)~~ (task 3b).
-  - ~~The `GOW3_READBACK_LINEAR=1` default in `run.py`~~ (task 4, 2026-10-25). The option stays.
+  - ~~The `TSUKI_READBACK_LINEAR=1` default in `run.py`~~ (task 4, 2026-10-25). The option stays.
 
   Not the previous game's code, so they stay: the 1920×1080 scene scaling (the project's base resolution), and the
   vendor-based guest MSAA decision (`gow3_msaa_default.h`, a workaround for AMD's and Intel's Windows drivers;
@@ -256,10 +256,10 @@ AIO, `sceKernelLoadStartModule`.
 
 The loader reports guest faults as image-relative offsets with an rbp backtrace; `--timeout N`
 arms a watchdog that dumps all thread stacks (Linux; SIGUSR2 dumps one thread). Scripted input:
-`GOW3_PAD_FILE`, `GOW3_PAD_RECORD`/`GOW3_PAD_REPLAY` (both from the game's first pad read, F9 only stops
-recording; clocked in pad reads, file header `reads`, old ms files are refused), `GOW3_MOUSE=0` (no mouse, for replays). `GOW3_FILE_TRACE=1` logs every guest file open
-(`File trace: open(<path>) -> fd <n>, <size> bytes` or `-> errno <e>`); `GOW3_AUDIO_TRACE` only covers failed reads and Ajm. `tools/got_import.py [--linked] <offset>` names the import
-bound to a GOT slot (`--linked`: `out/boot-linked.bin`, which includes `libc.prx`). Frame capture: `GOW3_FRAME_CAPTURE_KEY` (F11), or `GOW3_CAPTURE_TRIGGER=<file>` (creating the file records the next frame: passes, sampled images with their mips, and samplers as the guest asks for them and as Vulkan gets them). The full log of a launcher run is
+`TSUKI_PAD_FILE`, `TSUKI_PAD_RECORD`/`TSUKI_PAD_REPLAY` (both from the game's first pad read, F9 only stops
+recording; clocked in pad reads, file header `reads`, old ms files are refused), `TSUKI_MOUSE=0` (no mouse, for replays). `TSUKI_FILE_TRACE=1` logs every guest file open
+(`File trace: open(<path>) -> fd <n>, <size> bytes` or `-> errno <e>`); `TSUKI_AUDIO_TRACE` only covers failed reads and Ajm. `tools/got_import.py [--linked] <offset>` names the import
+bound to a GOT slot (`--linked`: `out/boot-linked.bin`, which includes `libc.prx`). Frame capture: `TSUKI_FRAME_CAPTURE_KEY` (F11), or `TSUKI_CAPTURE_TRIGGER=<file>` (creating the file records the next frame: passes, sampled images with their mips, and samplers as the guest asks for them and as Vulkan gets them). The full log of a launcher run is
 `user/last_run.log`.
 
 ## Conventions

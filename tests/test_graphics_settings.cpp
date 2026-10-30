@@ -43,19 +43,19 @@ int main() {
                "render_resolution=1440p\nengine_fps=240\ndeferred_readback=0\nstale_readback=1\n"
                "fsr1=1\nrcas=0\nrcas_strength=40\nframes_queued=2\n";
     }
-    _putenv_s("GOW3_CONFIG", path);
-    _putenv_s("GOW3_ASYNC_SHADERS", "");
+    _putenv_s("TSUKI_CONFIG", path);
+    _putenv_s("TSUKI_ASYNC_SHADERS", "");
     auto& v = Gow3Settings::Get();
     Gow3Settings::Load();
     assert(v.display_mode == G::Borderless && !v.vsync && v.fps_limit == 240 && !v.async_shaders);
     assert(v.render_resolution == 3 && v.engine_fps == 240 && !v.deferred_readback && v.stale_readback);
     assert(v.fsr1 && !v.rcas && v.rcas_strength == 40 && v.frames_queued == 2);
     assert(!Gow3Settings::GraphicsNeedRestart());
-    assert(v.applied_engine_fps == 240);  // no GOW3_ENGINE_FPS: the configured rate
-    _putenv_s("GOW3_ENGINE_FPS", "60");    // run.py: the frame rate patch did not apply
+    assert(v.applied_engine_fps == 240);  // no TSUKI_ENGINE_FPS: the configured rate
+    _putenv_s("TSUKI_ENGINE_FPS", "60");    // run.py: the frame rate patch did not apply
     Gow3Settings::Load();
     assert(v.engine_fps == 240 && v.applied_engine_fps == 60 && !Gow3Settings::GraphicsNeedRestart());
-    _putenv_s("GOW3_ENGINE_FPS", "");
+    _putenv_s("TSUKI_ENGINE_FPS", "");
     v.engine_fps = 120;
     assert(Gow3Settings::GraphicsNeedRestart());
     v.fps_limit = 60;  // live: no restart because of it
@@ -76,7 +76,7 @@ int main() {
         out << "display_mode=huge\nfps_limit=7\nrender_resolution=8K\nengine_fps=1\n"
                "rcas_strength=250\nframes_queued=9\n";
     }
-    _putenv_s("GOW3_ASYNC_SHADERS", "1");  // the environment still wins at start
+    _putenv_s("TSUKI_ASYNC_SHADERS", "1");  // the environment still wins at start
     v.async_shaders = false;
     Gow3Settings::Load();
     assert(v.display_mode == G::Windowed && v.fps_limit == 0 && v.render_resolution == 0 && v.engine_fps == 120);
@@ -104,8 +104,8 @@ int main() {
                "sharpness=1.5\nfsr4_auto_exposure=0\nfsr4_invert_jitter=1\nlive_resolution=1\n"
                "overlay_upscaler=1\nfsr1=1\n";
     }
-    for (const char* env : {"GOW3_UPSCALER=fsr3", "GOW3_UPSCALE_PRESET=3", "GOW3_JITTER=0", "GOW3_REACTIVE=1",
-                            "GOW3_OBJECT_MOTION=0", "GOW3_FSR_SHARPNESS=1.5", "GOW3_REACTIVE_SCALE=4"}) {
+    for (const char* env : {"TSUKI_UPSCALER=fsr3", "TSUKI_UPSCALE_PRESET=3", "TSUKI_JITTER=0", "TSUKI_REACTIVE=1",
+                            "TSUKI_OBJECT_MOTION=0", "TSUKI_FSR_SHARPNESS=1.5", "TSUKI_REACTIVE_SCALE=4"}) {
         const std::string pair = env;
         _putenv_s(pair.substr(0, pair.find('=')).c_str(), pair.substr(pair.find('=') + 1).c_str());
     }
@@ -127,6 +127,19 @@ int main() {
     // A fresh Values has the overlay's default items: FPS and frametime, not the old upscaler bit.
     const Gow3Settings::Values fresh;
     assert(fresh.overlay_items == 3u && fresh.upscaler == Gow3Settings::UpscalerOff);
+    {
+        // Spec 7: the old TSUKI_* names are not aliases.
+        std::ofstream out(path);
+        out << "fsr1=0\n";
+    }
+    _putenv_s("GOW3_FSR1", "1"); // rename-check: ok
+    Gow3Settings::Load();
+    assert(!v.fsr1);
+    _putenv_s("GOW3_FSR1", ""); // rename-check: ok
+    _putenv_s("TSUKI_FSR1", "1");
+    Gow3Settings::Load();
+    assert(v.fsr1);
+    _putenv_s("TSUKI_FSR1", "");
     std::remove(path);
     std::puts("PASS: graphics settings");
 }

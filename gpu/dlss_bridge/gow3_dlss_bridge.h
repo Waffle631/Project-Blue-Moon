@@ -14,7 +14,7 @@
 extern "C" {
 #endif
 
-#define GOW3_DLSS_BRIDGE_ABI 1
+#define TSUKI_DLSS_BRIDGE_ABI 1
 
 typedef void (*Gow3DlssLogFn)(int warning, const char* message);
 

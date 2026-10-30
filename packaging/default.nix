@@ -52,7 +52,7 @@ let
       --set-default FONTCONFIG_FILE ${fontsConf} \
       --set-default LC_ALL C.UTF-8 \
       --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath [ pkgs.libglvnd pkgs.libx11 pkgs.libxext ]} \
-      --set GOW3_VULKANINFO ${pkgs.vulkan-tools}/bin/vulkaninfo \
+      --set TSUKI_VULKANINFO ${pkgs.vulkan-tools}/bin/vulkaninfo \
   '';
 in
 pkgs.stdenv.mkDerivation {
@@ -91,11 +91,11 @@ pkgs.stdenv.mkDerivation {
     # The game (settings from the data directory's gow3.ini).
     makeShellWrapper ${pkgs.python3}/bin/python3 $out/libexec/gow3 \
       ${common}      --add-flags "$out/share/gow3/launcher/gow3_vulkan.py ${pkgs.bash}/bin/bash $out/share/gow3/run.sh" \
-      --set GOW3_PREBUILT 1 \
+      --set TSUKI_PREBUILT 1 \
       --set PYTHON ${pkgs.python3}/bin/python3 \
-      --set GOW3_BUNDLED_VK_DRIVER_FILES ${icds} \
+      --set TSUKI_BUNDLED_VK_DRIVER_FILES ${icds} \
       --prefix PATH : ${lib.makeBinPath [ pkgs.bash pkgs.coreutils ]} \
-      --run 'export GOW3_DATA_DIR=''${GOW3_DATA_DIR:-''${XDG_DATA_HOME:-$HOME/.local/share}/gow3}; mkdir -p "$GOW3_DATA_DIR"'
+      --run 'export TSUKI_DATA_DIR=''${TSUKI_DATA_DIR:-''${XDG_DATA_HOME:-$HOME/.local/share}/gow3}; mkdir -p "$TSUKI_DATA_DIR"'
   '';
   meta.mainProgram = "gow3";
 }

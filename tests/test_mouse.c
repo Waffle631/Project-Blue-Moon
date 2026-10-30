@@ -72,17 +72,17 @@ static void no_device(void) {
     assert(r.connected==0 && r.timestamp==0 && r.x==0 && r.y==0 && r.wheel==0 && r.buttons==0 && r.tilt==0);
     present=1;
 }
-/* GOW3_MOUSE=0 (scripted routes): the game sees no mouse even with one plugged in, and the bridge is
+/* TSUKI_MOUSE=0 (scripted routes): the game sees no mouse even with one plugged in, and the bridge is
  * still drained so nothing moved meanwhile arrives later. */
 static void mouse_off(void) {
-    setenv("GOW3_MOUSE","0",1);
+    setenv("TSUKI_MOUSE","0",1);
     assert(mouse_init()==0);
     int32_t h=mouse_open(10,0,0,NULL); assert(h>0);
     acc_dx=5; acc_dy=-3; acc_wheel=1; acc_buttons=0x1; present=1;
     Report r; assert(read_report(h,&r)==1);
     assert(r.connected==0 && r.timestamp==0 && r.x==0 && r.y==0 && r.wheel==0 && r.buttons==0 && r.tilt==0);
     assert(acc_dx==0 && acc_dy==0 && acc_wheel==0);
-    unsetenv("GOW3_MOUSE");
+    unsetenv("TSUKI_MOUSE");
     assert(mouse_init()==0);
     acc_dx=2; assert(read_report(h,&r)==1 && r.connected==1 && r.x==2);
 }

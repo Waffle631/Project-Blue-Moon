@@ -14,7 +14,7 @@ namespace Gow3Settings {
 namespace {
 
 const char* Path() {
-    const char* env = std::getenv("GOW3_CONFIG");
+    const char* env = std::getenv("TSUKI_CONFIG");
     return env && env[0] ? env : "gow3.ini";
 }
 
@@ -110,9 +110,9 @@ void Load() {
     }
     // Environment overrides (scripts, A/B tests).
     const std::pair<const char*, const char*> env_keys[] = {
-        {"GOW3_ASYNC_SHADERS", "async_shaders"},      {"GOW3_DEFERRED_READBACK", "deferred_readback"},
-        {"GOW3_STALE_READBACK", "stale_readback"},     {"GOW3_FSR1", "fsr1"},
-        {"GOW3_RCAS", "rcas"},                        {"GOW3_FRAMES_AHEAD", "frames_queued"},
+        {"TSUKI_ASYNC_SHADERS", "async_shaders"},      {"TSUKI_DEFERRED_READBACK", "deferred_readback"},
+        {"TSUKI_STALE_READBACK", "stale_readback"},     {"TSUKI_FSR1", "fsr1"},
+        {"TSUKI_RCAS", "rcas"},                        {"TSUKI_FRAMES_AHEAD", "frames_queued"},
     };
     for (const auto& [env, key] : env_keys) {
         if (const char* value = std::getenv(env); value && value[0]) {
@@ -125,7 +125,7 @@ void Load() {
     v.startup_output_res = v.output_res;
     v.startup_render_resolution = v.render_resolution;
     v.startup_engine_fps = v.engine_fps;
-    const char* applied = std::getenv("GOW3_ENGINE_FPS");
+    const char* applied = std::getenv("TSUKI_ENGINE_FPS");
     v.applied_engine_fps = applied && applied[0] ? Gow3Graphics::ParseEngineFps(std::atoi(applied))
                                                  : v.engine_fps.load();
     v.startup_deferred_readback = v.deferred_readback;
@@ -168,7 +168,7 @@ void ConfigureDlssSupport(bool available, const char* problem) {
 }
 
 bool FixedRenderSession() {
-    const char* size = std::getenv("GOW3_RENDER_RES");
+    const char* size = std::getenv("TSUKI_RENDER_RES");
     return size && size[0];
 }
 

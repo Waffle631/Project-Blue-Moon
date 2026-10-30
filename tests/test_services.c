@@ -138,11 +138,14 @@ int main(void) {
     assert(no_effect_calls[SHAREPLAY_PROHIBITION]==2 && no_effect_calls[VIDEO_RECORDING_INFO]==2);
     assert(printed_lines(capture_policy)==0 && no_effect_calls[SCREENSHOT_DISABLE]==4);
     /* The first language query is logged once, so a run's log says which language the game was given. */
-    unsetenv("GOW3_LANGUAGE");
+    unsetenv("TSUKI_LANGUAGE");
     assert(printed_lines(language_twice)==1 && printed_lines(language_twice)==0);
     int32_t language_id=0; assert(system_param(1,&language_id)==0 && language_id==1);
-    setenv("GOW3_LANGUAGE","8",1); assert(system_param(1,&language_id)==0 && language_id==8);
-    unsetenv("GOW3_LANGUAGE");
+    /* Spec 7: the old name is not an alias. */
+    setenv("GOW3_LANGUAGE","8",1); assert(system_param(1,&language_id)==0 && language_id==1); /* rename-check: ok */
+    unsetenv("GOW3_LANGUAGE"); /* rename-check: ok */
+    setenv("TSUKI_LANGUAGE","8",1); assert(system_param(1,&language_id)==0 && language_id==8);
+    unsetenv("TSUKI_LANGUAGE");
     puts("services test: ok");
     return 0;
 }

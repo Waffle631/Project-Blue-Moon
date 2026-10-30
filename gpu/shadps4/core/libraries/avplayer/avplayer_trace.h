@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// gow3: GOW3_TRACE_AVPLAYER=1 writes one stderr line per libSceAvPlayer call the game makes and per
-// event AvPlayer sends it, to learn the game's real contract (Spec 5, paso 1; docs/avplayer.md).
-// Lines read "AvTrace +<ms> t<tid>: ...", <ms> counted from the first traced call, whose wall clock
-// time the first line gives. With the variable unset a call site costs one load of a static bool.
+// gow3: TSUKI_TRACE_AVPLAYER=1 writes one stderr line per libSceAvPlayer call the game makes and
+// per event AvPlayer sends it, to learn the game's real contract (Spec 5, paso 1;
+// docs/avplayer.md). Lines read "AvTrace +<ms> t<tid>: ...", <ms> counted from the first traced
+// call, whose wall clock time the first line gives. With the variable unset a call site costs one
+// load of a static bool.
 
 #pragma once
 
@@ -19,7 +20,7 @@ namespace Libraries::AvPlayer {
 
 inline bool AvTraceEnabled() {
     static const bool enabled = [] {
-        const char* value = std::getenv("GOW3_TRACE_AVPLAYER");
+        const char* value = std::getenv("TSUKI_TRACE_AVPLAYER");
         return value != nullptr && value[0] != '\0' && value[0] != '0';
     }();
     return enabled;
@@ -42,7 +43,7 @@ inline long long AvTraceMs() {
         const std::time_t now = std::time(nullptr);
         char clock[16] = "?";
         std::strftime(clock, sizeof(clock), "%H:%M:%S", std::localtime(&now));
-        std::fprintf(stderr, "AvTrace: GOW3_TRACE_AVPLAYER on, +0 is %s\n", clock);
+        std::fprintf(stderr, "AvTrace: TSUKI_TRACE_AVPLAYER on, +0 is %s\n", clock);
         return true;
     }();
     (void)announced;

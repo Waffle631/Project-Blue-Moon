@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Prepares the game image and starts gow3-probe (Windows and Linux; run.sh wraps it on Linux).
 
-Environment variables (GOW3_GAME_DIR, GOW3_DATA_DIR, GOW3_PATCHES, GOW3_MODS_*,
-GOW3_USER_DIR, ...). Extra arguments go to gow3-probe.
-The in-game "Apply and restart" runs this script again through GOW3_RESTART_COMMAND;
+Environment variables (TSUKI_GAME_DIR, TSUKI_DATA_DIR, TSUKI_PATCHES, TSUKI_MODS_*,
+TSUKI_USER_DIR, ...). Extra arguments go to gow3-probe.
+The in-game "Apply and restart" runs this script again through TSUKI_RESTART_COMMAND;
 `--after PID` waits for the previous game process to end first (its GPU device and memory).
 """
 import os
@@ -64,8 +64,8 @@ def parse_cpu_features(output):
 
 
 def isa_rewrite_wanted(missing, env):
-    """GOW3_ISA_REWRITE=1 forces the ISA rewrite table, 0 disables it; otherwise the CPU decides."""
-    policy = env.get('GOW3_ISA_REWRITE')
+    """TSUKI_ISA_REWRITE=1 forces the ISA rewrite table, 0 disables it; otherwise the CPU decides."""
+    policy = env.get('TSUKI_ISA_REWRITE')
     if policy in ('0', '1'):
         return policy == '1'
     return bool(missing)
@@ -97,9 +97,9 @@ def launch_prefix(env):
     variable), GameMode a command that starts the game."""
     if WINDOWS:
         return []
-    if env.get('GOW3_MANGOHUD') == '1':
+    if env.get('TSUKI_MANGOHUD') == '1':
         env.setdefault('MANGOHUD', '1')
-    if env.get('GOW3_GAMEMODE') == '1':
+    if env.get('TSUKI_GAMEMODE') == '1':
         if gamemode := shutil.which('gamemoderun'):
             return [gamemode]
         print('GameMode: gamemoderun not found, starting without it', flush=True)
@@ -119,26 +119,26 @@ def main():
     if len(args) >= 2 and args[0] == '--after':
         wait_for(int(args[1]))
         args = args[2:]
-    # As run.sh: relative paths (GOW3_GAME_DIR, GOW3_DATA_DIR) are from the port.
+    # As run.sh: relative paths (TSUKI_GAME_DIR, TSUKI_DATA_DIR) are from the port.
     os.chdir(PORT)
     env = os.environ
-    data = Path(env.get('GOW3_DATA_DIR', PORT))
+    data = Path(env.get('TSUKI_DATA_DIR', PORT))
     out = data / 'out'
     out.mkdir(parents=True, exist_ok=True)
-    env.setdefault('GOW3_CONFIG', str(data / 'gow3.ini'))
+    env.setdefault('TSUKI_CONFIG', str(data / 'gow3.ini'))
     # Values this script derived on the previous start ("Apply and restart" inherits them) are
     # derived again from the new options.
-    for key in env.pop('GOW3_DERIVED', '').split(','):
+    for key in env.pop('TSUKI_DERIVED', '').split(','):
         env.pop(key, None)
     derived = []
     sys.path.insert(0, str(PORT / 'scripts'))
     import graphics_options
-    graphics, reverted = graphics_options.prepare(env['GOW3_CONFIG'], out / 'graphics_state.json')
+    graphics, reverted = graphics_options.prepare(env['TSUKI_CONFIG'], out / 'graphics_state.json')
     if reverted:
         print('Graphics: the last restart never reached the game; previous options restored', flush=True)
     env.update(graphics_options.environment(graphics))
 
-    probe = Path(env['GOW3_PROBE']) if env.get('GOW3_PROBE') else find_executable('gow3-probe' + EXE_SUFFIX)
+    probe = Path(env['TSUKI_PROBE']) if env.get('TSUKI_PROBE') else find_executable('gow3-probe' + EXE_SUFFIX)
     if not probe or not probe.is_file():
         fail(f'gow3-probe{EXE_SUFFIX} not found: build it with build.sh or use a packaged build.')
     # Development builds run from the MSYS2 tree: its CLANG64 DLLs (SDL3, FFmpeg, ...).
@@ -155,23 +155,23 @@ def main():
         sys.exit(20)
     missing = parse_cpu_features(features.stdout)
 
-    game = Path(env.get('GOW3_GAME_DIR', PORT / 'Tsukihime' / 'CUSA47999'))
+    game = Path(env.get('TSUKI_GAME_DIR', PORT / 'Tsukihime' / 'CUSA47999'))
     if not (game / 'eboot.bin').is_file():
-        fail(f'No eboot.bin in {game} (set GOW3_GAME_DIR).')
+        fail(f'No eboot.bin in {game} (set TSUKI_GAME_DIR).')
     update_view = None
-    if env.get('GOW3_PATCH_DIR'):
+    if env.get('TSUKI_PATCH_DIR'):
         import game_update
         try:
-            update_view = game_update.create_view(game, env['GOW3_PATCH_DIR'], out)
+            update_view = game_update.create_view(game, env['TSUKI_PATCH_DIR'], out)
         except (ValueError, OSError) as error:
             fail(str(error))
         game = update_view
-        print(f'Game and update combined from {env["GOW3_PATCH_DIR"]}', flush=True)
+        print(f'Game and update combined from {env["TSUKI_PATCH_DIR"]}', flush=True)
     original_game = game.resolve()
     game = Path(run_script('mods.py', game, '--out', out,
-                           '--mods-dir', env.get('GOW3_MODS_DIR', data / 'mods'),
-                           '--config', env.get('GOW3_MODS_CONFIG', data / 'mods.json'),
-                           '--enabled', env.get('GOW3_MODS_ENABLED', '1'), capture=True).strip())
+                           '--mods-dir', env.get('TSUKI_MODS_DIR', data / 'mods'),
+                           '--config', env.get('TSUKI_MODS_CONFIG', data / 'mods.json'),
+                           '--enabled', env.get('TSUKI_MODS_ENABLED', '1'), capture=True).strip())
     mod_view = game if game.resolve() != original_game else None
     try:
         run_script('prepare.py', game, '--out', out)
@@ -185,7 +185,7 @@ def main():
             print(output, end='', flush=True)
             if code == 0:
                 isa_args = ['--isa-rewrite', str(out / 'isa-rewrite.bin')]
-        run_script('content_profile.py', game, '--out', out, '--sku', env.get('GOW3_CONTENT_SKU', 'full'))
+        run_script('content_profile.py', game, '--out', out, '--sku', env.get('TSUKI_CONTENT_SKU', 'full'))
 
         import patches
         from patches import game_profile_for, patch_requirements, patch_status, selected_patches
@@ -203,47 +203,47 @@ def main():
             from PIL import Image
             with Image.open(icon_file) as icon:
                 icon.convert('RGBA').resize((64, 64), Image.LANCZOS).save(out / 'window_icon.bmp')
-            env.setdefault('GOW3_WINDOW_ICON', str(out / 'window_icon.bmp'))
+            env.setdefault('TSUKI_WINDOW_ICON', str(out / 'window_icon.bmp'))
         except (ImportError, OSError):
             pass
         if profile:
-            names = selected_patches(profile[1], profile[2], env.get('GOW3_PATCHES', ''), env.get('GOW3_PATCHES_ONLY') == '1')
+            names = selected_patches(profile[1], profile[2], env.get('TSUKI_PATCHES', ''), env.get('TSUKI_PATCHES_ONLY') == '1')
             # gow3.ini decides the resolution and frame rate patches (in-game menu, launcher).
             names = graphics_options.patch_names(names, graphics)
             names = graphics_options.restrict_to_available(names, patches.available_patches(profile[1], profile[2]))
-            env['GOW3_PATCHES'] = ';'.join(names)
-            env['GOW3_PATCHES_ONLY'] = '1'
+            env['TSUKI_PATCHES'] = ';'.join(names)
+            env['TSUKI_PATCHES_ONLY'] = '1'
         (out / 'patch_status.json').unlink(missing_ok=True)
-        run_script('patches.py', '--out', out, '--extra', env.get('GOW3_PATCHES', ''), '--game-dir', game,
-                   '--patches-dir', env.get('GOW3_PATCHES_DIR', data / 'patches'),
-                   '--patches-config', env.get('GOW3_PATCHES_CONFIG', data / 'patches.json'))
+        run_script('patches.py', '--out', out, '--extra', env.get('TSUKI_PATCHES', ''), '--game-dir', game,
+                   '--patches-dir', env.get('TSUKI_PATCHES_DIR', data / 'patches'),
+                   '--patches-config', env.get('TSUKI_PATCHES_CONFIG', data / 'patches.json'))
         if profile:
             # Only the patches found in this eboot.bin count: a frame rate patch that was skipped
             # leaves the engine at 60 FPS, and the notes' memory and VBlank needs follow the same list.
             applied = (patch_status(out) or {}).get('applied', [])
             engine_fps = graphics_options.applied_engine_fps(applied)
             dmem, vblank = patch_requirements(profile[1], applied, profile[2])
-            for key, value in (('GOW3_DMEM_MB', dmem), ('GOW3_VBLANK_HZ', vblank)):
+            for key, value in (('TSUKI_DMEM_MB', dmem), ('TSUKI_VBLANK_HZ', vblank)):
                 if value and key not in env:
                     env[key] = str(value)
                     derived.append(key)
-        if 'GOW3_VBLANK_HZ' not in env:
-            env['GOW3_VBLANK_HZ'] = '60'
-            derived.append('GOW3_VBLANK_HZ')
+        if 'TSUKI_VBLANK_HZ' not in env:
+            env['TSUKI_VBLANK_HZ'] = '60'
+            derived.append('TSUKI_VBLANK_HZ')
         # Without the frame rate patch the engine steps 1/60 s per frame: the present thread must
         # not flip faster (gow3_graphics.h PresentLimit), or the game speeds up.
-        env['GOW3_ENGINE_FPS'] = str(engine_fps)
-        derived.append('GOW3_ENGINE_FPS')
+        env['TSUKI_ENGINE_FPS'] = str(engine_fps)
+        derived.append('TSUKI_ENGINE_FPS')
         print(f'Engine frame rate: {engine_fps} FPS'
               + ('' if engine_fps > 60 or graphics['engine_fps'] == '60' else
                  ' (the frame rate patch was not found in this eboot.bin)'), flush=True)
-        env['GOW3_DERIVED'] = ','.join(derived)
+        env['TSUKI_DERIVED'] = ','.join(derived)
 
         # The in-game restart starts this script again once this process is gone.
         # GPU caches (shaders, pipelines) beside the saves; read before main(), so set here.
-        user_dir = Path(env.get('GOW3_USER_DIR', data / 'user')).resolve()
+        user_dir = Path(env.get('TSUKI_USER_DIR', data / 'user')).resolve()
         user_dir.mkdir(parents=True, exist_ok=True)
-        env.setdefault('GOW3_GPU_USER_DIR', str(user_dir))
+        env.setdefault('TSUKI_GPU_USER_DIR', str(user_dir))
         from save_backup import backup
         try:
             if made := backup(user_dir):
@@ -255,11 +255,11 @@ def main():
         # the probe replaces itself with the new launch while this process still waits for it.
         after = ['--after', str(os.getpid())] if WINDOWS else []
         restart = [sys.executable, *this, *after, *args]
-        env['GOW3_RESTART_COMMAND'] = subprocess.list2cmdline(restart) if WINDOWS else shlex.join(restart)
+        env['TSUKI_RESTART_COMMAND'] = subprocess.list2cmdline(restart) if WINDOWS else shlex.join(restart)
         command = [*launch_prefix(env), str(probe), str(out / 'boot-linked.bin'), '--content-profile', str(out / 'content.bin'),
                    '--patches', str(out / 'patches.bin'), '--app0', str(game),
                    '--user', str(user_dir),
-                   '--timeout', env.get('GOW3_TIMEOUT', '0'), *isa_args, *args]
+                   '--timeout', env.get('TSUKI_TIMEOUT', '0'), *isa_args, *args]
         # No stdin: an inherited pipe (shells such as Git Bash) cost the game its console output.
         return subprocess.run(command, stdin=subprocess.DEVNULL, creationflags=no_console()).returncode
     finally:

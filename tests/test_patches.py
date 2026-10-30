@@ -197,8 +197,8 @@ class PatchesMainTests(unittest.TestCase):
                 mock.patch.dict(os.environ), \
                 mock.patch.object(patches, 'game_sfo', side_effect=lambda game: seen.append(game) or dict(sfo or {})), \
                 contextlib.redirect_stdout(output):
-            os.environ.pop('GOW3_GAME_DIR', None)
-            os.environ.pop('GOW3_PATCHES_ONLY', None)
+            os.environ.pop('TSUKI_GAME_DIR', None)
+            os.environ.pop('TSUKI_PATCHES_ONLY', None)
             patches.main()
         return output.getvalue(), struct.unpack_from('<8sQQ', (self.out / 'patches.bin').read_bytes())[2], seen
 

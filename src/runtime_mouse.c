@@ -33,19 +33,19 @@ _Static_assert(offsetof(MouseData,buttons)==12 && offsetof(MouseData,x_axis)==16
     "the offsets the game reads");
 
 static pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER;
-static int initialized, disabled, next_handle=1; /* disabled: GOW3_MOUSE=0, read at Init */
+static int initialized, disabled, next_handle=1; /* disabled: TSUKI_MOUSE=0, read at Init */
 static struct { int32_t handle, user; } ports[MOUSE_PORTS]; /* handle 0 = free */
 
 static uint64_t now_us(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC,&t); return (uint64_t)t.tv_sec*1000000u+(uint64_t)t.tv_nsec/1000u; }
 /* Port index of an open handle, or -1. Caller holds the lock. */
 static int find_handle(int32_t handle) { if (handle<=0) return -1; for (int i=0; i<MOUSE_PORTS; i++) if (ports[i].handle==handle) return i; return -1; }
 
-/* GOW3_MOUSE=0 reports no mouse: a recorded route (GOW3_PAD_REPLAY) does not record the mouse, and a
+/* TSUKI_MOUSE=0 reports no mouse: a recorded route (TSUKI_PAD_REPLAY) does not record the mouse, and a
  * pointer left somewhere else would move the game's cursor on each replay. */
 static ABI int32_t mouse_init(void) {
-    const char *env=getenv("GOW3_MOUSE");
+    const char *env=getenv("TSUKI_MOUSE");
     pthread_mutex_lock(&lock); initialized=1; disabled=env && !strcmp(env,"0"); pthread_mutex_unlock(&lock);
-    if (disabled) puts("Runtime: mouse disabled (GOW3_MOUSE=0)");
+    if (disabled) puts("Runtime: mouse disabled (TSUKI_MOUSE=0)");
     return 0;
 }
 static ABI int32_t mouse_open(int32_t user,int32_t type,int32_t index,const void *param) {

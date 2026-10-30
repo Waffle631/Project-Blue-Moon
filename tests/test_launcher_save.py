@@ -26,13 +26,13 @@ class LauncherOverTemporaryFiles(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
         self.saved = (launcher.CONFIG_DIR, launcher.CONFIG_FILE, launcher.DATA_DIR, launcher.LANG,
-                      os.environ.get('GOW3_CONFIG'))
+                      os.environ.get('TSUKI_CONFIG'))
         launcher.CONFIG_DIR = self.tmp / 'config'
         launcher.CONFIG_FILE = launcher.CONFIG_DIR / 'settings.json'
         launcher.DATA_DIR = self.tmp / 'data'
         launcher.DATA_DIR.mkdir()
         launcher.LANG = 'en'
-        os.environ['GOW3_CONFIG'] = str(self.tmp / 'gow3.ini')
+        os.environ['TSUKI_CONFIG'] = str(self.tmp / 'gow3.ini')
         if self.INI:
             (self.tmp / 'gow3.ini').write_text(self.INI, encoding='utf-8')
         self.root = tk.Tk()
@@ -48,9 +48,9 @@ class LauncherOverTemporaryFiles(unittest.TestCase):
         self.close_window()
         launcher.CONFIG_DIR, launcher.CONFIG_FILE, launcher.DATA_DIR, launcher.LANG, config = self.saved
         if config is None:
-            os.environ.pop('GOW3_CONFIG', None)
+            os.environ.pop('TSUKI_CONFIG', None)
         else:
-            os.environ['GOW3_CONFIG'] = config
+            os.environ['TSUKI_CONFIG'] = config
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def save_state(self):

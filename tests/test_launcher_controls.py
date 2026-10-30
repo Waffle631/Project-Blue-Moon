@@ -35,9 +35,9 @@ class ControlMapTest(unittest.TestCase):
     def test_pipeline_binary_cache_switch(self):
         settings = {**launcher.APP_DEFAULTS}
         self.assertTrue(settings['pipeline_binary_cache'])
-        self.assertEqual(launcher.game_environment(settings)['GOW3_PIPELINE_BINARIES'], '1')
+        self.assertEqual(launcher.game_environment(settings)['TSUKI_PIPELINE_BINARIES'], '1')
         settings['pipeline_binary_cache'] = False
-        self.assertEqual(launcher.game_environment(settings)['GOW3_PIPELINE_BINARIES'], '0')
+        self.assertEqual(launcher.game_environment(settings)['TSUKI_PIPELINE_BINARIES'], '0')
 
     def test_changed_buttons_in_table_order(self):
         controls = {'key': {'circle': ' Left Shift ', 'cross': 'Q', 'square': ''}, 'pad': {'cross': 'b'}}
@@ -81,21 +81,21 @@ class ControlMapTest(unittest.TestCase):
     def test_environment(self):
         settings = {**launcher.APP_DEFAULTS, 'controls': {'key': {'cross': 'Q'}}}
         env = launcher.game_environment(settings)
-        self.assertEqual(env['GOW3_KEY_MAP'], 'cross=Q')
-        self.assertNotIn('GOW3_PAD_MAP', env)
-        self.assertEqual(env['GOW3_PARALLEL_WARMUP'], '1')
-        self.assertEqual(env['GOW3_BACKGROUND_WARMUP'], '1')
-        self.assertEqual(env['GOW3_PERF_DIAG'], '0')
-        self.assertNotIn('GOW3_FRAME_CAPTURE_KEY', {k for k in env if k not in __import__('os').environ})
-        self.assertEqual(launcher.game_environment({**settings, 'frame_capture_key': True})['GOW3_FRAME_CAPTURE_KEY'], '1')
+        self.assertEqual(env['TSUKI_KEY_MAP'], 'cross=Q')
+        self.assertNotIn('TSUKI_PAD_MAP', env)
+        self.assertEqual(env['TSUKI_PARALLEL_WARMUP'], '1')
+        self.assertEqual(env['TSUKI_BACKGROUND_WARMUP'], '1')
+        self.assertEqual(env['TSUKI_PERF_DIAG'], '0')
+        self.assertNotIn('TSUKI_FRAME_CAPTURE_KEY', {k for k in env if k not in __import__('os').environ})
+        self.assertEqual(launcher.game_environment({**settings, 'frame_capture_key': True})['TSUKI_FRAME_CAPTURE_KEY'], '1')
         # Graphics options live in gow3.ini (run.py and the in-game menu), not in the environment.
-        for name in ('GOW3_FULLSCREEN', 'GOW3_PRESENT_MODE', 'GOW3_FPS_LIMIT', 'GOW3_ASYNC_SHADERS',
-                     'GOW3_DEFERRED_READBACK', 'GOW3_STALE_READBACK', 'GOW3_FSR1', 'GOW3_RCAS'):
+        for name in ('TSUKI_FULLSCREEN', 'TSUKI_PRESENT_MODE', 'TSUKI_FPS_LIMIT', 'TSUKI_ASYNC_SHADERS',
+                     'TSUKI_DEFERRED_READBACK', 'TSUKI_STALE_READBACK', 'TSUKI_FSR1', 'TSUKI_RCAS'):
             self.assertNotIn(name, {k for k in env if k not in __import__('os').environ})
-        old = launcher.game_environment({**settings, 'extra_env': 'GOW3_DRAW_PIPE=0'})
-        self.assertNotIn('GOW3_DRAW_PIPE', old)  # the old free-text field is ignored
-        self.assertEqual(launcher.game_environment({**settings, 'parallel_warmup': False})['GOW3_PARALLEL_WARMUP'], '0')
-        self.assertEqual(launcher.game_environment({**settings, 'background_warmup': False})['GOW3_BACKGROUND_WARMUP'], '0')
+        old = launcher.game_environment({**settings, 'extra_env': 'TSUKI_DRAW_PIPE=0'})
+        self.assertNotIn('TSUKI_DRAW_PIPE', old)  # the old free-text field is ignored
+        self.assertEqual(launcher.game_environment({**settings, 'parallel_warmup': False})['TSUKI_PARALLEL_WARMUP'], '0')
+        self.assertEqual(launcher.game_environment({**settings, 'background_warmup': False})['TSUKI_BACKGROUND_WARMUP'], '0')
 
     def test_settings_keys_kept(self):
         # The redesign hides some options (player name) but keeps every saved setting working.
@@ -103,7 +103,7 @@ class ControlMapTest(unittest.TestCase):
                     'draw_pipe', 'readbacks', 'background_warmup', 'parallel_warmup', 'controls', 'pad_style'):
             self.assertIn(key, launcher.APP_DEFAULTS)
         env = launcher.game_environment({**launcher.APP_DEFAULTS, 'player_name': ' Shiki '})
-        self.assertEqual(env['GOW3_USER_NAME'], 'Shiki')
+        self.assertEqual(env['TSUKI_USER_NAME'], 'Shiki')
         for key in ('display_mode', 'fps_limit', 'render_resolution', 'engine_fps'):
             self.assertIn(key, launcher.INI_DEFAULTS)
 
@@ -113,7 +113,7 @@ class ControlMapTest(unittest.TestCase):
         self.assertEqual([v for v, _t in launcher.FPS_LIMITS], ['30', '60', '120', '240', '0'])
         self.assertEqual(d['frames_queued'], '1')
         self.assertEqual([v for v, _t in launcher.FRAMES_QUEUED], ['1', '2', '0'])
-        self.assertNotIn('GOW3_FRAMES_AHEAD', launcher.game_environment({**launcher.APP_DEFAULTS, 'frames_ahead': '2'}))
+        self.assertNotIn('TSUKI_FRAMES_AHEAD', launcher.game_environment({**launcher.APP_DEFAULTS, 'frames_ahead': '2'}))
 
 
 class GameFilesTest(unittest.TestCase):
@@ -515,13 +515,13 @@ class GpuChoiceTest(unittest.TestCase):
 
     def test_gpu_choice_reaches_the_game(self):
         from unittest import mock
-        with mock.patch.dict(launcher.os.environ, {'GOW3_GPU_ID': '7'}):
+        with mock.patch.dict(launcher.os.environ, {'TSUKI_GPU_ID': '7'}):
             env = launcher.game_environment({**launcher.APP_DEFAULTS, 'game_dir': 'x'})
-            self.assertIsNone(env.get('GOW3_GPU_ID'))  # Automatic wins over an inherited value
+            self.assertIsNone(env.get('TSUKI_GPU_ID'))  # Automatic wins over an inherited value
             env = launcher.game_environment({**launcher.APP_DEFAULTS, 'game_dir': 'x', 'gpu_id': '1'})
-            self.assertEqual(env['GOW3_GPU_ID'], '1')
+            self.assertEqual(env['TSUKI_GPU_ID'], '1')
             env = launcher.game_environment({**launcher.APP_DEFAULTS, 'game_dir': 'x', 'gpu_id': 'bad'})
-            self.assertIsNone(env.get('GOW3_GPU_ID'))
+            self.assertIsNone(env.get('TSUKI_GPU_ID'))
         self.assertEqual(launcher.APP_DEFAULTS['gpu_id'], '')
 
 

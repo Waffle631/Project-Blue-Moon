@@ -2,8 +2,8 @@
  * runtime uses. Included through runtime.h after the C library headers, so the macros below
  * only replace calls in this project's own sources. Paths are UTF-8: the executable's
  * manifest selects the UTF-8 code page (packaging/windows/gow3-probe.manifest). */
-#ifndef GOW3_COMPAT_WIN_H
-#define GOW3_COMPAT_WIN_H
+#ifndef TSUKI_COMPAT_WIN_H
+#define TSUKI_COMPAT_WIN_H
 #ifdef _WIN32
 #include <stdint.h>
 #include <stddef.h>

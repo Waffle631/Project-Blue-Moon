@@ -115,13 +115,13 @@ Dlss::Dlss() : impl{std::make_unique<Impl>()} {
         impl->module ? reinterpret_cast<Gow3DlssGetApiFn>(GetProcAddress(impl->module, "Gow3DlssGetApi"))
                      : nullptr;
     impl->api = get_api ? get_api() : nullptr;
-    if (!impl->api || impl->api->abi != GOW3_DLSS_BRIDGE_ABI) {
+    if (!impl->api || impl->api->abi != TSUKI_DLSS_BRIDGE_ABI) {
         impl->Disable("gow3_dlss.dll is missing or from another version");
         return;
     }
     // NGX writes its logs and model updates here: beside the saves and shader caches.
     std::filesystem::path data = directory / "dlss";
-    if (const char* user = std::getenv("GOW3_GPU_USER_DIR"); user && user[0]) {
+    if (const char* user = std::getenv("TSUKI_GPU_USER_DIR"); user && user[0]) {
         data = std::filesystem::path{user} / "dlss";
     }
     std::error_code error;

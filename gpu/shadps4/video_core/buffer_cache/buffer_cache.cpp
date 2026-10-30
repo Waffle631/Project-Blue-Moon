@@ -136,7 +136,7 @@ void BufferCache::SmallGuestCopy(const Gow3Copy::Item& item) {
 
 void BufferCache::ExtendWriteFault(VAddr device_addr) {
     static const u64 window = [] {
-        const char* env = std::getenv("GOW3_FAULT_WINDOW");
+        const char* env = std::getenv("TSUKI_FAULT_WINDOW");
         const u64 kib = env ? std::strtoull(env, nullptr, 10) : 256;
         return std::bit_ceil(std::clamp<u64>(kib, 4, 1024)) * 1024;
     }();
@@ -213,7 +213,7 @@ void BufferCache::DownloadMemory(const Buffer* arena, VAddr device_addr, u64 siz
 }
 
 namespace {
-// gow3: GOW3_BUFFER_STATS=1 — how buffer bindings reach the GPU, by guest region (256 MiB),
+// gow3: TSUKI_BUFFER_STATS=1 — how buffer bindings reach the GPU, by guest region (256 MiB),
 // printed every 5 s: small read-only copies into the stream buffer, arena bindings, and the
 // bytes those re-upload after CPU writes. Input for engine-level short paths.
 struct BufferStats {
@@ -250,7 +250,7 @@ u64 RegionKey(VAddr address) {
 }
 bool BufferStatsEnabled() {
     static const bool enabled = [] {
-        const char* value = std::getenv("GOW3_BUFFER_STATS");
+        const char* value = std::getenv("TSUKI_BUFFER_STATS");
         return value && value[0] == '1';
     }();
     return enabled;

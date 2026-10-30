@@ -159,10 +159,10 @@ Presenter::Presenter(Frontend::WindowSDL& window_, AmdGpu::Liverpool* liverpool_
     pp_pass.Create(device, swapchain.GetSurfaceFormat().format);
     Gow3Overlay::Init(instance, swapchain.GetSurfaceFormat().format, num_images);
 
-    const bool binary_cache = EmulatorSettingsImpl::Flag("GOW3_PIPELINE_BINARIES", true) &&
+    const bool binary_cache = EmulatorSettingsImpl::Flag("TSUKI_PIPELINE_BINARIES", true) &&
                               EmulatorSettings.IsPipelineCacheEnabled();
-    const bool capture_only = EmulatorSettingsImpl::Flag("GOW3_PIPELINE_BINARY_ISOLATED", false) &&
-                              EmulatorSettingsImpl::Flag("GOW3_PIPELINE_CAPTURE_ONLY", false);
+    const bool capture_only = EmulatorSettingsImpl::Flag("TSUKI_PIPELINE_BINARY_ISOLATED", false) &&
+                              EmulatorSettingsImpl::Flag("TSUKI_PIPELINE_CAPTURE_ONLY", false);
     if (UseOnDemandPipelines(binary_cache, instance.GetPipelineBinaryGlobalKey().keySize != 0,
                             capture_only)) {
         rasterizer->GetPipelineCache().StartOnDemand();
@@ -172,7 +172,7 @@ Presenter::Presenter(Frontend::WindowSDL& window_, AmdGpu::Liverpool* liverpool_
     // gow3: by default the cached pipelines load while the game runs (a corner note shows the
     // progress). Otherwise rebuilding them takes up to minutes before the first game frame:
     // show what is happening instead of a black window.
-    const char* background_warmup = std::getenv("GOW3_BACKGROUND_WARMUP");
+    const char* background_warmup = std::getenv("TSUKI_BACKGROUND_WARMUP");
     if ((!background_warmup || *background_warmup != '0') &&
         rasterizer->GetPipelineCache().StartBackgroundWarmUp()) {
         return;
@@ -351,7 +351,7 @@ static vk::Format GetFrameViewFormat(const Libraries::VideoOut::PixelFormat form
 }
 
 // gow3: copies a 32-bit image to host memory and hands the pixels to `sink` on the scheduler's
-// priority thread once the GPU is done (GOW3_FRAME_DUMP_TRIGGER raw dumps, PNG screenshots).
+// priority thread once the GPU is done (TSUKI_FRAME_DUMP_TRIGGER raw dumps, PNG screenshots).
 using HostImageSink = std::function<void(const u8* pixels, u32 w, u32 h)>;
 static void CopyToHost(const Instance& instance, Scheduler& scheduler, vk::CommandBuffer cmdbuf,
                        vk::Image image, vk::ImageLayout layout, u32 w, u32 h, HostImageSink sink) {
@@ -380,11 +380,11 @@ static void CopyToHost(const Instance& instance, Scheduler& scheduler, vk::Comma
     });
 }
 
-// gow3: GOW3_FRAME_DUMP_TRIGGER: the pixels as they are, in GOW3_DUMP_DIR (default out/dump).
+// gow3: TSUKI_FRAME_DUMP_TRIGGER: the pixels as they are, in TSUKI_DUMP_DIR (default out/dump).
 static void DumpRaw(const Instance& instance, Scheduler& scheduler, vk::CommandBuffer cmdbuf,
                     vk::Image image, vk::ImageLayout layout, u32 w, u32 h, const char* name,
                     int index) {
-    const char* dir = std::getenv("GOW3_DUMP_DIR");
+    const char* dir = std::getenv("TSUKI_DUMP_DIR");
     char path[512];
     std::snprintf(path, sizeof(path), "%s/%s_%03d_%ux%u.raw", dir && *dir ? dir : "out/dump", name,
                   index, w, h);
@@ -414,14 +414,14 @@ static std::optional<Gow3Screenshot::PixelOrder> ScreenshotOrder(vk::Format form
 
 Frame* Presenter::PrepareFrame(const Libraries::VideoOut::BufferAttributeGroup& attribute,
                                VAddr cpu_address) {
-    // gow3: GOW3_FRAME_DUMP_TRIGGER=<file>: when the file exists it is removed and this frame's
-    // guest display buffer and presented image are written to GOW3_DUMP_DIR (default out/dump)
+    // gow3: TSUKI_FRAME_DUMP_TRIGGER=<file>: when the file exists it is removed and this frame's
+    // guest display buffer and presented image are written to TSUKI_DUMP_DIR (default out/dump)
     // as raw 32-bit pixels (menus and movies included; the upscaler dumps scene frames only).
-    static const char* frame_dump_trigger = std::getenv("GOW3_FRAME_DUMP_TRIGGER");
+    static const char* frame_dump_trigger = std::getenv("TSUKI_FRAME_DUMP_TRIGGER");
     static int frame_dump_index = 0;
     const bool frame_dump = frame_dump_trigger && std::remove(frame_dump_trigger) == 0;
     // gow3: presentation frame number (one PrepareFrame per guest flip, the first is 1) for
-    // GOW3_SCREENSHOT_AT and F12 (gow3_screenshot.h): the presented image is saved as a PNG.
+    // TSUKI_SCREENSHOT_AT and F12 (gow3_screenshot.h): the presented image is saved as a PNG.
     static u64 presented_frames = 0;
     const u64 frame_number = ++presented_frames;
     const bool screenshot = Gow3Screenshot::Global().ShouldCapture(frame_number);
@@ -579,12 +579,12 @@ Frame* Presenter::PrepareFrame(const Libraries::VideoOut::BufferAttributeGroup& 
     SubmitInfo info{};
     draw_scheduler.Flush(info);
 
-    // gow3: the GPU command thread runs at most GOW3_FRAMES_AHEAD (default 1) guest frames
+    // gow3: the GPU command thread runs at most TSUKI_FRAMES_AHEAD (default 1) guest frames
     // ahead of the GPU: it waits here for the frame that many flips back. When the GPU is the
     // bottleneck it finishes frames at an even rate; without this bound the command thread ran
     // ahead and then blocked wherever a resource ran out, so flips (and the guest's frame
     // timing) came in bursts: 12.5/25 ms alternation at 80 FPS. 0 turns it off.
-    // The in-game menu changes it live (Gow3Settings::frames_queued; GOW3_FRAMES_AHEAD at start).
+    // The in-game menu changes it live (Gow3Settings::frames_queued; TSUKI_FRAMES_AHEAD at start).
     const u32 frames_ahead = u32(std::max(0, Gow3Settings::Get().frames_queued.load()));
     if (!frames_ahead) {
         recent_frame_ticks.clear();

@@ -42,10 +42,10 @@ bool ParseFrameList(std::string_view text, std::set<std::uint64_t>& out) {
 
 Schedule& Global() {
     static Schedule schedule = [] {
-        const char* env = std::getenv("GOW3_SCREENSHOT_AT");
+        const char* env = std::getenv("TSUKI_SCREENSHOT_AT");
         std::set<std::uint64_t> frames;
         if (env && !ParseFrameList(env, frames)) {
-            std::fprintf(stderr, "GOW3_SCREENSHOT_AT: malformed frame list '%s' (expected e.g. "
+            std::fprintf(stderr, "TSUKI_SCREENSHOT_AT: malformed frame list '%s' (expected e.g. "
                                  "120,600); no scheduled captures\n", env);
         }
         return Schedule(std::move(frames));
@@ -54,7 +54,7 @@ Schedule& Global() {
 }
 
 std::filesystem::path OutputDirectory() {
-    const char* env = std::getenv("GOW3_SCREENSHOT_DIR");
+    const char* env = std::getenv("TSUKI_SCREENSHOT_DIR");
     return env && *env ? std::filesystem::path(env) : std::filesystem::path("out/baseline");
 }
 

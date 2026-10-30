@@ -57,7 +57,7 @@ static ABI int32_t user_list(int32_t *ids) {
 }
 static ABI int32_t user_name(int32_t id,char *name,uint64_t size) {
     if (id!=USER_ID || !name) return USER_INVALID_ARGUMENT;
-    const char *value=getenv("GOW3_USER_NAME") ? getenv("GOW3_USER_NAME") : "Hunter";
+    const char *value=getenv("TSUKI_USER_NAME") ? getenv("TSUKI_USER_NAME") : "Hunter";
     if (strlen(value)+1>size) return (int32_t)0x8096000a; /* BUFFER_TOO_SHORT */
     strcpy(name,value); return 0;
 }
@@ -78,7 +78,7 @@ static ABI int32_t user_event(int32_t *event) {
 }
 
 /* ---- SystemService ---- */
-static int language(void) { const char *v=getenv("GOW3_LANGUAGE"); return v ? atoi(v) : 1; }
+static int language(void) { const char *v=getenv("TSUKI_LANGUAGE"); return v ? atoi(v) : 1; }
 static ABI int32_t system_param(int32_t id,int32_t *value) {
     if (!value) return SYSTEM_PARAMETER;
     switch (id) {
@@ -468,11 +468,11 @@ static ABI int32_t ime_init(const ImeParam *param, const void *extended) {
     char initial[512], prompt[256];
     utf16_to_utf8(param->buffer,param->max_length,initial,sizeof(initial));
     utf16_to_utf8(param->title,128,prompt,sizeof(prompt));
-    const char *preset=getenv("GOW3_IME_TEXT");
+    const char *preset=getenv("TSUKI_IME_TEXT");
     if (preset) { ime_complete(0,preset); return 0; }
     /* An empty field starts with the player name (launcher) or "Hunter": a controller alone
      * can accept it (the port has no on-screen keyboard). */
-    const char *name=getenv("GOW3_USER_NAME");
+    const char *name=getenv("TSUKI_USER_NAME");
     const char *start=initial[0] ? initial : name && *name ? name : "Hunter";
     if (!gow3gpu_text_input_begin(start,prompt[0] ? prompt : "Text")) ime_complete(0,start);
     else printf("Runtime: ImeDialog opened: shown on screen; keyboard Enter or Cross accepts, Esc or Circle cancels\n");

@@ -1,7 +1,7 @@
 /* C interface of the GPU library (gpu/): shadPS4's Liverpool/Vulkan video core,
  * GnmDriver, VideoOut and kernel event queues, adapted to the native loader. */
-#ifndef GOW3GPU_H
-#define GOW3GPU_H
+#ifndef TSUKIGPU_H
+#define TSUKIGPU_H
 #include <stdint.h>
 #ifdef __cplusplus
 extern "C" {
@@ -22,7 +22,7 @@ int gow3gpu_init(const Gow3GpuConfig *config);
 uintptr_t gow3gpu_resolve(const char *scoped_nid);
 /* Called first by the loader's SIGSEGV handler: 1 when a GPU page-tracking fault was handled. */
 int gow3gpu_handle_fault(void *ucontext, void *address);
-/* GOW3_WRITE_LOG=1: prints the logged GPU-side writes to guest memory near the fault. */
+/* TSUKI_WRITE_LOG=1: prints the logged GPU-side writes to guest memory near the fault. */
 void gow3gpu_dump_guest_writes(void *ucontext);
 /* Keyboard text entry through the game window (IME dialog). begin returns 0 when
  * no window exists; poll returns 0 typing, 1 confirmed, 2 cancelled (UTF-8 text). */
@@ -43,7 +43,7 @@ int gow3gpu_overlay_captures_input(void);
 int gow3gpu_mouse_read(int32_t *dx, int32_t *dy, int32_t *wheel, uint32_t *buttons);
 /* Counters for the final GPU: line (runtime_report and the watchdog): command buffer
  * submissions, draws, dispatches, guest flips presented, and warnings logged as unimplemented
- * (only those passing GOW3_GPU_LOG). Atomic loads only: safe in a signal handler. */
+ * (only those passing TSUKI_GPU_LOG). Atomic loads only: safe in a signal handler. */
 typedef struct { uint64_t submits, draws, dispatches, flips, unimplemented; } Gow3GpuStats;
 void gow3gpu_get_stats(Gow3GpuStats *out);
 /* Number of symbols registered by the vendored libraries (diagnostics). */

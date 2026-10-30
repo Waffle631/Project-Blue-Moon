@@ -190,10 +190,10 @@ static File *get(int fd) {
     if (fd<3 || fd>=MAX_FILES || !files[fd].used) return NULL;
     return &files[fd];
 }
-/* GOW3_AUDIO_TRACE=1: failed reads of sound files (missing game sounds). Opens are GOW3_FILE_TRACE's. */
-static int audio_trace(void) { static int v=-1; if (v<0) { const char *e=getenv("GOW3_AUDIO_TRACE"); v=e && e[0]=='1'; } return v; }
-/* GOW3_FILE_TRACE=1: every guest open, with path, descriptor and size (or the errno of the failure). */
-static int file_trace(void) { static int v=-1; if (v<0) { const char *e=getenv("GOW3_FILE_TRACE"); v=e && e[0]=='1'; } return v; }
+/* TSUKI_AUDIO_TRACE=1: failed reads of sound files (missing game sounds). Opens are TSUKI_FILE_TRACE's. */
+static int audio_trace(void) { static int v=-1; if (v<0) { const char *e=getenv("TSUKI_AUDIO_TRACE"); v=e && e[0]=='1'; } return v; }
+/* TSUKI_FILE_TRACE=1: every guest open, with path, descriptor and size (or the errno of the failure). */
+static int file_trace(void) { static int v=-1; if (v<0) { const char *e=getenv("TSUKI_FILE_TRACE"); v=e && e[0]=='1'; } return v; }
 /* Game mounts (including linked mod overlays) are read-only. Saves use other mounts. */
 static int game_path(const char *p) {
     if (!p || !*p) return 0;
@@ -249,7 +249,7 @@ static int64_t do_open(const char *guest,int flags,int mode) {
     ++opens;
     pthread_mutex_unlock(&lock);
     if (file_trace()) printf("File trace: open(%s) -> fd %d, %lld bytes\n",guest,fd,(long long)s.st_size);
-    const char *mod_trace=getenv("GOW3_MOD_TRACE"), *mod_root=getenv("GOW3_MODS_DIR");
+    const char *mod_trace=getenv("TSUKI_MOD_TRACE"), *mod_root=getenv("TSUKI_MODS_DIR");
     if (mod_trace && mod_trace[0]=='1' && mod_root) {
         char actual[PATH_MAX],root[PATH_MAX];
         static unsigned traced;
