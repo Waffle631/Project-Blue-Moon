@@ -23,22 +23,20 @@ Then, in the repository:
 ```bash
 git submodule update --init --recursive
 bash build.sh                      # out/gow3-probe.exe, out/gow3-gpu-capabilities.exe
-GOW3_GAME_DIR=F:/path/to/CUSA01623 python run.py
+GOW3_GAME_DIR=F:/path/to/CUSA47999 python run.py
 python launcher/gow3_launcher_win.py
-bash packaging/windows/package.sh  # dist/gow3-windows/ and .zip: God of War III.exe + DLLs
+bash packaging/windows/package.sh  # dist/gow3-windows/ and .zip: Tsukihime.exe + DLLs
 ```
 
 `run.py` is the Windows `run.sh` (same variables; works from a plain Windows Python too).
 The package freezes the launcher with PyInstaller (a private venv in `out/pyenv`, from a
-python.org Python) into `God of War III.exe`, which also runs `run.py` (`--run`), the preparation
+python.org Python) into `Tsukihime.exe`, which also runs `run.py` (`--run`), the preparation
 scripts (`--script`) and the game without the window (`--play`): players need no Python.
 The venv also receives `iced-x86`, which `scripts/isa_rewrite.py` uses for CPUs without MOVBE,
 BMI1 or LZCNT.
-`Play God of War III.exe` (`packaging/windows/play.c`) is a small native program that runs
-`God of War III.exe --play` from its folder and waits for it, for players who want to start the
+`Play Tsukihime.exe` (`packaging/windows/play.c`) is a small native program that runs
+`Tsukihime.exe --play` from its folder and waits for it, for players who want to start the
 game directly with the saved settings.
-`patches.py` applies the built-in patches only to the game build they were checked against
-(CUSA01623 01.02, by eboot.bin sha256; `GOW3_FORCE_PATCHES=1` overrides); other builds run unpatched.
 From a source tree it adds `C:\msys64\clang64\bin` (or `$MSYS2_ROOT`) to `PATH` for the DLLs.
 
 DLSS (optional): `DLSS_SDK_ROOT=<checkout of github.com/NVIDIA/DLSS> bash
@@ -52,7 +50,7 @@ render-pixel motion vectors, jitter).
 The launcher texts are written in English with the Russian beside them; the other languages
 are in `launcher/gow3_lang.py` (one list per language in the order of `KEYS`; a missing or
 empty text falls back to English). The icon (`launcher/gow3.ico`/`.png`) is drawn by
-`packaging/windows/make_icon.py` and built into `God of War III.exe`, `gow3-probe.exe` (the game
+`packaging/windows/make_icon.py` and built into `Tsukihime.exe`, `gow3-probe.exe` (the game
 window) and `gow3-gpu-capabilities.exe`.
 
 ## What is different from Linux

@@ -1,25 +1,25 @@
 # tsuki_pc — Roadmap hasta la versión Alpha
 
-Port nativo de **TSUKIHIME -A piece of blue glass moon-** (PS4) a PC, construido sobre el código de
-gow3_pc (God of War III Remastered), que a su vez viene de
+Port nativo de **TSUKIHIME -A piece of blue glass moon-** (PS4) a PC, construido sobre el código del
+port del juego anterior ([docs/gow3/ROADMAP.md](../gow3/ROADMAP.md)), que a su vez viene de
 [bbport / bloodborne_pc](https://github.com/Supermedo/bloodborne_pc).
 
 | | |
 |---|---|
-| Rama | `tsuki/main` (sobre el código de gow3_pc) |
+| Rama | `tsuki/main` (sobre el código del port del juego anterior) |
 | Juego objetivo | TSUKIHIME -A piece of blue glass moon-, **CUSA47999**, versión **01.00** (`HP3279-CUSA47999_00-GAME000TSUKIHIME`) |
 | Idioma objetivo | **Inglés** (el runtime ya reporta inglés al juego: `GOW3_LANGUAGE`, valor 1 por defecto) |
 | Plataforma | Linux primero (máquina de desarrollo), Windows 10/11 después; Vulkan 1.3 |
 | Máquina de pruebas | Bazzite 44 (KDE Plasma 6.7, Wayland), AMD Ryzen 5 7600, 16 GB, **AMD Radeon RX 6650 XT** |
 | Dump | `Tsukihime/CUSA47999/` (sin versionar, ~45 GB) |
-| Última actualización | 2026-10-28 (cierre de la Spec 1b). **La Spec 1b (heurísticas de GPU de GoW3) queda cerrada.** Fuera del árbol: `gbuffer_draw`, la constante de cámara de 864 bytes y los hashes fijos de shaders del upscaler temporal. Antes, la lectura lineal por defecto de `run.py`. Un contador con las heurísticas encendidas dio 0 coincidencias en el arranque y en el recorrido grabado de la Spec 6, y tras los borrados las capturas salen idénticas: los fotogramas oráculo del arranque y el recorrido frente a `out/baseline/6a/` (los dos fotogramas del menú de carga, revisados a ojo). Las suites están verdes (Python: 273). Sin `gbuffer_draw`, `CameraMotion` se queda sin entradas y el upscaler temporal ya no puede escalar con este juego. El usuario decide conservar su código y quitar en la Spec 7 las opciones que lo encienden. La Spec 7 queda desbloqueada. La rama `tsuki/spec-1b-cierre` está pendiente de fusionar en `tsuki/main` (*fusionada por avance rápido el mismo día; corregido el 2026-10-30*); `tsuki/spec-6bcd` ya está fusionada. Antes, 2026-10-28 (cierre de la Spec 6). **La Spec 6 (2D, ratón, saves e idioma) queda cerrada.** El usuario la cierra sin esperar a la Spec 1b. La comprobación que las ataba pasa a ser un criterio de la 1b: después de borrar `gbuffer_draw` y los hashes del upscaler, repetir el recorrido grabado y que coincida con `out/baseline/6a/`. La Spec 7 depende ahora directamente de la 1b. Quedan pendientes la revisión final de la rama `tsuki/spec-6bcd` y su fusión en `tsuki/main` (*fusionada por avance rápido; corregido el 2026-10-28*). Antes, 2026-10-28 (Spec 6, bloque A). **Bloque A (render 2D) hecho: la Spec 6 solo espera a la Spec 1b.** El usuario grabó un recorrido desde una copia fija de su partida. Pasa por el menú de carga, texto largo, un fundido a negro, sprites y un fundido cruzado. `GOW3_PAD_REPLAY` lo repite contando lecturas del mando (`tools/route.sh`), y las capturas salen idénticas píxel a píxel en todas las ejecuciones. En las de texto se tapa el cursor animado de espera, y el menú de carga se juzga a ojo porque detrás sigue el vídeo del título. El usuario aprobó las 8 capturas (`out/baseline/6a/`) y dio el texto en inglés por legible. La miniatura algo pixelada de las ranuras es del propio juego: la compone en la CPU desde `allpac2.mrg`, y Vulkan la muestrea con los filtros que pide el guest. El usuario la deja como está. Las suites están verdes (Python: 273). Antes, 2026-10-25 (Spec 6, bloques B, C y D). **Ratón, saves e idioma hechos; falta el bloque A (render 2D).** El ratón funciona en el juego: `src/runtime_mouse.c` y el puente `gow3gpu_mouse_read` hacen que el cursor del juego siga al puntero, y los clics y la rueda llegan. Mando, teclado y ratón avanzan el texto. Un save grabado desde el menú del juego sobrevive al reinicio y se carga (tres grabados del usuario y una carga), y hay un test que lo comprueba en un proceso nuevo. `GOW3_FILE_TRACE=1` registra cada apertura de archivo; con él se ve que el juego recibe el idioma 1 y abre `ft_en.mrg` y los `*_en.mp4`. También abre `ft_ja.mrg` con cualquier idioma, y el usuario da el criterio de idioma por cumplido. Las suites están verdes (Python: 267 ejecutados, 35 omitidos, 4 fallos esperados). Antes, 2026-10-25 (cierre de la Spec 5). **La Spec 5 (vídeo, AvPlayer) queda cerrada.** En el juego, el título del capítulo 1 ya no se cuelga en `sceAvPlayerStop` y el juego sigue: tres de tres ejecuciones y el recorrido final, sin `STOP:`, `Fault:` ni `join failed`. El opening llega entero y el usuario lo ve y lo oye sincronizado; el prólogo va a tiempo real, saltar el logo `TM_CI` no cuelga y el fondo del menú de título hace bucle a su ritmo. Fuera del juego, el arnés `avplayer-test` reproduce los 134 vídeos, y los 117 cortos hasta su último fotograma. Son ocho arreglos en el AvPlayer de shadPS4, cada uno con su caso rojo, y el contrato del juego queda en `docs/avplayer.md`. Las suites están verdes. Del plan queda la revisión adversarial de lo implementado (tarea 8, paso 4), pendiente a petición del usuario. Antes, 2026-10-21 (cierre de 4b). **La Spec 4b (HEVAG) queda cerrada, y con ella las dos partes de la Spec 4.** `libSceAudiodecCpu` decodifica los efectos de `vag.mrg` con el HEVAG adaptado de vgmstream. El estado vive en la memoria de trabajo que entrega el juego, y la voz acaba por la bandera 7 que la biblioteca deja en la bsi. En una ejecución en el menú de título hay 240 voces sin errores, y **el usuario oye bien los efectos**. Las suites están verdes, sin `SKIP:`, y `--check-imports` sigue en las 3 trampas de la Spec 2. Del plan de la Spec 4 queda la revisión adversarial de lo implementado (tarea 13). Antes, 2026-10-21 (cierre de 4a). **La Spec 4a (ATRAC9) queda cerrada.** Las suites están verdes, sin `SKIP:` de audio. `--check-imports` solo da las 3 trampas de la Spec 2, y un arranque de 60 s llega al menú de título sin `STOP:` ni `Fault:`, con `unimplemented=0` y sin errores de Audiodec. Las capturas de ese arranque muestran lo que sale ahora después del prólogo: el aviso de autoguardado, la advertencia legal, el menú de título y, con entrada, escenas de la novela con texto y sprites. Con eso, las specs 1b y 6 ya pueden capturar el 2D posterior al prólogo, y la casilla de la Spec 2 «pasa del arranque a los logos» queda cumplida. Sigue la Spec 4b (HEVAG). Antes, 2026-10-21 (después). **Las voces y los efectos `vse` también suenan bien**, sin cortes ni sonidos metálicos, según el usuario (tarea 8 de la Spec 4 cerrada). Las voces son entradas de `voice.mrg` que el juego ya entrega descomprimidas: el MZX lo quita el propio juego, así que el runtime no lo necesita. Hay un test que reproduce contra LibAtrac9 los flujos que volcó una partida. Sigue el cierre de 4a (tarea 9). Antes, 2026-10-21. **La música suena bien** (lo confirma el usuario; tarea 7 de la Spec 4 cerrada). Una ejecución con la traza completa de Audiodec dio 158 decodificadores ATRAC9 sin errores y con desfase 0. Los bucles caen donde predice `docs/audiodec.md` y hay un fixture dorado con los bloques de control reales. **El juego se cuelga al pasar al título del capítulo 1** (`phasetitle_01_00_en.mp4`), en `sceAvPlayerStop`. Es de la Spec 5, no de Audiodec; la evidencia está en la spec 5, §2. Antes, 2026-10-20: **El arranque va directo al menú de título, sin el vídeo del prólogo.** Con las tareas 3–6 de la Spec 4 el juego decodifica ATRAC9 sin errores (falta que el usuario confirme de oído cómo suena, tarea 7), pasa del prólogo y guarda progreso en su partida (`user/savedata/1/CUSA47999/`). Desde entonces cada arranque llega al menú de título en segundos. El prólogo solo sale con una partida sin progreso: hay una copia en `out/savedata-sin-progreso/`, sin versionar, porque `run.py` solo guarda las 10 últimas copias de seguridad. Una prueba de lo que viene después del prólogo ya no cuesta 6 min 29 s, pero el vídeo (Spec 5) y los fotogramas de vídeo de `out/baseline/` (del 720 en adelante) piden restaurar esa partida. `--check-imports` da 3, las trampas de la Spec 2. Antes, 2026-10-19: **la Spec 3 queda cerrada.** Las 23 APIs de plataforma tienen un comportamiento explícito: 15 se adelantaron en la Spec 2 y 8 se cierran ahora. Son tres "sin efecto" con su línea de log, el color del usuario 1, las dos consultas de copia de seguridad (`NOT_FOUND`), un error explícito para la información de desenrollado y la línea que le faltaba a `sceMsgDialogGetResult`. `--check-imports` baja de 19 a 11: los 8 de Audiodec (Spec 4) y las 3 trampas decididas de la Spec 2. En un arranque de 60 s salen las ocho líneas "sin efecto" de siempre y ningún `STOP:` nuevo. Las APIs nuevas no se llaman, porque solo se usan en casos concretos (cierre del juego, partida rota, excepciones de C++). Esfuerzo real: 1 día, frente a los 2–3 previstos. Antes, 2026-10-19: **la Spec 1a queda cerrada.** Están fuera del árbol los hooks, el perfil y el XML de parches, la semántica del touchpad, los tests de GoW3 y los textos de identidad, y el cargador solo arranca CUSA47999 (código 30 para cualquier otro juego). El log de arranque pierde las diez líneas "code not found" y para en el mismo punto. Las capturas no cambian: el fotograma 300 sale idéntico, y lo demás es el icono que gira o el vídeo. Fallan 4 tests del launcher, marcados como fallo esperado hasta que se limpie después de la Alpha. La elección de parches de resolución y de frame rate por nombre de GoW3, que sin perfil no hace nada, se deja para después de la Alpha, con el launcher (decisión del usuario, 2026-10-19). Antes, 2026-10-18: **el hito de primer fotograma queda cerrado:** hay imagen correcta, así que se sigue el orden previsto. El aviso de autoguardado, primer 2D del propio juego, sale nítido y con los colores bien, y el vídeo del prólogo también. En los logs no hay ningún `Unimplemented` (línea `GPU:` al final). Hay herramienta de captura PNG (`GOW3_SCREENSHOT_AT`, F12) y de comparación exacta (`tools/compare_captures.sh`), con la línea base en `out/baseline/`. Esfuerzos re-estimados en la sección 4. Antes, 2026-10-17 (noche): **la Spec 2 queda cerrada** con la fase 2B: en libkernel solo quedan las tres trampas decididas (`scePthreadCancel` y las dos de información de módulo), ya con nombre; `--check-imports` baja de 28 a 19, todo de las specs 3 y 4. Antes, 2026-10-17 (tarde): sin watchdog, el juego reproduce entero el vídeo del prólogo (se ve y se oye bien) y después para en `sceAudiodecCreateDecoder`, el primer decodificador ATRAC9 (Spec 4a). Su sitio de llamada da la estructura de control de Audiodec (Spec 4, 2.5). Por decisión del usuario solo se documenta. Antes, 2026-10-17: la fase 2A de la Spec 2 (guiada por los `STOP:`) termina tras 10 iteraciones: el juego abre `VideoOut`, presenta ~60 fotogramas por segundo y reproduce el vídeo del prólogo, sin ningún `STOP:` de libkernel. Falta ver qué pinta (hito). La Spec 4 se replantea en dos partes: **4a ATRAC9** (música, voces y efectos `vse`) y **4b HEVAG** (19 efectos de `vag.mrg`). 2026-10-14: revisión del orden tras un análisis adversarial (el kernel va primero, hay un hito de "primer fotograma", el borrado se parte en dos y el renombrado pasa al final; lo específico de GoW3 se elimina, no se desactiva) |
+| Última actualización | 2026-10-28 (cierre de la Spec 1b). **La Spec 1b (heurísticas de GPU del juego anterior) queda cerrada.** Fuera del árbol: `gbuffer_draw`, la constante de cámara de 864 bytes y los hashes fijos de shaders del upscaler temporal. Antes, la lectura lineal por defecto de `run.py`. Un contador con las heurísticas encendidas dio 0 coincidencias en el arranque y en el recorrido grabado de la Spec 6, y tras los borrados las capturas salen idénticas: los fotogramas oráculo del arranque y el recorrido frente a `out/baseline/6a/` (los dos fotogramas del menú de carga, revisados a ojo). Las suites están verdes (Python: 273). Sin `gbuffer_draw`, `CameraMotion` se queda sin entradas y el upscaler temporal ya no puede escalar con este juego. El usuario decide conservar su código y quitar en la Spec 7 las opciones que lo encienden. La Spec 7 queda desbloqueada. La rama `tsuki/spec-1b-cierre` está pendiente de fusionar en `tsuki/main` (*fusionada por avance rápido el mismo día; corregido el 2026-10-30*); `tsuki/spec-6bcd` ya está fusionada. Antes, 2026-10-28 (cierre de la Spec 6). **La Spec 6 (2D, ratón, saves e idioma) queda cerrada.** El usuario la cierra sin esperar a la Spec 1b. La comprobación que las ataba pasa a ser un criterio de la 1b: después de borrar `gbuffer_draw` y los hashes del upscaler, repetir el recorrido grabado y que coincida con `out/baseline/6a/`. La Spec 7 depende ahora directamente de la 1b. Quedan pendientes la revisión final de la rama `tsuki/spec-6bcd` y su fusión en `tsuki/main` (*fusionada por avance rápido; corregido el 2026-10-28*). Antes, 2026-10-28 (Spec 6, bloque A). **Bloque A (render 2D) hecho: la Spec 6 solo espera a la Spec 1b.** El usuario grabó un recorrido desde una copia fija de su partida. Pasa por el menú de carga, texto largo, un fundido a negro, sprites y un fundido cruzado. `GOW3_PAD_REPLAY` lo repite contando lecturas del mando (`tools/route.sh`), y las capturas salen idénticas píxel a píxel en todas las ejecuciones. En las de texto se tapa el cursor animado de espera, y el menú de carga se juzga a ojo porque detrás sigue el vídeo del título. El usuario aprobó las 8 capturas (`out/baseline/6a/`) y dio el texto en inglés por legible. La miniatura algo pixelada de las ranuras es del propio juego: la compone en la CPU desde `allpac2.mrg`, y Vulkan la muestrea con los filtros que pide el guest. El usuario la deja como está. Las suites están verdes (Python: 273). Antes, 2026-10-25 (Spec 6, bloques B, C y D). **Ratón, saves e idioma hechos; falta el bloque A (render 2D).** El ratón funciona en el juego: `src/runtime_mouse.c` y el puente `gow3gpu_mouse_read` hacen que el cursor del juego siga al puntero, y los clics y la rueda llegan. Mando, teclado y ratón avanzan el texto. Un save grabado desde el menú del juego sobrevive al reinicio y se carga (tres grabados del usuario y una carga), y hay un test que lo comprueba en un proceso nuevo. `GOW3_FILE_TRACE=1` registra cada apertura de archivo; con él se ve que el juego recibe el idioma 1 y abre `ft_en.mrg` y los `*_en.mp4`. También abre `ft_ja.mrg` con cualquier idioma, y el usuario da el criterio de idioma por cumplido. Las suites están verdes (Python: 267 ejecutados, 35 omitidos, 4 fallos esperados). Antes, 2026-10-25 (cierre de la Spec 5). **La Spec 5 (vídeo, AvPlayer) queda cerrada.** En el juego, el título del capítulo 1 ya no se cuelga en `sceAvPlayerStop` y el juego sigue: tres de tres ejecuciones y el recorrido final, sin `STOP:`, `Fault:` ni `join failed`. El opening llega entero y el usuario lo ve y lo oye sincronizado; el prólogo va a tiempo real, saltar el logo `TM_CI` no cuelga y el fondo del menú de título hace bucle a su ritmo. Fuera del juego, el arnés `avplayer-test` reproduce los 134 vídeos, y los 117 cortos hasta su último fotograma. Son ocho arreglos en el AvPlayer de shadPS4, cada uno con su caso rojo, y el contrato del juego queda en `docs/avplayer.md`. Las suites están verdes. Del plan queda la revisión adversarial de lo implementado (tarea 8, paso 4), pendiente a petición del usuario. Antes, 2026-10-21 (cierre de 4b). **La Spec 4b (HEVAG) queda cerrada, y con ella las dos partes de la Spec 4.** `libSceAudiodecCpu` decodifica los efectos de `vag.mrg` con el HEVAG adaptado de vgmstream. El estado vive en la memoria de trabajo que entrega el juego, y la voz acaba por la bandera 7 que la biblioteca deja en la bsi. En una ejecución en el menú de título hay 240 voces sin errores, y **el usuario oye bien los efectos**. Las suites están verdes, sin `SKIP:`, y `--check-imports` sigue en las 3 trampas de la Spec 2. Del plan de la Spec 4 queda la revisión adversarial de lo implementado (tarea 13). Antes, 2026-10-21 (cierre de 4a). **La Spec 4a (ATRAC9) queda cerrada.** Las suites están verdes, sin `SKIP:` de audio. `--check-imports` solo da las 3 trampas de la Spec 2, y un arranque de 60 s llega al menú de título sin `STOP:` ni `Fault:`, con `unimplemented=0` y sin errores de Audiodec. Las capturas de ese arranque muestran lo que sale ahora después del prólogo: el aviso de autoguardado, la advertencia legal, el menú de título y, con entrada, escenas de la novela con texto y sprites. Con eso, las specs 1b y 6 ya pueden capturar el 2D posterior al prólogo, y la casilla de la Spec 2 «pasa del arranque a los logos» queda cumplida. Sigue la Spec 4b (HEVAG). Antes, 2026-10-21 (después). **Las voces y los efectos `vse` también suenan bien**, sin cortes ni sonidos metálicos, según el usuario (tarea 8 de la Spec 4 cerrada). Las voces son entradas de `voice.mrg` que el juego ya entrega descomprimidas: el MZX lo quita el propio juego, así que el runtime no lo necesita. Hay un test que reproduce contra LibAtrac9 los flujos que volcó una partida. Sigue el cierre de 4a (tarea 9). Antes, 2026-10-21. **La música suena bien** (lo confirma el usuario; tarea 7 de la Spec 4 cerrada). Una ejecución con la traza completa de Audiodec dio 158 decodificadores ATRAC9 sin errores y con desfase 0. Los bucles caen donde predice `docs/audiodec.md` y hay un fixture dorado con los bloques de control reales. **El juego se cuelga al pasar al título del capítulo 1** (`phasetitle_01_00_en.mp4`), en `sceAvPlayerStop`. Es de la Spec 5, no de Audiodec; la evidencia está en la spec 5, §2. Antes, 2026-10-20: **El arranque va directo al menú de título, sin el vídeo del prólogo.** Con las tareas 3–6 de la Spec 4 el juego decodifica ATRAC9 sin errores (falta que el usuario confirme de oído cómo suena, tarea 7), pasa del prólogo y guarda progreso en su partida (`user/savedata/1/CUSA47999/`). Desde entonces cada arranque llega al menú de título en segundos. El prólogo solo sale con una partida sin progreso: hay una copia en `out/savedata-sin-progreso/`, sin versionar, porque `run.py` solo guarda las 10 últimas copias de seguridad. Una prueba de lo que viene después del prólogo ya no cuesta 6 min 29 s, pero el vídeo (Spec 5) y los fotogramas de vídeo de `out/baseline/` (del 720 en adelante) piden restaurar esa partida. `--check-imports` da 3, las trampas de la Spec 2. Antes, 2026-10-19: **la Spec 3 queda cerrada.** Las 23 APIs de plataforma tienen un comportamiento explícito: 15 se adelantaron en la Spec 2 y 8 se cierran ahora. Son tres "sin efecto" con su línea de log, el color del usuario 1, las dos consultas de copia de seguridad (`NOT_FOUND`), un error explícito para la información de desenrollado y la línea que le faltaba a `sceMsgDialogGetResult`. `--check-imports` baja de 19 a 11: los 8 de Audiodec (Spec 4) y las 3 trampas decididas de la Spec 2. En un arranque de 60 s salen las ocho líneas "sin efecto" de siempre y ningún `STOP:` nuevo. Las APIs nuevas no se llaman, porque solo se usan en casos concretos (cierre del juego, partida rota, excepciones de C++). Esfuerzo real: 1 día, frente a los 2–3 previstos. Antes, 2026-10-19: **la Spec 1a queda cerrada.** Están fuera del árbol los hooks, el perfil y el XML de parches, la semántica del touchpad, los tests del juego anterior y los textos de identidad, y el cargador solo arranca CUSA47999 (código 30 para cualquier otro juego). El log de arranque pierde las diez líneas "code not found" y para en el mismo punto. Las capturas no cambian: el fotograma 300 sale idéntico, y lo demás es el icono que gira o el vídeo. Fallan 4 tests del launcher, marcados como fallo esperado hasta que se limpie después de la Alpha. La elección de parches de resolución y de frame rate por nombre del juego anterior, que sin perfil no hace nada, se deja para después de la Alpha, con el launcher (decisión del usuario, 2026-10-19). Antes, 2026-10-18: **el hito de primer fotograma queda cerrado:** hay imagen correcta, así que se sigue el orden previsto. El aviso de autoguardado, primer 2D del propio juego, sale nítido y con los colores bien, y el vídeo del prólogo también. En los logs no hay ningún `Unimplemented` (línea `GPU:` al final). Hay herramienta de captura PNG (`GOW3_SCREENSHOT_AT`, F12) y de comparación exacta (`tools/compare_captures.sh`), con la línea base en `out/baseline/`. Esfuerzos re-estimados en la sección 4. Antes, 2026-10-17 (noche): **la Spec 2 queda cerrada** con la fase 2B: en libkernel solo quedan las tres trampas decididas (`scePthreadCancel` y las dos de información de módulo), ya con nombre; `--check-imports` baja de 28 a 19, todo de las specs 3 y 4. Antes, 2026-10-17 (tarde): sin watchdog, el juego reproduce entero el vídeo del prólogo (se ve y se oye bien) y después para en `sceAudiodecCreateDecoder`, el primer decodificador ATRAC9 (Spec 4a). Su sitio de llamada da la estructura de control de Audiodec (Spec 4, 2.5). Por decisión del usuario solo se documenta. Antes, 2026-10-17: la fase 2A de la Spec 2 (guiada por los `STOP:`) termina tras 10 iteraciones: el juego abre `VideoOut`, presenta ~60 fotogramas por segundo y reproduce el vídeo del prólogo, sin ningún `STOP:` de libkernel. Falta ver qué pinta (hito). La Spec 4 se replantea en dos partes: **4a ATRAC9** (música, voces y efectos `vse`) y **4b HEVAG** (19 efectos de `vag.mrg`). 2026-10-14: revisión del orden tras un análisis adversarial (el kernel va primero, hay un hito de "primer fotograma", el borrado se parte en dos y el renombrado pasa al final; lo específico del juego anterior se elimina, no se desactiva) |
 
 ---
 
 ## Índice
 
 1. [Cómo funciona el proyecto (versión simple)](#1-cómo-funciona-el-proyecto-versión-simple)
-2. [Qué cambia respecto a God of War III](#2-qué-cambia-respecto-a-god-of-war-iii)
+2. [Qué cambia respecto al juego anterior](#2-qué-cambia-respecto-al-juego-anterior)
 3. [Definición de la Alpha](#3-definición-de-la-alpha)
 4. [Visión general de las etapas](#4-visión-general-de-las-etapas)
 5. [Etapas en detalle](#5-etapas-en-detalle)
@@ -47,21 +47,21 @@ El proyecto **imita el sistema de la PS4** alrededor del juego:
 | Adaptador de base de datos | Traductor de gráficos: comandos de la GPU de la PS4 → Vulkan | `gpu/` (núcleo de shadPS4) |
 | Error 404 con el nombre de la ruta | API inexistente → `STOP: first unsupported PS4 import: <nombre>` | `src/probe.c` |
 
-El trabajo del port es: **implementar cada API que usa Tsukihime y que gow3_pc no implementa,
-eliminar todo lo específico de God of War III y validar el camino 2D, de vídeo y de audio.**
+El trabajo del port es: **implementar cada API que usa Tsukihime y que el port anterior no implementa,
+eliminar todo lo específico del juego anterior y validar el camino 2D, de vídeo y de audio.**
 
 ---
 
-## 2. Qué cambia respecto a God of War III
+## 2. Qué cambia respecto al juego anterior
 
 Tsukihime es una **novela visual**: casi todo es 2D (fondos, sprites, texto), vídeo (openings,
-títulos de capítulo, créditos) y audio (BGM, voces, efectos). El trabajo de rendimiento 3D de gow3
-(readbacks, G-buffer, upscalers) importa poco; importan el texto, las transiciones, el vídeo y el
+títulos de capítulo, créditos) y audio (BGM, voces, efectos). El trabajo de rendimiento 3D del juego
+anterior (readbacks, G-buffer, upscalers) importa poco; importan el texto, las transiciones, el vídeo y el
 audio.
 
-| Aspecto | God of War III | Tsukihime |
+| Aspecto | Juego anterior | Tsukihime |
 |---|---|---|
-| ID / versión | CUSA01623 v01.02 | CUSA47999 v01.00 |
+| ID / versión | ver [docs/gow3/ROADMAP.md](../gow3/ROADMAP.md) | CUSA47999 v01.00 |
 | SDK | — | 11.008 (`sdk_ver=11008000`, publicado el 2025-09-19) |
 | Imagen del eboot | — | 34 MB, entrada `0xef390`, relocaciones tipo 1/7/8 (dentro de los límites del loader) |
 | Imports | 387 | 337 (359 quedan al runtime tras enlazar `libc.prx` y `libSceFios2.prx`) |
@@ -75,40 +75,40 @@ audio.
 
 ### Qué se elimina (no se desactiva ni se adapta)
 
-Todo lo que solo sirve a God of War III se **borra del árbol**; no se deja código muerto detrás de
-un interruptor. GoW3 deja de ser un título soportado en esta rama (la historia sigue en git y en
+Todo lo que solo sirve al juego anterior se **borra del árbol**; no se deja código muerto detrás de
+un interruptor. El juego anterior deja de ser un título soportado en esta rama (la historia sigue en git y en
 la rama `gow3`).
 
 - Hooks de orbes, daño, cheats y barra de vida del enemigo: los `install_*` de `src/probe.c`,
-  `src/*_hook.h`, `gpu/shim/gow3_orbs.cpp`, `gpu/shim/gow3_actors.cpp`, y sus llamadas desde el
+  `src/*_hook.h`, los backends de orbes y actores de `gpu/shim/`, y sus llamadas desde el
   overlay. *(Spec 1a, ✅ 2026-10-19: con ellos se fue la pestaña "Game" del menú del juego.)* Las del
   launcher se quitan al final (ver "Después de la Alpha").
-- `tools/gow3_frame_map.py` (herramienta específica de GoW3). *(Spec 1a, ✅ borrado.)*
-- `patches/God_of_War_III_Remastered.xml`, el perfil `GAMES` y `REFERENCE_SHA256` de
-  `scripts/patches.py`, y `tools/make_signatures.py` si solo genera firmas de GoW3. *(Spec 1a, ✅: el
+- La herramienta de mapa de fotogramas del juego anterior (`tools/`). *(Spec 1a, ✅ borrada.)*
+- El XML de parches del juego anterior (`patches/`), el perfil `GAMES` y `REFERENCE_SHA256` de
+  `scripts/patches.py`, y `tools/make_signatures.py` si solo genera firmas del juego anterior. *(Spec 1a, ✅: el
   XML y el SHA están borrados y `GAMES` queda vacío. `make_signatures.py` se conserva porque es
-  genérico: sirve para cualquier eboot y no lleva datos de GoW3.)*
+  genérico: sirve para cualquier eboot y no lleva datos del juego anterior.)*
 - Semántica del touchpad (modo foto / pausa) en `runtime_pad.c`. *(Spec 1a, ✅: `touchpad`,
   `touchpad_left` y `touchpad_right` son ahora nombres del mismo botón.)*
-- Tests que solo inspeccionan código de GoW3: `stat-multipliers-test`, `cheat-hooks-test`,
-  `signatures-test` y los de Python que dependen del perfil de GoW3. *(Spec 1a, ✅.)*
-- Identidad de GoW3: título y serial por defecto en `probe.c` y en `run.py`/`scripts/patches.py`.
+- Tests que solo inspeccionan código del juego anterior: `stat-multipliers-test`, `cheat-hooks-test`,
+  `signatures-test` y los de Python que dependen del perfil del juego anterior. *(Spec 1a, ✅.)*
+- Identidad del juego anterior: título y serial por defecto en `probe.c` y en `run.py`/`scripts/patches.py`.
   *(Spec 1a, ✅: además, cualquier juego que no sea CUSA47999 sale con código 30.)* El acceso de Steam,
-  los textos del launcher, el empaquetado y los README se dejan para el final (ver "Después de la
-  Alpha").
+  los textos del launcher y el empaquetado los cambió la Spec 7 (§11 de su spec); los README, el icono, la
+  fuente de títulos y la paleta del launcher se dejan para el final (ver "Después de la Alpha").
 - **Después de la Alpha** (decidido el 2026-10-19): la elección de parches de resolución y de frame rate usa todavía los nombres de los
-  parches de GoW3 ("Resolution Patch", "Frame Rate Patch", "Bug Fix - Texture Corruption Fix"). Está
+  parches del juego anterior ("Resolution Patch", "Frame Rate Patch", "Bug Fix - Texture Corruption Fix"). Está
   en `scripts/patches.py`, `scripts/graphics_options.py`, `run.py`, el menú del juego y sus ajustes.
   Sin perfil de parches no hace nada, pero `run.py` sigue diciendo en cada arranque que no encontró el
   parche de frame rate. La Spec 1a no la cubría, y el launcher importa `EXCLUSIVE_PREFIX` de
   `patches.py`, así que se borra junto con el launcher (ver "Después de la Alpha").
-- Heurísticas de GPU de GoW3: `gbuffer_draw` y la constante de cámara de 864 bytes en
+- Heurísticas de GPU del juego anterior: `gbuffer_draw` y la constante de cámara de 864 bytes en
   `vk_rasterizer.cpp`; los hashes fijos de shaders del upscaler temporal; `GOW3_READBACK_LINEAR=1` por defecto en
   `run.py`. *(Spec 1b, ✅ 2026-10-28)* El escalado a 1920×1080 **se conserva**: el proyecto trabaja de base a 1080p.
   La decisión de MSAA por vendor también se conserva: es un parche para dos drivers de Windows, no del juego
   (decisión del 2026-10-25).
 
-Lo que no es de GoW3 sino genérico (loader, runtime, núcleo de shadPS4, upscalers) se conserva.
+Lo que no es del juego anterior sino genérico (loader, runtime, núcleo de shadPS4, upscalers) se conserva.
 
 **Por qué el borrado va en dos tandas:** los hooks, patches y tests no tocan el renderizador y quitan
 ruido del log, así que se borran pronto. Las heurísticas están dentro del núcleo de GPU
@@ -178,15 +178,15 @@ motivos están en la sección "Hito".
 | 0 | Preparar el entorno (Linux) | Setup | — | — | ✅ Concluida |
 | 1 | Inventario de APIs faltantes | Diagnóstico | 0 | — | ✅ Concluida |
 | 2 | Kernel: event flags, tiempo, hilos (y lo mínimo de servicios para arrancar) | **Spec 2** | 1 | 3–5 días | ✅ Concluida (fases 2A y 2B; en libkernel solo quedan las 3 trampas decididas) |
-| 3 | Borrar hooks, patches, touchpad, tests e identidad de GoW3 | **Spec 1a** | 1 (en paralelo con la Spec 2) | 1–2 días (real: 1 día) | ✅ Concluida el 2026-10-19 (otro juego sale con código 30; 4 tests del launcher marcados como fallo esperado hasta su limpieza; la elección de parches por nombre de GoW3 queda para después de la Alpha) |
+| 3 | Borrar hooks, patches, touchpad, tests e identidad del juego anterior | **Spec 1a** | 1 (en paralelo con la Spec 2) | 1–2 días (real: 1 día) | ✅ Concluida el 2026-10-19 (otro juego sale con código 30; 4 tests del launcher marcados como fallo esperado hasta su limpieza; la elección de parches por nombre del juego anterior queda para después de la Alpha) |
 | 4 | **Hito: primer fotograma** | Hito | Spec 2 | 1 día (real: ~1 día) | ✅ Concluido el 2026-10-18 (imagen correcta: el aviso de autoguardado y el vídeo del prólogo se ven bien; `unimplemented=0`; capturas PNG y `compare_captures.sh` con línea base en `out/baseline/`; se sigue el orden previsto) |
-| 5 | Borrar las heurísticas de GPU de GoW3 | **Spec 1b** | Spec 1a, hito | 1–2 días (antes 2–3; real: del 25 al 28 de octubre) | ✅ Concluida el 2026-10-28 (`gbuffer_draw`, la constante de 864 y los hashes del upscaler borrados; de la lectura lineal, solo su valor por defecto; el escalado a 1080p y el MSAA por vendor se quedan; capturas idénticas y recorrido de la Spec 6 igual a `out/baseline/6a/`) |
+| 5 | Borrar las heurísticas de GPU del juego anterior | **Spec 1b** | Spec 1a, hito | 1–2 días (antes 2–3; real: del 25 al 28 de octubre) | ✅ Concluida el 2026-10-28 (`gbuffer_draw`, la constante de 864 y los hashes del upscaler borrados; de la lectura lineal, solo su valor por defecto; el escalado a 1080p y el MSAA por vendor se quedan; capturas idénticas y recorrido de la Spec 6 igual a `out/baseline/6a/`) |
 | 6 | Servicios del sistema que faltan | **Spec 3** | Spec 2 | 2–3 días (real: 1 día, más las 15 adelantadas en la Spec 2) | ✅ Concluida el 2026-10-19 (23 de 23: 15 adelantadas en la Spec 2 y 8 en la Spec 3; `--check-imports` da 11, todos de las Specs 2 y 4) |
 | 7a | Audio ATRAC9 (`libSceAudiodec`): música → voces → efectos `vse`, con investigación previa | **Spec 4a** | Spec 2 | 1–2 semanas, sin tope (real: 3 días de plan, del 19 al 21 de octubre, más el estudio del sitio de llamada del 17) | ✅ Concluida el 2026-10-21 (las seis funciones sobre LibAtrac9, bit-exactas contra LibAtrac9; **suenan bien la música, las voces y los efectos `vse`**; `--check-imports` sin Audiodec; arranque de 60 s sin `STOP:` ni errores de Audiodec) |
 | 7b | Audio HEVAG (`libSceAudiodecCpu`): efectos de `vag.mrg`, con investigación previa | **Spec 4b** | Spec 4a (música y voces) | sin estimar, sin tope (real: 1 día, el 21 de octubre) | ✅ Concluida el 2026-10-21 (`QueryMemSize`, `InitDecoder` y `Decode` sobre el HEVAG de vgmstream, con el estado en la memoria de trabajo del guest; **los efectos de `vag.mrg` suenan bien**; 240 voces sin errores en el menú de título; queda la revisión adversarial de la tarea 13 del plan) |
 | 8 | Vídeo (AvPlayer) | **Spec 5** | Specs 2 y 3 | 2–3 días (antes 2–4; real: 1 día de plan, el 24 de octubre, y el cierre el 25, más el estudio del cuelgue del 21) | ✅ Concluida el 2026-10-25 (**arreglado el cuelgue en `sceAvPlayerStop` del título del capítulo 1**, confirmado en el juego tres de tres veces y en el recorrido final; en el juego, el opening llega entero y sincronizado según el usuario, el prólogo a tiempo real, saltar el logo no cuelga y el fondo del menú de título ya no se acelera; los 134 vídeos se reproducen fuera del juego; queda la revisión adversarial, tarea 8 paso 4; sección Spec 5) |
 | 9 | 2D correcto, ratón y saves | **Spec 6** | Hito (empieza), Specs 3, 4 y 5 (cierra) | 1–3 semanas (real: del 25 al 28 de octubre) | ✅ Concluida el 2026-10-28 (ratón, saves, idioma y render 2D; línea base `out/baseline/6a/` aprobada por el usuario y repetible con `tools/route.sh`; la miniatura pixelada es del juego y se deja; la comprobación tras la Spec 1b pasa a la 1b, decisión del usuario) |
-| 10 | Renombrar `gow3` → `tsuki` | **Spec 7** | Specs 6 y 1b | 2–3 días | ⬜ Pendiente (desbloqueada el 2026-10-28; ampliada con las opciones del upscaler temporal, §10 de su spec) |
+| 10 | Renombrar el proyecto a `tsuki` | **Spec 7** | Specs 6 y 1b | 2–3 días | ⬜ Pendiente (desbloqueada el 2026-10-28; ampliada con las opciones del upscaler temporal, §10 de su spec) |
 
 **Total: 8 specs (la 4 en dos partes) y 1 hito** (pueden crecer según lo que aparezca al ejecutar el juego).
 
@@ -223,7 +223,7 @@ flowchart LR
 | — | `prepare.py` y `link_modules.py` procesan el eboot sin errores: 104 enlaces nativos a `libc`/`Fios2`, 359 imports para el runtime, 0 parches `fs→gs`. | — |
 | 1 | Inventario estático (sección de la etapa 1): ~61 APIs sin implementación, 57 con nombre. | — |
 | 2 | Spec 2 (kernel) cerrada: 26 de las 29 APIs de libkernel implementadas y 3 trampas con nombre; en la fase 2A se adelantaron 15 APIs de la Spec 3 y una provisional de la 4. | `2531937`…`7244263` |
-| 3 | Spec 1a cerrada. Fuera del árbol: los hooks de GoW3 y sus backends, la pestaña "Game" del menú, el XML y el perfil de parches, el touchpad en dos mitades, los tests de GoW3 y los textos de identidad. El cargador solo arranca CUSA47999 (código 30 para cualquier otro). Los 4 tests del launcher que rompe quedan como fallo esperado. | `9f86fc1`…`4832164` |
+| 3 | Spec 1a cerrada. Fuera del árbol: los hooks del juego anterior y sus backends, la pestaña "Game" del menú, el XML y el perfil de parches, el touchpad en dos mitades, los tests del juego anterior y los textos de identidad. El cargador solo arranca CUSA47999 (código 30 para cualquier otro). Los 4 tests del launcher que rompe quedan como fallo esperado. | `9f86fc1`…`4832164` |
 | 4 | Hito de primer fotograma cerrado: línea `GPU:` al final del log, capturas PNG del fotograma presentado (`GOW3_SCREENSHOT_AT`, F12), `tools/compare_captures.sh`, línea base en `out/baseline/` y decisión: seguir el orden previsto. | `8c40e39`…`5acfafe` y `0e6bf51` (cierre) |
 | 5 | Spec 1b cerrada. Fuera del árbol: `gbuffer_draw` y la constante de cámara de 864 bytes, los hashes fijos de shaders del upscaler temporal (sustituidos por `UiComposition::Trigger`, que solo dispara con un hash configurado) y el valor por defecto de `GOW3_READBACK_LINEAR` en `run.py`. Un contador temporal con las heurísticas encendidas dio 0 coincidencias, y las capturas del arranque y del recorrido de la Spec 6 salen idénticas tras los borrados. | `fe33d5e`…`13cba4c`, `61e34a3`…`0570722` y el cierre (`Docs(Spec1b): cierre de la Spec 1b`) |
 | 6 | Spec 3 cerrada: las 23 APIs de plataforma con comportamiento explícito y probado. `tests/test_import_names.py` fija NID y nombre de cada una, y no se finge ninguna conexión a PSN ni a la red. | `f4a5d0a`…`5fcc578` |
@@ -246,8 +246,8 @@ flowchart LR
 
 ## 5. Etapas en detalle
 
-> Hasta que se ejecute la Spec 7 (renombrado), el resto de este documento usa los nombres **actuales**
-> (`GOW3_*`, `gow3-probe`, `libgow3gpu.so`). La última capa del renombrado los actualiza aquí también.
+> Hasta que se ejecute la Spec 7 (renombrado), el resto de este documento usa los nombres **anteriores** de
+> variables, binarios y biblioteca. La última capa del renombrado los actualiza aquí también.
 
 ### Etapa 0 — Preparar el entorno (Linux)
 
@@ -283,7 +283,7 @@ Cambios en el repo para compilar en Fedora:
 | Suite | Resultado |
 |---|---|
 | `bash build.sh --test` (C) | 10/10 PASS: pad, runtime, file-mods, sema, content, mp3, videodec, services, isa-emulate, isa-stub |
-| `python3 -m unittest discover -s tests` | 238 ejecutados, OK, 37 saltados: 17 sin `iced-x86` (pip), 16 solo Windows/Tk, 2 sin dump de GoW3 (`GOW3_GAME`), 2 registro de fuentes GDI (Windows) |
+| `python3 -m unittest discover -s tests` | 238 ejecutados, OK, 37 saltados: 17 sin `iced-x86` (pip), 16 solo Windows/Tk, 2 sin dump del juego anterior (`GOW3_GAME`), 2 registro de fuentes GDI (Windows) |
 | `out/gow3-probe --cpu-features` | `CPU: complete` (MOVBE/BMI1/LZCNT nativos, sin `isa_rewrite`) |
 | `out/gow3-probe --vulkan-only` | RX 6650 XT (RADV NAVI23): envío de comandos + readback de 4096 bytes PASS |
 
@@ -371,7 +371,7 @@ Native libc initialization is incomplete; game entry has not run.
 - Un import sin implementar solo detiene el juego **cuando se llama**, así que los 61 son un límite
   superior: el trabajo de la Spec 2 se guía por los `STOP:` y se cierra la lista al final.
 - No hizo falta cambiar código. El perfil de parches responde "no patch profile for CUSA47999" y
-  los hooks de GoW3 informan "code not found" (ruido que borra la Spec 1a). Sin `profile.bin` en
+  los hooks del juego anterior informan "code not found" (ruido que borra la Spec 1a). Sin `profile.bin` en
   la caché de pipelines (aviso inocuo en el primer arranque).
 - Logs: `out/check-imports.log`, `out/first-run.log`.
 
@@ -473,11 +473,11 @@ abierto: las ramas Windows nuevas no se han compilado, y `tm_isdst` sale siempre
 
 ---
 
-### Spec 1a — Eliminar hooks, patches, touchpad, tests e identidad de GoW3
+### Spec 1a — Eliminar hooks, patches, touchpad, tests e identidad del juego anterior
 
 > Spec detallada: [docs/specs/2026-10-14-spec-1a-borrar-hooks-y-patches.md](../specs/2026-10-14-spec-1a-borrar-hooks-y-patches.md)
 
-**Problema:** el código asume God of War III en el título, el serial, los patches, los hooks y los
+**Problema:** el código asume el juego anterior en el título, el serial, los patches, los hooks y los
 tests. Dejarlo desactivado confunde el diagnóstico (el log de arranque ya muestra diez líneas de
 "code not found") y obliga a mantenerlo compilando. Esta parte no toca el renderizador, así que se
 puede hacer en paralelo con la Spec 2 y sin ver el juego.
@@ -492,7 +492,7 @@ puede hacer en paralelo con la Spec 2 y sin ver el juego.
 2. Patches: XML, perfil `GAMES`, `REFERENCE_SHA256`; el cargador de patches queda genérico (sin
    perfil, no aplica ninguno).
 3. Entrada: touchpad de `runtime_pad.c`.
-4. Tests: borrar los de GoW3 y ajustar los genéricos (`test_patches.py`, etc.).
+4. Tests: borrar los del juego anterior y ajustar los genéricos (`test_patches.py`, etc.).
 5. Identidad: título y serial por defecto. El launcher, el acceso de Steam y el empaquetado no se
    tocan (quedan para el final).
 
@@ -501,7 +501,7 @@ los tests y fuentes eliminados.
 
 **Requisitos**
 
-- El árbol no debe contener hooks, patches ni firmas de God of War III.
+- El árbol no debe contener hooks, patches ni firmas del juego anterior.
 - Cuando el juego no sea CUSA47999, el sistema debe rechazarlo con un mensaje claro en el log.
 - Lo genérico (loader, runtime, núcleo de shadPS4, upscalers) no debe cambiar de comportamiento.
 
@@ -512,7 +512,7 @@ los tests y fuentes eliminados.
   *(2026-10-19: C pasa. Python: 255 ejecutados y 35 omitidos; solo fallan 4 tests del launcher,
   que la spec deja anotados sin arreglar y que están marcados con `@unittest.expectedFailure`. Las diferencias están en la sección 6 de la spec.)*
 - [x] Comprobación de símbolos con una **lista cerrada y coincidencia de palabra completa**
-  (`git grep -nw`), por ejemplo `CUSA01623`, `CUSA01715`, `God_of_War_III_Remastered`,
+  (`git grep -nw`), por ejemplo los seriales del juego anterior, el nombre de su XML de parches,
   `REFERENCE_SHA256` y los nombres de los `install_*` borrados. La lista exacta se fija al escribir
   la spec. No se usan términos sueltos como `orb` o `damage`, que coinciden con `LICENSE`, las
   cabeceras de FSR y cualquier "absorb". *(2026-10-19: 0 resultados.)*
@@ -530,7 +530,7 @@ los tests y fuentes eliminados.
 - **Orden real:** pasos 0, 1, 4, 2, 3 y 5. El 4 (tests) va antes que el 2 porque borrar el XML rompía
   `test_patches.py`.
 - **Paso 1, hooks:** se borran con su pestaña "Game" del menú del juego, que solo tenía cheats,
-  multiplicadores y la barra de vida. Las claves de GoW3 de un `gow3.ini` antiguo se ignoran sin error.
+  multiplicadores y la barra de vida. Las claves del juego anterior de un `gow3.ini` antiguo se ignoran sin error.
 - **Paso 2, parches:** el cargador queda genérico y dice en el log
   `Patches: no patch profile for CUSA47999: none applied`. La carpeta de juego por defecto es
   `Tsukihime/CUSA47999`.
@@ -551,10 +551,10 @@ los tests y fuentes eliminados.
   icono "Saving…", que gira, y del 720 en adelante es el vídeo del prólogo (unos 6 minutos), que no se
   puede repetir.
 - **Consecuencias en lo que no se tocó:**
-  - El launcher ya no reconoce un dump, porque usaba el perfil de GoW3.
+  - El launcher ya no reconoce un dump, porque usaba el perfil del juego anterior.
   - El empaquetado copia `patches/` con `cp -r`, y esa carpeta ya no existe.
   - Las dos cosas van con la limpieza de después de la Alpha.
-- **Después de la Alpha:** la elección de parches por nombre de GoW3 (decidido el 2026-10-19; ver la sección 2).
+- **Después de la Alpha:** la elección de parches por nombre del juego anterior (decidido el 2026-10-19; ver la sección 2).
 - **Esfuerzo:** 1 día, el mínimo de lo previsto.
 
 ---
@@ -635,11 +635,11 @@ cómo dibuja este juego en el traductor de GPU, y es la mayor incógnita del pro
 
 ---
 
-### Spec 1b — Eliminar las heurísticas de GPU de GoW3
+### Spec 1b — Eliminar las heurísticas de GPU del juego anterior
 
 > Spec detallada: [docs/specs/2026-10-14-spec-1b-heuristicas-gpu.md](../specs/2026-10-14-spec-1b-heuristicas-gpu.md)
 
-**Problema:** el traductor de GPU conserva ajustes pensados para God of War III: `gbuffer_draw`, la
+**Problema:** el traductor de GPU conserva ajustes pensados paral juego anterior: `gbuffer_draw`, la
 constante de cámara de 864 bytes, los hashes fijos de shaders del upscaler temporal y `GOW3_READBACK_LINEAR=1` por
 defecto (el escalado a 1920×1080 se conserva: 1080p es la resolución base del proyecto). La decisión de MSAA por
 vendor estaba en la lista, pero salió del alcance el 2026-10-25 (spec §2.2): es un parche de drivers de Windows. Están
@@ -674,7 +674,7 @@ tiene forma de comprobarse. Por eso esta spec va después del hito.
      `GOW3_PAD_RECORD`/`GOW3_PAD_REPLAY`.*
 2. Borrar una heurística, compilar, pasar tests y recapturar.
 3. Comparar las capturas (diferencia de píxeles). Si cambian, entender por qué antes de seguir; si el
-   cambio es el esperado (la heurística actuaba sobre algo de GoW3), anotarlo y actualizar la línea base.
+   cambio es el esperado (la heurística actuaba sobre algo del juego anterior), anotarlo y actualizar la línea base.
 4. Repetir con la siguiente. Valores por defecto de `run.py` y `scripts/graphics_options.py` al final.
 
 **Requisitos**
@@ -699,7 +699,7 @@ tiene forma de comprobarse. Por eso esta spec va después del hito.
 
 - Borrado: la lectura lineal por defecto (Tarea 4, 2026-10-25), `gbuffer_draw` y la constante de 864 bytes (Tarea 3)
   y los hashes fijos del upscaler (Tarea 3b), cada uno en su commit.
-- Prueba: un contador temporal con `CameraMotion` y el upscaler encendidos (`GOW3_EXPERIMENTAL_UPSCALER=1`) dio 0
+- Prueba: un contador temporal con `CameraMotion` y el upscaler encendidos (con el interruptor experimental, ya quitado) dio 0
   coincidencias en 272 268 draws del arranque y 5 165 990 del recorrido. Tras cada borrado, los cuatro fotogramas
   oráculo del arranque salen idénticos, con el upscaler apagado y encendido. El recorrido de la Spec 6 sale igual a
   `out/baseline/6a/`. Los dos fotogramas del menú de carga solo cambian en el vídeo de fondo; se revisaron a ojo.
@@ -858,7 +858,7 @@ de lo implementado (tarea 13).
 > Spec detallada: [docs/specs/2026-10-14-spec-5-avplayer.md](../specs/2026-10-14-spec-5-avplayer.md)
 
 **Problema:** los 134 vídeos (`image/movie/*.mp4`: openings, títulos de capítulo, finales, créditos)
-pasan por `sceAvPlayer`, que viene de shadPS4 y en gow3 apenas se usó. Hay versiones por idioma
+pasan por `sceAvPlayer`, que viene de shadPS4 y en el port anterior apenas se usó. Hay versiones por idioma
 (`_en`, `_zc`, `_zt`).
 
 **Solución:** validar el AvPlayer de shadPS4 con los vídeos del juego y corregir lo que falle:
@@ -1022,63 +1022,47 @@ resultados de §4, §5 y §6.*
 
 ---
 
-### Spec 7 — Renombrar `gow3` a `tsuki`
+### Spec 7 — Renombrar el proyecto a `tsuki`
 
 > Spec detallada: [docs/specs/2026-10-14-spec-7-renombrado.md](../specs/2026-10-14-spec-7-renombrado.md)
 
-**Problema:** todos los nombres estáticos del proyecto dicen `gow3`. Es un cambio mecánico pero grande
-(2551 líneas en 290 archivos, 194 variables de entorno distintas, 40 archivos con `gow3` en el nombre).
-No reduce ningún riesgo técnico, y hacerlo antes de que el juego arranque mezclaría sus errores con
-los de las specs nuevas. Va al final, cuando existe un recorrido que comprueba que nada cambió.
+**Problema:** los nombres estáticos del proyecto (variables de entorno, binarios, biblioteca de la GPU, archivos,
+clases, `.ini`, empaquetado) son los del port del juego anterior: 2551 líneas en 290 archivos, 194 variables de
+entorno distintas y 40 archivos con el nombre viejo. Es un cambio mecánico pero grande. No reduce ningún riesgo
+técnico, y hacerlo antes de que el juego arranque mezclaría sus errores con los de las specs nuevas. Va al final,
+cuando existe un recorrido que comprueba que nada cambió.
 
-**Solución:** pasar **todos los nombres estáticos** `gow3` al prefijo `tsuki`, por capas, sin alias.
-
-**Tabla de renombrado** (primera propuesta, se revisa antes de ejecutar)
-
-| Hoy | Pasa a |
-|---|---|
-| Variables de entorno `GOW3_*` (194 distintas: `GOW3_GAME_DIR`, `GOW3_DATA_DIR`, `GOW3_CONFIG`, `GOW3_FRAME_STATS`, `GOW3_NO_MSAA`, …) | `TSUKI_*` |
-| Binarios `gow3-probe`, `gow3-gpu-capabilities` (y `.exe`), pruebas `gow3-*` | `tsuki-probe`, `tsuki-gpu-capabilities`, … |
-| `libgow3gpu.so`, `gow3gpu.h`, `gow3gpu_resolve`, `gow3gpu_register_*` | `libtsukigpu.so`, `tsukigpu.h`, `tsukigpu_*` |
-| Archivos `gpu/shim/gow3_*.cpp/.h`, `gpu/dlss_bridge/gow3_dlss_bridge.*`, `gpu/shadps4/video_core/amdgpu/gow3_msaa*.h` | `tsuki_*` |
-| Clases y símbolos `Gow3Settings`, `Gow3Overlay`, `Gow3Graphics`, `Gow3Png`, `gow3_longjmp`, … | `TsukiSettings`, `TsukiOverlay`, … / `tsuki_*` |
-| `gow3.ini`, `%APPDATA%\gow3-launcher`, `launcher/gow3.png/.ico`, `God of War III.exe` | `tsuki.ini`, `%APPDATA%\tsuki-launcher`, … |
-| Marca `gow3:` en los cambios del código de shadPS4 | `tsuki:` |
-| Nombres del proyecto: `gow3_pc`, `gow3-windows`, `gow3_launcher_win`, `.gitignore`, `shell.nix`, empaquetado | `tsuki_pc`, … |
-
-Las configuraciones y saves antiguos no se migran (no hay usuarios de los nombres viejos).
+**Solución:** pasar **todos los nombres estáticos** al prefijo `tsuki` (`TSUKI_*`, `tsuki-probe`, `libtsukigpu.so`,
+`TsukiSettings`, `tsuki.ini`, la marca `tsuki:` en el código de shadPS4, …), por capas, sin alias. La tabla completa
+está en la spec (§3). Las configuraciones y saves antiguos no se migran (no hay usuarios de los nombres viejos).
 
 **Orden de trabajo** (por capas; compilar y pasar tests tras cada una)
 
-1. Inventario: `git grep -ohiE '[a-z0-9_.-]*gow3[a-z0-9_.-]*'` y `git ls-files | grep -i gow3`,
-   más los nombres en strings, scripts, `CMakeLists.txt`, `build.sh`, `run.py`, `shell.nix`,
-   empaquetado y documentación. Los submódulos `gpu/third_party/*` no se tocan; de los parches de
-   `gpu/patches/fsr-vulkan/`, el `0001` (perfilado de FSR 4 con `GOW3_FSR4_*`) se borra, y en `0002` y `0003`
-   (cabeceras para compilar en Windows) los comentarios `gow3:` pasan a `tsuki:` (decisión del usuario, 2026-10-30).
-   Un análisis previo no encontró nombres construidos dinámicamente (`GOW3_%s` o concatenaciones);
-   se vuelve a comprobar al empezar.
-2. Variables de entorno `GOW3_*` → `TSUKI_*` en C, C++, Python y documentos a la vez, sin
-   dejar alias ni lectura de los nombres viejos.
-3. Archivos y directorios con `git mv` (conserva la historia), luego `#include`, CMake y
-   listas de fuentes.
-4. Símbolos, clases, binarios, biblioteca de la GPU, `.ini`, rutas de usuario y marca `gow3:`.
-5. Documentación (`CLAUDE.md`, `README*.md`, este roadmap) y la memoria del proyecto.
+1. Inventario cerrado de nombres viejos → nuevos, con comprobación de colisiones. Los submódulos `gpu/third_party/*`
+   no se tocan; de los parches de `gpu/patches/fsr-vulkan/`, el `0001` (perfilado de FSR 4) se borra, y en `0002` y
+   `0003` (cabeceras para compilar en Windows) cambia la marca de los comentarios (decisión del usuario,
+   2026-10-30). Un análisis previo no encontró nombres de variable construidos dinámicamente; se vuelve a comprobar
+   al empezar.
+2. Variables de entorno y de compilación en C, C++, Python y documentos a la vez, sin dejar alias ni lectura de los
+   nombres viejos.
+3. Archivos y directorios con `git mv` (conserva la historia), luego `#include`, CMake y listas de fuentes.
+4. Símbolos, clases, binarios, biblioteca de la GPU, `.ini`, rutas de usuario y marca de shadPS4.
+5. Documentación (`CLAUDE.md`, este roadmap) y la memoria del proyecto. Los README del jugador esperan a la Alpha.
 
 **Archivos afectados:** prácticamente todo el árbol.
 
 **Requisitos**
 
-- Ninguna variable `GOW3_*` debe seguir leyéndose.
+- Ninguna variable con el prefijo viejo debe seguir leyéndose.
 - El comportamiento no cambia: el recorrido grabado y las capturas de la línea base dan el mismo resultado.
 
 **Criterios de aceptación**
 
 - [ ] `bash build.sh --test` y `python3 -m unittest discover -s tests` pasan.
-- [ ] Un script único de comprobación (`tools/check_rename.sh`, nuevo) busca `gow3` sin distinguir
-  mayúsculas con `git grep -i` y devuelve error si encuentra algo fuera de estas **excepciones
-  explícitas**: `docs/gow3/`, `docs/plans/` (documentos históricos, o se borran), `docs/specs/` (decisión del
-  usuario, 2026-10-28), los submódulos y la mención de la rama `gow3` por su nombre en `CLAUDE.md` y en este
-  roadmap. La lista completa está en la spec, §6.
+- [ ] Un script único de comprobación (`tools/check_rename.sh`) busca los nombres viejos sin distinguir mayúsculas
+  con `git grep -i` y devuelve error si encuentra alguno fuera de las **excepciones explícitas**: `docs/gow3/`,
+  `docs/plans/` y `docs/specs/` (documentos históricos), los submódulos, los README del jugador y la mención de la
+  rama `gow3` por su nombre en `CLAUDE.md` y en este roadmap. La lista completa está en la spec, §6.
 - [ ] `bash build.sh` produce `out/tsuki-probe` y `out/gpu/libtsukigpu.so`, y
   `TSUKI_GAME_DIR=Tsukihime/CUSA47999 python3 run.py` repite el recorrido grabado igual que antes
   del renombrado (mismo log, sin `STOP:` ni `Fault:`).
@@ -1088,11 +1072,19 @@ Las configuraciones y saves antiguos no se migran (no hay usuarios de los nombre
 miden en Windows y en Linux salen "n/a". Va después del renombrado ya comprobado, en un commit aparte.
 - [ ] La ventana y el menú Insert muestran el título leído del `param.sfo`.
 
-**Añadido el 2026-10-28** (spec §10): quitar las opciones que encienden el upscaler temporal (interruptor
-`GOW3_EXPERIMENTAL_UPSCALER` de `run.py`, sus controles del launcher, sus claves de `gow3.ini` y sus variables de
-entorno). Desde la tarea 3 de la Spec 1b, encendido ya no hace nada: `CameraMotion` se quedó sin entradas. El código se
+**Añadido el 2026-10-28** (spec §10): quitar las opciones que encienden el upscaler temporal (el interruptor
+experimental de `run.py`, sus controles del launcher, sus claves del `.ini` y sus variables de entorno). Desde la tarea 3 de la Spec 1b, encendido ya no hace nada: `CameraMotion` se quedó sin entradas. El código se
 conserva (decisión del usuario); FSR 1 y RCAS, que son espaciales, se quedan. Va antes del renombrado, en un commit aparte.
-- [ ] Nada puede encender el upscaler temporal, y FSR 1 y RCAS siguen funcionando.
+- [x] Nada puede encender el upscaler temporal, y FSR 1 y RCAS siguen funcionando. *(2026-10-30, tareas 2 y 3 del
+  plan.)*
+
+**Añadido el 2026-10-30** (spec §11): quitar también todo lo que nombra al juego anterior, no solo los nombres viejos.
+La identidad (nombre de la aplicación, del `.exe`, del acceso directo y de Steam, textos del launcher) pasa a
+Tsukihime; los comentarios que explicaban algo con lo que hacía aquel juego se borran; los créditos de otros
+proyectos se quedan; el actualizador del launcher se borra, porque bajaba el port del juego anterior. Los README del
+jugador, el icono, la fuente de títulos y la paleta del launcher esperan a la Alpha.
+- [x] `tools/check_rename.sh` no encuentra el nombre ni los seriales del juego anterior fuera de las excepciones, y
+  el launcher no tiene actualizador. *(2026-10-30, tarea 4 del plan.)*
 
 ---
 
@@ -1107,14 +1099,14 @@ conserva (decisión del usuario); FSR 1 y RCAS, que son espaciales, se quedan. V
 | Audiodec se llama antes del primer draw y podría bloquear el hito | Medio | Respuesta provisional con error explícito, que el juego ignora. Visto el 2026-10-17: `CreateDecoder` no llega hasta el final del prólogo, así que no bloquea el hito, pero sí pasar del prólogo (fase A de 4a). Superado el 2026-10-20 (tareas 3–6 de la Spec 4) |
 | El traductor de GPU no dibuja bien una novela visual | Medio (antes Alto) | Hito cerrado el 2026-10-18: el aviso de autoguardado (2D del juego) y el vídeo salen bien y no hay ningún `Unimplemented`. Queda el resto del 2D de la novela, que no se verá hasta pasar del prólogo (Spec 4a; ya se pasa desde el 2026-10-20, y el arranque llega al menú de título); la Spec 6 lo revisa con capturas aprobadas. 2026-10-21: el menú de título, el menú de carga y escenas de la novela con texto y sprites se ven bien a ojo (`out/spec4-t9-shots/`) |
 | "Cubierta" se confunde con "funciona" (Mouse parecía cubierta y es un stub) | Medio | Cubierta solo si tiene test o el juego la llamó en un recorrido real; ratón pasa a la Spec 6 como trabajo nuevo |
-| SDK 11.008, mucho más nuevo que el de GoW3: comportamientos del kernel no vistos | Medio | Seguir la semántica de shadPS4; registrar todo lo nuevo en el log |
+| SDK 11.008, mucho más nuevo que el del juego anterior: comportamientos del kernel no vistos | Medio | Seguir la semántica de shadPS4; registrar todo lo nuevo en el log |
 | AvPlayer de shadPS4 inmaduro (sincronía, eventos) | Medio; superado el 2026-10-25 | Probar opening y títulos de capítulo pronto; seguir upstream. **Superado el 2026-10-25** (Spec 5 cerrada): ocho defectos corregidos, cada uno con su caso rojo; los 134 vídeos se reproducen fuera del juego y, en el juego, el opening, el prólogo, el título del capítulo 1, el salto del logo y el bucle del menú de título van bien. Los arreglos llevan la marca `gow3:` y no se han llevado a upstream |
 | Defectos 2D (alfa, fundidos, texto) en el traductor | Medio | Línea base de capturas aprobadas por el usuario; captura antes y después de cada corrección |
 | Borrar heurísticas del renderizador (Spec 1b) rompe el dibujo sin que se sepa qué cambió | Medio; cerrado el 2026-10-28 | Se hace después del hito, una heurística por vez, con captura antes y después. **Cerrado:** Spec 1b terminada sin cambios en las capturas ni en el recorrido grabado |
 | Borrar por error código compartido con lo genérico | Medio | Borrar por pasos, compilar y pasar los tests tras cada uno; la historia queda en git y en la rama `gow3`. En la Spec 1a (2026-10-19) no hubo regresiones en tests, log ni capturas |
-| El launcher y el empaquetado se quedan rotos hasta su limpieza: tras la Spec 1a, el launcher no reconoce un dump (usaba el perfil de parches de GoW3) y el empaquetado copia una carpeta `patches/` que ya no existe | Bajo (el launcher solo es de Windows/Tk, y en Linux se usa `run.py`) | Se arreglan juntos después de la Alpha; los 4 tests del launcher afectados están marcados como fallo esperado, y unittest avisa en cuanto vuelvan a pasar |
+| El launcher y el empaquetado se quedan rotos hasta su limpieza: tras la Spec 1a, el launcher no reconoce un dump (usaba el perfil de parches del juego anterior) y el empaquetado copia una carpeta `patches/` que ya no existe | Bajo (el launcher solo es de Windows/Tk, y en Linux se usa `run.py`) | Se arreglan juntos después de la Alpha; los 4 tests del launcher afectados están marcados como fallo esperado, y unittest avisa en cuanto vuelvan a pasar |
 | El renombrado masivo rompe el build o una variable queda a medias (el juego ignora la opción sin avisar) | Medio | Va al final (Spec 7), con recorrido grabado y capturas como oráculo; renombrar por capas con `git mv`; sin alias; script de comprobación con excepciones explícitas |
-| Defecto de render RDNA2 (franjas oscuras) documentado en `docs/plans/2026-10-12-gpu-corruption-rdna2.md`; la máquina de pruebas es una Navi 23 | Bajo | Visto solo en Windows y en la ruta de MSAA de GoW3. La Spec 1b no la borra: el parche de MSAA por vendor para Windows se queda (2026-10-25), así que el riesgo no cambia; `--vulkan-only` pasa en RADV. En el hito (2026-10-18) no apareció nada parecido |
+| Defecto de render RDNA2 (franjas oscuras) documentado en `docs/plans/2026-10-12-gpu-corruption-rdna2.md`; la máquina de pruebas es una Navi 23 | Bajo | Visto solo en Windows y en la ruta de MSAA del juego anterior. La Spec 1b no la borra: el parche de MSAA por vendor para Windows se queda (2026-10-25), así que el riesgo no cambia; `--vulkan-only` pasa en RADV. En el hito (2026-10-18) no apareció nada parecido |
 | El juego no elige inglés o mezcla recursos de otro idioma | Bajo | El runtime ya reporta inglés; verificar `_en` en el log de archivos abiertos |
 | Sin estimaciones fiables de esfuerzo | Bajo | Las de la sección 4 son una propuesta; se corrigieron tras el hito (2026-10-18) y se vuelven a revisar cuando se vea el 2D de la novela |
 | Licencia | Bajo | Mantener GPL-2.0 y los créditos; no distribuir nunca archivos del juego (tampoco capturas: `out/baseline/` no se versiona) |
@@ -1129,7 +1121,7 @@ conserva (decisión del usuario); FSR 1 y RCAS, que son espaciales, se quedan. V
 | Aprobar cada spec antes de la implementación | Specs 1a, 1b, 2 a 7 |
 | ~~Mirar el resultado del hito de primer fotograma y decidir con el autor cómo seguir~~ Hecho el 2026-10-18: seguir el orden previsto | Hito |
 | Aprobar las capturas de línea base (una por una) | Hito, Spec 1b, Spec 6 |
-| ~~Decidir qué hacer con la elección de parches de resolución y de frame rate por nombre de GoW3 (sección 2)~~ Hecho el 2026-10-19: se deja para después de la Alpha, con el launcher | Spec 1b |
+| ~~Decidir qué hacer con la elección de parches de resolución y de frame rate por nombre del juego anterior (sección 2)~~ Hecho el 2026-10-19: se deja para después de la Alpha, con el launcher | Spec 1b |
 | Probar el recorrido en el juego e informar de lo que vio y oyó | Specs 4 a 6 |
 
 ---
@@ -1148,7 +1140,7 @@ Ideas para versiones siguientes, sin compromiso:
   - Dar un mensaje propio al código 30.
   - Quitar el `cp -r patches` de `packaging/linux/build.sh` y de `packaging/windows/package.sh`.
   - Quitar la mención de `tools/gow3_frame_map.py` en `docs/upscaler.md`.
-  - Quitar la elección de parches de resolución y de frame rate por nombre de GoW3 (sección 2), con
+  - Quitar la elección de parches de resolución y de frame rate por nombre del juego anterior (sección 2), con
     el aviso de `run.py` sobre el parche de frame rate. Está en `scripts/patches.py`
     (`EXCLUSIVE_PREFIX`, que importa el launcher), `scripts/graphics_options.py`, `run.py`, el menú
     del juego, sus ajustes y sus tests. Decidido el 2026-10-19.
@@ -1195,6 +1187,6 @@ Ideas para versiones siguientes, sin compromiso:
   probado con CUSA47999) trae estructuras, ids de códec y errores.
 - [vgmstream](https://github.com/vgmstream/vgmstream), decodificador HEVAG (`src/coding/psv_decoder.c`)
   y detección de `VAGp` (`src/meta/vag.c`); licencia tipo ISC.
-- Roadmap de God of War III: [docs/gow3/ROADMAP.md](../gow3/ROADMAP.md) (histórico; se puede borrar junto con el resto de GoW3).
+- Roadmap del juego anterior: [docs/gow3/ROADMAP.md](../gow3/ROADMAP.md) (histórico; se puede borrar junto con el resto del juego anterior).
 - Documentos internos: [CLAUDE.md](../../CLAUDE.md), [mods](../MODS.md),
   [Windows](../../packaging/windows/README.md).

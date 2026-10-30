@@ -1,7 +1,8 @@
 # Spec 7 — Renombrar `gow3` a `tsuki`
 
 Fecha: 2026-10-14, ampliada el 2026-10-25 (§9), el 2026-10-28 (§10) y el 2026-10-30 (§11). Estado: **borrador para aprobación**; tareas 0 (rama
-`tsuki/spec-7` y línea base, §4), 1 (`tools/check_rename.sh`, §6), 2 y 3 (§10 completa) del plan hechas el 2026-10-30. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 7".
+`tsuki/spec-7` y línea base, §4), 1 (`tools/check_rename.sh`, §6), 2 y 3 (§10 completa) y 4 (inventario, prosa y
+§11) del plan hechas el 2026-10-30. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 7".
 Depende de: Spec 6 (el recorrido grabado y las capturas son el oráculo del renombrado) y Spec 1b. El renombrado va
 al final. Antes de que la Spec 6 se cerrara sin la 1b (2026-10-28), esta dependencia llegaba a través de la 6.
 
@@ -115,8 +116,8 @@ fotogramas `eye` (2700, 2890: el menú de carga sobre `titlebg1.mp4`) quedan a o
 1. `docs/gow3/` (histórico de GoW3);
 2. `docs/plans/` (diagnósticos históricos de GoW3; **excluido**, decidido 2026-10-14);
 3. `docs/specs/` (las specs cuentan lo que se hizo con los nombres de entonces; **[D]** 2026-10-28);
-4. el nombre de la **rama** `gow3` cuando aparece como `rama \`gow3\`` o `branch gow3`, y la ruta `docs/gow3/`,
-   en `CLAUDE.md` y en el roadmap;
+4. el nombre de la **rama** `gow3` cuando aparece como `rama \`gow3\`` o `branch gow3`, y la ruta `docs/gow3/`
+   (también como enlace relativo `../gow3/`), en `CLAUDE.md` y en el roadmap;
 5. los submódulos y `pgo/`;
 6. el propio script y su test, y las líneas marcadas con `rename-check: ok` (el test del §7 que comprueba que
    una variable `GOW3_*` ya no tiene efecto tiene que nombrarla);
@@ -415,10 +416,41 @@ mayúsculas), con las excepciones del §6 más los tres README del punto 6 y las
 Orden: la prosa, los comentarios y los textos de esta sección van en la tarea 4 del plan, **antes** de cualquier
 `sed`, porque el `sed` no los arregla y algunos los volvería falsos.
 
+**Hecho (tarea 4 del plan, 2026-10-30):**
+
+- `check_rename.sh` (commit `5571780`): busca también el nombre y los seriales, con tres tests nuevos. Además acepta
+  la ruta `docs/gow3/` escrita como enlace relativo (`../gow3/`) en `CLAUDE.md` y el roadmap, que es la misma
+  excepción del §6 punto 4.
+- Actualizador (commit `05e1692`): borrado con sus 12 textos en los 13 idiomas (`KEYS` y las 12 listas, 130 → 118,
+  comprobado contra el archivo anterior) y un test que comprueba que no queda.
+- Identidad: `APP_NAME` del launcher es `Tsukihime`, y el título completo va en el `.desktop`, en el acceso de Steam
+  y en el texto que pide el dump. `Tsukihime.exe` y `Play Tsukihime.exe` aparecen en `package.sh`, `play.c`, el
+  acceso directo y el comentario de CMake. El logo de Steam dice «TSUKIHIME / A PIECE OF BLUE GLASS MOON» (visto
+  renderizado). `CUSA47999` sustituye al serial anterior en la carpeta por defecto, en el texto «Choose the game
+  folder…» (13 idiomas), en `docs/MODS.md`, en la plantilla de incidencias y en los datos de prueba. `Kratos`
+  pasa a `Shiki` en los tests. Se borra una entrada huérfana de `EXTRA['pt']`: su clave no era la que pide el
+  launcher, y nombraba el juego.
+- Comentarios borrados (regla 2): `gow3_msaa.h`, `liverpool.cpp`, `camera_motion.comp`, `motion_history.h`,
+  `vk_frame_capture.cpp`, dos en `texture_cache.cpp`, `gow3_overlay.cpp`, `scripts/patches.py`,
+  `test_blend_rewrite.cpp`, `test_graphics_settings.cpp` y `test_patches.py`. En el código del juego solo cambian
+  comentarios (`git diff` sin otra línea), así que el recorrido grabado no se repite.
+- Créditos (regla 3): el build de `KrachDev/shadPS4_GOW3` va en su propia línea con el marcador
+  (`vk_lighting_test.h`). La fuente de títulos se explica en una línea marcada; los demás comentarios dicen «la
+  fuente de títulos» y «los colores del juego anterior».
+- Historia (regla 5): `CLAUDE.md`, el roadmap, `docs/upscaler.md`, `docs/ENTORNO.md` y los comentarios de cuatro
+  tests. En `CLAUDE.md`, «Game-specific surface» pasa a ser la lista de lo borrado: nombraba archivos que la Spec
+  1a ya había quitado. «the `gow3` branch» pasa a «branch `gow3`». La sección de la Spec 7 del roadmap ya no copia
+  los nombres viejos (la tabla está en el §3), y lleva la §11. Las frases de `CLAUDE.md` y del roadmap que nombraban
+  variables quitadas en la §10 ya no las nombran.
+- Resultados: `check_rename.sh` no encuentra ninguna línea con el nombre o los seriales (2233 restos, todos
+  nombres `gow3`). `build.sh --test` verde (12 PASS); Python 283 tests, 35 omitidos y los 4 fallos esperados.
+- Queda para antes de la tarea 5: `docs/upscaler.md`, `docs/DEPTH_ADAPTIVE_TAA.md` y `docs/motion_vectors.md`
+  nombran variables quitadas en la §10, que el `sed` convertiría en nombres `TSUKI_*` que nunca existieron.
+
 Criterios de aceptación:
 
-- [ ] `tools/check_rename.sh` no encuentra `God of War`, `CUSA01623` ni `CUSA01715` fuera de las excepciones.
-- [ ] El launcher no tiene actualizador: ni `RELEASES_API`, ni `--install-update`, ni el ajuste `check_updates`;
-  un test lo comprueba.
-- [ ] `README.md`, `README.pt-BR.md`, `packaging/windows/README-Windows.txt`, el icono y `launcher/gowfont.ttf` no
-  cambian de contenido en esta spec.
+- [x] `tools/check_rename.sh` no encuentra `God of War`, `CUSA01623` ni `CUSA01715` fuera de las excepciones.
+- [x] El launcher no tiene actualizador: ni `RELEASES_API`, ni `--install-update`, ni el ajuste `check_updates`;
+  un test lo comprueba (`test_no_updater`).
+- [x] `README.md`, `README.pt-BR.md`, `packaging/windows/README-Windows.txt`, el icono y `launcher/gowfont.ttf` no
+  cambian de contenido en esta spec (`git diff ef0c90c` vacío para ellos al cerrar la tarea 4).

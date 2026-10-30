@@ -113,7 +113,7 @@ ninja -C out/gpu frame-capture-test && out/gpu/frame-capture-test   # un test C+
 ```
 
 Línea base (2026-10-14): 10/10 tests en C pasan; Python 238 tests OK con 37 saltados (17 piden
-`pip install iced-x86`, 16 son solo de Windows/Tk, 2 piden el dump de GoW3, 2 son de fuentes GDI).
+`pip install iced-x86`, 16 son solo de Windows/Tk, 2 piden el dump del juego anterior, 2 son de fuentes GDI).
 
 Tests que usan contenido del juego (sin versionar) escriben `SKIP: <motivo>` cuando les falta algo:
 los clips de `python3 tools/extract_audio_clips.py --image Tsukihime/CUSA47999/image --out

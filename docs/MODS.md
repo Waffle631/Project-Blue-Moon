@@ -38,8 +38,8 @@ del mod se rechazan.
 Desde la terminal:
 
 ```sh
-GOW3_GAME_DIR=/ruta/CUSA01623 GOW3_MODS_DIR=/ruta/mods python run.py
-GOW3_GAME_DIR=/ruta/CUSA01623 GOW3_MODS_ENABLED=0 python run.py
+GOW3_GAME_DIR=/ruta/CUSA47999 GOW3_MODS_DIR=/ruta/mods python run.py
+GOW3_GAME_DIR=/ruta/CUSA47999 GOW3_MODS_ENABLED=0 python run.py
 ```
 
 El orden y las desactivaciones se guardan en `mods.json` en el directorio de datos:
@@ -65,6 +65,5 @@ se ignoran. La activación predeterminada viene del `isEnabled` del archivo; la 
 
 Tipos de línea aceptados: `bytes`, `bytes16/32/64`, `float32/64`, `utf8`, `utf16`. Un parche con
 líneas `mask` (búsqueda por patrón) o con una dirección fuera del eboot se ignora por completo, con aviso en el
-log. Los parches de terceros se aplican después de los integrados
-(`patches/God_of_War_III_Remastered.xml`): donde ambos escriben, gana el de terceros. Desde la
-terminal: `GOW3_PATCHES_DIR=/ruta GOW3_PATCHES_CONFIG=/ruta/patches.json python run.py`.
+log. Los parches de terceros se aplican después de los integrados: donde ambos escriben, gana el de
+terceros. Desde la terminal: `GOW3_PATCHES_DIR=/ruta GOW3_PATCHES_CONFIG=/ruta/patches.json python run.py`.

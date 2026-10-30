@@ -4,12 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A native PC port of God of War III Remastered (PS4, CUSA01623/CUSA01715). The game's original
+A native PC port of TSUKIHIME -A piece of blue glass moon- (PS4, CUSA47999). The game's original
 x86-64 `eboot.bin` runs directly on the host CPU; a C runtime replaces the PS4 system libraries
 (HLE, no CPU emulation), and a vendored shadPS4 video core translates GNM command buffers and
-GCN shaders to Vulkan. Lineage: deadinside28/bloodborne_pc → Supermedo (Windows) → this fork.
-When GoW3 replaced Bloodborne, the Bloodborne-specific code was deleted and `bb`/`bbport` renamed
-to `gow3` (commits `3a0712a`, `a7cf186`) — the code is single-game, not a multi-game platform.
+GCN shaders to Vulkan. Lineage: deadinside28/bloodborne_pc → Supermedo (Windows) → a port of the previous
+game (`docs/gow3/ROADMAP.md`, branch `gow3`) → this fork. Each new game replaced the last one's code and
+names (commits `3a0712a`, `a7cf186`; Spec 7 for this one) — the code is single-game, not a multi-game platform.
 
 No game files are in the repo. A decrypted (fake-signed) dump folder with `eboot.bin`,
 `sce_module/` and `sce_sys/` is needed to run anything beyond unit tests.
@@ -17,15 +17,15 @@ No game files are in the repo. A decrypted (fake-signed) dump folder with `eboot
 ## Current goal: retarget to Tsukihime (branch `tsuki/main`)
 
 This branch is porting **TSUKIHIME -A piece of blue glass moon-** (PS4, CUSA47999, v01.00) on top
-of the GoW3 codebase. Everything below still describes the GoW3 code as it is; the
-"Game-specific surface" section is the checklist of what must be generalized or replaced.
-GoW3-only features (orb/damage hooks, actors, enemy health bar, GoW3 patches XML, GPU heuristics,
-touchpad semantics, GoW3-only tests; Specs 1a and 1b removed them) must be **deleted** from the tree, not disabled,
-isolated or adapted: no dead code behind a switch. GoW3 stops being a supported title on this
-branch (history stays in git and the `gow3` branch). Generic code (loader, runtime, shadPS4 core,
+of the previous game's codebase. Some sections below still describe code inherited from it; the
+"Game-specific surface" section is the checklist of what had to be generalized or replaced.
+Features only the previous game used (orb/damage hooks, actors, enemy health bar, its patches XML, GPU heuristics,
+touchpad semantics, its own tests; Specs 1a and 1b removed them) must be **deleted** from the tree, not disabled,
+isolated or adapted: no dead code behind a switch. The previous game stops being a supported title on this
+branch (history stays in git and in the branch `gow3`). Generic code (loader, runtime, shadPS4 core,
 upscalers) stays. Order of work and acceptance criteria: `docs/tsuki/ROADMAP.md` (kernel Spec 2 first; Spec 1a deletes
 hooks/patches early; a "first frame" milestone gates Spec 1b, which deletes the renderer heuristics
-with before/after captures; the `gow3` → `tsuki` rename is Spec 7, done last).
+with before/after captures; the rename to `tsuki` is Spec 7, done last).
 
 - Dump: `Tsukihime/CUSA47999/` (untracked, ~45 GB — never `git add` it). Run with
   `GOW3_GAME_DIR=Tsukihime/CUSA47999`. Game data is in `image/` (`allpac*.hed/.mrg/.nam`,
@@ -70,12 +70,13 @@ with before/after captures; the `gow3` → `tsuki` rename is Spec 7, done last).
   host): the fixed save `out/savedata-usuario-1b/` in its own `GOW3_USER_DIR`, `GOW3_MOUSE=0`, 40 s fullscreen.
 - Spec 1b (GPU heuristics) is closed (2026-10-28; branch `tsuki/spec-1b-cierre`, fast-forward merged into `tsuki/main` the same day).
   For Tsukihime none of the heuristics was needed or in the way; the delete-don't-disable rule above is why they went.
-  A temporary counter with them switched on (`GOW3_EXPERIMENTAL_UPSCALER=1`) found 0 matches at boot and on the
-  recorded route; after the deletions the oracle frames and the route match `out/baseline/6a/`.
+  A temporary counter with them switched on (the experimental upscaler switch, gone since Spec 7 §10) found 0
+  matches at boot and on the recorded route; after the deletions the oracle frames and the route match
+  `out/baseline/6a/`.
   Scope, as the user decided on 2026-10-25 (spec §2.2):
   - deleted: `gbuffer_draw` and the 864-byte constant (task 3), and the temporal upscaler's hard-coded shader
-    hashes from another game (task 3b). The upscaler now has no trigger by default: `UiComposition::Trigger` fires
-    only on a hash given by `GOW3_UPSCALE_BEFORE_CS` / `GOW3_UI_TRIGGER_VS`;
+    hashes from another game (task 3b). After that the upscaler had no trigger by default, and Spec 7 §10 removed
+    the variables that could give `UiComposition::Trigger` one;
   - linear readback: only the `GOW3_READBACK_LINEAR=1` default in `run.py` went (task 4, done). With it on,
     Tsukihime put no image in `download_images`, either at boot or in the novel, so it did nothing for this
     game. `readback_linear_images` is a shadPS4 option and stays: off by default, and
@@ -136,7 +137,7 @@ Linux (deps via pkg-config: vulkan, sdl3, ffmpeg; `shell.nix` on NixOS, re-enter
 ```bash
 bash build.sh            # out/gpu/libgow3gpu.so (CMake/Ninja, LTO on, PGO if pgo/ has profiles) + out/gow3-probe
 bash build.sh --test     # also builds and runs the C tests (runtime, pad, sema, mp3, videodec, services, isa...)
-GOW3_GAME_DIR=/path/to/CUSA01623 python3 run.py    # or: bash run.sh (builds first); --software uses lavapipe
+GOW3_GAME_DIR=Tsukihime/CUSA47999 python3 run.py    # or: bash run.sh (builds first); --software uses lavapipe
 ```
 
 Windows: MSYS2 CLANG64 shell (packages in `packaging/windows/README.md`), same `bash build.sh`;
@@ -214,10 +215,10 @@ TEB TLS slot on Windows, patched by `patch_tcb_loads`).
 ## Architecture: GPU (`gpu/`)
 
 - `gpu/shadps4/` — vendored shadPS4 (commit and backports in `gpu/VENDOR.txt`) plus cuesta4's
-  GoW3 rendering fixes. Every local change is marked with a `gow3:` comment; keep doing that.
+  rendering fixes for the previous game. Every local change is marked with a `gow3:` comment; keep doing that.
 - `gpu/shim/` — glue replacing the parts of shadPS4's emulator core (`core/`, `common/`), the SDL
   window, the ImGui in-game menu/perf overlay (`gow3_overlay.cpp`), settings (`gow3_settings.cpp`,
-  `gow3.ini`), and the GoW3 feature backends (orbs, actors).
+  `gow3.ini`).
 - `gpu/gow3gpu.h` — the C interface between loader/runtime and the GPU library.
 - Linux: `libgow3gpu.so` loaded via rpath `$ORIGIN/gpu`; Windows: static, linked into `gow3-probe.exe`.
 - Many behaviours are toggled by `GOW3_*` environment variables (diagnostics, readbacks,
@@ -227,14 +228,12 @@ TEB TLS slot on Windows, patched by `patch_tcb_loads`).
   `GOW3_STALE_READBACK`, `scripts/graphics_options.py:14-15`), so CPU reads of GPU-written images use the
   previous frame's copy.
 
-## Game-specific surface (GoW3 code to delete; what any other title would need)
+## Game-specific surface (the previous game's code, deleted; what any other title would need)
 
-- Hooks (cheats, orb/damage multipliers, enemy health bar): `install_*` in `src/probe.c`,
-  `src/*_hook.h`, `gpu/shim/gow3_orbs.cpp`, `gow3_actors.cpp`. Sites are found by byte signature
-  (`src/signature.h`); a missing site disables only that feature.
-- Patches: `patches/God_of_War_III_Remastered.xml` (shadPS4/GoldHEN XML; `Pattern`/`At`
-  signatures generated by `tools/make_signatures.py`), the `GAMES` profile and
-  `REFERENCE_SHA256` in `scripts/patches.py`. Literal writes only; mask patches are rejected.
+- ~~Hooks (cheats, orb/damage multipliers, enemy health bar), their byte signatures and backends~~ (Spec 1a).
+- ~~The built-in patch XML and its profile~~ (Spec 1a). `scripts/patches.py` still reads third-party
+  shadPS4/GoldHEN XML (`GAMES` is empty; literal writes only, mask patches are rejected), and
+  `tools/make_signatures.py` still generates `Pattern`/`At` signatures.
 - GPU heuristics (Spec 1b, closed 2026-10-28), all removed:
   - ~~`gbuffer_draw` and the 864-byte camera constant buffer in `vk_rasterizer.cpp`~~ (task 3). The 864-byte
     classifier in `motion_history.h:45` stays, with the now unreachable `CameraMotion`/`ObjectMotion`.
@@ -242,7 +241,7 @@ TEB TLS slot on Windows, patched by `patch_tcb_loads`).
     `ui_trigger_vs`)~~ (task 3b).
   - ~~The `GOW3_READBACK_LINEAR=1` default in `run.py`~~ (task 4, 2026-10-25). The option stays.
 
-  Not GoW3 code, so they stay: the 1920×1080 scene scaling (the project's base resolution), and the
+  Not the previous game's code, so they stay: the 1920×1080 scene scaling (the project's base resolution), and the
   vendor-based guest MSAA decision (`gow3_msaa_default.h`, a workaround for AMD's and Intel's Windows drivers;
   user decision of 2026-10-25).
 - Pad touchpad semantics (photo mode / pause) in `runtime_pad.c`; title/serial defaults in
@@ -265,13 +264,13 @@ bound to a GOT slot (`--linked`: `out/boot-linked.bin`, which includes `libc.prx
 
 ## Conventions
 
-- Development branch is `gow3`; `main` receives tested merges.
+- Development happens on `tsuki/main` (the previous game's was the branch `gow3`); `main` receives tested merges.
 - Commit messages are in **Spanish**, `Tipo(Ámbito): descripción` (e.g. `Feat(Kernel): implementar event flags`,
   `Fix(GPU): ...`, `Test(GPU): ...`, `Docs(Spec1b): ...`), body explaining the cause. This has been the user's rule
-  since 2026-10-17; older commits from the GoW3 era are in Portuguese.
+  since 2026-10-17; older commits from the previous game's era are in Portuguese.
 - C is compiled with `-std=c11 -Wall -Wextra -Werror`; code style is dense (short lines joined with
   `;`, few braces) — match the surrounding file. Comments explain why, often referencing the
   file that depends on a contract.
 - User-facing docs: `README.md` (English) and `README.pt-BR.md` must stay in sync;
-  progress lives in `docs/tsuki/ROADMAP.md` (Spanish; `docs/gow3/ROADMAP.md` is the historical GoW3 one, in Portuguese).
+  progress lives in `docs/tsuki/ROADMAP.md` (Spanish; `docs/gow3/ROADMAP.md` is the previous game's, in Portuguese).
 - Repo is only local, so u can do commits or create a branch to test something

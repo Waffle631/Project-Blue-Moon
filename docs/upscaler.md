@@ -7,7 +7,7 @@
 > (`Gow3Settings::TemporalUpscalerAvailable` vale `false`). Las herramientas que descargaban,
 > optimizaban, comprobaban y medían los assets de FSR 4 y 4.1.1 se borraron con él y siguen en la
 > historia de git. FSR 1 y RCAS son espaciales y siguen en el menú. El resto del documento es la
-> referencia de cuando funcionaba con God of War III: las opciones, variables y herramientas que
+> referencia de cuando funcionaba con el juego anterior: las opciones, variables y herramientas que
 > nombra ya no existen.
 
 ## TAA nativo y assets de FSR 4 ausentes (2026-10-01)
@@ -95,7 +95,7 @@ Analizador de fotogramas: `GOW3_CAPTURE_TRIGGER=<archivo> GOW3_CAPTURE_DIR=<dir>
 el siguiente fotograma (límite: el pase que escribe un display buffer) — pases, objetivos, shaders,
 texturas muestreadas y el primer 1 KiB de las constantes enlazadas para los pases pequeños y los primeros draws.
 
-## El fotograma de God of War III (mapeado el 2026-10-10, render 2560x1440)
+## El fotograma del juego anterior (mapeado el 2026-10-10, render 2560x1440)
 
 Capturado con el menú del juego (Insert > Diagnostics > Capture frame, archivos en
 `user/captures/`). `tools/gow3_frame_map.py <captura>` encuentra cada pieza de abajo por estructura,
@@ -142,7 +142,7 @@ Las matrices del fotograma anterior no están en el fotograma; el port debe cons
 - FSR 3.1 (`GOW3_UPSCALER=fsr3`, submódulo FireBurn/FSR-Vulkan): color de escena antes de la
   combinación de postprocesado (compute shader 9a9cf8a9), 1:1, RGB escrito de vuelta (el juego guarda datos
   en el alfa). El toggle 1<<24 lo apaga en tiempo de ejecución.
-  `9a9cf8a9` era el compute de God of War III. Desde la Spec 1b (2026-10-28) no hay disparador por defecto: hay
+  `9a9cf8a9` era el compute del juego anterior. Desde la Spec 1b (2026-10-28) no hay disparador por defecto: hay
   que darlo con `GOW3_UPSCALE_BEFORE_CS=<hash>` (y el shader de la interfaz con `GOW3_UI_TRIGGER_VS`). Con Tsukihime
   el upscaler temporal no puede escalar (`CameraMotion` sin entradas; ver la Spec 1b, tarea 3).
 - Jitter: desplazamiento del viewport de la geometría de escena (dibujada con la profundidad de escena, no con quads
