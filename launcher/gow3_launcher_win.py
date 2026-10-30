@@ -27,10 +27,6 @@ import sys
 import tempfile
 import threading
 import unicodedata
-import time
-import urllib.request
-import webbrowser
-import zipfile
 
 WINDOWS = sys.platform == 'win32'
 if WINDOWS:
@@ -53,13 +49,8 @@ NO_WINDOW = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
 # The game and everything it starts form one process group, ended together (GameJob).
 NEW_GROUP = {} if WINDOWS else {'start_new_session': True}
 UI_FONT, MONO_FONT, SERIF_FONT = 'Segoe UI', 'Consolas', 'Georgia'
-# This build; GitHub release tags are windows-v<VERSION>.
+# This build, shown on the Advanced page.
 VERSION = '2.1.8'
-RELEASES_API = 'https://api.github.com/repos/FelipePrado0/gow3_pc/releases/latest'
-RELEASES_PAGE = 'https://github.com/FelipePrado0/gow3_pc/releases/latest'
-UPDATE_DIR = Path(tempfile.gettempdir()) / 'gow3-update'
-# Never copied over an installation by an update (the package does not hold them either).
-USER_FILES = ('user', 'out', 'mods', 'gow3.ini', 'mods.json', 'mods_presets.json', 'patches.json', 'last_run.log')
 # The God of War face for titles, next to gow3.ico; main() registers it for this process only.
 FONT_FILE = PORT_DIR / 'launcher' / 'gowfont.ttf'
 FR_PRIVATE = 0x10
@@ -204,14 +195,6 @@ def host_environment():
     return env
 
 
-def open_url(url):
-    if WINDOWS:
-        webbrowser.open(url)
-    else:
-        subprocess.Popen(['xdg-open', url], env=host_environment(), stdin=subprocess.DEVNULL,
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-
 def _(en, ru=None):
     if en.endswith(WARN):
         return _(en[:-len(WARN)], ru and ru.removesuffix(WARN)) + WARN
@@ -307,7 +290,7 @@ APP_DEFAULTS = {'ui_language': 'en', 'game_dir': os.environ.get('GOW3_GAME_DIR',
                 'gpu_id': '', 'background_warmup': True, 'parallel_warmup': True, 'pipeline_binary_cache': True,
                 'perf_diag': False, 'frame_capture_key': False, 'frame_stats': False, 'gpu_profile': False,
                 'vk_validation': False, 'close_on_play': False,
-                'check_updates': False, 'game_patches': {}, 'controls': {}, 'pad_style': 'playstation'}
+                'game_patches': {}, 'controls': {}, 'pad_style': 'playstation'}
 
 # PS4 button, default key, default gamepad button (SDL names; src/runtime_pad.c). L2/R2 come
 # from the analog triggers and the left touchpad click (photo mode) from L1 + the right click's
@@ -787,7 +770,6 @@ class Launcher:
         self.banner_source = self.banner_image = None
         self.ui_calls = queue.Queue()  # work for the Tk thread from helper threads
         self.mod_order, self.mod_vars, self.patch_vars = [], {}, {}
-        self.pending_update = None  # (version, url, page) once offered
         root.title(f'{APP_NAME} (PC)')
         if sys.platform == 'win32':
             try:  # the taskbar shows this window's icon, not Python's
@@ -821,8 +803,6 @@ class Launcher:
         root.protocol('WM_DELETE_WINDOW', self.close)
         root.after(100, self.drain_output)
         root.after(500, self.watch_changes)
-        if WINDOWS and self.app.get('check_updates', True):
-            threading.Thread(target=self.check_update, daemon=True).start()
 
     def meta_dir(self):
         return meta_folder(self.var('game_dir', 'app').get(), self.var('update_dir', 'app').get())
@@ -1037,7 +1017,6 @@ class Launcher:
             item.bind('<Leave>', lambda _e, n=name: n != self.current_page and self.nav[n].configure(bg=BG))
             self.nav[name] = item
         tk.Frame(side, bg=BG).pack(fill='both', expand=True)
-        self.update_box = None
         self.side_note = tk.Label(side, text=_('In the game: Insert or R3+L2\nopens the port\'s menu.',
                                                'В игре: Insert или R3+L2\nоткрывает меню порта.'),
                                   bg=BG, fg=MUTED, font=(UI_FONT, 9), justify='left', wraplength=self.px(210))
@@ -1474,16 +1453,9 @@ class Launcher:
         self.row(f, _('Launcher language', 'Язык лаунчера'), self.choice(f, 'ui_language', 'app', UI_LANGUAGES),
                  _('Applies when the launcher opens again.', 'Применится при следующем открытии лаунчера.'))
         self.check(f, 'close_on_play', 'app', _('Close the launcher when the game starts', 'Закрывать лаунчер при запуске игры'))
-        if WINDOWS:
-            self.check(f, 'check_updates', 'app', _('Check for updates when the launcher opens',
-                                                    'Проверять обновления при открытии лаунчера'))
         holder = ttk.Frame(f)
         holder.grid(row=self.next_row(f), column=0, columnspan=2, sticky='w', pady=(10, 0))
-        if WINDOWS:
-            ttk.Button(holder, text=_('Check for updates', 'Проверить обновления'),
-                       command=lambda: threading.Thread(target=self.check_update, args=(True,), daemon=True).start()
-                       ).pack(side='left')
-        ttk.Button(holder, text=_('Desktop shortcut', 'Ярлык на рабочем столе'), command=self.shortcut).pack(side='left', padx=6)
+        ttk.Button(holder, text=_('Desktop shortcut', 'Ярлык на рабочем столе'), command=self.shortcut).pack(side='left')
         ttk.Button(holder, text=_('Add to Steam'), command=self.add_to_steam).pack(side='left')
         ttk.Label(holder, text=f'v{VERSION}', style='Muted.TLabel').pack(side='left', padx=10)
         if not WINDOWS:
@@ -1765,10 +1737,10 @@ class Launcher:
 
     def rebuild(self, language):
         """The window again in another language: every setting stays in its variable; the page,
-        the log, the running game and a pending update offer come back."""
+        the log and the running game come back."""
         global LANG
         LANG = language
-        log, page, update = self.log.get('1.0', 'end-1c'), self.current_page, self.pending_update
+        log, page = self.log.get('1.0', 'end-1c'), self.current_page
         status = self.status['text'], self.status['fg']  # of the running game; otherwise build() redoes it
         for var in self.vars.values():  # the old widgets' value labels and links
             for modes, name in var.trace_info():
@@ -1781,8 +1753,6 @@ class Launcher:
         if self.process:
             self.play_button.configure(text=heading_text(_('RUNNING')), state='disabled')
             self.status.configure(text=status[0], fg=status[1])
-        if update:
-            self.offer_update(*update)
         self.show(page)
         self.refresh_lists()
         self.refresh_game_patches()
@@ -1975,98 +1945,6 @@ class Launcher:
         else:
             subprocess.Popen(['xdg-open', str(path)], env=host_environment(), stdin=subprocess.DEVNULL,
                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-    # ---- updates -------------------------------------------------------------------------------
-    def check_update(self, manual=False):
-        """Helper thread: asks GitHub for the newest release and offers it when it is newer."""
-        try:
-            version, url, page = latest_release()
-        except (OSError, ValueError, KeyError) as failure:
-            if manual:
-                self.ui_calls.put(lambda error=failure: self.messagebox.showerror(
-                    APP_NAME, _('Could not check for updates: {}', 'Не удалось проверить обновления: {}').format(error)))
-            return
-
-        def show():
-            if version_tuple(version) > version_tuple(VERSION):
-                self.offer_update(version, url, page)
-            elif manual:
-                self.messagebox.showinfo(APP_NAME, _('You have the latest version ({}).',
-                                                         'У вас последняя версия ({}).').format(VERSION))
-        self.ui_calls.put(show)
-
-    def offer_update(self, version, url, page):
-        if self.update_box:
-            return
-        tk, ttk = self.tk, self.ttk
-        text = _('Version {} is available.', 'Доступна версия {}.').format(version)
-        box = tk.Frame(self.side, bg=CARD, highlightthickness=1, highlightbackground=ACCENT)
-        self.update_label = tk.Label(box, text=text, bg=CARD, fg=TEXT, font=(UI_FONT, 10, 'bold'),
-                                     wraplength=self.px(160), justify='left')
-        self.update_label.pack(anchor='w', padx=10, pady=(8, 6))
-        buttons = tk.Frame(box, bg=CARD)
-        buttons.pack(fill='x', padx=10, pady=(0, 10))
-        self.update_button = ttk.Button(buttons, text=_('Update', 'Обновить'),
-                                        command=lambda: self.install_update(version, url, page))
-        self.update_button.pack(fill='x')
-        ttk.Button(buttons, text=_("What's new", 'Что нового'), command=lambda: open_url(page)).pack(
-            fill='x', pady=(4, 0))
-        box.pack(fill='x', padx=(22, 18), pady=(0, 14), before=self.side_note)
-        self.update_box = box
-        self.pending_update = (version, url, page)
-        if not self.process:
-            self.status.configure(text=text, fg=TEXT)
-
-    def install_update(self, version, url, page):
-        if self.process:
-            self.messagebox.showinfo(APP_NAME, _('Close the game before updating.', 'Закройте игру перед обновлением.'))
-            return
-        if not FROZEN or not url:  # a source tree updates with git
-            open_url(page)
-            return
-        if not self.messagebox.askyesno(APP_NAME, _(
-                'Install version {} now? The launcher closes, installs it and opens again. Saves and settings are kept.',
-                'Установить версию {} сейчас? Лаунчер закроется, установит её и откроется снова. Сохранения и '
-                'настройки останутся.').format(version)):
-            return
-        self.update_button.configure(state='disabled')
-
-        def progress(percent):
-            self.update_label.configure(text=_('Downloading version {}… {}%', 'Загрузка версии {}… {}%').format(
-                version, percent))
-
-        def work():
-            try:
-                shutil.rmtree(UPDATE_DIR, ignore_errors=True)
-                UPDATE_DIR.mkdir(parents=True, exist_ok=True)
-                archive = UPDATE_DIR / 'update.zip'
-                request = urllib.request.Request(url, headers={'User-Agent': 'gow3-launcher'})
-                with urllib.request.urlopen(request, timeout=60) as response, open(archive, 'wb') as out:
-                    total, done, shown = int(response.headers.get('Content-Length') or 0), 0, -1
-                    while chunk := response.read(1 << 20):
-                        out.write(chunk)
-                        done += len(chunk)
-                        percent = done * 100 // total if total else 0
-                        if percent != shown:
-                            shown = percent
-                            self.ui_calls.put(lambda p=percent: progress(p))
-                with zipfile.ZipFile(archive) as package:
-                    package.extractall(UPDATE_DIR / 'new')
-                archive.unlink()
-                new = next((p.parent for p in (UPDATE_DIR / 'new').rglob('God of War III.exe')), None)
-                if not new:
-                    raise OSError('God of War III.exe is missing from the download')
-                # The new launcher copies itself over this installation once this one has closed.
-                subprocess.Popen([str(new / 'God of War III.exe'), '--install-update', str(PORT_DIR), str(os.getpid())],
-                                 cwd=str(new), stdin=subprocess.DEVNULL, creationflags=NO_WINDOW)
-                self.ui_calls.put(self.root.destroy)
-            except (OSError, zipfile.BadZipFile) as failure:
-                def failed(error=failure):
-                    self.update_button.configure(state='normal')
-                    self.update_label.configure(text=_('Version {} is available.', 'Доступна версия {}.').format(version))
-                    self.messagebox.showerror(APP_NAME, _('Update failed: {}', 'Не удалось обновить: {}').format(error))
-                self.ui_calls.put(failed)
-        threading.Thread(target=work, daemon=True).start()
 
     def clear_cache(self):
         """Shader and pipeline caches; they are rebuilt while playing."""
@@ -2270,49 +2148,6 @@ def play_without_window(settings):
         return process.wait()
 
 
-def version_tuple(text):
-    return tuple(int(number) for number in re.findall(r'\d+', text or ''))
-
-
-def latest_release():
-    """(version, zip URL, page URL) of the newest GitHub release."""
-    request = urllib.request.Request(RELEASES_API, headers={'Accept': 'application/vnd.github+json',
-                                                            'User-Agent': 'gow3-launcher'})
-    with urllib.request.urlopen(request, timeout=15) as response:
-        release = json.load(response)
-    version = '.'.join(re.findall(r'\d+', release['tag_name']))
-    url = next((asset['browser_download_url'] for asset in release.get('assets', [])
-                if asset.get('name', '').lower().endswith('.zip')), None)
-    return version, url, release.get('html_url') or RELEASES_PAGE
-
-
-def install_update(target, wait_pid):
-    """--install-update TARGET PID, run by the downloaded version from its temporary folder:
-    waits for the old launcher to close, copies this version over TARGET (never the saves,
-    settings or mods) and starts it."""
-    target = Path(target)
-    kernel = ctypes.windll.kernel32
-    handle = kernel.OpenProcess(0x00100000, False, int(wait_pid))  # SYNCHRONIZE
-    if handle:
-        kernel.WaitForSingleObject(handle, 60000)
-        kernel.CloseHandle(handle)
-    ignore = shutil.ignore_patterns(*USER_FILES)
-    for attempt in range(30):
-        try:
-            shutil.copytree(PORT_DIR, target, dirs_exist_ok=True, ignore=ignore)
-            break
-        except OSError:  # a file still in use: the old launcher is closing
-            time.sleep(1)
-    else:
-        ctypes.windll.user32.MessageBoxW(None, _(
-            'Could not install the update. Download it from the releases page.',
-            'Не удалось установить обновление. Скачайте его со страницы релизов.'), APP_NAME, 0x10)
-        open_url(RELEASES_PAGE)
-        return 1
-    subprocess.Popen([str(target / 'God of War III.exe')], cwd=str(target))
-    return 0
-
-
 def main():
     global LANG, FONT_LOADED
     args = sys.argv[1:]
@@ -2323,10 +2158,6 @@ def main():
     if not WINDOWS:
         integrate_desktop(settings.get('desktop_integration', True), os.environ.get('APPIMAGE'),
                           PORT_DIR / 'launcher' / 'gow3.png', DATA_DIR)
-    if WINDOWS and args[:1] == ['--install-update'] and len(args) == 3:
-        sys.exit(install_update(args[1], args[2]))
-    if WINDOWS and FROZEN and UPDATE_DIR not in PORT_DIR.parents:
-        shutil.rmtree(UPDATE_DIR, ignore_errors=True)  # what a finished update left behind
     # Without a usable game folder there is nothing to play yet: open the launcher instead.
     if '--play' in args and ready_to_play(settings['game_dir'], settings.get('update_dir') or ''):
         sys.exit(play_without_window(settings))

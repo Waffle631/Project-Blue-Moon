@@ -525,11 +525,17 @@ class GpuChoiceTest(unittest.TestCase):
         self.assertEqual(launcher.APP_DEFAULTS['gpu_id'], '')
 
 
-class ReleaseVersionTest(unittest.TestCase):
-    def test_god_of_war_release_is_newer_than_the_inherited_tags(self):
-        self.assertEqual(launcher.VERSION, '2.1.8')
-        self.assertGreater(launcher.version_tuple(launcher.VERSION), launcher.version_tuple('windows-v1.5'))
-        self.assertGreater(launcher.version_tuple('windows-v2.2'), launcher.version_tuple(launcher.VERSION))
+class LauncherAppTest(unittest.TestCase):
+    def test_no_updater(self):
+        # Spec 7 §11: the updater downloaded the previous game's port over this one, so it went.
+        for name in ('RELEASES_API', 'RELEASES_PAGE', 'UPDATE_DIR', 'USER_FILES', 'latest_release', 'install_update',
+                     'version_tuple', 'open_url'):
+            self.assertFalse(hasattr(launcher, name), name)
+        for name in ('check_update', 'offer_update', 'install_update'):
+            self.assertFalse(hasattr(launcher.Launcher, name), name)
+        self.assertNotIn('check_updates', launcher.APP_DEFAULTS)
+        with open(launcher.__file__, encoding='utf-8') as source:
+            self.assertNotIn('--install-update', source.read())
 
     def test_first_start_is_in_english(self):
         # The translations are partial; 'System' stays a choice in Advanced.

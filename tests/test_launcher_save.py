@@ -192,8 +192,7 @@ class EverySettingSavesTest(LauncherOverTemporaryFiles):
         def spy(app, parent, key, store, options, width=30, var=None):
             self.options[key or 'upscale_mode'] = [value for value, _text in options]
             return original(app, parent, key, store, options, width, var)
-        self.patches = [mock.patch.object(launcher.Launcher, 'choice', spy),
-                        mock.patch.object(launcher.Launcher, 'check_update', lambda app, manual=False: None)]
+        self.patches = [mock.patch.object(launcher.Launcher, 'choice', spy)]
         for patch in self.patches:
             patch.start()
             self.addCleanup(patch.stop)
