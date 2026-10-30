@@ -1,7 +1,7 @@
 # Spec 7 — Renombrar `gow3` a `tsuki`
 
 Fecha: 2026-10-14, ampliada el 2026-10-25 (§9) y el 2026-10-28 (§10). Estado: **borrador para aprobación**; tareas 0 (rama
-`tsuki/spec-7` y línea base, §4) y 1 (`tools/check_rename.sh`, §6) del plan hechas el 2026-10-30. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 7".
+`tsuki/spec-7` y línea base, §4), 1 (`tools/check_rename.sh`, §6) y 2 (§10, núcleo) del plan hechas el 2026-10-30. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 7".
 Depende de: Spec 6 (el recorrido grabado y las capturas son el oráculo del renombrado) y Spec 1b. El renombrado va
 al final. Antes de que la Spec 6 se cerrara sin la 1b (2026-10-28), esta dependencia llegaba a través de la 6.
 
@@ -250,6 +250,52 @@ grabado tienen que salir iguales.
 
 Fuera de esta spec: borrar el código del upscaler temporal, `CameraMotion`, `ObjectMotion`, los shaders de movimiento
 y el submódulo `fsr-vulkan`. El usuario decidió conservarlo (2026-10-28).
+
+**Hecho, núcleo (tarea 2 del plan, 2026-10-30):** el juego ya no tiene forma de encender el upscaler temporal.
+
+- `run.py` ya no lee `GOW3_EXPERIMENTAL_UPSCALER` ni pone `GOW3_UPSCALER=none` ni `GOW3_FSR411_DIR`. `run.sh` ya no
+  compila los pases optimizados de FSR 4 (`tools/fsr4_optimize.sh`) en cada arranque.
+- `GOW3_UPSCALER=none` no solo apagaba el ajuste: el renderer lo leía para dejar `TemporalUpscaler::enabled` y
+  `CameraMotion::for_upscaler` en falso, y el rasterizer mira los dos. Quitar la variable sin más los habría encendido.
+  Ahora valen la constante `Gow3Settings::TemporalUpscalerAvailable` (`false`). Con ella, `Dlss::Get()` ya no carga
+  las DLL (sustituye a `GOW3_DLSS=0`).
+- `Gow3Settings` ni lee ni escribe las claves del upscaler temporal. El inventario de la tarea añadió `sharpen`,
+  `sharpness`, `fsr4_auto_exposure` y `fsr4_invert_jitter`, que solo lee el upscaler temporal, y `live_resolution`,
+  que no leía nadie (campo borrado). `Values::upscaler` empieza en `UpscalerOff`, y los demás campos se quedan en su
+  valor por defecto porque el código conservado los lee.
+- Variables que ya no se leen: `GOW3_UPSCALER`, `GOW3_UPSCALE_PRESET`, `GOW3_JITTER`, `GOW3_REACTIVE*`,
+  `GOW3_OBJECT_MOTION`, `GOW3_OBJECT_MOTION_ALL`, `GOW3_FSR_SHARPNESS`, `GOW3_UPSCALE_BEFORE_CS`,
+  `GOW3_UI_TRIGGER_VS`, `GOW3_OUTPUT_RES`, `GOW3_PRESET_FILE` (también podía cambiar el upscaler), `GOW3_DEBUG_MOTION`,
+  `GOW3_TAA_DIAGNOSTICS` (con su volcado de imágenes), `GOW3_DLSS`, `GOW3_FSR4_DIR`, `GOW3_FSR4_OPT` y
+  `GOW3_FSR411_DIR`.
+- **Se quedan:**
+  - `GOW3_RENDER_RES`, según la decisión del plan.
+  - Los volcados de diagnóstico del código conservado (`GOW3_DUMP_*`, `GOW3_PRESENT_DUMP_*`, `GOW3_MOTION_SELECT_LOG`),
+    que no lo encienden ni lo configuran.
+  - Las variables propias de las herramientas sueltas de FSR 4 (`gpu/tools/fsr4_bench.cpp`, `tools/fsr4_*.sh`,
+    `tools/fsr4cap/`, `tools/fetch_fsr4_assets.sh`). No las lee el juego.
+  - `GOW3_FSR4_PROFILE`/`STATS` (parche `0001`), que se van en la tarea 8.
+- Overlay:
+  - El ítem «Upscaler» sale de `Gow3PerfStats` y del menú. El bit 2 queda libre, sin renumerar los demás.
+  - `DefaultItems` pasa a FPS y frametime, y es también el valor inicial de `overlay_items`, que antes era `7` puesto
+    a mano.
+  - Una clave `overlay_upscaler` de un `gow3.ini` viejo se ignora.
+- Pruebas:
+  - `graphics-settings-test`: el `.ini` lleva `upscaler=fsr3` y todas las claves del upscaler temporal, y el entorno
+    `GOW3_UPSCALER=fsr3` y otras seis variables. El resultado es el upscaler apagado y ninguna de esas claves en el
+    `Save()`; `fsr1=1` se sigue leyendo.
+  - `perf-overlay-test` se ajustó al overlay sin el ítem.
+  - `upscaler-support-test` se ajustó: ya no prueba guardar y leer la elección, que se quitó; la vuelta a FSR 3.1 se
+    sigue probando.
+  - Nuevo `test_launch_has_no_temporal_upscaler_switch`, sobre `run.py` y `run.sh`.
+  - Resultados: `build.sh --test` verde. En Python 282 tests (281 + 1), 35 omitidos y los 4 fallos esperados de la
+    línea base. Siguen verdes `ui-composition-test`, `camera-motion-test`, `taa-shader-test` y
+    `scene-resolution-test`.
+  - Recorrido grabado `t2` (`out/route/t2/`), adelantado de la tarea 3 porque el cambio toca el rasterizer y la caché
+    de pipelines: los 6 fotogramas `exact`/`mask` son idénticos a `out/baseline/6a/`, sin `STOP:`/`Fault:`. 2700 y
+    2890 son `eye` (vídeo debajo) y no se comparan a nivel de píxel.
+- Quedan para la tarea 3: el launcher, el empaquetado y la documentación (`docs/upscaler.md`,
+  `docs/DEPTH_ADAPTIVE_TAA.md`, `docs/motion_vectors.md`, `packaging/windows/README.md`).
 
 Criterios de aceptación:
 
