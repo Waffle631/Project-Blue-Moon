@@ -35,7 +35,9 @@ mecánico, no reduce riesgo técnico y mezclaría sus errores con los de las spe
   `docs/gow3/ROADMAP.md`.
 - **[V]** El parche de FSR (`gpu/patches/fsr-vulkan/0001-FSR-4-v07-provider-GOW3_FSR4_PROFILE-pass-timings-GOW3_F.patch`)
   lleva variables `GOW3_*` en su nombre y en su contenido. Se aplica al submódulo `gpu/third_party/fsr-vulkan`
-  (`build.sh` lo hace), que no se modifica.
+  (`build.sh` lo hace), que no se modifica. **[D] 2026-10-30:** ese parche solo añade `GOW3_FSR4_PROFILE` y
+  `GOW3_FSR4_STATS`, que miden un FSR 4 que con este juego ya no se ejecuta (§10). **Se borra en vez de
+  renombrarse** (paso 6 del §4). Los parches `0002` y `0003` no nombran `gow3` y se quedan.
 - **[V]** `pgo/` no existe en el árbol: renombrar funciones no invalida ningún perfil de PGO hoy. Si se
   añade uno antes del renombrado, hay que regenerarlo.
 
@@ -86,8 +88,11 @@ fotogramas `eye` (2700, 2890: el menú de carga sobre `titlebg1.mp4`) quedan a o
    → `tsuki:` en el código de shadPS4 (es un cambio de comentario, no de lógica).
 5. **Documentación.** `CLAUDE.md`, `README*.md`, este roadmap y la memoria del proyecto. El historial
    (`docs/gow3/`) no se renombra.
-6. **Parche de FSR.** Renombrar el archivo y las variables internas; comprobar que `build.sh` lo aplica al
-   submódulo limpio.
+6. **Parche de FSR.** Borrar `0001-…GOW3_FSR4_PROFILE….patch` (**[D]** 2026-10-30, §2) y quitarlo de su
+   `README.md`. `build.sh` aplica los parches y nunca los quita, así que el `0001` se revierte una vez del árbol
+   de trabajo del submódulo con `git apply --reverse`. Hasta este paso, los pasos 2 a 4 no tocan
+   `gpu/patches/`: cambiar el parche con el `0001` viejo aplicado hace fallar `git apply` en `build.sh`.
+   Comprobar que `build.sh` aplica `0002` y `0003` al submódulo limpio.
 7. **Métricas del overlay en Linux** (§9), con el renombrado ya comprobado por el §7.
 
 ## 5. Requisitos
@@ -103,9 +108,12 @@ fotogramas `eye` (2700, 2890: el menú de carga sobre `titlebg1.mp4`) quedan a o
 
 1. `docs/gow3/` (histórico de GoW3);
 2. `docs/plans/` (diagnósticos históricos de GoW3; **excluido**, decidido 2026-10-14);
-3. el nombre de la **rama** `gow3` cuando aparece como `rama \`gow3\`` o `branch gow3` en `CLAUDE.md` y
-   en este roadmap;
-4. los submódulos y `pgo/`.
+3. `docs/specs/` (las specs cuentan lo que se hizo con los nombres de entonces; **[D]** 2026-10-28);
+4. el nombre de la **rama** `gow3` cuando aparece como `rama \`gow3\`` o `branch gow3`, y la ruta `docs/gow3/`,
+   en `CLAUDE.md` y en el roadmap;
+5. los submódulos y `pgo/`;
+6. el propio script y su test, y las líneas marcadas con `rename-check: ok` (el test del §7 que comprueba que
+   una variable `GOW3_*` ya no tiene efecto tiene que nombrarla).
 
 El script se ejecuta en `bash build.sh --test` para que no regrese ningún nombre antiguo.
 
@@ -216,7 +224,11 @@ Lo que hay que quitar (punto de partida; se rehace el inventario al empezar):
 - Variables de entorno que lo encienden o lo configuran: `GOW3_UPSCALER`, `GOW3_UPSCALE_PRESET`,
   `GOW3_UPSCALE_BEFORE_CS`, `GOW3_UI_TRIGGER_VS`, `GOW3_PRESET_FILE`, `GOW3_JITTER`, `GOW3_OBJECT_MOTION*`,
   `GOW3_DEBUG_MOTION`, `GOW3_TAA_DIAGNOSTICS`, `GOW3_DLSS*`, `GOW3_FSR4_*`, `GOW3_FSR411_DIR`. `GOW3_RENDER_RES` se mira
-  aparte, porque también la usa el escalado de escena.
+  aparte, porque también la usa el escalado de escena. `GOW3_FSR4_PROFILE` y `GOW3_FSR4_STATS` solo se leen dentro
+  del parche `0001` de FSR-Vulkan: se van con él en el paso 6 del §4 (**[D]** 2026-10-30, §2), nunca se renombran.
+- El ítem «Upscaler» del overlay sale de `DefaultItems` **y** del valor inicial `overlay_items{7}` de
+  `Gow3Settings` (`gow3_settings.h:44`), que repite a mano los bits 0-2. Si no, el bit 2 sigue encendido por
+  defecto (**[D]** 2026-10-30).
 - Empaquetado y documentación: los assets de FSR 4 / 4.1.1 (`packaging/`), y `docs/upscaler.md`, que pasa a decir
   que el upscaler está aparcado y sin forma de encenderlo.
 

@@ -4,7 +4,8 @@ Fecha: 2026-10-14. Estado: **cerrada (2026-10-28)**. Aprobada el 2026-10-24; tar
 y 3, 3b, el recorrido de la Spec 6 y el cierre el 2026-10-28 (§7). La Tarea 1 amplió el alcance, por decisión del
 usuario, a los hashes fijos de shaders del upscaler temporal. Tras la Tarea 2 el usuario redujo el alcance (§2.2,
 2026-10-25): de la lectura lineal solo se quita el valor por defecto, y el MSAA por vendor sale de la spec. Rama
-`tsuki/spec-1b-cierre`; su fusión en `tsuki/main` queda pendiente, a decisión del usuario.
+`tsuki/spec-1b-cierre`; su fusión en `tsuki/main` queda pendiente, a decisión del usuario (*fusionada por avance rápido el
+2026-10-28; corregido el 2026-10-30*).
 Roadmap:
 `docs/tsuki/ROADMAP.md`, sección "Spec 1b".
 Depende de: Spec 1a y del hito de primer fotograma (necesita su herramienta de captura de píxeles).

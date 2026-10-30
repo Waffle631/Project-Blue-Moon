@@ -68,7 +68,7 @@ with before/after captures; the `gow3` → `tsuki` rename is Spec 7, done last).
   distrobox) compares them; the reference is `out/baseline/1b/antes/`. Since Spec 6 the user's save changed and
   the game sees a mouse, so retakes use `out/spec1b-t3/run-oracle.sh <take> [VAR=value…]` (untracked, run from the
   host): the fixed save `out/savedata-usuario-1b/` in its own `GOW3_USER_DIR`, `GOW3_MOUSE=0`, 40 s fullscreen.
-- Spec 1b (GPU heuristics) is closed (2026-10-28; branch `tsuki/spec-1b-cierre`, not yet merged into `tsuki/main`).
+- Spec 1b (GPU heuristics) is closed (2026-10-28; branch `tsuki/spec-1b-cierre`, fast-forward merged into `tsuki/main` the same day).
   For Tsukihime none of the heuristics was needed or in the way; the delete-don't-disable rule above is why they went.
   A temporary counter with them switched on (`GOW3_EXPERIMENTAL_UPSCALER=1`) found 0 matches at boot and on the
   recorded route; after the deletions the oracle frames and the route match `out/baseline/6a/`.
