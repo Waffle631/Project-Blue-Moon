@@ -1,7 +1,7 @@
 # Spec 7 — Renombrar `gow3` a `tsuki`
 
 Fecha: 2026-10-14, ampliada el 2026-10-25 (§9) y el 2026-10-28 (§10). Estado: **borrador para aprobación**; tareas 0 (rama
-`tsuki/spec-7` y línea base, §4), 1 (`tools/check_rename.sh`, §6) y 2 (§10, núcleo) del plan hechas el 2026-10-30. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 7".
+`tsuki/spec-7` y línea base, §4), 1 (`tools/check_rename.sh`, §6), 2 y 3 (§10 completa) del plan hechas el 2026-10-30. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 7".
 Depende de: Spec 6 (el recorrido grabado y las capturas son el oráculo del renombrado) y Spec 1b. El renombrado va
 al final. Antes de que la Spec 6 se cerrara sin la 1b (2026-10-28), esta dependencia llegaba a través de la 6.
 
@@ -297,10 +297,60 @@ y el submódulo `fsr-vulkan`. El usuario decidió conservarlo (2026-10-28).
 - Quedan para la tarea 3: el launcher, el empaquetado y la documentación (`docs/upscaler.md`,
   `docs/DEPTH_ADAPTIVE_TAA.md`, `docs/motion_vectors.md`, `packaging/windows/README.md`).
 
+**Hecho, launcher, empaquetado y documentación (tarea 3 del plan, 2026-10-30):**
+
+- **[D]** 2026-10-30: el usuario decide borrar también las herramientas sueltas de FSR 4, que la tarea 2 había dejado.
+  No las usa el juego; solo descargaban, optimizaban, comprobaban y medían los assets de un FSR 4 que ya no se puede
+  encender. Siguen en la historia de git. Se borraron `tools/fetch_fsr4_assets.sh`, `tools/fsr4_optimize.sh`,
+  `tools/fsr4_verify.sh`, `tools/fsr4_post_lds.pl`, `tools/fsr4_pass11_guard.pl`, `tools/Fsr4SpirvCrossFixes.pm`,
+  `tools/fsr4cap/` (12 archivos), `gpu/tools/fsr4_bench.cpp` con su target `fsr4-bench` y la línea de
+  `tools/fsr4cap/*.exe` en `.gitignore`. También `tools/soak.sh`, un resto de GoW3 («entra en el nivel y gira la
+  cámara»). El código del upscaler (`vk_fsr4.cpp`, `fsr411/`, el submódulo) se queda; sus comentarios ya no mandan a
+  las herramientas borradas. `fsr4_shaders/` y `fsr4_411/` siguen en `.gitignore`, porque el código conservado los
+  busca ahí y protegen copias locales.
+- Launcher:
+  - ya no envía `GOW3_EXPERIMENTAL_UPSCALER` ni `GOW3_FSR4_DIR` (con su `fsr4_folder()`);
+  - `experimental_upscaler` sale de `APP_DEFAULTS`; un `settings.json` viejo que lo tenga se ignora;
+  - `upscaler`, `preset`, `output_res`, `live_resolution` y `object_motion` salen de `INI_DEFAULTS`/`INI_FLAGS`.
+    Ya no se escribían, porque el launcher solo guarda las claves con control, pero eran valores por defecto
+    muertos;
+  - se borran el bloque comentado de `build_graphics`, las listas `UPSCALERS`, `PRESETS`, `OUTPUTS` y `LIVE`, y
+    `launcher/gow3_assets.py` (comprobaba los assets de FSR 4.1.1; solo lo usaban el empaquetado Nix y su test);
+  - `gow3_lang.py`: salen los 26 textos del upscaler de `KEYS` y de las 12 listas por posición (156 → 130, con los
+    mismos índices en todas; comprobado contra el archivo anterior), y 4 de `EXTRA['pt']`. Quedan otros textos
+    huérfanos de la época de GoW3, que no son del upscaler y no se tocan aquí.
+- `tools/gpu_capabilities.c` se queda solo con `--list`, la lista de GPUs del launcher. Sus otros dos modos no
+  los llamaba nadie: `--live-resolution` (decidía `live_resolution=auto`) y la comprobación de blit de los presets
+  en vivo. Sin `--list`, sale con el uso y código 2.
+- Empaquetado: `packaging/default.nix` ya no copia `fsr4_shaders` ni `fsr4_411` (con `GOW3_PACKAGE_FSR411`).
+  `package.sh` ya no los empaquetaba; su comentario y el de `packaging/windows/README.md` (que decía que
+  `GOW3_DLSS=0` lo apagaba y que el paquete llevaba la DLL de DLSS) dicen ahora que no se puede encender.
+  `build_dlss.sh` y `gpu/dlss_bridge` se quedan: construyen código conservado.
+- Documentación: `docs/upscaler.md` abre con un aviso de que el upscaler está aparcado, sin forma de encenderlo y
+  sin sus herramientas, y el resto queda como referencia. `docs/DEPTH_ADAPTIVE_TAA.md` y `docs/motion_vectors.md`
+  llevan una nota igual. `README.md` y `README.pt-BR.md` (juntos) quitan el interruptor «experimental» y el ítem
+  «upscaler» del overlay. `CLAUDE.md` dice que §10 está hecha. Las cabeceras no nombran variables quitadas, para que
+  el `sed` de la tarea 5 no las convierta en nombres `TSUKI_*` que nunca existieron.
+- Pruebas:
+  - `test_launcher_upscale.py` se reescribe: sin claves ni valores por defecto del upscaler, sin las dos variables
+    en el entorno de lanzamiento aunque `settings.json` traiga `experimental_upscaler`, y sin sus textos; cada tabla
+    de traducción sigue cuadrando con `KEYS`. Falló por la razón esperada antes del cambio.
+  - Se borra `test_upscaler_assets.py`, que solo probaba `gow3_assets.py`.
+  - `HiddenUpscalingTest` (`test_launcher_save.py`, solo Windows) se queda: comprueba que las claves viejas de un
+    `gow3.ini` se conservan sin migrar.
+  - Resultados: `build.sh --test` verde (12 PASS) y sin avisos nuevos; Python 280 tests (282 − 3 + 1), 35 omitidos y
+    los 4 fallos esperados; `graphics-settings-test`, `perf-overlay-test` y `upscaler-support-test` verdes.
+    `gow3-gpu-capabilities --list` lista las 3 GPUs.
+  - Recorrido grabado `tras10`: los 6 fotogramas `exact`/`mask` son idénticos a `out/baseline/6a/`, y 2700 y 2890
+    coinciden a ojo. Sin `STOP:`/`Fault:`; `Object motion: off`.
+- Pendiente del usuario: mirar a ojo, en una ejecución corta con el menú Insert abierto, que siguen los controles de
+  FSR 1 y RCAS (plan, tarea 3, paso 4).
+
 Criterios de aceptación:
 
-- [ ] Ni el launcher, ni el menú Insert, ni `gow3.ini`, ni una variable de entorno pueden encender el upscaler temporal.
+- [x] Ni el launcher, ni el menú Insert, ni `gow3.ini`, ni una variable de entorno pueden encender el upscaler temporal.
   Lo comprueba un test que ponga `upscaler=fsr3` en el `.ini` y `GOW3_UPSCALER=fsr3` en el entorno, y vea el
   upscaler apagado.
-- [ ] FSR 1 y RCAS siguen funcionando como antes.
-- [ ] Suites verdes; las capturas de la línea base y el recorrido grabado no cambian.
+- [ ] FSR 1 y RCAS siguen funcionando como antes. `graphics-settings-test` lee y guarda `fsr1`, `rcas` y
+  `rcas_strength`; falta que el usuario vea los controles en el menú Insert.
+- [x] Suites verdes; las capturas de la línea base y el recorrido grabado no cambian (`t2` y `tras10`).
