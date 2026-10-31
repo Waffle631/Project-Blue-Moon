@@ -14,7 +14,6 @@ pgo/
 last_run.log
 dist/
 packaging/runtime-paths.nix
-fsr4_411/
 vkd3d-proton.cache
 perf.data
 # Local leftovers: patch backups, generated SPIR-V, analysis outputs, test saves and routes

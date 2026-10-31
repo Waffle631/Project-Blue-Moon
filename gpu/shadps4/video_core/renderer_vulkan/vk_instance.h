@@ -304,11 +304,6 @@ public:
                features.shaderStorageImageExtendedFormats;
     }
 
-    /// gow3: FSR 4.1.1 (INT8 model passes and VK_VALVE_shader_mixed_float_dot_product).
-    bool IsFsr411Supported() const {
-        return IsFsr4Int8Supported() && mixed_float_dot_product;
-    }
-
     /// VK_KHR_shader_clock is supported.
     bool IsShaderSubgroupClockSupported() const {
         return shader_clock && shader_clock_features.shaderSubgroupClock;
@@ -588,7 +583,6 @@ private:
     bool pipeline_executable_properties{}; // gow3: TSUKI_WAVE_STATS=1 (vk_wave_stats.h)
     bool amd_shader_info{};                // gow3: with it, VK_AMD_shader_info when present
     bool compute_shader_derivatives{};
-    bool mixed_float_dot_product{}; // gow3: VK_VALVE_shader_mixed_float_dot_product (FSR 4.1.1)
     bool supports_memory_budget{};
     bool supports_block_texel_view{};
     u64 total_memory_budget{};

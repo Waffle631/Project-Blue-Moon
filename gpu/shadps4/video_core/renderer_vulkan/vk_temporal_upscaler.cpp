@@ -161,8 +161,7 @@ TemporalUpscaler::TemporalUpscaler(const Instance& instance_, Scheduler& schedul
     : instance{instance_}, scheduler{scheduler_}, texture_cache{texture_cache_},
       runtime{runtime_}, camera_motion{camera_motion_}, scene_targets{scene_targets_} {
     // Reject unsupported shaders before allocating resources or recording a frame.
-    Gow3Settings::ConfigureUpscalerSupport(instance.IsFsr4Int8Supported(),
-                                         instance.IsFsr411Supported());
+    Gow3Settings::ConfigureUpscalerSupport(instance.IsFsr4Int8Supported());
     fsr4 = std::make_unique<Fsr4Upscaler>(instance, scheduler);
     {
         const Dlss* dlss = Dlss::Get();
@@ -1884,11 +1883,8 @@ bool TemporalUpscaler::DisplayOverride(VAddr address, Display& display) {
 namespace Vulkan {
 
 bool TemporalUpscaler::UseFsr4() const {
-    const int selected = Gow3Settings::Get().upscaler;
-    const bool supported = selected == Gow3Settings::UpscalerFsr411
-                               ? instance.IsFsr411Supported()
-                               : instance.IsFsr4Int8Supported();
-    return Gow3Settings::IsFsr4(selected) && supported && !fsr4_failed;
+    return Gow3Settings::IsFsr4(Gow3Settings::Get().upscaler) && instance.IsFsr4Int8Supported() &&
+           !fsr4_failed;
 }
 
 bool TemporalUpscaler::RecordFsr4(vk::CommandBuffer cmdbuf, Fsr4Upscaler::Image color,

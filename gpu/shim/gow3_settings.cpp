@@ -140,13 +140,11 @@ bool GraphicsNeedRestart() {
            v.stale_readback != v.startup_stale_readback;
 }
 
-void ConfigureUpscalerSupport(bool fsr4, bool fsr411) {
+void ConfigureUpscalerSupport(bool fsr4) {
     auto& v = Get();
     v.fsr4_supported = fsr4;
-    v.fsr411_supported = fsr4 && fsr411;
     const int requested = v.upscaler;
-    if ((requested == UpscalerFsr4 && !v.fsr4_supported) ||
-        (requested == UpscalerFsr411 && !v.fsr411_supported)) {
+    if (requested == UpscalerFsr4 && !v.fsr4_supported) {
         v.fsr4_problem = "GPU does not support the selected FSR 4 shaders; using FSR 3.1";
         std::printf("Upscaler: %s unsupported on this GPU; falling back to FSR 3.1 before the first frame\n",
                     UpscalerName(requested));
@@ -227,7 +225,7 @@ const char* PresetName(int preset) {
 }
 
 const char* UpscalerName(int upscaler) {
-    static constexpr const char* names[UpscalerCount] = {"off", "fsr3", "fsr4", "fsr411", "taa", "dlss"};
+    static constexpr const char* names[UpscalerCount] = {"off", "fsr3", "fsr4", "taa", "dlss"};
     return names[std::clamp(upscaler, 0, UpscalerCount - 1)];
 }
 

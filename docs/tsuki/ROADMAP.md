@@ -267,7 +267,8 @@ Comandos y recreación del contenedor en `docs/ENTORNO.md`. Ajustes del entorno,
 contenedor:
 
 - Fedora 44 trae Vulkan-Headers 1.4.341 y shadPS4 usa `VK_VALVE_shader_mixed_float_dot_product`
-  (1.4.344): se instala Vulkan-Headers v1.4.344 en `/usr/local`.
+  (1.4.344): se instala Vulkan-Headers v1.4.344 en `/usr/local`. *(Ya no hace falta desde el 2026-10-30: esa
+  extensión solo la usaba el FSR 4.1.1, que la Spec 7 borró. `docs/ENTORNO.md`.)*
 - ffmpeg completo de RPM Fusion en vez de `ffmpeg-free` (que no decodifica H.264 sin openh264;
   `videodec-test` fallaba). Hará falta igualmente para los `.mp4` de AvPlayer.
 

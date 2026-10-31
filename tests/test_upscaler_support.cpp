@@ -19,21 +19,17 @@ int main() {
     s.upscaler = UpscalerFsr3;
     assert(RenderPreset() == Performance);
     for (bool fsr4 : {false, true}) {
-        for (bool fsr411 : {false, true}) {
-            for (int requested = 0; requested < UpscalerCount; ++requested) {
-                s.upscaler = requested;
-                s.fsr4_problem = nullptr;
-                ConfigureUpscalerSupport(fsr4, fsr411);
-                const bool unsupported = (requested == UpscalerFsr4 && !fsr4) ||
-                    (requested == UpscalerFsr411 && !(fsr4 && fsr411));
-                assert(s.upscaler == (unsupported ? UpscalerFsr3 : requested));
-                assert(s.fsr4_supported == fsr4);
-                assert(s.fsr411_supported == (fsr4 && fsr411));
-                assert(bool(s.fsr4_problem.load()) == unsupported);
-                assert(s.preset == Performance);
-                ConfigureUpscalerSupport(fsr4, fsr411);
-                assert(s.upscaler == (unsupported ? UpscalerFsr3 : requested));
-            }
+        for (int requested = 0; requested < UpscalerCount; ++requested) {
+            s.upscaler = requested;
+            s.fsr4_problem = nullptr;
+            ConfigureUpscalerSupport(fsr4);
+            const bool unsupported = requested == UpscalerFsr4 && !fsr4;
+            assert(s.upscaler == (unsupported ? UpscalerFsr3 : requested));
+            assert(s.fsr4_supported == fsr4);
+            assert(bool(s.fsr4_problem.load()) == unsupported);
+            assert(s.preset == Performance);
+            ConfigureUpscalerSupport(fsr4);
+            assert(s.upscaler == (unsupported ? UpscalerFsr3 : requested));
         }
     }
     s.startup_preset = Quality;

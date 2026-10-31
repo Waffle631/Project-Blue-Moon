@@ -56,21 +56,15 @@ sudo dnf install -y gcc gcc-c++ clang make cmake ninja-build git pkgconf-pkg-con
 sudo dnf install -y https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm
 ```
 
-Fedora 44 trae Vulkan-Headers **1.4.341**, pero el shadPS4 vendorizado usa
-`VK_VALVE_shader_mixed_float_dot_product`, que llega en **1.4.344**. Se instalan esos headers
-(incluye `vulkan.hpp`) en `/usr/local` dentro del contenedor, que tiene prioridad sobre
-`/usr/include`:
+Los headers de Vulkan del sistema (Fedora 44: **1.4.341**) bastan desde el 2026-10-30. Antes hacía falta
+1.4.344 en `/usr/local`, porque el FSR 4.1.1 usaba `VK_VALVE_shader_mixed_float_dot_product`. La Spec 7 borró el
+FSR 4.1.1 y esa extensión. Un contenedor creado antes todavía tiene esa copia; no molesta, porque la 1.4.344 también
+sirve. Para volver a los headers del sistema:
 
 ```bash
-d=$(mktemp -d)
-git clone --depth 1 --branch v1.4.344 https://github.com/KhronosGroup/Vulkan-Headers.git $d/vh
-cmake -S $d/vh -B $d/build -G Ninja -DCMAKE_INSTALL_PREFIX=/usr/local
-sudo cmake --install $d/build && rm -rf $d
-rm -f out/gpu/CMakeCache.txt     # si ya se había configurado con los headers del sistema
+sudo rm -rf /usr/local/include/vulkan /usr/local/include/vk_video /usr/local/share/cmake/VulkanHeaders /usr/local/share/vulkan
+rm -rf out/gpu     # la caché de CMake guarda la ruta de los headers
 ```
-
-Cuando Fedora publique `vulkan-headers` ≥ 1.4.344 se puede borrar la copia de `/usr/local`
-(`sudo rm -rf /usr/local/include/vulkan /usr/local/include/vk_video /usr/local/share/cmake/VulkanHeaders /usr/local/share/vulkan`).
 
 Notas:
 
@@ -92,7 +86,7 @@ Notas:
 
 ```bash
 distrobox stop ps4dev && distrobox rm ps4dev
-# volver a 1. (create) y 2. (dnf + Vulkan-Headers); después rm -rf out/gpu y bash build.sh
+# volver a 1. (create) y 2. (dnf); después rm -rf out/gpu y bash build.sh
 ```
 
 ## 3. Build y tests (dentro del contenedor, desde el repo)

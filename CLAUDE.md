@@ -127,7 +127,7 @@ with before/after captures; the rename to `tsuki` is Spec 7, done last).
   see `distrobox`, so run commands as
   `flatpak-spawn --host distrobox enter ps4dev -- sh -c 'cd /var/home/wafflepc/Documentos/ps4_port && bash build.sh'`.
   `/tmp` of the Flatpak sandbox is not visible inside the container: write logs under `out/`.
-  Container setup, dependencies (Vulkan-Headers ≥ 1.4.344 in `/usr/local`, RPM Fusion full ffmpeg)
+  Container setup, dependencies (RPM Fusion full ffmpeg; the system Vulkan-Headers 1.4.341 are enough since 2026-10-30)
   and command reference: `docs/ENTORNO.md`.
 
 ## Build and test

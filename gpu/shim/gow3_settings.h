@@ -18,11 +18,11 @@ namespace Gow3Settings {
 /// available: run.py used to switch them off at every launch, and nothing can switch them on now.
 inline constexpr bool TemporalUpscalerAvailable = false;
 
-enum Upscaler : int { UpscalerOff = 0, UpscalerFsr3 = 1, UpscalerFsr4 = 2, UpscalerFsr411 = 3,
-                      UpscalerTaa = 4, UpscalerDlss = 5, UpscalerCount };
-/// FSR 4 v07 or FSR 4.1.1: the same inputs, settings and placement in the frame.
+enum Upscaler : int { UpscalerOff = 0, UpscalerFsr3 = 1, UpscalerFsr4 = 2, UpscalerTaa = 3, UpscalerDlss = 4,
+                      UpscalerCount };
+/// FSR 4 v07 (the FSR-Vulkan provider).
 inline bool IsFsr4(int upscaler) {
-    return upscaler == UpscalerFsr4 || upscaler == UpscalerFsr411;
+    return upscaler == UpscalerFsr4;
 }
 enum Preset : int { NativeAA = 0, Quality, Balanced, Performance, UltraPerformance, PresetCount };
 enum DebugView : int { DebugNone = 0, DebugReactive = 1, DebugMotion = 2, DebugViewCount };
@@ -86,7 +86,7 @@ struct Values {
     std::atomic<int> output_res{OutputDefault}; ///< index into OutputWidths
     /// Why FSR 4 cannot run (assets, device features), or null. Set by the renderer.
     std::atomic<const char*> fsr4_problem{nullptr};
-    std::atomic<bool> fsr4_supported{false}, fsr411_supported{false};
+    std::atomic<bool> fsr4_supported{false};
     /// DLSS (gow3_dlss.dll, NVIDIA RTX) is ready, or why not (null before the device exists).
     std::atomic<bool> dlss_supported{false};
     std::atomic<const char*> dlss_problem{nullptr};
@@ -103,7 +103,7 @@ Values& Get();
 /// Reads the file, then the environment overrides. Called once at start.
 void Load();
 /// Checks the loaded choice before the first frame; unsupported FSR 4 uses FSR 3.1.
-void ConfigureUpscalerSupport(bool fsr4, bool fsr411);
+void ConfigureUpscalerSupport(bool fsr4);
 /// After device creation: DLSS availability; a DLSS setting falls back to FSR 3.1 without it.
 void ConfigureDlssSupport(bool available, const char* problem);
 /// Startup-patched scene dimensions cannot change until run.sh prepares a new image.
