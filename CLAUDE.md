@@ -120,7 +120,9 @@ with before/after captures; the rename to `tsuki` is Spec 7, done last).
   files, `tsuki-probe`, `libtsukigpu.so`, `tsuki.ini`, the `tsuki:` mark. No old name is read and nothing is migrated:
   an `.ini` with the old name left in the root is ignored. `bash build.sh --test` ends with `tools/check_rename.sh`, which fails when
   an old name comes back (exceptions: `docs/gow3/`, `docs/specs/`, the player READMEs, the branch `gow3`; full list in
-  the script). The user confirmed the title in the window and the Insert menu. Left: the Linux overlay metrics (spec §9).
+  the script). The user confirmed the title in the window and the Insert menu. The
+  performance overlay now measures CPU, RAM, GPU and VRAM on Linux too (spec §9): `/proc/self/statm`, process CPU time,
+  and `drm-engine-gfx` from the fdinfo of the process's `/dev/dri` descriptors (`tsuki_perf_stats.h`).
 - Target language: **English**. The game ships ja/en/zc/zt (`ft_*.mrg` fonts, `*_en.mp4` videos)
   and picks it from the system language (`sceSystemServiceParamGetInt`); `runtime_services.c`
   already reports 1 = English (US) unless `TSUKI_LANGUAGE` overrides it, and logs the first query. Japanese

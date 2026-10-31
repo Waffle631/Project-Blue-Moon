@@ -4,7 +4,7 @@ Fecha: 2026-10-14, ampliada el 2026-10-25 (§9), el 2026-10-28 (§10) y el 2026-
 `tsuki/spec-7` y línea base, §4), 1 (`tools/check_rename.sh`, §6), 2 y 3 (§10 completa), 4 (inventario, prosa y
 §11), 5 (variables `TSUKI_*`, §4 paso 2), 5.5 (borrar el upscaler temporal y el escalado, §12), 6 (`git mv`, §4
 paso 3), 7 (símbolos y binarios, §4 paso 4), 8 (documentación, §4 paso 5) y 9 (enganche y oráculo final, §7) del
-plan hechas el 2026-10-30; queda la tarea 10 (§9). Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 7".
+plan hechas el 2026-10-30, y la tarea 10 (métricas del overlay en Linux, §9) el mismo día. Queda fusionar la rama. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 7".
 Depende de: Spec 6 (el recorrido grabado y las capturas son el oráculo del renombrado) y Spec 1b. El renombrado va
 al final. Antes de que la Spec 6 se cerrara sin la 1b (2026-10-28), esta dependencia llegaba a través de la 6.
 
@@ -308,13 +308,47 @@ Diseño propuesto:
 
 Criterios de aceptación:
 
-- [ ] `perf-overlay-test` cubre `statm`, un `fdinfo` de amdgpu con dos clientes y un `fdinfo` sin
+- [x] `perf-overlay-test` cubre `statm`, un `fdinfo` de amdgpu con dos clientes y un `fdinfo` sin
   `drm-engine-gfx` (resultado: "n/a").
-- [ ] En el juego, con CPU, RAM, GPU y VRAM activados en el overlay, las cuatro muestran cifras (RADV, este
+- [x] En el juego, con CPU, RAM, GPU y VRAM activados en el overlay, las cuatro muestran cifras (RADV, este
   equipo). CPU y RAM se comparan a mano con `top`, y VRAM con `mem_info_vram_used` de `card1`.
-- [ ] Las capturas de la línea base no cambian: CPU, RAM, GPU y VRAM no están en `DefaultItems`.
+- [x] Las capturas de la línea base no cambian: CPU, RAM, GPU y VRAM no están en `DefaultItems`.
 - [ ] Windows: solo cambia que la VRAM pasa a código común. Queda pendiente de compilar en MSYS2 cuando se
   aborde Windows (como el resto del §8).
+
+**Hecho (tarea 10 del plan, 2026-10-30, commit `dfd4692`):**
+- `tsuki_perf_stats.h` tiene tres funciones puras: `ParseStatmResidentPages`, `ParseDrmFdinfo` (devuelve un
+  `DrmClient` con `drm-pdev`, `drm-client-id`, `drm-engine-gfx` y `drm-resident-vram`) y `SumGfxNs`.
+  - `SumGfxNs` no repite un cliente. Se distinguen por la pareja `drm-pdev` + `drm-client-id`, no solo por el id,
+    por si dos tarjetas dieran el mismo.
+  - Sin `drm-client-id` o sin `drm-engine-gfx` no hay cliente. **[V]** amdgpu no escribe `drm-engine-gfx`
+    hasta que el cliente usa el motor. Un `fdinfo` real de este equipo (kernel 7.2) sirvió de modelo para el texto
+    del test.
+- En el `.cpp`, `Run()` de Linux mide:
+  - CPU: `CLOCK_PROCESS_CPUTIME_ID` sobre `CLOCK_MONOTONIC`, con `CpuPercent` y todos los núcleos;
+  - RAM: residente de `statm` por `_SC_PAGESIZE`, sobre `_SC_PHYS_PAGES`;
+  - GPU %: delta de `SumGfxNs` sobre el tiempo de pared. Si la suma baja (se cerró un cliente), se mantiene la
+    cifra anterior una muestra.
+
+  La VRAM (`Vram()`) es común a los dos sistemas. El hilo y la lectura de `/proc` no tienen test.
+- `perf-overlay-test` PASS y `bash build.sh --test` verde (12 PASS y `check_rename` limpio). Los fotogramas oráculo
+  del arranque, con los valores por defecto (`out/baseline/1b/despues10`), salen idénticos a `antes`.
+- Comprobación a mano (RX 6650 XT, menú de título, overlay completo). Las referencias se tomaron del proceso
+  `tsuki-probe` en deltas de 3 s:
+
+  | Métrica | Overlay | Referencia |
+  |---|---|---|
+  | GPU | 17 % y 15 % | 15,8 % y 15,0 % (`drm-engine-gfx`) |
+  | CPU | 4 % | 4,2 % y 4,1 % de 12 núcleos (`utime+stime`) |
+  | RAM | 1.3 / 14.8 GB | RES de `top` y `statm`: 1,33 GiB |
+  | VRAM | 0.7 / 6.4–6.5 GB | `drm-resident-vram`: 0,66 GiB |
+
+  - VRAM: `mem_info_vram_used` de `card1` cuenta toda la tarjeta. Bajó de 2,38 a 1,65 GB al cerrarse el juego,
+    lo mismo que da el overlay. El total del overlay es el presupuesto de `VK_EXT_memory_budget`, no los 8 GB de
+    la tarjeta.
+  - `gpu_busy_percent` de `card1` (15–38 %) también cuenta el escritorio, así que no sirve de referencia.
+  - Las capturas del juego no incluyen el overlay, así que se usó una captura del escritorio (`spectacle`). Solo
+    se guardaron los recortes del overlay: `out/t10-overlay-{1,2}.png`, sin versionar.
 
 ## 10. Añadido: quitar las opciones del upscaler temporal, que ya no hacen nada
 
