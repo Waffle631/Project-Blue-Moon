@@ -696,9 +696,10 @@ def game_environment(s):
 # ---------------------------------------------------------------------------------------------
 # The window.
 
-# The previous game's colors, kept until the Alpha (Spec 7 §11): near black, ash and blood red.
+# Near black and ash from the previous game's palette; the accent is the user's blue (2026-10-31). ACCENT_HI is the
+# same hue, lighter, because it is also text (section headings, the selected page): 3.5:1 on PANEL.
 BG, PANEL, CARD, LINE = '#0d0b0b', '#161212', '#1d1717', '#2a2222'
-TEXT, MUTED, ACCENT, ACCENT_HI = '#e6e0d8', '#8a817a', '#a4161a', '#c81e25'
+TEXT, MUTED, ACCENT, ACCENT_HI = '#e6e0d8', '#8a817a', '#1a43a5', '#3a66d0'
 
 
 def window_icon(root, tk, game_icon, own_icon, ico_file):
