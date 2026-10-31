@@ -365,6 +365,7 @@ void runtime_audiodec_report(void) {
         fflush(table[i]->dump);
         if (table[i]->notes) fflush(table[i]->notes);
     }
-    printf("Runtime: Audiodec decoders=%zu, frames=%zu, errors=%zu\n",created,frames_decoded,errors);
+    /* live: decoders the game never deleted (tests/test_audiodec.c reads objects too). */
+    printf("Runtime: Audiodec decoders=%zu, frames=%zu, errors=%zu, live=%zu\n",created,frames_decoded,errors,objects);
     pthread_mutex_unlock(&lock); pthread_rwlock_unlock(&tables);
 }

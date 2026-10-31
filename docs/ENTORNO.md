@@ -231,6 +231,7 @@ El port de Windows se compila desde la distrobox, sin un PC con Windows (Spec 8 
 ```bash
 bash tools/cross_windows_env.sh               # baja y extrae lo que falte; una línea por componente: «ya estaba» o «bajado»
 bash tools/cross_windows_env.sh --update-lock # vuelve a resolver la lista de MSYS2 desde clang64.db y la reescribe en el script
+bash build.sh --windows                       # todo lo anterior y el build: out/tsuki-probe.exe, tsuki-gpu-capabilities.exe, tsuki-play.exe
 cmake -S gpu -B out/gpu-win -G Ninja -DCMAKE_TOOLCHAIN_FILE=$PWD/packaging/windows/cross-toolchain.cmake
 ```
 
@@ -243,7 +244,13 @@ que el `clang` de MSYS2). Cuando la lista cambia, el sysroot se extrae de nuevo 
 programas (glslang, Python) solo en Linux. El `pkg-config` de Linux lee los `.pc` del sysroot
 (`PKG_CONFIG_LIBDIR`, `PKG_CONFIG_SYSROOT_DIR`: los `.pc` dicen `prefix=/clang64`). Como el clang de MSYS2, el
 compilador busca por defecto en `sysroot/clang64/include` y `sysroot/clang64/lib`; el paquete CMake de Zydis lo
-necesita (`-lZycore` sin ruta). `TSUKI_CROSS_DIR` cambia la carpeta `out/cross`.
+necesita (`-lZycore` sin ruta). También define `_WIN32_WINNT=0xA00` (Windows 10), que es lo que dan por defecto los
+headers de MSYS2; los de llvm-mingw dan Windows 7 y esconden APIs como `CreateFileMapping2`. `TSUKI_CROSS_DIR`
+cambia la carpeta `out/cross`.
+
+`build.sh --windows` compila en `out/gpu-win` (log en `out/gpu-win-build.log`), sin PGO ni LTO, como el build de MSYS2, y
+copia los tres `.exe` a `out/`. Para ejecutarlos hacen falta las DLL de `out/cross/sysroot/clang64/bin` y las de
+`out/cross/llvm-mingw/x86_64-w64-mingw32/bin` (`libc++.dll`, `libunwind.dll`, `libwinpthread-1.dll`).
 
 No hace falta ningún paquete nuevo en la distrobox: el script usa `curl`, `tar`, `xz`, `zstd`, `sha256sum` y
 `python3`, que ya están. `file` no está en la distrobox (sí en el host) y no lo usa ningún script.

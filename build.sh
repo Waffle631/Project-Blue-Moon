@@ -2,6 +2,25 @@
 set -euo pipefail
 cd -- "$(dirname -- "$0")"
 mkdir -p out
+# --windows: the Windows build of the MSYS2 block below, cross-compiled from Linux with llvm-mingw and MSYS2's
+# CLANG64 libraries (tools/cross_windows_env.sh fills out/cross/; docs/ENTORNO.md §8). out/gpu-win keeps it apart
+# from the Linux out/gpu. The toolchain file needs an absolute path: CMake resolves a relative one from the build folder.
+if [[ ${1:-} == --windows ]]; then
+    bash tools/cross_windows_env.sh
+    if [[ ! -f gpu/third_party/imgui/imgui.h || ! -f gpu/third_party/xbyak/xbyak/xbyak.h ]]; then
+        git submodule update --init --recursive
+    fi
+    cmake -S gpu -B out/gpu-win -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DTSUKI_PGO=off -DTSUKI_LTO=OFF \
+        -DCMAKE_TOOLCHAIN_FILE="$PWD/packaging/windows/cross-toolchain.cmake" >/dev/null
+    echo 'Windows GPU library and loader (cross build): LTO OFF'
+    if ! ninja -C out/gpu-win tsuki-probe tsuki-gpu-capabilities tsuki-play > out/gpu-win-build.log 2>&1; then
+        grep -v '^\[' out/gpu-win-build.log | tail -40 >&2
+        echo 'Build failed (full log: out/gpu-win-build.log)' >&2; exit 1
+    fi
+    cp out/gpu-win/tsuki-probe.exe out/gpu-win/tsuki-gpu-capabilities.exe out/gpu-win/tsuki-play.exe out/
+    echo "Built $PWD/out/tsuki-probe.exe"
+    exit 0
+fi
 # Windows: MSYS2 CLANG64 (packages in packaging/windows/README.md). The GPU library is static
 # there and CMake links tsuki-probe.exe as well; no PGO (GCC-only flags), LTO off by default.
 case $(uname -s) in

@@ -8,7 +8,8 @@
 #include <spdlog/sinks/async_sink.h>
 #include <spdlog/sinks/dup_filter_sink.h>
 #ifdef _WIN32
-#include <Windows.h>
+// tsuki: lower case, as mingw-w64 ships it, so the Linux cross build finds it (build.sh --windows).
+#include <windows.h>
 #endif
 
 #include "common/assert.h"

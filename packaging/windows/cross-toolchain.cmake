@@ -37,6 +37,10 @@ set(CMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES ${TSUKI_SYSROOT}/clang64/include)
 foreach(kind EXE SHARED MODULE)
     set(CMAKE_${kind}_LINKER_FLAGS_INIT -L${TSUKI_SYSROOT}/clang64/lib)
 endforeach()
+# MSYS2's headers default to Windows 10 (_WIN32_WINNT 0xA00, so NTDDI_VERSION is the newest) and llvm-mingw's to
+# Windows 7: without this, CreateFileMapping2 (io_file.cpp, src/runtime_memory.c) is not declared.
+set(CMAKE_C_FLAGS_INIT -D_WIN32_WINNT=0xA00)
+set(CMAKE_CXX_FLAGS_INIT -D_WIN32_WINNT=0xA00)
 
 # The .pc files say prefix=/clang64: the host pkg-config reads only the sysroot's and puts it in front of each path.
 set(ENV{PKG_CONFIG_PATH} "")

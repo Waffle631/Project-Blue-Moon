@@ -64,10 +64,9 @@ static uint64_t tls_filesz, tls_memsz, tls_align=16;
 static size_t created, joined_count, exited, dtors_runs;
 /* libc.prx registers these at init (+0x780; docs/specs/2026-10-14-spec-2-kernel.md, 5.1). The dtors
  * callback runs libc's per-thread atexit list (thread_local destructors) of the calling thread.
- * Count/Report only serve module unloading, which this runtime never does: kept, never called. */
+ * Count/Report only serve module unloading, which this runtime never does: accepted and dropped. */
 typedef void (ABI *ThreadDtors)(void);
 static ThreadDtors thread_dtors;
-static void *atexit_count, *atexit_report;
 /* References held by per-thread atexit entries; they would block unloading their module. */
 static int64_t rtld_atexit_refs;
 
@@ -376,14 +375,8 @@ static ABI int32_t set_thread_dtors(ThreadDtors callback) {
     printf("Runtime: libc thread dtors callback registered (%p)\n",(void *)callback);
     return 0;
 }
-static ABI int32_t set_atexit_count(void *callback) {
-    pthread_mutex_lock(&lock); atexit_count=callback; pthread_mutex_unlock(&lock);
-    return 0;
-}
-static ABI int32_t set_atexit_report(void *callback) {
-    pthread_mutex_lock(&lock); atexit_report=callback; pthread_mutex_unlock(&lock);
-    return 0;
-}
+static ABI int32_t set_atexit_count(void *callback) { (void)callback; return 0; }
+static ABI int32_t set_atexit_report(void *callback) { (void)callback; return 0; }
 /* libc's per-thread atexit registration (+0xb5c70) fails when Increment returns non-zero. */
 static ABI int32_t rtld_atexit_increment(void *dso) {
     (void)dso;
