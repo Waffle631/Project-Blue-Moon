@@ -47,8 +47,10 @@ The same executables build on Linux, without a Windows PC: `bash build.sh --wind
 `out/tsuki-gpu-capabilities.exe` and `out/tsuki-play.exe` in `out/gpu-win` with
 `packaging/windows/cross-toolchain.cmake`. It has the ABI of CLANG64 (clang, libc++, UCRT). To run them, the DLLs
 of `out/cross/sysroot/clang64/bin` and `out/cross/llvm-mingw/x86_64-w64-mingw32/bin` go beside them.
-`package.sh` still needs MSYS2 (`cygpath`, PowerShell and a Windows Python for PyInstaller). Details, in
-Spanish: `docs/ENTORNO.md` §8.
+`bash packaging/windows/package.sh` then makes the same package on Linux: it installs a python.org Python into a
+Wine prefix (`out/wine-prefix`) on the first run and freezes the launcher there, follows the import tables of the
+`.exe` files for their DLLs, and zips with Python. Wine is `wine` when it is on the `PATH`, else the
+`org.winehq.Wine` Flatpak (`WINE` names another command). Details, in Spanish: `docs/ENTORNO.md` §8.
 
 The launcher texts are written in English with the Russian beside them; the other languages
 are in `launcher/tsuki_lang.py` (one list per language in the order of `KEYS`; a missing or

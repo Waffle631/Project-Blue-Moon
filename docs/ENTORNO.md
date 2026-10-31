@@ -255,6 +255,19 @@ copia los tres `.exe` a `out/`. Para ejecutarlos hacen falta las DLL de `out/cro
 No hace falta ningún paquete nuevo en la distrobox: el script usa `curl`, `tar`, `xz`, `zstd`, `sha256sum` y
 `python3`, que ya están. `file` lo pide appimagetool (sección 9).
 
+El paquete de Windows también sale desde la distrobox (Spec 8, tarea 13):
+
+```bash
+bash build.sh --windows && bash packaging/windows/package.sh   # dist/project-blue-moon-windows/ y su .zip
+```
+
+En Linux, `package.sh` usa Wine: `wine` si está en el `PATH`, si no el Flatpak `org.winehq.Wine` (el `flatpak` de
+la distrobox llama al del host), con el prefijo `out/wine-prefix/` (`WINEPREFIX` lo cambia) y acceso solo al repo.
+La primera vez instala ahí Python 3.14.10 de python.org (el instalador queda en `out/cross/downloads/`, con su SHA256
+en el script; python.org solo publica firmas sigstore) y crea el venv `out/pyenv/` con PyInstaller, Pillow e
+iced-x86. Las DLL salen de las tablas de importación (`llvm-objdump -p`) de llvm-mingw y del sysroot, y el `.zip` se
+hace con Python. Primera pasada, ~40 s; las siguientes, ~16 s.
+
 ## 9. AppImage de Linux
 
 `packaging/linux/build.sh` genera `dist/project-blue-moon-x86_64.AppImage` (~145 MB) desde el build de Linux
