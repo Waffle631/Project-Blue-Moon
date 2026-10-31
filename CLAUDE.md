@@ -123,9 +123,12 @@ with before/after captures; the rename to `tsuki` is Spec 7, done last).
   full list in the script; since Spec 8 the player READMEs are checked too). The user confirmed the title in the window and the Insert menu. The
   performance overlay now measures CPU, RAM, GPU and VRAM on Linux too (spec §9): `/proc/self/statm`, process CPU time,
   and `drm-engine-gfx` from the fdinfo of the process's `/dev/dri` descriptors (`tsuki_perf_stats.h`).
-- Spec 8 (public Alpha) was approved on 2026-10-30 and is being implemented on the branch `tsuki/spec-8`; the spec is
-  `docs/specs/2026-10-30-spec-8-alpha.md` and its progress is written there task by task. The Alpha goes to a new GitHub repository (it does not exist yet). The user
-  creates it and uploads the release (AppImage + Windows `.zip`); the spec pushes nothing and adds no remotes.
+- Spec 8 (public Alpha, approved 2026-10-30) has all its technical work done (2026-10-31, branch `tsuki/spec-8`; spec
+  `docs/specs/2026-10-30-spec-8-alpha.md`, task by task). The recorded route and the boot oracle still match
+  (`run-oracle.sh` takes need `TSUKI_CONFIG=out/t9-defaults.ini`: the root `tsuki.ini` holds the user's own settings,
+  and its RCAS changes every pixel). Left for the user: try the launcher on Linux (source and AppImage) and judge the logos and
+  the audio; then confirm the fast-forward merge into `tsuki/main`. The Alpha goes to a new GitHub repository (it does not
+  exist yet). The user creates it and uploads the release (AppImage + Windows `.zip`); the spec pushes nothing and adds no remotes.
   User decisions:
   - The public name is **"Project Blue Moon"**, so the port does not present itself under the game's trademark.
     It covers the launcher's `APP_NAME`, the `.exe` names, shortcuts, `.desktop`, Steam and package names.
@@ -134,14 +137,19 @@ with before/after captures; the rename to `tsuki` is Spec 7, done last).
   - Windows is in the Alpha. It is cross-built from Linux (llvm-mingw + MSYS2 CLANG64 packages in `out/cross/`,
     `build.sh --windows`, exit code 0) and tried under the `org.winehq.Wine` Flatpak; the user then tests it on real
     Windows.
-  - The launcher must recognise the dump and the packaging must build. This pulls in the launcher, packaging and
-    patch-name cleanup that was planned for after the Alpha.
-  - The READMEs are rewritten for this project (done: `README.md`, `README.es.md` in Spanish, which replaced
-    `README.pt-BR.md`, and `packaging/windows/README-Windows.txt`). Their repository links use the one placeholder
+  - The launcher recognises the dump by its `param.sfo` (`scripts/game_identity.py`, mirrored by `SUPPORTED_TITLE_ID`
+    in `src/probe.c`), and both packages build: `packaging/linux/build.sh` → `project-blue-moon-x86_64.AppImage`,
+    `packaging/windows/package.sh` (from Linux, PyInstaller under Wine) → `project-blue-moon-windows.zip`. Mods stay
+    off by default: `scripts/mods.py` only mounts the previous game's `dvdroot_ps4/` layout (roadmap §8).
+  - The READMEs are rewritten for this project (`README.md`, `README.es.md` in Spanish and
+    `packaging/windows/README-Windows.txt`). Their repository links use the one placeholder
     `https://github.com/OWNER/REPO`, also in `.github/ISSUE_TEMPLATE/`, which the user replaces when the repository
     exists.
   - The title font (`launcher/gowfont.ttf`), the launcher palette and the icon are not changed by the spec. It only
-    lists their files (§7), and having them changed by the user is a criterion for publishing.
+    lists their files and how to regenerate the `.ico` and the AppImage icon (§7); having them changed by the user is
+    a criterion for publishing.
+  - The port's commits are authored with the GitHub `noreply` address (history rewritten on 2026-10-31; the old state
+    is in `out/backup-antes-noreply.bundle`).
 - Target language: **English**. The game ships ja/en/zc/zt (`ft_*.mrg` fonts, `*_en.mp4` videos)
   and picks it from the system language (`sceSystemServiceParamGetInt`); `runtime_services.c`
   already reports 1 = English (US) unless `TSUKI_LANGUAGE` overrides it, and logs the first query. Japanese
@@ -260,8 +268,9 @@ TEB TLS slot on Windows, patched by `patch_tcb_loads`).
 ## Game-specific surface (the previous game's code, deleted; what any other title would need)
 
 - ~~Hooks (cheats, orb/damage multipliers, enemy health bar), their byte signatures and backends~~ (Spec 1a).
-- ~~The built-in patch XML and its profile~~ (Spec 1a). `scripts/patches.py` still reads third-party
-  shadPS4/GoldHEN XML (`GAMES` is empty; literal writes only, mask patches are rejected), and
+- ~~The built-in patch XML and its profile~~ (Spec 1a); ~~the per-game patch selection (`GAMES`,
+  `game_profile`) and the render resolution / engine frame rate options~~ (Spec 8). `scripts/patches.py` still reads
+  third-party shadPS4/GoldHEN XML for CUSA47999 v01.00 (literal writes only, mask patches are rejected), and
   `tools/make_signatures.py` still generates `Pattern`/`At` signatures.
 - GPU heuristics (Spec 1b, closed 2026-10-28), all removed:
   - ~~`gbuffer_draw` and the 864-byte camera constant buffer in `vk_rasterizer.cpp`~~ (task 3). The 864-byte
@@ -272,8 +281,8 @@ TEB TLS slot on Windows, patched by `patch_tcb_loads`).
 
   Not the previous game's code, so it stays: the vendor-based guest MSAA decision (`tsuki_msaa_default.h`, a
   workaround for AMD's and Intel's Windows drivers; user decision of 2026-10-25).
-- Pad touchpad semantics (photo mode / pause) in `runtime_pad.c`; title/serial defaults in
-  `probe.c`; launcher, Steam shortcut and packaging identity.
+- ~~Pad touchpad semantics (photo mode / pause) in `runtime_pad.c`~~ (Spec 1a). Game identity: `scripts/game_identity.py`
+  and `SUPPORTED_TITLE_ID` in `probe.c`; the public name ("Project Blue Moon") in the launcher, shortcuts and packages.
 
 Known limits for other eboots: SELF must be unencrypted/uncompressed; image ≤ 512 MiB; ≤ 16 linked
 modules, TLS module IDs 2–7; relocation types 1, 6, 7, 8 only; extra bundled `.prx` need
