@@ -3,7 +3,8 @@
 Fecha: 2026-10-14, ampliada el 2026-10-25 (§9), el 2026-10-28 (§10) y el 2026-10-30 (§11 y §12). Estado: **borrador para aprobación**; tareas 0 (rama
 `tsuki/spec-7` y línea base, §4), 1 (`tools/check_rename.sh`, §6), 2 y 3 (§10 completa), 4 (inventario, prosa y
 §11), 5 (variables `TSUKI_*`, §4 paso 2), 5.5 (borrar el upscaler temporal y el escalado, §12), 6 (`git mv`, §4
-paso 3) y 7 (símbolos y binarios, §4 paso 4) del plan hechas el 2026-10-30. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 7".
+paso 3), 7 (símbolos y binarios, §4 paso 4), 8 (documentación, §4 paso 5) y 9 (enganche y oráculo final, §7) del
+plan hechas el 2026-10-30; queda la tarea 10 (§9). Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 7".
 Depende de: Spec 6 (el recorrido grabado y las capturas son el oráculo del renombrado) y Spec 1b. El renombrado va
 al final. Antes de que la Spec 6 se cerrara sin la 1b (2026-10-28), esta dependencia llegaba a través de la 6.
 
@@ -166,6 +167,20 @@ fotogramas `eye` (2700, 2890: el menú de carga sobre `titlebg1.mp4`) quedan a o
   Lo instalado por builds anteriores (`~/.local/share/gow3`, `gow3.desktop`, `%APPDATA%\gow3-launcher`) queda sin
   leer: no se migra (§3).
 
+**Hecho, paso 5 (tarea 8 del plan, 2026-10-30):**
+- El mismo `sed` sobre los seis `.md` de desarrollo con restos (`CLAUDE.md`, roadmap, `docs/ENTORNO.md`,
+  `docs/parallel_gpu.md`, `docs/avplayer.md`, `packaging/windows/README.md`), protegiendo además la rama `gow3`
+  (`rama \`gow3\``, `branch \`gow3\``, `branch gow3`) y `../gow3/`. «the `gow3` branch» de `CLAUDE.md` ya decía «the
+  branch `gow3`».
+- A mano, dos frases que el `sed` volvía falsas: el roadmap nombraba `tsuki_orbs.cpp` y `tsuki_actors.cpp`, que nunca
+  existieron, y «un `tsuki.ini` antiguo», cuando un `.ini` antiguo se llama `gow3.ini` y ya no se lee. El encabezado
+  «Última actualización» del roadmap se condensa en el estado actual y una lista de hitos (el relato fechado queda en
+  git), y su nota «hasta la Spec 7 se usan los nombres anteriores» se invierte.
+- Memoria del proyecto: `hung-game-stack-dump`, `close-game-run-sigterm` y `tsukihime-boot-captures` pasan a
+  `tsuki-probe`, `libtsukigpu.so`, `tsukigpu.cpp` y `TSUKI_*`; «GoW3» queda donde nombra al juego anterior.
+- Los README del jugador no se tocan (§11). `git grep FSR4_PROFILE\|FSR4_STATS` fuera de las excepciones: 0.
+  `bash build.sh` compila y `check_rename.sh` sale 0 sin salida. Commit `0aabf57`.
+
 ## 5. Requisitos
 
 - Ninguna variable `GOW3_*` debe seguir leyéndose.
@@ -202,14 +217,15 @@ branch» (`CLAUDE.md:25`) no es una de las formas del punto 4: hay que escribirl
 
 ## 7. Pruebas y criterios de aceptación
 
-- [ ] `bash build.sh --test` y `python3 -m unittest discover -s tests` pasan, con la línea base como
+- [x] `bash build.sh --test` y `python3 -m unittest discover -s tests` pasan, con la línea base como
   referencia.
-- [ ] `tools/check_rename.sh` termina con éxito.
-- [ ] `bash build.sh` produce `out/tsuki-probe` y `out/gpu/libtsukigpu.so`, y
+- [x] `tools/check_rename.sh` termina con éxito.
+- [x] `bash build.sh` produce `out/tsuki-probe` y `out/gpu/libtsukigpu.so`, y
   `TSUKI_GAME_DIR=Tsukihime/CUSA47999 python3 run.py` repite el recorrido grabado con el mismo log (sin
   `STOP:` ni `Fault:`).
-- [ ] Las capturas de píxeles de la línea base coinciden antes y después (`tools/compare_captures.sh`).
-- [ ] La ventana y el menú Insert muestran el título leído del `param.sfo`.
+- [x] Las capturas de píxeles de la línea base coinciden antes y después (`tools/compare_captures.sh`).
+- [ ] La ventana y el menú Insert muestran el título leído del `param.sfo`. *(El código y el log lo dicen; falta que
+  el usuario lo vea.)*
 - [x] Un test comprueba que una variable `GOW3_*` ya no tiene efecto (por ejemplo, `GOW3_LANGUAGE=8`
   no cambia el idioma, `TSUKI_LANGUAGE=8` sí).
 
@@ -221,6 +237,30 @@ branch» (`CLAUDE.md:25`) no es una de las formas del punto 4: hay que escribirl
   se listan como pendientes de verificar cuando se aborde Windows.
 - Los hashes de PGO (si algún día se generan) y las cachés de pipelines/shaders con rutas o
   nombres antiguos quedan obsoletas; se regeneran.
+
+**Comprobado el 2026-10-30 (tarea 9 del plan):**
+- `build.sh --test` termina con `bash tools/check_rename.sh`: un nombre viejo que vuelva al árbol versionado pone el
+  build en rojo. Funcionó en la primera ejecución: el comentario que lo anunciaba decía «gow3» y lo paró.
+- Desde cero (`out/gpu` borrado): `build.sh --test` verde (12 PASS), 26 tests C++ PASS, Python 286 OK, 35 omitidos,
+  4 fallos esperados (`test_check_rename.py` incluido). `--check-imports`: las mismas 3 trampas de libkernel.
+- Recorrido grabado `despues7`: 6 fotogramas idénticos a `out/baseline/6a/` y los 2 del menú de carga a ojo, como en
+  todas las repeticiones. Log sin `STOP:` ni `Fault:`, con `Settings: …/out/route/tsuki.ini`. Frente a
+  `out/baseline/7/antes.log`, con los números normalizados, solo cambian la línea `Object motion` (borrada en el §12)
+  y la carpeta de capturas.
+- Oráculo de arranque (`out/spec1b-t3/run-oracle.sh`, `compare-oracle.sh` frente a `out/baseline/1b/antes/`): con
+  el `tsuki.ini` local del usuario salen diferencias mínimas (PSNR 71–79 dB), porque ese archivo trae
+  `rcas_strength=0` en lugar del 75 por defecto. Con un `.ini` vacío (`despues7-defecto`), los cuatro fotogramas son
+  idénticos. El único `STOP:` es el watchdog de 40 s que cierra cada toma.
+- Configuración vieja (Review Focus 5): con solo un `gow3.ini` en la raíz, con el contenido del `tsuki.ini` del
+  usuario, el juego arranca sin error ni `Settings:`, es decir, con los valores por defecto, y los cuatro fotogramas
+  salen idénticos (con `rcas_strength=0` leído no lo serían): el nombre viejo no se lee. El `tsuki.ini` del usuario
+  se restauró después (`cmp` igual).
+- Título: la ventana (`gpu/shim/tsukigpu.cpp`, `config->title`) y la cabecera del menú Insert
+  (`tsuki_overlay.cpp`, `ElfInfo::Title()`) usan el título del `param.sfo`, y el log empieza por `TSUKIHIME A piece
+  of blue glass moon`. Las capturas no incluyen el overlay, así que falta que el usuario lo vea.
+- Pendiente de Windows, sin poder compilarse ni probarse aquí: `build.sh` en MSYS2 (`tsuki-probe.exe`,
+  `libtsukigpu.a`), `packaging/windows/*` (`dist/tsuki-windows/`, el icono en los `.exe`), el launcher de Tk
+  (`%APPDATA%\tsuki-launcher`) y `tsuki_setjmp`/`tsuki_longjmp`. El AppImage de Linux tampoco se empaquetó.
 
 ## 9. Añadido: CPU, RAM, GPU y VRAM del overlay de rendimiento en Linux
 
