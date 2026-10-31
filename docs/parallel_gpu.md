@@ -87,7 +87,7 @@ todo el fotograma, sobre todo en el kernel, subiendo 50–400 MB de texturas y b
 Hallazgos, en el orden en que se corrigieron:
 
 1. Las copias guest-a-staging se ejecutaban en un solo hilo (el hilo de grabación; las texturas en el hilo de
-   GPU). Ahora empiezan de inmediato en hilos de copia (`Gow3Copy::Async`, `tsuki_copy.cpp`);
+   GPU). Ahora empiezan de inmediato en hilos de copia (`TsukiCopy::Async`, `tsuki_copy.cpp`);
    las copias pequeñas se agrupan por hilo (un despertar por cada ~512 KiB — uno por copia costaba un 25 % de FPS).
    Los fences visibles para el guest y el envío a la cola las esperan (`Scheduler::WaitHostCopies`),
    lo que mantiene la corrección del parpadeo de la UI (el guest reutilizaba buffers antes de que se ejecutaran las copias diferidas).
@@ -234,7 +234,7 @@ Estado tras este trabajo, quieto, `TSUKI_FPS_LIMIT=0`, FSR 4: 82–85 FPS; hilo 
 
 ## LTO y PGO (2026-09-30)
 
-`build.sh` compila `libgow3gpu` con LTO (`-flto=auto`, también para sirit, enlazado
+`build.sh` compila `libtsukigpu` con LTO (`-flto=auto`, también para sirit, enlazado
 en ella) y, cuando `pgo/` contiene un perfil, con `-fprofile-use` (`-fprofile-partial-training
 -fprofile-correction`; las funciones modificadas desde el perfil se compilan sin él). Sin `-march`:
 la misma build funciona en la Steam Deck.
@@ -269,7 +269,7 @@ texturas, buffers y barreras (`slot_images[id]`, descripciones de imagen, estado
 espera envíos del guest el 0.5 %. Alrededor del 9 % está bloqueado en `Scheduler::WaitHostCopies`: ~130
 veces por fotograma (eventos EOP/EOS, `WriteData`, envíos) espera las pequeñas copias del guest
 encoladas en el stream de grabación, es decir, hasta que el hilo de grabación ha grabado todos los
-comandos anteriores, más ~4 % por los hilos de copia (`Gow3Copy::WaitAsync`). El propio hilo de grabación
+comandos anteriores, más ~4 % por los hilos de copia (`TsukiCopy::WaitAsync`). El propio hilo de grabación
 trabaja ~40 % (el resto es su spin); no es el límite.
 
 ### Binding de texturas en un hilo auxiliar (opt-in: `TSUKI_TEXTURE_HELPER=1`, toggle 1 << 22)

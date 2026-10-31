@@ -115,7 +115,7 @@ Vuelve justo después de que el watchdog (`TSUKI_TIMEOUT=60`) vuelque las pilas.
 
 La pila de `task_game` en el volcado es la misma que en `a3` (spec §2): eboot `+0x10225f` →
 `sceAvPlayerStop` → `AvPlayer::Stop` → `AvPlayerState::Stop` → `std::thread::join` → `pthread_join`, con
-`rdi=0x7f7887447ce8`, el mismo desplazamiento `…ce8` que en `a3`. La base de `libgow3gpu.so`, deducida con `nm`, era
+`rdi=0x7f7887447ce8`, el mismo desplazamiento `…ce8` que en `a3`. La base de `libtsukigpu.so`, deducida con `nm`, era
 `0x7f7a70a00000`.
 
 Es el disparador que plantea el plan: EOF con las colas vacías y `Stop` inmediato. El prólogo hace lo

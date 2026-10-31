@@ -94,11 +94,11 @@ distrobox stop ps4dev && distrobox rm ps4dev
 ## 3. Build y tests (dentro del contenedor, desde el repo)
 
 ```bash
-bash build.sh                      # out/gpu/libgow3gpu.so + out/gow3-probe (LTO activado)
+bash build.sh                      # out/gpu/libtsukigpu.so + out/tsuki-probe (LTO activado)
 bash build.sh --test               # además compila y ejecuta los tests en C
 TSUKI_LTO=OFF bash build.sh         # sin LTO (menos RAM y enlace más rápido)
 ninja -C out/gpu <target>          # un target concreto, p. ej. frame-capture-test
-ninja -C out/gpu -j6 gow3gpu       # limitar hilos si falta RAM
+ninja -C out/gpu -j6 tsukigpu       # limitar hilos si falta RAM
 tail -40 out/gpu-build.log         # log completo del build de la biblioteca GPU
 
 python3 -m unittest discover -s tests                         # todos los tests Python
@@ -132,19 +132,19 @@ cd ../.. && ln -sf vgmstream-src/build/cli/vgmstream-cli out/vgmstream-cli
 ## 4. Loader y juego
 
 ```bash
-out/gow3-probe --cpu-features                 # extensiones de CPU (MOVBE/BMI1/LZCNT)
-out/gow3-probe --vulkan-only                  # comprueba Vulkan sin cargar el juego
+out/tsuki-probe --cpu-features                 # extensiones de CPU (MOVBE/BMI1/LZCNT)
+out/tsuki-probe --vulkan-only                  # comprueba Vulkan sin cargar el juego
 
 # Preparar el eboot e inventariar los imports sin implementar (no arranca el juego)
 python3 scripts/prepare.py Tsukihime/CUSA47999 --out out       # → out/boot.bin, out/analysis.json
 python3 scripts/link_libc.py Tsukihime/CUSA47999 --out out
 python3 scripts/link_modules.py Tsukihime/CUSA47999 --out out  # → out/boot-linked.bin
-out/gow3-probe out/boot-linked.bin --app0 Tsukihime/CUSA47999 --check-imports   # una línea MISSING por import; sale con 1 si falta alguno
+out/tsuki-probe out/boot-linked.bin --app0 Tsukihime/CUSA47999 --check-imports   # una línea MISSING por import; sale con 1 si falta alguno
 
 # Ejecutar el juego completo (run.py hace todo el pipeline)
 TSUKI_GAME_DIR=Tsukihime/CUSA47999 python3 run.py
 TSUKI_GAME_DIR=Tsukihime/CUSA47999 python3 run.py --software   # lavapipe (sin GPU)
-out/gow3-probe out/boot-linked.bin --app0 Tsukihime/CUSA47999 --timeout 60   # watchdog: vuelca las pilas a los 60 s
+out/tsuki-probe out/boot-linked.bin --app0 Tsukihime/CUSA47999 --timeout 60   # watchdog: vuelca las pilas a los 60 s
 ```
 
 Elegir GPU si alguna vez arranca en la iGPU: `MESA_VK_DEVICE_SELECT=list vulkaninfo` lista los
@@ -182,7 +182,7 @@ dispositivos y `MESA_VK_DEVICE_SELECT=<vendor:device>` fuerza uno.
   (captura que falta, línea mal formada, recuadro fuera de la imagen).
 - `tools/route.sh record` / `tools/route.sh replay <nombre>` — el recorrido grabado de la Spec 6 (bloque A), todo en
   `out/route/`. Cada ejecución parte de la copia fija `out/route/save/` en un `out/route/user/` nuevo, con
-  `out/route/gow3.ini` (`async_shaders=0`), pantalla completa y sin ratón. `record` graba `pad.txt` y las capturas
+  `out/route/tsuki.ini` (`async_shaders=0`), pantalla completa y sin ratón. `record` graba `pad.txt` y las capturas
   de F12, y escribe `frames.txt`; `replay` repite `pad.txt`, captura los fotogramas de `frames.txt` en
   `out/route/<nombre>/` y cierra el juego al acabar. Desde el host vuelve a entrar en el distrobox.
 - Para ver qué teclas recibe el juego: `SDL_EVENT_LOGGING=1 SDL_LOGGING='*=info'` escribe cada evento
@@ -193,7 +193,7 @@ dispositivos y `MESA_VK_DEVICE_SELECT=<vendor:device>` fuerza uno.
   `<lectura> <botones> <lx> <ly> <rx> <ry> <l2> <r2>`. Un archivo del formato antiguo (ms, sin cabecera) no se
   repite. La repetición acaba 30 lecturas después de la última línea (`Runtime: pad replay finished at read <r>`).
 - `TSUKI_MOUSE=0` — el juego no ve ningún ratón; el recorrido no graba el ratón y el puntero movería su cursor.
-- `gdb --args out/gow3-probe out/boot-linked.bin --app0 Tsukihime/CUSA47999` — `gdb` viene en el
+- `gdb --args out/tsuki-probe out/boot-linked.bin --app0 Tsukihime/CUSA47999` — `gdb` viene en el
   bloque `dnf`.
 
 ## 6. Diagnóstico del entorno

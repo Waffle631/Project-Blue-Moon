@@ -52,7 +52,7 @@ with before/after captures; the rename to `tsuki` is Spec 7, done last).
   adversarial review, plan task 8 step 4, is pending): the vendored AvPlayer plays all 134 outside the game
   (`avplayer-test --movie-dir`), and in game the opening, the prologue, the chapter 1 title, skipping the
   logo and the title-menu loop work; the game's AvPlayer contract is in `docs/avplayer.md`. Start bring-up with
-  `out/gow3-probe out/boot-linked.bin --app0 Tsukihime/CUSA47999 --check-imports`.
+  `out/tsuki-probe out/boot-linked.bin --app0 Tsukihime/CUSA47999 --check-imports`.
 - What a run shows depends on the save in `user/savedata/1/CUSA47999/`. With no progress in it, the
   boot plays the prologue video first (`prologue_en.mp4`, ~6 min 29 s, buttons do not skip it). The first run to get past the video (2026-10-20, once ATRAC9 decoded) saved progress, and
   since then every launch **goes straight to the title menu** (music in < 10 s, no video). To see the
@@ -100,7 +100,7 @@ with before/after captures; the rename to `tsuki` is Spec 7, done last).
     Everything lives in `out/route/` (untracked):
     - every run starts from the fixed save copy `out/route/save/` in its own `TSUKI_USER_DIR`, so `user/` is never
       touched;
-    - `out/route/gow3.ini` sets `async_shaders=0`; runs are fullscreen with no mouse;
+    - `out/route/tsuki.ini` sets `async_shaders=0`; runs are fullscreen with no mouse;
     - `pad.txt` is the user's recording (pad reads); `frames.txt` says how each frame is compared.
     `tools/compare_route.sh <a>/ <b>/ out/route/frames.txt` compares two capture folders. Frames are `exact`, or
     `mask` with boxes that hide the animated click-wait cursor, or `eye` for the load menu over `titlebg1.mp4`.
@@ -110,7 +110,7 @@ with before/after captures; the rename to `tsuki` is Spec 7, done last).
     512×256 one-mip texture, which Vulkan samples as the guest asks. The user decided to leave it as is
     (2026-10-28).
   - Mouse: `src/runtime_mouse.c`. The window thread accumulates SDL events (`gpu/shim/tsuki_mouse.h`) and
-    `sceMouseRead` takes them through `gow3gpu_mouse_read`. The game's cursor lives in a 640×448 space, so
+    `sceMouseRead` takes them through `tsukigpu_mouse_read`. The game's cursor lives in a 640×448 space, so
     the bridge sends deltas that put that cursor where the host pointer is, not the raw SDL deltas. While
     the Insert menu is open the game sees a connected mouse with no movement and no buttons.
   - Saves: the game keeps every slot in one 4 MiB `savedata000`. At boot it reads the whole file read-only.
@@ -137,13 +137,13 @@ with before/after captures; the rename to `tsuki` is Spec 7, done last).
 Linux (deps via pkg-config: vulkan, sdl3, ffmpeg; `shell.nix` on NixOS, re-entered automatically):
 
 ```bash
-bash build.sh            # out/gpu/libgow3gpu.so (CMake/Ninja, LTO on, PGO if pgo/ has profiles) + out/gow3-probe
+bash build.sh            # out/gpu/libtsukigpu.so (CMake/Ninja, LTO on, PGO if pgo/ has profiles) + out/tsuki-probe
 bash build.sh --test     # also builds and runs the C tests (runtime, pad, sema, mp3, videodec, services, isa...)
 TSUKI_GAME_DIR=Tsukihime/CUSA47999 python3 run.py    # or: bash run.sh (builds first); --software uses lavapipe
 ```
 
 Windows: MSYS2 CLANG64 shell (packages in `packaging/windows/README.md`), same `bash build.sh`;
-there CMake builds `gow3-probe.exe` too and the C tests are CMake targets (`mp3-test`, `services-test`, ...).
+there CMake builds `tsuki-probe.exe` too and the C tests are CMake targets (`mp3-test`, `services-test`, ...).
 Packaging: `packaging/windows/package.sh`, `packaging/linux/build.sh` (AppImage).
 
 Build output of the GPU library goes to `out/gpu-build.log`; on failure only its tail is printed.
@@ -163,7 +163,7 @@ game code (`stat-multipliers-test`, `cheat-hooks-test`, `signatures-test`, ...) 
 `out/eboot.elf` as argument. Launcher tests need `tkinter`; most skip without a display.
 There is no CI — run the relevant suites locally.
 
-Useful loader modes: `out/gow3-probe out/boot-linked.bin --app0 <game> --check-imports` lists every
+Useful loader modes: `out/tsuki-probe out/boot-linked.bin --app0 <game> --check-imports` lists every
 PS4 import with no implementation without starting the game; `--cpu-features`, `--vulkan-only`.
 
 ## Architecture: the launch pipeline
@@ -180,14 +180,14 @@ PS4 import with no implementation without starting the game; `--cpu-features`, `
    rewrites `mov rax, fs:[0]` to `gs:` (host libc owns FS). Only that exact byte pattern is patched.
 4. `isa_rewrite.py` — only on CPUs lacking MOVBE/BMI1/LZCNT: table of sites emulated by
    `src/isa_emulate.c` (runs inside guest code: `-mgeneral-regs-only`, no XMM).
-5. `content_profile.py`, `patches.py` (XML → `patches.bin`), graphics options from `gow3.ini`.
-6. Starts `gow3-probe` with those files. The in-game "Apply and restart" re-runs `run.py` via
+5. `content_profile.py`, `patches.py` (XML → `patches.bin`), graphics options from `tsuki.ini`.
+6. Starts `tsuki-probe` with those files. The in-game "Apply and restart" re-runs `run.py` via
    `TSUKI_RESTART_COMMAND`.
 
 `src/probe.c` (loader): maps the image below 1 TiB (GPU descriptors hold 40-bit addresses, so all
 guest-visible memory, stacks and host objects handed to the guest must stay low), resolves each
 import, applies patches, installs hooks, runs module initializers, jumps to the entry point.
-Import resolution order: `runtime_resolve` (C runtime) → `gow3gpu_resolve` (shadPS4 HLE:
+Import resolution order: `runtime_resolve` (C runtime) → `tsukigpu_resolve` (shadPS4 HLE:
 GnmDriver, VideoOut, AvPlayer, kernel equeue) → native export of a linked `.prx` → a trap.
 **There are no auto-success stubs**: an unimplemented import stops with
 `STOP: first unsupported PS4 import: <name>`; keep it that way.
@@ -216,15 +216,15 @@ TEB TLS slot on Windows, patched by `patch_tcb_loads`).
 ## Architecture: GPU (`gpu/`)
 
 - `gpu/shadps4/` — vendored shadPS4 (commit and backports in `gpu/VENDOR.txt`) plus cuesta4's
-  rendering fixes for the previous game. Every local change is marked with a `gow3:` comment; keep doing that.
+  rendering fixes for the previous game. Every local change is marked with a `tsuki:` comment; keep doing that.
 - `gpu/shim/` — glue replacing the parts of shadPS4's emulator core (`core/`, `common/`), the SDL
   window, the ImGui in-game menu/perf overlay (`tsuki_overlay.cpp`), settings (`tsuki_settings.cpp`,
-  `gow3.ini`).
+  `tsuki.ini`).
 - `gpu/tsukigpu.h` — the C interface between loader/runtime and the GPU library.
-- Linux: `libgow3gpu.so` loaded via rpath `$ORIGIN/gpu`; Windows: static, linked into `gow3-probe.exe`.
+- Linux: `libtsukigpu.so` loaded via rpath `$ORIGIN/gpu`; Windows: static, linked into `tsuki-probe.exe`.
 - Many behaviours are toggled by `TSUKI_*` environment variables (diagnostics, readbacks,
   multisampling); `run.py` and `scripts/graphics_options.py` derive them from the
-  launcher/`gow3.ini`. There are no temporal upscalers or motion vectors (deleted, Spec 7 §12).
+  launcher/`tsuki.ini`. There are no temporal upscalers or motion vectors (deleted, Spec 7 §12).
   `run.py` turns on deferred and stale image readback by default (`TSUKI_DEFERRED_READBACK`,
   `TSUKI_STALE_READBACK`, `scripts/graphics_options.py:14-15`), so CPU reads of GPU-written images use the
   previous frame's copy.

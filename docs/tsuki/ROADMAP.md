@@ -12,7 +12,7 @@ port del juego anterior ([docs/gow3/ROADMAP.md](../gow3/ROADMAP.md)), que a su v
 | Plataforma | Linux primero (máquina de desarrollo), Windows 10/11 después; Vulkan 1.3 |
 | Máquina de pruebas | Bazzite 44 (KDE Plasma 6.7, Wayland), AMD Ryzen 5 7600, 16 GB, **AMD Radeon RX 6650 XT** |
 | Dump | `Tsukihime/CUSA47999/` (sin versionar, ~45 GB) |
-| Última actualización | 2026-10-28 (cierre de la Spec 1b). **La Spec 1b (heurísticas de GPU del juego anterior) queda cerrada.** Fuera del árbol: `gbuffer_draw`, la constante de cámara de 864 bytes y los hashes fijos de shaders del upscaler temporal. Antes, la lectura lineal por defecto de `run.py`. Un contador con las heurísticas encendidas dio 0 coincidencias en el arranque y en el recorrido grabado de la Spec 6, y tras los borrados las capturas salen idénticas: los fotogramas oráculo del arranque y el recorrido frente a `out/baseline/6a/` (los dos fotogramas del menú de carga, revisados a ojo). Las suites están verdes (Python: 273). Sin `gbuffer_draw`, `CameraMotion` se queda sin entradas y el upscaler temporal ya no puede escalar con este juego. El usuario decide conservar su código y quitar en la Spec 7 las opciones que lo encienden. La Spec 7 queda desbloqueada. La rama `tsuki/spec-1b-cierre` está pendiente de fusionar en `tsuki/main` (*fusionada por avance rápido el mismo día; corregido el 2026-10-30*); `tsuki/spec-6bcd` ya está fusionada. Antes, 2026-10-28 (cierre de la Spec 6). **La Spec 6 (2D, ratón, saves e idioma) queda cerrada.** El usuario la cierra sin esperar a la Spec 1b. La comprobación que las ataba pasa a ser un criterio de la 1b: después de borrar `gbuffer_draw` y los hashes del upscaler, repetir el recorrido grabado y que coincida con `out/baseline/6a/`. La Spec 7 depende ahora directamente de la 1b. Quedan pendientes la revisión final de la rama `tsuki/spec-6bcd` y su fusión en `tsuki/main` (*fusionada por avance rápido; corregido el 2026-10-28*). Antes, 2026-10-28 (Spec 6, bloque A). **Bloque A (render 2D) hecho: la Spec 6 solo espera a la Spec 1b.** El usuario grabó un recorrido desde una copia fija de su partida. Pasa por el menú de carga, texto largo, un fundido a negro, sprites y un fundido cruzado. `TSUKI_PAD_REPLAY` lo repite contando lecturas del mando (`tools/route.sh`), y las capturas salen idénticas píxel a píxel en todas las ejecuciones. En las de texto se tapa el cursor animado de espera, y el menú de carga se juzga a ojo porque detrás sigue el vídeo del título. El usuario aprobó las 8 capturas (`out/baseline/6a/`) y dio el texto en inglés por legible. La miniatura algo pixelada de las ranuras es del propio juego: la compone en la CPU desde `allpac2.mrg`, y Vulkan la muestrea con los filtros que pide el guest. El usuario la deja como está. Las suites están verdes (Python: 273). Antes, 2026-10-25 (Spec 6, bloques B, C y D). **Ratón, saves e idioma hechos; falta el bloque A (render 2D).** El ratón funciona en el juego: `src/runtime_mouse.c` y el puente `gow3gpu_mouse_read` hacen que el cursor del juego siga al puntero, y los clics y la rueda llegan. Mando, teclado y ratón avanzan el texto. Un save grabado desde el menú del juego sobrevive al reinicio y se carga (tres grabados del usuario y una carga), y hay un test que lo comprueba en un proceso nuevo. `TSUKI_FILE_TRACE=1` registra cada apertura de archivo; con él se ve que el juego recibe el idioma 1 y abre `ft_en.mrg` y los `*_en.mp4`. También abre `ft_ja.mrg` con cualquier idioma, y el usuario da el criterio de idioma por cumplido. Las suites están verdes (Python: 267 ejecutados, 35 omitidos, 4 fallos esperados). Antes, 2026-10-25 (cierre de la Spec 5). **La Spec 5 (vídeo, AvPlayer) queda cerrada.** En el juego, el título del capítulo 1 ya no se cuelga en `sceAvPlayerStop` y el juego sigue: tres de tres ejecuciones y el recorrido final, sin `STOP:`, `Fault:` ni `join failed`. El opening llega entero y el usuario lo ve y lo oye sincronizado; el prólogo va a tiempo real, saltar el logo `TM_CI` no cuelga y el fondo del menú de título hace bucle a su ritmo. Fuera del juego, el arnés `avplayer-test` reproduce los 134 vídeos, y los 117 cortos hasta su último fotograma. Son ocho arreglos en el AvPlayer de shadPS4, cada uno con su caso rojo, y el contrato del juego queda en `docs/avplayer.md`. Las suites están verdes. Del plan queda la revisión adversarial de lo implementado (tarea 8, paso 4), pendiente a petición del usuario. Antes, 2026-10-21 (cierre de 4b). **La Spec 4b (HEVAG) queda cerrada, y con ella las dos partes de la Spec 4.** `libSceAudiodecCpu` decodifica los efectos de `vag.mrg` con el HEVAG adaptado de vgmstream. El estado vive en la memoria de trabajo que entrega el juego, y la voz acaba por la bandera 7 que la biblioteca deja en la bsi. En una ejecución en el menú de título hay 240 voces sin errores, y **el usuario oye bien los efectos**. Las suites están verdes, sin `SKIP:`, y `--check-imports` sigue en las 3 trampas de la Spec 2. Del plan de la Spec 4 queda la revisión adversarial de lo implementado (tarea 13). Antes, 2026-10-21 (cierre de 4a). **La Spec 4a (ATRAC9) queda cerrada.** Las suites están verdes, sin `SKIP:` de audio. `--check-imports` solo da las 3 trampas de la Spec 2, y un arranque de 60 s llega al menú de título sin `STOP:` ni `Fault:`, con `unimplemented=0` y sin errores de Audiodec. Las capturas de ese arranque muestran lo que sale ahora después del prólogo: el aviso de autoguardado, la advertencia legal, el menú de título y, con entrada, escenas de la novela con texto y sprites. Con eso, las specs 1b y 6 ya pueden capturar el 2D posterior al prólogo, y la casilla de la Spec 2 «pasa del arranque a los logos» queda cumplida. Sigue la Spec 4b (HEVAG). Antes, 2026-10-21 (después). **Las voces y los efectos `vse` también suenan bien**, sin cortes ni sonidos metálicos, según el usuario (tarea 8 de la Spec 4 cerrada). Las voces son entradas de `voice.mrg` que el juego ya entrega descomprimidas: el MZX lo quita el propio juego, así que el runtime no lo necesita. Hay un test que reproduce contra LibAtrac9 los flujos que volcó una partida. Sigue el cierre de 4a (tarea 9). Antes, 2026-10-21. **La música suena bien** (lo confirma el usuario; tarea 7 de la Spec 4 cerrada). Una ejecución con la traza completa de Audiodec dio 158 decodificadores ATRAC9 sin errores y con desfase 0. Los bucles caen donde predice `docs/audiodec.md` y hay un fixture dorado con los bloques de control reales. **El juego se cuelga al pasar al título del capítulo 1** (`phasetitle_01_00_en.mp4`), en `sceAvPlayerStop`. Es de la Spec 5, no de Audiodec; la evidencia está en la spec 5, §2. Antes, 2026-10-20: **El arranque va directo al menú de título, sin el vídeo del prólogo.** Con las tareas 3–6 de la Spec 4 el juego decodifica ATRAC9 sin errores (falta que el usuario confirme de oído cómo suena, tarea 7), pasa del prólogo y guarda progreso en su partida (`user/savedata/1/CUSA47999/`). Desde entonces cada arranque llega al menú de título en segundos. El prólogo solo sale con una partida sin progreso: hay una copia en `out/savedata-sin-progreso/`, sin versionar, porque `run.py` solo guarda las 10 últimas copias de seguridad. Una prueba de lo que viene después del prólogo ya no cuesta 6 min 29 s, pero el vídeo (Spec 5) y los fotogramas de vídeo de `out/baseline/` (del 720 en adelante) piden restaurar esa partida. `--check-imports` da 3, las trampas de la Spec 2. Antes, 2026-10-19: **la Spec 3 queda cerrada.** Las 23 APIs de plataforma tienen un comportamiento explícito: 15 se adelantaron en la Spec 2 y 8 se cierran ahora. Son tres "sin efecto" con su línea de log, el color del usuario 1, las dos consultas de copia de seguridad (`NOT_FOUND`), un error explícito para la información de desenrollado y la línea que le faltaba a `sceMsgDialogGetResult`. `--check-imports` baja de 19 a 11: los 8 de Audiodec (Spec 4) y las 3 trampas decididas de la Spec 2. En un arranque de 60 s salen las ocho líneas "sin efecto" de siempre y ningún `STOP:` nuevo. Las APIs nuevas no se llaman, porque solo se usan en casos concretos (cierre del juego, partida rota, excepciones de C++). Esfuerzo real: 1 día, frente a los 2–3 previstos. Antes, 2026-10-19: **la Spec 1a queda cerrada.** Están fuera del árbol los hooks, el perfil y el XML de parches, la semántica del touchpad, los tests del juego anterior y los textos de identidad, y el cargador solo arranca CUSA47999 (código 30 para cualquier otro juego). El log de arranque pierde las diez líneas "code not found" y para en el mismo punto. Las capturas no cambian: el fotograma 300 sale idéntico, y lo demás es el icono que gira o el vídeo. Fallan 4 tests del launcher, marcados como fallo esperado hasta que se limpie después de la Alpha. La elección de parches de resolución y de frame rate por nombre del juego anterior, que sin perfil no hace nada, se deja para después de la Alpha, con el launcher (decisión del usuario, 2026-10-19). Antes, 2026-10-18: **el hito de primer fotograma queda cerrado:** hay imagen correcta, así que se sigue el orden previsto. El aviso de autoguardado, primer 2D del propio juego, sale nítido y con los colores bien, y el vídeo del prólogo también. En los logs no hay ningún `Unimplemented` (línea `GPU:` al final). Hay herramienta de captura PNG (`TSUKI_SCREENSHOT_AT`, F12) y de comparación exacta (`tools/compare_captures.sh`), con la línea base en `out/baseline/`. Esfuerzos re-estimados en la sección 4. Antes, 2026-10-17 (noche): **la Spec 2 queda cerrada** con la fase 2B: en libkernel solo quedan las tres trampas decididas (`scePthreadCancel` y las dos de información de módulo), ya con nombre; `--check-imports` baja de 28 a 19, todo de las specs 3 y 4. Antes, 2026-10-17 (tarde): sin watchdog, el juego reproduce entero el vídeo del prólogo (se ve y se oye bien) y después para en `sceAudiodecCreateDecoder`, el primer decodificador ATRAC9 (Spec 4a). Su sitio de llamada da la estructura de control de Audiodec (Spec 4, 2.5). Por decisión del usuario solo se documenta. Antes, 2026-10-17: la fase 2A de la Spec 2 (guiada por los `STOP:`) termina tras 10 iteraciones: el juego abre `VideoOut`, presenta ~60 fotogramas por segundo y reproduce el vídeo del prólogo, sin ningún `STOP:` de libkernel. Falta ver qué pinta (hito). La Spec 4 se replantea en dos partes: **4a ATRAC9** (música, voces y efectos `vse`) y **4b HEVAG** (19 efectos de `vag.mrg`). 2026-10-14: revisión del orden tras un análisis adversarial (el kernel va primero, hay un hito de "primer fotograma", el borrado se parte en dos y el renombrado pasa al final; lo específico del juego anterior se elimina, no se desactiva) |
+| Última actualización | 2026-10-30 (Spec 7, renombrado a `tsuki`). **Hechas las cinco capas del renombrado:** variables `TSUKI_*`, archivos `tsuki_*`, símbolos y clases (`TsukiSettings`, `tsukigpu_*`), binarios (`tsuki-probe`), biblioteca de la GPU (`libtsukigpu.so`), `tsuki.ini`, la marca `tsuki:` en shadPS4 y esta documentación. Antes, la misma spec borró el upscaler temporal (FSR 3.1/4, DLSS y TAA, §12 de su spec); FSR 1 y RCAS siguen. Falta la comprobación final: recorrido grabado, oráculo de arranque y título. Hitos anteriores: Spec 1b y Spec 6 cerradas el 2026-10-28; Spec 5 el 2026-10-25; Spec 4 (4a ATRAC9 y 4b HEVAG) el 2026-10-21; Spec 1a y Spec 3 el 2026-10-19; primer fotograma el 2026-10-18; Spec 2 el 2026-10-17; el orden de las specs se revisó el 2026-10-14 tras un análisis adversarial. Quedan pendientes las revisiones adversariales de lo implementado en la Spec 4 (tarea 13 de su plan) y en la Spec 5 (tarea 8, paso 4), y 4 tests del launcher marcados como fallo esperado hasta después de la Alpha. El detalle de cada hito está en su sección de la etapa 5 y en su spec; el relato fechado completo, en la historia de git de este archivo. |
 
 ---
 
@@ -249,8 +249,8 @@ flowchart LR
 
 ## 5. Etapas en detalle
 
-> Hasta que se ejecute la Spec 7 (renombrado), el resto de este documento usa los nombres **anteriores** de
-> variables, binarios y biblioteca. La última capa del renombrado los actualiza aquí también.
+> Desde la Spec 7 (2026-10-30) este documento usa los nombres nuevos (`TSUKI_*`, `tsuki-probe`, `libtsukigpu.so`),
+> también en los pasos que se cerraron con los nombres anteriores.
 
 ### Etapa 0 — Preparar el entorno (Linux)
 
@@ -260,7 +260,7 @@ flowchart LR
 
 1. ✅ Dependencias por pkg-config (vulkan, sdl3, ffmpeg). Bazzite es inmutable: compilar dentro de
    un contenedor (distrobox/toolbox de Fedora) con los `-devel` instalados, no con `rpm-ostree`.
-2. ✅ `bash build.sh` y confirmar que existen `out/gpu/libgow3gpu.so` y `out/gow3-probe`.
+2. ✅ `bash build.sh` y confirmar que existen `out/gpu/libtsukigpu.so` y `out/tsuki-probe`.
 3. ✅ `bash build.sh --test` y `python3 -m unittest discover -s tests`; anotar la línea base.
 
 **Listo cuando:** el build termina sin errores y la línea base de los tests está registrada.
@@ -288,8 +288,8 @@ Cambios en el repo para compilar en Fedora:
 |---|---|
 | `bash build.sh --test` (C) | 10/10 PASS: pad, runtime, file-mods, sema, content, mp3, videodec, services, isa-emulate, isa-stub |
 | `python3 -m unittest discover -s tests` | 238 ejecutados, OK, 37 saltados: 17 sin `iced-x86` (pip), 16 solo Windows/Tk, 2 sin dump del juego anterior, 2 registro de fuentes GDI (Windows) |
-| `out/gow3-probe --cpu-features` | `CPU: complete` (MOVBE/BMI1/LZCNT nativos, sin `isa_rewrite`) |
-| `out/gow3-probe --vulkan-only` | RX 6650 XT (RADV NAVI23): envío de comandos + readback de 4096 bytes PASS |
+| `out/tsuki-probe --cpu-features` | `CPU: complete` (MOVBE/BMI1/LZCNT nativos, sin `isa_rewrite`) |
+| `out/tsuki-probe --vulkan-only` | RX 6650 XT (RADV NAVI23): envío de comandos + readback de 4096 bytes PASS |
 
 ---
 
@@ -302,7 +302,7 @@ Cambios en el repo para compilar en Fedora:
 1. ✅ `prepare.py` + `link_modules.py` sobre el dump.
 2. ✅ Inventario estático: cruzar los imports con `src/import_names.inc`, el código del runtime y
    las tablas de shadPS4 en `gpu/`; nombres recuperados calculando el NID de nombres candidatos.
-3. ✅ Confirmarlo con `out/gow3-probe out/boot-linked.bin --app0 Tsukihime/CUSA47999 --check-imports`:
+3. ✅ Confirmarlo con `out/tsuki-probe out/boot-linked.bin --app0 Tsukihime/CUSA47999 --check-imports`:
    61 imports sin implementación (2026-10-14), el mismo reparto por biblioteca que el inventario estático.
 4. ✅ Intentar iniciar el juego (`TSUKI_GAME_DIR=Tsukihime/CUSA47999 python3 run.py`) y anotar el
    primer `STOP:`.
@@ -491,8 +491,8 @@ puede hacer en paralelo con la Spec 2 y sin ver el juego.
 
 **Orden de trabajo** (un paso por vez, compilando y pasando tests entre pasos)
 
-1. Hooks y backends: `install_*` en `src/probe.c`, `src/*_hook.h`, `gow3_orbs.cpp`,
-   `gow3_actors.cpp`, y lo que los referencie en el overlay y la configuración.
+1. Hooks y backends: `install_*` en `src/probe.c`, `src/*_hook.h`, los `*_orbs.cpp` y
+   `*_actors.cpp` del juego anterior, y lo que los referencie en el overlay y la configuración.
 2. Patches: XML, perfil `GAMES`, `REFERENCE_SHA256`; el cargador de patches queda genérico (sin
    perfil, no aplica ninguno).
 3. Entrada: touchpad de `runtime_pad.c`.
@@ -534,7 +534,7 @@ los tests y fuentes eliminados.
 - **Orden real:** pasos 0, 1, 4, 2, 3 y 5. El 4 (tests) va antes que el 2 porque borrar el XML rompía
   `test_patches.py`.
 - **Paso 1, hooks:** se borran con su pestaña "Game" del menú del juego, que solo tenía cheats,
-  multiplicadores y la barra de vida. Las claves del juego anterior de un `gow3.ini` antiguo se ignoran sin error.
+  multiplicadores y la barra de vida. Las claves del juego anterior que queden en el `.ini` se ignoran sin error.
 - **Paso 2, parches:** el cargador queda genérico y dice en el log
   `Patches: no patch profile for CUSA47999: none applied`. La carpeta de juego por defecto es
   `Tsukihime/CUSA47999`.
@@ -692,7 +692,7 @@ tiene forma de comprobarse. Por eso esta spec va después del hito.
 **Criterios de aceptación**
 
 - [x] `bash build.sh --test` y `python3 -m unittest discover -s tests` pasan.
-- [x] `out/gow3-probe --vulkan-only` sigue en PASS en la RX 6650 XT.
+- [x] `out/tsuki-probe --vulkan-only` sigue en PASS en la RX 6650 XT.
 - [x] Las capturas antes y después de cada borrado son idénticas o la diferencia está explicada por escrito.
 - [x] La comprobación de símbolos (lista cerrada, `git grep -nw`) no encuentra `gbuffer_draw` ni la
   constante de 864 bytes (ni los hashes del upscaler).
@@ -869,7 +869,7 @@ pasan por `sceAvPlayer`, que viene de shadPS4 y en el port anterior apenas se us
 sincronía vídeo/audio, fin de stream, salto del vídeo con un botón, rutas `/app0/image/movie/...`
 a través de `runtime_file.c`.
 
-**Archivos afectados:** `gpu/shadps4/core/libraries/avplayer/` (cambios marcados con `gow3:`),
+**Archivos afectados:** `gpu/shadps4/core/libraries/avplayer/` (cambios marcados con `tsuki:`),
 `src/runtime_file.c` si hay problemas de rutas.
 
 **Requisitos**
@@ -1051,8 +1051,11 @@ está en la spec (§3). Las configuraciones y saves antiguos no se migran (no ha
    nombres viejos. *(Hecho el 2026-10-30, tarea 5 del plan: `TSUKI_*`. Dos tests comprueban que el nombre viejo ya
    no tiene efecto, y el recorrido grabado sale igual.)*
 3. Archivos y directorios con `git mv` (conserva la historia), luego `#include`, CMake y listas de fuentes.
-4. Símbolos, clases, binarios, biblioteca de la GPU, `.ini`, rutas de usuario y marca de shadPS4.
+   *(Hecho el 2026-10-30, tarea 6 del plan.)*
+4. Símbolos, clases, binarios, biblioteca de la GPU, `.ini`, rutas de usuario y marca de shadPS4. *(Hecho el
+   2026-10-30, tarea 7 del plan: `sed` mecánico sobre 189 archivos, compilado desde cero.)*
 5. Documentación (`CLAUDE.md`, este roadmap) y la memoria del proyecto. Los README del jugador esperan a la Alpha.
+   *(Hecho el 2026-10-30, tarea 8 del plan.)*
 
 **Archivos afectados:** prácticamente todo el árbol.
 
@@ -1113,7 +1116,7 @@ una función nueva, con su spec. Va antes del `git mv` (tarea 5.5 del plan).
 | El traductor de GPU no dibuja bien una novela visual | Medio (antes Alto) | Hito cerrado el 2026-10-18: el aviso de autoguardado (2D del juego) y el vídeo salen bien y no hay ningún `Unimplemented`. Queda el resto del 2D de la novela, que no se verá hasta pasar del prólogo (Spec 4a; ya se pasa desde el 2026-10-20, y el arranque llega al menú de título); la Spec 6 lo revisa con capturas aprobadas. 2026-10-21: el menú de título, el menú de carga y escenas de la novela con texto y sprites se ven bien a ojo (`out/spec4-t9-shots/`) |
 | "Cubierta" se confunde con "funciona" (Mouse parecía cubierta y es un stub) | Medio | Cubierta solo si tiene test o el juego la llamó en un recorrido real; ratón pasa a la Spec 6 como trabajo nuevo |
 | SDK 11.008, mucho más nuevo que el del juego anterior: comportamientos del kernel no vistos | Medio | Seguir la semántica de shadPS4; registrar todo lo nuevo en el log |
-| AvPlayer de shadPS4 inmaduro (sincronía, eventos) | Medio; superado el 2026-10-25 | Probar opening y títulos de capítulo pronto; seguir upstream. **Superado el 2026-10-25** (Spec 5 cerrada): ocho defectos corregidos, cada uno con su caso rojo; los 134 vídeos se reproducen fuera del juego y, en el juego, el opening, el prólogo, el título del capítulo 1, el salto del logo y el bucle del menú de título van bien. Los arreglos llevan la marca `gow3:` y no se han llevado a upstream |
+| AvPlayer de shadPS4 inmaduro (sincronía, eventos) | Medio; superado el 2026-10-25 | Probar opening y títulos de capítulo pronto; seguir upstream. **Superado el 2026-10-25** (Spec 5 cerrada): ocho defectos corregidos, cada uno con su caso rojo; los 134 vídeos se reproducen fuera del juego y, en el juego, el opening, el prólogo, el título del capítulo 1, el salto del logo y el bucle del menú de título van bien. Los arreglos llevan la marca `tsuki:` y no se han llevado a upstream |
 | Defectos 2D (alfa, fundidos, texto) en el traductor | Medio | Línea base de capturas aprobadas por el usuario; captura antes y después de cada corrección |
 | Borrar heurísticas del renderizador (Spec 1b) rompe el dibujo sin que se sepa qué cambió | Medio; cerrado el 2026-10-28 | Se hace después del hito, una heurística por vez, con captura antes y después. **Cerrado:** Spec 1b terminada sin cambios en las capturas ni en el recorrido grabado |
 | Borrar por error código compartido con lo genérico | Medio | Borrar por pasos, compilar y pasar los tests tras cada uno; la historia queda en git y en la rama `gow3`. En la Spec 1a (2026-10-19) no hubo regresiones en tests, log ni capturas |
