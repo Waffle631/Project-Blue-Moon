@@ -2,8 +2,8 @@
 
 Fecha: 2026-10-14, ampliada el 2026-10-25 (§9), el 2026-10-28 (§10) y el 2026-10-30 (§11 y §12). Estado: **borrador para aprobación**; tareas 0 (rama
 `tsuki/spec-7` y línea base, §4), 1 (`tools/check_rename.sh`, §6), 2 y 3 (§10 completa), 4 (inventario, prosa y
-§11), 5 (variables `TSUKI_*`, §4 paso 2) y 5.5 (borrar el upscaler temporal y el escalado, §12) del plan hechas el
-2026-10-30. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 7".
+§11), 5 (variables `TSUKI_*`, §4 paso 2), 5.5 (borrar el upscaler temporal y el escalado, §12) y 6 (`git mv`, §4
+paso 3) del plan hechas el 2026-10-30. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 7".
 Depende de: Spec 6 (el recorrido grabado y las capturas son el oráculo del renombrado) y Spec 1b. El renombrado va
 al final. Antes de que la Spec 6 se cerrara sin la 1b (2026-10-28), esta dependencia llegaba a través de la 6.
 
@@ -124,6 +124,22 @@ fotogramas `eye` (2700, 2890: el menú de carga sobre `titlebg1.mp4`) quedan a o
     dos del menú de carga, revisados a ojo. El log muestra que el juego leyó `out/route/gow3.ini` por `TSUKI_CONFIG`.
 - `README.md` (5 menciones) y `README.pt-BR.md` (3) siguen nombrando las variables `GOW3_*`, que ya no funcionan,
   hasta que se reescriban para la Alpha (§11).
+
+**Hecho, paso 3 (tarea 6 del plan, 2026-10-30):**
+- `git mv` de los 33 archivos con `gow3` en el nombre que quedaban, a `tsuki`/`tsukigpu`. Son 5 menos que en el
+  inventario de la tarea 0, porque el §12 borró `gpu/dlss_bridge/`. `docs/gow3/` no se renombra (§4 paso 5).
+- En el contenido solo cambian los **nombres de archivo**: `#include`, listas de CMake, `.rc`, empaquetado,
+  `.gitignore`, los `import` de Python (`tsuki_launcher_win`, `tsuki_lang`, `tsuki_vulkan`) y las rutas que citan
+  los comentarios y los `.md` de desarrollo. Son 99 archivos, 198 líneas. Los símbolos (`Gow3Settings`,
+  `gow3gpu_*`, el objetivo `gow3gpu`) siguen igual hasta el paso 4.
+- **Se quedan para el paso 4**, porque son identidad y no archivos del árbol: los nombres que el launcher y el AppImage
+  instalan en el sistema (`~/.local/share/applications/gow3.desktop`, `gow3.png` en la carpeta de datos, `$appdir/gow3.*`),
+  el id de aplicación `gow3` (`Icon=`/`StartupWMClass=` del `.desktop`, `SDL_APP_ID`, `className` de Tk) y
+  `share/gow3` del paquete. Los README del jugador siguen citando las rutas viejas hasta la Alpha (§11).
+- `build.sh --test` sale verde (12 PASS) y los 26 tests C++ pasan (`avplayer-test` con `tests/data`). Python: 286 OK,
+  35 omitidos, 4 fallos esperados. `check_rename.sh`: 1348 → 1131 restos.
+- No se repitió el recorrido grabado: el cambio no toca lógica, y el oráculo final es el de la tarea 9. El
+  empaquetado de Linux y el de Windows no se probaron (Windows: §8).
 
 ## 5. Requisitos
 
