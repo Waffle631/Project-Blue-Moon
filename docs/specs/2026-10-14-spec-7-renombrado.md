@@ -588,7 +588,12 @@ Criterios de aceptación:
 - [x] El recorrido grabado coincide con `out/baseline/6a/`, sin `STOP:` ni `Fault:`.
 - [x] El `git grep` del inventario (`fsr ?3|fsr ?4|ffx|dlss|ngx|fsr-vulkan|taa|temporal|camera_?motion|object_?motion|jitter|reactive|upscal|scene_?targets|scene_resolution`)
   solo encuentra historia, FSR 1/RCAS y el test del §10. `check_rename.sh` no empeora.
-- [ ] FSR 1 y RCAS siguen funcionando en el menú Insert (lo comprueba el usuario a mano).
+- [x] FSR 1 y RCAS siguen funcionando. *(El usuario no tiene un monitor de más de 1080p, así que no puede probar a
+  mano el escalado de FSR 1. Se comprobó así: RCAS está encendido por defecto y, a pantalla completa en 1080p, corre
+  en cada fotograma; las capturas del recorrido se toman después de él (`vk_presenter.cpp`, `fsr_pass.Render` antes
+  de `CopyToHost`) y salen idénticas a `out/baseline/6a/`. El paso EASU de FSR 1 no corre en esta máquina, pero
+  `fsr_pass.cpp`, `fsr.comp`, `host_shaders/fsr/` y `FsrPassRuns` no cambian en la tarea 5.5 (`git diff` vacío),
+  y el presentador les pasa la misma imagen del juego que antes.)*
 
 **Hecho (tarea 5.5 del plan, 2026-10-30):**
 
