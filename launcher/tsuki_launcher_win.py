@@ -36,7 +36,8 @@ PORT_DIR = Path(sys.executable).resolve().parent if FROZEN else Path(__file__).r
 sys.path.insert(0, str(PORT_DIR / 'scripts'))
 import save_backup  # noqa: E402  (scripts/)
 import steam_shortcut  # noqa: E402  (scripts/)
-from patches import game_profile, game_sfo  # noqa: E402  (scripts/)
+from game_identity import game_sfo  # noqa: E402  (scripts/)
+from patches import game_profile  # noqa: E402  (scripts/)
 from prepare import load_sfo  # noqa: E402  (scripts/)
 DATA_DIR = Path(os.environ.get('TSUKI_DATA_DIR', PORT_DIR))
 CONFIG_DIR = (Path(os.environ.get('APPDATA', Path.home())) if WINDOWS else
@@ -657,7 +658,8 @@ def steam_launch_command():
 
 def game_profile_of(folder):
     """(title id, (ids, built-in XML, app version)) of a game with a patch profile, else (id, None)."""
-    from patches import game_profile_for, game_title_id
+    from game_identity import game_title_id
+    from patches import game_profile_for
     title_id = game_title_id(folder) if folder else None
     return title_id, game_profile_for(folder)
 
@@ -1604,7 +1606,7 @@ class Launcher:
         chosen = load_json(DATA_DIR / 'patches.json', {})
         _title_id, game = game_profile_of(self.meta_dir())
         found = external_patches(Path(self.var('patches_dir', 'app').get() or DATA_DIR / 'patches'),
-                                 game[2], game[1], game[0]) if game else []
+                                 game[2], game[0]) if game else []
         old = {n: v.get() for n, v in self.patch_vars.items()}
         self.patch_vars = {}
         if not found:

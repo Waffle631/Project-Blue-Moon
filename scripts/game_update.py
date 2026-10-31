@@ -51,7 +51,7 @@ def remove(path):
 
 def create_view(base, update, out):
     """The folder holding base with update over it, made in out; the caller removes it."""
-    from patches import game_title_id
+    from game_identity import game_title_id
     base, update = Path(base).resolve(), Path(update).resolve()
     base_id, update_id = game_title_id(base), game_title_id(update)
     if not base_id or base_id != update_id:

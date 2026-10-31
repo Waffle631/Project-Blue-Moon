@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Prepares the game image and starts tsuki-probe (Windows and Linux; run.sh wraps it on Linux).
 
-Environment variables (TSUKI_GAME_DIR, TSUKI_DATA_DIR, TSUKI_PATCHES, TSUKI_MODS_*,
+Environment variables (TSUKI_GAME_DIR, TSUKI_DATA_DIR, TSUKI_PATCHES_DIR, TSUKI_MODS_*,
 TSUKI_USER_DIR, ...). Extra arguments go to tsuki-probe.
 The in-game "Apply and restart" runs this script again through TSUKI_RESTART_COMMAND;
 `--after PID` waits for the previous game process to end first (its GPU device and memory).
@@ -187,9 +187,6 @@ def main():
                 isa_args = ['--isa-rewrite', str(out / 'isa-rewrite.bin')]
         run_script('content_profile.py', game, '--out', out, '--sku', env.get('TSUKI_CONTENT_SKU', 'full'))
 
-        import patches
-        from patches import game_profile_for, patch_requirements, patch_status, selected_patches
-        profile = game_profile_for(game)
         engine_fps = 60
         # The window shows the game's icon (BMP: the format SDL loads without extra libraries); on
         # Linux the launcher's own icon (the AppImage ships the one chosen when it was built) and
@@ -206,27 +203,9 @@ def main():
             env.setdefault('TSUKI_WINDOW_ICON', str(out / 'window_icon.bmp'))
         except (ImportError, OSError):
             pass
-        if profile:
-            names = selected_patches(profile[1], profile[2], env.get('TSUKI_PATCHES', ''), env.get('TSUKI_PATCHES_ONLY') == '1')
-            # tsuki.ini decides the resolution and frame rate patches (in-game menu, launcher).
-            names = graphics_options.patch_names(names, graphics)
-            names = graphics_options.restrict_to_available(names, patches.available_patches(profile[1], profile[2]))
-            env['TSUKI_PATCHES'] = ';'.join(names)
-            env['TSUKI_PATCHES_ONLY'] = '1'
-        (out / 'patch_status.json').unlink(missing_ok=True)
-        run_script('patches.py', '--out', out, '--extra', env.get('TSUKI_PATCHES', ''), '--game-dir', game,
+        run_script('patches.py', '--out', out, '--game-dir', game,
                    '--patches-dir', env.get('TSUKI_PATCHES_DIR', data / 'patches'),
                    '--patches-config', env.get('TSUKI_PATCHES_CONFIG', data / 'patches.json'))
-        if profile:
-            # Only the patches found in this eboot.bin count: a frame rate patch that was skipped
-            # leaves the engine at 60 FPS, and the notes' memory and VBlank needs follow the same list.
-            applied = (patch_status(out) or {}).get('applied', [])
-            engine_fps = graphics_options.applied_engine_fps(applied)
-            dmem, vblank = patch_requirements(profile[1], applied, profile[2])
-            for key, value in (('TSUKI_DMEM_MB', dmem), ('TSUKI_VBLANK_HZ', vblank)):
-                if value and key not in env:
-                    env[key] = str(value)
-                    derived.append(key)
         if 'TSUKI_VBLANK_HZ' not in env:
             env['TSUKI_VBLANK_HZ'] = '60'
             derived.append('TSUKI_VBLANK_HZ')

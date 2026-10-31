@@ -360,7 +360,8 @@ static int sfo_value(const char *path, const char *key, char *text, size_t text_
     return 0;
 }
 /* This build runs one game: another game folder, or one without a readable TITLE_ID, stops with
- * exit code 30 before anything is mounted or a window opens (docs/tsuki/ROADMAP.md). */
+ * exit code 30 before anything is mounted or a window opens (docs/tsuki/ROADMAP.md). run.py, the launcher and
+ * the packaging read the same TITLE_ID from scripts/game_identity.py (tests/test_game_identity.py compares them). */
 #define SUPPORTED_TITLE_ID "CUSA47999"
 static int check_title(const char *app0) {
     char sfo[4096], id[16]="";

@@ -1,12 +1,13 @@
-"""Compile selected shadPS4/GoldHEN XML patches into out/patches.bin for the loader.
+"""Compile the selected third-party shadPS4/GoldHEN XML patches of this game (game_identity) into
+out/patches.bin for the loader.
 
 Patch addresses are PS4 virtual addresses (eboot base 0x400000); the loader's
 image places eboot vaddr 0 at image offset 0. Only literal writes are supported
 (bytes, bytes16/32/64, float32/64, utf8, utf16); pattern ("mask") patches are rejected.
-The built-in file's lines carry signatures (Pattern/At) that find each site in any build.
+compile_patches also reads lines with signatures (Pattern/At, tools/make_signatures.py) that find
+each site in any build.
 """
 import argparse
-import hashlib
 import json
 import os
 import re
@@ -15,12 +16,9 @@ import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+from game_identity import APP_VERSION, IDS, TITLE_ID, game_sfo, game_title_id, is_game
+
 EBOOT_BASE=0x400000
-
-
-def game_app_version(game):
-    """APP_VER of the game folder's param.sfo ("01.02"), or None when it cannot be read."""
-    return game_sfo(game).get('APP_VER')
 
 
 def eboot_segments(elf):
@@ -153,28 +151,11 @@ def compile_patches(xml, names, app_version, segments, image=None, skipped=None)
     return writes
 
 
-PATCHES_DIR=Path(__file__).resolve().parent.parent/'patches'
-# Built-in patch file per game: (title IDs, PATCHES_DIR/<file>.xml, the AppVer its metadata is
-# tagged with, the title that also recognizes a release under an ID not listed). The signatures
-# find the sites in any region or version whose code matches, so the eboot.bin build is not
-# checked. None yet: a game without a profile gets no patches.
+# There is no built-in patch profile any more: main() reads only third-party files. Until the launcher's
+# built-in patch page goes too (docs/specs/2026-10-30-spec-8-alpha.md §5), it still imports GAMES (empty),
+# game_profile*, game_patchable, patch_status (nothing writes patch_status.json now) and EXCLUSIVE_PREFIX.
 GAMES=[]
-DMEM_RETAIL_MB=5056  # runtime_memory.c POOL_SIZE default
-
-
-def game_sfo(game):
-    """The values of the game folder's param.sfo, or {} when it cannot be read (prepare.read_sfo)."""
-    if not game:
-        return {}
-    try:
-        from prepare import read_sfo
-    except ImportError:
-        return {}
-    return read_sfo(Path(game) / 'sce_sys/param.sfo') or {}
-
-
-def game_title_id(game):
-    return game_sfo(game).get('TITLE_ID')
+EXCLUSIVE_PREFIX='Resolution Patch'
 
 
 def game_profile(title_id, title=None):
@@ -187,19 +168,6 @@ def game_profile_for(game):
     """The profile of a game folder, by title ID or by the title in its param.sfo."""
     values=game_sfo(game) if game else {}
     return game_profile(values.get('TITLE_ID'),values.get('TITLE'))
-_SHA_CACHE={}
-
-
-def eboot_sha256(game):
-    try:
-        path=Path(game)/'eboot.bin'
-        stat=path.stat()
-        key=(str(path),stat.st_mtime_ns,stat.st_size)
-        if key not in _SHA_CACHE:
-            _SHA_CACHE[key]=hashlib.sha256(path.read_bytes()).hexdigest()
-        return _SHA_CACHE[key]
-    except (OSError, TypeError):
-        return None
 
 
 def game_patchable(game):
@@ -215,48 +183,13 @@ def patch_status(out):
         return None
 
 
-def available_patches(xml, app_version):
-    """Names of the patches the XML has for this app version."""
-    return {m.get('Name') for m in ET.parse(xml).getroot().iter('Metadata') if m.get('AppVer')==app_version}
-
-
-EXCLUSIVE_PREFIX='Resolution Patch'
-REPLACED_BY_EXCLUSIVE={'Bug Fix - Texture Corruption Fix'}
-
-
-def selected_patches(xml, app_version, extra, only=False):
-    """The file's isEnabled patches for this version, then the names in extra (";"-separated).
-    only: extra is the whole selection (the launcher's), without the file's defaults."""
-    names=[] if only else [m.get('Name') for m in ET.parse(xml).getroot().iter('Metadata')
-                           if m.get('AppVer')==app_version and m.get('isEnabled','false').lower()=='true']
-    names+=[n for n in (n.strip() for n in extra.split(';')) if n and n not in names]
-    exclusive=[n for n in names if n.startswith(EXCLUSIVE_PREFIX)]
-    if len(exclusive)>1:
-        raise ValueError(f'choose one resolution patch, not {exclusive}')
-    return [n for n in names if not (exclusive and n in REPLACED_BY_EXCLUSIVE)]
-
-
-def patch_requirements(xml, names, app_version):
-    """(direct memory MiB, VBlank Hz) the selected patches' notes ask for, None when not needed.
-    shadPS4 notes say "Requires setting DMEM to N MB": N is on top of the retail pool."""
-    dmem=vblank=None
-    for meta in ET.parse(xml).getroot().iter('Metadata'):
-        if meta.get('Name') not in names or meta.get('AppVer')!=app_version: continue
-        note=meta.get('Note','')
-        if m:=re.search(r'DMEM to (\d+) MB',note): dmem=max(dmem or 0,DMEM_RETAIL_MB+int(m.group(1)))
-        if m:=re.search(r'VBlank to (\d+) FPS',note): vblank=max(vblank or 0,int(m.group(1)))
-    return dmem,vblank
-
-
-def external_patches(directory, app_version, exclude, ids):
+def external_patches(directory, app_version, ids):
     """[(key, file, metadata)] of eboot patches for this version in directory/*.xml (third-party
-    shadPS4/GoldHEN files in the data directory's patches/ folder).
+    shadPS4/GoldHEN files in the data directory's patches/ folder) whose files name one of ids, or none.
     key is "<file name>/<patch name>" (the launcher's selection, patches.json)."""
     found=[]
     directory=Path(directory)
     for path in sorted(directory.glob('*.xml')) if directory.is_dir() else []:
-        if path.resolve()==Path(exclude).resolve() or path.resolve() in {g[1].resolve() for g in GAMES}:
-            continue  # built-in files (patches/ in a checkout) are not also offered as external
         try:
             root=ET.parse(path).getroot()
         except ET.ParseError as error:
@@ -313,36 +246,22 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--patches-dir',type=Path,help='third-party patch XML files (shadPS4 format)')
     p.add_argument('--patches-config',type=Path,help='patches.json: enabled/disabled external patches')
-    p.add_argument('--extra',default='',help='additional patch names, separated by ";"')
     p.add_argument('--out',type=Path,default=Path(__file__).resolve().parent.parent/'out')
     p.add_argument('--game-dir',type=Path,default=Path(os.environ.get('TSUKI_GAME_DIR',
-                   Path(__file__).resolve().parent.parent/'Tsukihime'/'CUSA47999')))
+                   Path(__file__).resolve().parent.parent/'Tsukihime'/TITLE_ID)))
     a=p.parse_args()
     title=game_title_id(a.game_dir)
-    profile=game_profile_for(a.game_dir)
-    if not profile:
+    if not is_game(title):
+        # src/probe.c stops another game with exit code 30; nothing to patch before that.
         write_patches(a.out,[])
-        print(f'Patches: no patch profile for {title}: none applied')
+        print(f'Patches: {title or "no title ID"} is not {TITLE_ID}: none applied')
         return
-    ids,xml,tag,_name=profile
-    sha=eboot_sha256(a.game_dir)
-    print(f'Patches: {title} {game_app_version(a.game_dir)}, eboot.bin sha256 {sha}')
-    names=selected_patches(xml,tag,a.extra,os.environ.get('TSUKI_PATCHES_ONLY')=='1')
-    elf=(a.out/'eboot.elf').read_bytes()
-    segments=eboot_segments(elf)
-    skipped={}
-    writes=compile_patches(xml,names,None,segments,eboot_image(elf),skipped)
-    for name,reason in skipped.items():
-        print(f'Patches: {name} skipped ({reason} in this eboot.bin)')
-    if a.patches_dir:
-        # Third-party files: absolute addresses, written as they are (no signatures). After the
-        # built-in ones: an external patch of the same bytes wins.
-        writes+=compile_external(external_selection(external_patches(a.patches_dir,tag,xml,ids),
-                                                    a.patches_config),segments)
+    # Third-party files: absolute addresses of version APP_VERSION, written as they are (no signatures).
+    found=external_patches(a.patches_dir,APP_VERSION,IDS) if a.patches_dir else []
+    selected=external_selection(found,a.patches_config)
+    writes=compile_external(selected,eboot_segments((a.out/'eboot.elf').read_bytes())) if selected else []
     write_patches(a.out,writes)
-    applied=[n for n in names if n not in skipped]
-    (a.out/'patch_status.json').write_text(json.dumps({'sha256':sha,'applied':applied,'skipped':skipped}))
-    print(f'Patches: {title}; {len(writes)} writes from {applied or "none"}')
+    print(f'Patches: {title}; {len(writes)} writes from {len(selected)} third-party patches')
 
 if __name__=='__main__':
     main()

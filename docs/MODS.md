@@ -32,7 +32,8 @@ Los archivos del juego nunca se modifican. En cada inicio se monta un árbol de 
 de lectura; los saves siguen en la carpeta de siempre.
 
 No se admiten mods que reemplacen `eboot.bin`, `sce_module` o `sce_sys`, inyectores de DLL ni plugins de script.
-Los parches de código van en `patches/` / `TSUKI_PATCHES`. Los enlaces simbólicos dentro
+Los parches de código son XML de shadPS4/GoldHEN en `patches/` del directorio de datos (`TSUKI_PATCHES_DIR`).
+Los enlaces simbólicos dentro
 del mod se rechazan.
 
 Desde la terminal:
