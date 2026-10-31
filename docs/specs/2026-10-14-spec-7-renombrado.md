@@ -2,8 +2,8 @@
 
 Fecha: 2026-10-14, ampliada el 2026-10-25 (§9), el 2026-10-28 (§10) y el 2026-10-30 (§11 y §12). Estado: **borrador para aprobación**; tareas 0 (rama
 `tsuki/spec-7` y línea base, §4), 1 (`tools/check_rename.sh`, §6), 2 y 3 (§10 completa), 4 (inventario, prosa y
-§11), 5 (variables `TSUKI_*`, §4 paso 2), 5.5 (borrar el upscaler temporal y el escalado, §12) y 6 (`git mv`, §4
-paso 3) del plan hechas el 2026-10-30. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 7".
+§11), 5 (variables `TSUKI_*`, §4 paso 2), 5.5 (borrar el upscaler temporal y el escalado, §12), 6 (`git mv`, §4
+paso 3) y 7 (símbolos y binarios, §4 paso 4) del plan hechas el 2026-10-30. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 7".
 Depende de: Spec 6 (el recorrido grabado y las capturas son el oráculo del renombrado) y Spec 1b. El renombrado va
 al final. Antes de que la Spec 6 se cerrara sin la 1b (2026-10-28), esta dependencia llegaba a través de la 6.
 
@@ -140,6 +140,31 @@ fotogramas `eye` (2700, 2890: el menú de carga sobre `titlebg1.mp4`) quedan a o
   35 omitidos, 4 fallos esperados. `check_rename.sh`: 1348 → 1131 restos.
 - No se repitió el recorrido grabado: el cambio no toca lógica, y el oráculo final es el de la tarea 9. El
   empaquetado de Linux y el de Windows no se probaron (Windows: §8).
+
+**Hecho, paso 4 (tarea 7 del plan, 2026-10-30):**
+- `sed` mecánico (`GOW3`→`TSUKI`, `GoW3`/`Gow3`→`Tsuki`, `gow3`→`tsuki`) sobre 189 archivos: clases y espacios de
+  nombres (`TsukiSettings`, `TsukiStats`, `TsukiToggle`…), la interfaz C `tsukigpu_*`, el objetivo de CMake
+  `tsukigpu` (`libtsukigpu.so`), los binarios `tsuki-probe`, `tsuki-gpu-capabilities` y `tsuki-play`, el `tsuki.ini`
+  por defecto, la marca `tsuki:` (303 en `gpu/shadps4`, ninguna `gow3:` en `gpu/`) y los nombres de identidad que dejó
+  el paso 3 (`tsuki.desktop`, id de aplicación `tsuki`, `share/tsuki`, `tsuki-launcher`).
+- Fuera del `sed`: todos los `.md` (paso 5), los README del jugador, `check_rename.sh` y su test, las líneas
+  `rename-check: ok`, la ruta `docs/gow3/` y los créditos `gow3 contributors`. Nueve líneas de `gpu/shadps4` y
+  `gpu/shim` pasaban de 100 columnas al crecer un carácter y se reajustaron; en `build.sh`, `gpu/CMakeLists.txt`,
+  `run.sh` y el launcher, que ya tenían muchas líneas largas, se dejaron así.
+- Fuera del árbol: `out/route/gow3.ini` → `out/route/tsuki.ini` (lo crea y lo pasa `tools/route.sh`), el `gow3.ini`
+  local de la raíz → `tsuki.ini` (el valor del usuario se conserva, aunque la spec no migra) y los 30 scripts de `out/`
+  que nombraban `gow3-probe`, `-lgow3gpu` o `gow3.ini`.
+- Compilado desde cero (`out/gpu` borrado, porque la caché de CMake guardaba el objetivo viejo): `build.sh --test`
+  verde (12 PASS), los 26 tests C++ pasan, Python 286 OK, 35 omitidos, 4 fallos esperados.
+- `tsuki-probe --check-imports` da las mismas 3 trampas de libkernel que `out/baseline/7/imports.log`. El resto del
+  diff son números de línea, los mensajes del upscaler borrado (§10, §12) y `Window: Borderless`: el `tsuki.ini`
+  local cambió a `display_mode=borderless` después de la línea base, y que se note confirma que el probe lee el
+  `tsuki.ini` de la raíz.
+- `check_rename.sh`: 1131 → 43, todos en `.md` de desarrollo (`CLAUDE.md`, roadmap, `docs/ENTORNO.md`,
+  `docs/parallel_gpu.md`, `docs/avplayer.md`, `packaging/windows/README.md`), que son del paso 5.
+- Sin recorrido grabado (es de la tarea 9). El empaquetado de Linux y el de Windows no se probaron (Windows: §8).
+  Lo instalado por builds anteriores (`~/.local/share/gow3`, `gow3.desktop`, `%APPDATA%\gow3-launcher`) queda sin
+  leer: no se migra (§3).
 
 ## 5. Requisitos
 
