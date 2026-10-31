@@ -241,10 +241,14 @@ if (WIN32)
     add_executable(tsuki-gpu-capabilities ../tools/gpu_capabilities.c ../packaging/windows/tsuki-gpu-capabilities.rc)
     target_include_directories(tsuki-gpu-capabilities PRIVATE shadps4)
     target_link_libraries(tsuki-gpu-capabilities PRIVATE Vulkan::Vulkan)
-    # "Play Tsukihime.exe": the game with the launcher's saved settings, no launcher window.
+    # "Play Project Blue Moon.exe": the game with the launcher's saved settings, no launcher window.
     add_executable(tsuki-play WIN32 ../packaging/windows/play.c ../packaging/windows/play.rc)
     target_compile_options(tsuki-play PRIVATE -municode)
     target_link_options(tsuki-play PRIVATE -municode)
+    # The resource compiler's depfile lists no ICON or manifest file: without this a new icon keeps the old .res.
+    set_source_files_properties(../packaging/windows/tsuki-probe.rc ../packaging/windows/tsuki-gpu-capabilities.rc
+        ../packaging/windows/play.rc PROPERTIES OBJECT_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/../launcher/tsuki.ico;${CMAKE_CURRENT_SOURCE_DIR}/../packaging/windows/tsuki-probe.manifest")
 endif()
 
 # Explicit test targets; neither launches the game nor needs a Vulkan device.
