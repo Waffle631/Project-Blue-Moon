@@ -214,3 +214,36 @@ podman system df              # en el host: espacio usado por imágenes y conten
 ```
 
 Tras actualizar el compilador o las bibliotecas, borrar `out/gpu` para forzar un build limpio.
+
+## 8. Build cruzado de Windows
+
+El port de Windows se compila desde la distrobox, sin un PC con Windows (Spec 8 §4 A1). La cadena vive en
+`out/cross/` (sin versionar, ~2,5 GB) y la prepara `tools/cross_windows_env.sh`:
+
+- `out/cross/llvm-mingw/`: el compilador, [llvm-mingw](https://github.com/mstorsjo/llvm-mingw) 20261020 para host
+  Linux x86_64 y UCRT. Tiene el mismo ABI que MSYS2 CLANG64 (clang, libc++, UCRT) y la misma versión de LLVM (23.1.4).
+- `out/cross/sysroot/clang64/`: los paquetes de MSYS2 CLANG64 de `packaging/windows/README.md` y sus dependencias
+  (134 paquetes; el ffmpeg de MSYS2 arrastra la mayoría), extraídos de `repo.msys2.org`. Son los mismos binarios que
+  usa un build nativo. Se dejan fuera los que ya trae llvm-mingw (CRT, headers, winpthreads, libc++, libunwind,
+  compiler-rt) y las herramientas (toolchain, cmake, ninja, pkgconf, python, glslang): el build usa las de Linux.
+- `out/cross/downloads/`: los archivos bajados, para que una segunda pasada no baje nada.
+
+```bash
+bash tools/cross_windows_env.sh               # baja y extrae lo que falte; una línea por componente: «ya estaba» o «bajado»
+bash tools/cross_windows_env.sh --update-lock # vuelve a resolver la lista de MSYS2 desde clang64.db y la reescribe en el script
+cmake -S gpu -B out/gpu-win -G Ninja -DCMAKE_TOOLCHAIN_FILE=$PWD/packaging/windows/cross-toolchain.cmake
+```
+
+Las versiones son fijas: llvm-mingw en las variables `LLVM_MINGW*` y los paquetes de MSYS2 en la lista `LOCK` del
+final del script, cada uno con su SHA256. MSYS2 retira del repositorio las versiones viejas al cabo de un tiempo: si
+una descarga da 404, `--update-lock` pasa a las actuales (y conviene subir llvm-mingw a la release con el mismo LLVM
+que el `clang` de MSYS2). Cuando la lista cambia, el sysroot se extrae de nuevo entero.
+
+`packaging/windows/cross-toolchain.cmake` busca bibliotecas, headers y paquetes de CMake solo en el sysroot, y
+programas (glslang, Python) solo en Linux. El `pkg-config` de Linux lee los `.pc` del sysroot
+(`PKG_CONFIG_LIBDIR`, `PKG_CONFIG_SYSROOT_DIR`: los `.pc` dicen `prefix=/clang64`). Como el clang de MSYS2, el
+compilador busca por defecto en `sysroot/clang64/include` y `sysroot/clang64/lib`; el paquete CMake de Zydis lo
+necesita (`-lZycore` sin ruta). `TSUKI_CROSS_DIR` cambia la carpeta `out/cross`.
+
+No hace falta ningún paquete nuevo en la distrobox: el script usa `curl`, `tar`, `xz`, `zstd`, `sha256sum` y
+`python3`, que ya están. `file` no está en la distrobox (sí en el host) y no lo usa ningún script.
