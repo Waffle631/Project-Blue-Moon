@@ -123,11 +123,11 @@ with before/after captures; the rename to `tsuki` is Spec 7, done last).
   full list in the script; since Spec 8 the player READMEs are checked too). The user confirmed the title in the window and the Insert menu. The
   performance overlay now measures CPU, RAM, GPU and VRAM on Linux too (spec §9): `/proc/self/statm`, process CPU time,
   and `drm-engine-gfx` from the fdinfo of the process's `/dev/dri` descriptors (`tsuki_perf_stats.h`).
-- Spec 8 (public Alpha, approved 2026-10-30) has all its technical work done (2026-10-31, branch `tsuki/spec-8`; spec
+- Spec 8 (public Alpha, approved 2026-10-30) is technically closed (2026-10-31, branch `tsuki/spec-8`; spec
   `docs/specs/2026-10-30-spec-8-alpha.md`, task by task). The recorded route and the boot oracle still match
   (`run-oracle.sh` takes need `TSUKI_CONFIG=out/t9-defaults.ini`: the root `tsuki.ini` holds the user's own settings,
-  and its RCAS changes every pixel). Left for the user: try the launcher on Linux (source and AppImage) and judge the logos and
-  the audio; then confirm the fast-forward merge into `tsuki/main`. The Alpha goes to a new GitHub repository (it does not
+  and its RCAS changes every pixel). The user tried the launcher on Linux (source and AppImage) and approved the logos and the
+  audio. Before publishing, the user still has to do the title font, the repository, the real-Windows test and the release. The Alpha goes to a new GitHub repository (it does not
   exist yet). The user creates it and uploads the release (AppImage + Windows `.zip`); the spec pushes nothing and adds no remotes.
   User decisions:
   - The public name is **"Project Blue Moon"**, so the port does not present itself under the game's trademark.
@@ -147,7 +147,8 @@ with before/after captures; the rename to `tsuki` is Spec 7, done last).
     exists.
   - The title font (`launcher/gowfont.ttf`), the launcher palette and the icon are not changed by the spec. It only
     lists their files and how to regenerate the `.ico` and the AppImage icon (§7); having them changed by the user is
-    a criterion for publishing.
+    a criterion for publishing. Done by the user on 2026-10-31: the accent is blue (`ACCENT` `#1a43a5`, `ACCENT_HI`
+    `#3a66d0`, lighter because it is also text) and the icon is a blue moon; the font is still the old one.
   - The port's commits are authored with the GitHub `noreply` address (history rewritten on 2026-10-31; the old state
     is in `out/backup-antes-noreply.bundle`).
 - Target language: **English**. The game ships ja/en/zc/zt (`ft_*.mrg` fonts, `*_en.mp4` videos)

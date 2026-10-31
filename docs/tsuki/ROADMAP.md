@@ -12,7 +12,7 @@ port del juego anterior ([docs/gow3/ROADMAP.md](../gow3/ROADMAP.md)), que a su v
 | Plataforma | Linux (máquina de desarrollo) y Windows 10/11, los dos en la Alpha (Spec 8); Vulkan 1.3 |
 | Máquina de pruebas | Bazzite 44 (KDE Plasma 6.7, Wayland), AMD Ryzen 5 7600, 16 GB, **AMD Radeon RX 6650 XT** |
 | Dump | `Tsukihime/CUSA47999/` (sin versionar, ~45 GB) |
-| Última actualización | 2026-10-31 (**Spec 8: hecho todo lo técnico** en la rama `tsuki/spec-8`, la Alpha pública con el nombre **"Project Blue Moon"**. El build de Windows se hace en cruzado desde Linux con exit 0 y llega al menú de título bajo Wine. El launcher reconoce CUSA47999 por su `param.sfo`. Se generan el AppImage y el `.zip` de Windows. Los README son nuevos. El recorrido grabado y el oráculo del arranque salen idénticos. Falta que el usuario pruebe el launcher en Linux y juzgue los logos y el audio. Antes de publicar, también la estética, el repositorio, la prueba en Windows real y la release. La spec se aprobó el 2026-10-30. Sección "Spec 8"). Antes, el 2026-10-30, **Spec 7 cerrada** ( renombrado a `tsuki`; rama `tsuki/spec-7` fusionada en `tsuki/main` con fast-forward). **Hechas las cinco capas del renombrado:** variables `TSUKI_*`, archivos `tsuki_*`, símbolos y clases (`TsukiSettings`, `tsukigpu_*`), binarios (`tsuki-probe`), biblioteca de la GPU (`libtsukigpu.so`), `tsuki.ini`, la marca `tsuki:` en shadPS4 y esta documentación. Antes, la misma spec borró el upscaler temporal (FSR 3.1/4, DLSS y TAA, §12 de su spec); FSR 1 y RCAS siguen. Comprobado: el recorrido grabado y los fotogramas oráculo del arranque salen idénticos, y `build.sh --test` termina con `tools/check_rename.sh`. El usuario confirmó el título. El overlay de rendimiento ya mide en Linux CPU, RAM, GPU y VRAM (§9 de su spec). Windows sin probar. Hitos anteriores: Spec 1b y Spec 6 cerradas el 2026-10-28; Spec 5 el 2026-10-25; Spec 4 (4a ATRAC9 y 4b HEVAG) el 2026-10-21; Spec 1a y Spec 3 el 2026-10-19; primer fotograma el 2026-10-18; Spec 2 el 2026-10-17; el orden de las specs se revisó el 2026-10-14 tras un análisis adversarial. Quedan pendientes las revisiones adversariales de lo implementado en la Spec 4 (tarea 13 de su plan) y en la Spec 5 (tarea 8, paso 4), Los 4 tests del launcher que estaban marcados como fallo esperado pasan desde la Spec 8. El detalle de cada hito está en su sección de la etapa 5 y en su spec; el relato fechado completo, en la historia de git de este archivo. |
+| Última actualización | 2026-10-31 (**Spec 8: cierre técnico** en la rama `tsuki/spec-8`, la Alpha pública con el nombre **"Project Blue Moon"**. El build de Windows se hace en cruzado desde Linux con exit 0 y llega al menú de título bajo Wine. El launcher reconoce CUSA47999 por su `param.sfo`. Se generan el AppImage y el `.zip` de Windows. Los README son nuevos. El recorrido grabado y el oráculo del arranque salen idénticos. El usuario probó el launcher en Linux, desde el código fuente y desde el AppImage, y dio por buenos los logos y el audio, así que todos los criterios de la sección 3 están marcados. Puso el acento azul y el icono de la luna. Antes de publicar faltan la fuente de títulos, el repositorio, la prueba en Windows real y la release. La spec se aprobó el 2026-10-30. Sección "Spec 8"). Antes, el 2026-10-30, **Spec 7 cerrada** ( renombrado a `tsuki`; rama `tsuki/spec-7` fusionada en `tsuki/main` con fast-forward). **Hechas las cinco capas del renombrado:** variables `TSUKI_*`, archivos `tsuki_*`, símbolos y clases (`TsukiSettings`, `tsukigpu_*`), binarios (`tsuki-probe`), biblioteca de la GPU (`libtsukigpu.so`), `tsuki.ini`, la marca `tsuki:` en shadPS4 y esta documentación. Antes, la misma spec borró el upscaler temporal (FSR 3.1/4, DLSS y TAA, §12 de su spec); FSR 1 y RCAS siguen. Comprobado: el recorrido grabado y los fotogramas oráculo del arranque salen idénticos, y `build.sh --test` termina con `tools/check_rename.sh`. El usuario confirmó el título. El overlay de rendimiento ya mide en Linux CPU, RAM, GPU y VRAM (§9 de su spec). Windows sin probar. Hitos anteriores: Spec 1b y Spec 6 cerradas el 2026-10-28; Spec 5 el 2026-10-25; Spec 4 (4a ATRAC9 y 4b HEVAG) el 2026-10-21; Spec 1a y Spec 3 el 2026-10-19; primer fotograma el 2026-10-18; Spec 2 el 2026-10-17; el orden de las specs se revisó el 2026-10-14 tras un análisis adversarial. Quedan pendientes las revisiones adversariales de lo implementado en la Spec 4 (tarea 13 de su plan) y en la Spec 5 (tarea 8, paso 4), Los 4 tests del launcher que estaban marcados como fallo esperado pasan desde la Spec 8. El detalle de cada hito está en su sección de la etapa 5 y en su spec; el relato fechado completo, en la historia de git de este archivo. |
 
 ---
 
@@ -155,15 +155,15 @@ segundos los juzga el usuario jugando.
 
 **Los juzga el usuario**
 
-- [ ] El juego muestra los logos y el opening en inglés (`op1_arc_en.mp4`) con vídeo y sonido.
+- [x] El juego muestra los logos y el opening en inglés (`op1_arc_en.mp4`) con vídeo y sonido.
   *(2026-10-24: el opening, sí; el usuario lo vio y lo oyó sincronizado (Spec 5, tarea 7). El logo `TM_CI`
-  sale en cada arranque, entero o saltado con Cruz, pero el usuario aún no ha juzgado los logos.)*
+  sale en cada arranque, entero o saltado con Cruz. 2026-10-31: el usuario da por buenos los logos (Spec 8, tarea 15).)*
 - [x] Llega al menú principal e inicia una partida nueva. *(Llega en cada arranque. La partida nueva queda cubierta
   con el prólogo, que el usuario jugó varias veces desde cero (decisión de la Spec 8 §2).)*
 - [x] El texto se ve correctamente y fondos, sprites y transiciones no tienen corrupción ni pantalla
   negra/blanca, según las capturas de línea base que el usuario ha aprobado (ver Spec 6). *(Spec 6, bloque A,
   2026-10-28: el usuario aprobó `out/baseline/6a/`. Spec 8, tarea 14: el recorrido sigue saliendo igual.)*
-- [ ] BGM, voces y efectos suenan sin chirridos ni cortes.
+- [x] BGM, voces y efectos suenan sin chirridos ni cortes. *(2026-10-31: lo confirma el usuario, Spec 8, tarea 15.)*
 - [x] Se avanza el texto con mando, teclado y ratón. *(Spec 6, tarea 6.)*
 
 **Para publicarla** (añadido el 2026-10-30, Spec 8 §8): la Alpha se publica en un repositorio de GitHub nuevo con
@@ -205,7 +205,7 @@ motivos están en la sección "Hito".
 | 8 | Vídeo (AvPlayer) | **Spec 5** | Specs 2 y 3 | 2–3 días (antes 2–4; real: 1 día de plan, el 24 de octubre, y el cierre el 25, más el estudio del cuelgue del 21) | ✅ Concluida el 2026-10-25 (**arreglado el cuelgue en `sceAvPlayerStop` del título del capítulo 1**, confirmado en el juego tres de tres veces y en el recorrido final; en el juego, el opening llega entero y sincronizado según el usuario, el prólogo a tiempo real, saltar el logo no cuelga y el fondo del menú de título ya no se acelera; los 134 vídeos se reproducen fuera del juego; queda la revisión adversarial, tarea 8 paso 4; sección Spec 5) |
 | 9 | 2D correcto, ratón y saves | **Spec 6** | Hito (empieza), Specs 3, 4 y 5 (cierra) | 1–3 semanas (real: del 25 al 28 de octubre) | ✅ Concluida el 2026-10-28 (ratón, saves, idioma y render 2D; línea base `out/baseline/6a/` aprobada por el usuario y repetible con `tools/route.sh`; la miniatura pixelada es del juego y se deja; la comprobación tras la Spec 1b pasa a la 1b, decisión del usuario) |
 | 10 | Renombrar el proyecto a `tsuki` | **Spec 7** | Specs 6 y 1b | 2–3 días | ✅ Cerrada el 2026-10-30 (fusionada en `tsuki/main`): recorrido y oráculo de arranque idénticos; el usuario confirmó el título; métricas del overlay en Linux hechas (§9 de su spec). Windows sin probar |
-| 11 | Alpha pública ("Project Blue Moon"): criterios, Windows, launcher, empaquetado y README | **Spec 8** | Spec 7 | sin estimar (real: 2 días, el 30 y el 31 de octubre) | 🟨 Hecho todo lo técnico el 2026-10-31 en `tsuki/spec-8`: build cruzado de Windows con exit 0 y menú de título bajo Wine, launcher que reconoce CUSA47999, AppImage y `.zip`, README, y recorrido y oráculo idénticos. Faltan la prueba del usuario en Linux (launcher, logos y audio) y lo de antes de publicar |
+| 11 | Alpha pública ("Project Blue Moon"): criterios, Windows, launcher, empaquetado y README | **Spec 8** | Spec 7 | sin estimar (real: 2 días, el 30 y el 31 de octubre) | ✅ Cierre técnico el 2026-10-31 en `tsuki/spec-8`: build cruzado de Windows con exit 0 y menú de título bajo Wine, launcher que reconoce CUSA47999, AppImage y `.zip`, README, y recorrido y oráculo idénticos. El usuario probó el launcher en Linux y juzgó los logos y el audio. Falta lo de antes de publicar: la fuente, el repositorio, Windows real y la release |
 
 **Total: 9 specs (la 4 en dos partes) y 1 hito** (pueden crecer según lo que aparezca al ejecutar el juego).
 
@@ -1177,21 +1177,20 @@ El usuario quiere publicarla en un repositorio de GitHub nuevo que todavía no e
 
 **Criterios de aceptación** (la lista completa está en la spec, §8)
 
-- [ ] Los criterios de la sección 3 marcados, cada uno con su evidencia; el usuario juzga los logos y el audio.
+- [x] Los criterios de la sección 3 marcados, cada uno con su evidencia; el usuario juzga los logos y el audio.
 - [x] `bash build.sh --windows` termina con exit code 0. Bajo Wine, el `.exe` ve la GPU y `--check-imports` da las
   3 trampas. *(2026-10-31: además, el juego llega al menú de título bajo Wine.)*
 - [x] `bash build.sh --test` y `python3 -m unittest discover -s tests` en verde, sin `expectedFailure` en el launcher.
   *(2026-10-31: 291 tests OK y 18 omitidos.)*
-- [ ] El launcher arranca el juego desde el código fuente y desde el AppImage. El AppImage y el `.zip` se generan.
-  *(Los dos paquetes se generan, y el launcher del `.zip` arranca el juego bajo Wine. Falta que el usuario lo pruebe
-  en Linux.)*
+- [x] El launcher arranca el juego desde el código fuente y desde el AppImage. El AppImage y el `.zip` se generan.
+  *(2026-10-31: el usuario lo probó en Linux. El launcher del `.zip` también arranca el juego bajo Wine.)*
 - [x] El recorrido grabado y el oráculo del arranque salen iguales. *(2026-10-31.)*
 - [x] Los README describen este proyecto; `README.pt-BR.md` ya no existe. *(2026-10-31: `README.md`, `README.es.md` y
   `README-Windows.txt`.)*
 - [ ] **Antes de publicar (los cumple el usuario):** la estética cambiada, el repositorio creado, el `.zip` probado
   en Windows real y la release subida.
 
-**Resultado (2026-10-31, rama `tsuki/spec-8`, de `0987055` en adelante):** hecho todo lo técnico; el detalle está en
+**Resultado (2026-10-31, rama `tsuki/spec-8`, de `0987055` en adelante):** cierre técnico; el detalle está en
 la spec, tarea por tarea.
 
 - **Windows.** `build.sh --windows` usa llvm-mingw y los paquetes de MSYS2 CLANG64 de `out/cross/`, fijados por
@@ -1204,8 +1203,9 @@ la spec, tarea por tarea.
   `project-blue-moon-windows.zip`.
 - **README.** Se reescribieron los README y las plantillas de issues. `check_rename.sh` ya revisa los README.
 - **Historial.** Se repasó el árbol público. El email de autor de los commits del port es el `noreply` de GitHub.
-- **Pendiente.** Que el usuario pruebe el launcher en Linux y juzgue los logos y el audio. Después, lo de antes de
-  publicar.
+- **Prueba del usuario.** Probó el launcher en Linux y dio por buenos los logos y el audio (tarea 15). Puso el
+  acento azul `#1a43a5` y el icono de la luna.
+- **Pendiente antes de publicar.** La fuente de títulos, el repositorio, la prueba en Windows real y la release.
 
 ---
 
@@ -1245,10 +1245,10 @@ la spec, tarea por tarea.
 | Aprobar las capturas de línea base (una por una) | Hito, Spec 1b, Spec 6 |
 | ~~Decidir qué hacer con la elección de parches de resolución y de frame rate por nombre del juego anterior (sección 2)~~ Hecho el 2026-10-19: se deja para después de la Alpha, con el launcher | Spec 1b |
 | Probar el recorrido en el juego e informar de lo que vio y oyó | Specs 4 a 6 |
-| Juzgar los logos y el audio para los criterios de la Alpha | Spec 8 (tarea 15 de su plan; lo único técnico que queda) |
-| Probar el launcher en Linux con el dump, desde el código fuente y desde el AppImage | Spec 8 (tarea 15 de su plan) |
+| ~~Juzgar los logos y el audio para los criterios de la Alpha~~ Hecho el 2026-10-31 | Spec 8 (tarea 15 de su plan) |
+| ~~Probar el launcher en Linux con el dump, desde el código fuente y desde el AppImage~~ Hecho el 2026-10-31 | Spec 8 (tarea 15 de su plan) |
 | Confirmar la fusión de `tsuki/spec-8` en `tsuki/main` | Cierre de la Spec 8 |
-| Poner la fuente de títulos, la paleta y el icono nuevos (los archivos están listados en la spec, §7) | Antes de publicar la Alpha |
+| Poner la fuente de títulos, la paleta y el icono nuevos (los archivos están listados en la spec, §7). Hechos el acento azul y el icono el 2026-10-31; falta la fuente | Antes de publicar la Alpha |
 | Crear el repositorio de GitHub y sustituir el marcador `https://github.com/OWNER/REPO` | Antes de publicar la Alpha |
 | Probar el `.zip` en Windows real (el launcher reconoce el dump; el juego llega al menú de título con música y guarda) | Antes de publicar la Alpha |
 | Subir la release (AppImage y `.zip` de Windows) | Publicación de la Alpha |
