@@ -36,8 +36,7 @@ PORT_DIR = Path(sys.executable).resolve().parent if FROZEN else Path(__file__).r
 sys.path.insert(0, str(PORT_DIR / 'scripts'))
 import save_backup  # noqa: E402  (scripts/)
 import steam_shortcut  # noqa: E402  (scripts/)
-from game_identity import game_sfo  # noqa: E402  (scripts/)
-from patches import game_profile  # noqa: E402  (scripts/)
+from game_identity import APP_VERSION, IDS, TITLE, TITLE_ID, game_sfo, game_title_id, is_game  # noqa: E402  (scripts/)
 from prepare import load_sfo  # noqa: E402  (scripts/)
 DATA_DIR = Path(os.environ.get('TSUKI_DATA_DIR', PORT_DIR))
 CONFIG_DIR = (Path(os.environ.get('APPDATA', Path.home())) if WINDOWS else
@@ -284,7 +283,7 @@ DISPLAY_MODES = [('windowed', ('Windowed',)), ('borderless', ('Borderless',)), (
 FPS_LIMITS = [('30', ('30',)), ('60', ('60',)), ('120', ('120',)), ('240', ('240',)), ('0', ('Unlimited',))]
 # The sidebar's pages, top to bottom, and the methods that refresh a page's lists when it is shown.
 PAGES = ('home', 'graphics', 'performance', 'game', 'advanced')
-PAGE_REFRESH = {'home': ('refresh_status',), 'game': ('refresh_lists', 'refresh_game_patches')}
+PAGE_REFRESH = {'home': ('refresh_status',), 'game': ('refresh_lists',)}
 APP_DEFAULTS = {'ui_language': 'en', 'game_dir': os.environ.get('TSUKI_GAME_DIR', str(PORT_DIR.parent / 'CUSA47999') if WINDOWS else ''), 'update_dir': '',
                 'video_backend': 'auto', 'gamemode': False, 'mangohud': False, 'desktop_integration': True, 'user_dir': '',
                 'mods_dir': '', 'mods_enabled': True, 'patches_dir': '', 'language': '1',
@@ -292,7 +291,7 @@ APP_DEFAULTS = {'ui_language': 'en', 'game_dir': os.environ.get('TSUKI_GAME_DIR'
                 'gpu_id': '', 'background_warmup': True, 'parallel_warmup': True, 'pipeline_binary_cache': True,
                 'perf_diag': False, 'frame_capture_key': False, 'frame_stats': False, 'gpu_profile': False,
                 'vk_validation': False, 'close_on_play': False,
-                'game_patches': {}, 'controls': {}, 'pad_style': 'playstation'}
+                'controls': {}, 'pad_style': 'playstation'}
 
 # PS4 button, default key, default gamepad button (SDL names; src/runtime_pad.c). L2/R2 come
 # from the analog triggers and the left touchpad click (photo mode) from L1 + the right click's
@@ -534,7 +533,7 @@ def same_folder(a, b):
 def system_files_beside(folder, reference=None, base=None):
     """PKG extractors write the system files (param.sfo, icon0.png, pic1.png, trophy/) to Sc0/
     beside the game files (Image0/), while the port reads them from the folder's sce_sys/: the
-    Sc0 folder beside `folder` holding the param.sfo of a known game (patches.game_profile), while
+    Sc0 folder beside `folder` holding this game's param.sfo (game_identity.is_game), while
     `folder` has none worth keeping (an unreadable one is a different problem). For an update
     folder the title must be that of `reference` (the base game's param.sfo values); an Sc0
     beside the base game itself (`base`) is the base game's own unless the base game's param.sfo
@@ -554,8 +553,7 @@ def system_files_beside(folder, reference=None, base=None):
         values = load_sfo(sibling / 'param.sfo')
     except (OSError, ValueError):
         return None
-    title = values.get('TITLE')
-    if not game_profile(values.get('TITLE_ID'), title if isinstance(title, str) else None):
+    if not is_game(values.get('TITLE_ID')):
         return None
     if reference is not None and values.get('TITLE_ID') != reference.get('TITLE_ID'):
         return None
@@ -656,12 +654,21 @@ def steam_launch_command():
     return sys.executable, f'"{Path(__file__).resolve()}" --play', str(PORT_DIR)
 
 
-def game_profile_of(folder):
-    """(title id, (ids, built-in XML, app version)) of a game with a patch profile, else (id, None)."""
-    from game_identity import game_title_id
-    from patches import game_profile_for
-    title_id = game_title_id(folder) if folder else None
-    return title_id, game_profile_for(folder)
+def title_id_of(folder):
+    """The TITLE_ID of a game folder's param.sfo, or None."""
+    return game_title_id(folder) if folder else None
+
+
+def only_this_game():
+    """src/probe.c starts no other game (exit code 30)."""
+    return _('This build only runs {} ({}).').format(TITLE, TITLE_ID)
+
+
+def third_party_patches(folder, directory):
+    """[(key, file, metadata)] of the third-party patch files in `directory` for this game's version,
+    when `folder` is this game (patches.py applies the same ones)."""
+    from patches import external_patches
+    return external_patches(directory, APP_VERSION, IDS) if is_game(title_id_of(folder)) else []
 
 
 def game_environment(s):
@@ -676,12 +683,6 @@ def game_environment(s):
             env['SDL_VIDEO_DRIVER'] = env['SDL_VIDEODRIVER'] = backend
         env['TSUKI_GAMEMODE'] = '1' if s.get('gamemode') else '0'
         env['TSUKI_MANGOHUD'] = '1' if s.get('mangohud') else '0'
-    # The launcher's patch selection is the whole list (run.py, patches.py).
-    title_id, profile = game_profile_of(meta_folder(s['game_dir'], s.get('update_dir')))
-    chosen = s.get('game_patches', {}).get(title_id) if title_id else None
-    if profile and chosen is not None:
-        env['TSUKI_PATCHES'] = ';'.join(chosen)
-        env['TSUKI_PATCHES_ONLY'] = '1'
     if s['user_dir']:
         env['TSUKI_USER_DIR'] = s['user_dir']
     env['TSUKI_MODS_DIR'] = s['mods_dir'] or str(DATA_DIR / 'mods')
@@ -801,7 +802,6 @@ class Launcher:
         self.build()
         self.show('home')
         self.refresh_lists()  # the Game page's lists now, so the first visit does not count as a change
-        self.refresh_game_patches()
         self.saved = self.gather()
         root.protocol('WM_DELETE_WINDOW', self.close)
         root.after(100, self.drain_output)
@@ -1112,7 +1112,7 @@ class Launcher:
             c.create_text(30, h - 74, text=heading_text(APP_NAME.upper(), every_language=True), anchor='w', fill=TEXT,
                           font=heading_font(32, every_language=True))
         if info:
-            title_id = game_profile_of(folder)[0]
+            title_id = title_id_of(folder)
             sub = _('{} · version {}', '{} · версия {}').format(title_id or '?', info[1])
             c.create_text(33, h - 30, text=sub, anchor='w', fill=ACCENT_HI, font=(UI_FONT, 11, 'bold'))
         else:
@@ -1276,12 +1276,7 @@ class Launcher:
                                  (_(' Previous saves: {}.').format(safety.name) if safety else ''))
 
     def build_patches(self, f):
-        """Community patches of the selected game's built-in XML and third-party patch files, on the
-        Game page. Resolution and frame rate patches follow Performance (tsuki.ini; run.py adds them)."""
-        self.section(f, _('Game patches', 'Патчи игры'))
-        self.game_patch_frame = self.ttk.Frame(f)
-        self.game_patch_frame.grid(row=self.next_row(f), column=0, columnspan=2, sticky='we')
-        self.game_patch_title, self.game_patch_vars = None, {}
+        """Third-party patch files of this game, on the Game page (patches.py applies them at start)."""
         self.section(f, _('Third-party patches', 'Сторонние патчи'))
         self.folder(f, 'patches_dir', _('Patches folder', 'Папка патчей'), _('Choose the patches folder', 'Выберите папку патчей'),
                     _('shadPS4/GoldHEN XML patch files for this game version. Empty: {}',
@@ -1291,45 +1286,6 @@ class Launcher:
         self.patches_frame.grid(row=self.next_row(f), column=0, columnspan=2, sticky='we', pady=(8, 0))
         self.ttk.Button(f, text=_('Refresh', 'Обновить'), command=self.refresh_lists).grid(
             row=self.next_row(f), column=0, sticky='w', pady=(14, 0))
-
-    def refresh_game_patches(self):
-        import xml.etree.ElementTree as ET
-        from patches import EXCLUSIVE_PREFIX
-        tk, f = self.tk, self.game_patch_frame
-        self.store_game_patches()
-        for widget in f.winfo_children():
-            widget.destroy()
-        f.columnconfigure(1, weight=1)
-        folder = self.meta_dir()
-        title_id, profile = game_profile_of(folder)
-        self.game_patch_title, self.game_patch_vars = None, {}
-        if not profile:
-            self.note(f, _('No built-in patches for this game.', 'Для этой игры нет встроенных патчей.'), top=0)
-            return
-        _ids, xml, version = profile[:3]
-        metas = [m for m in ET.parse(xml).getroot().iter('Metadata') if m.get('AppVer') == version]
-        chosen = self.app.get('game_patches', {}).get(title_id)
-        on = set(chosen) if chosen is not None else {m.get('Name') for m in metas
-                                                         if m.get('isEnabled', 'false').lower() == 'true'}
-        self.note(f, _('{} · version {} · {}. Resolution and frame rate patches follow Performance.',
-                       '{} · версия {} · {}.').format(title_id, version, xml.name), top=0)
-        for meta in metas:
-            name = meta.get('Name')
-            if name.startswith(EXCLUSIVE_PREFIX) or name.startswith('Frame Rate Patch'):
-                continue
-            var = tk.BooleanVar(value=name in on)
-            self.game_patch_vars[name] = var
-            author = meta.get('Author')
-            self.check(f, None, None, name + (f'  ({author})' if author else ''), meta.get('Note'), var=var)
-        self.game_patch_title = title_id
-
-    def store_game_patches(self):
-        """The page's selection into settings (the whole list for this game, without the resolution
-        and frame rate patches: run.py adds those from tsuki.ini)."""
-        if not self.game_patch_title:
-            return
-        self.app.setdefault('game_patches', {})[self.game_patch_title] = \
-            [n for n, v in self.game_patch_vars.items() if v.get()]
 
     def build_mods(self, f):
         """Loose-file mods layered over the game at start, on the Game page."""
@@ -1526,8 +1482,6 @@ class Launcher:
         title = info[0] if info else APP_NAME
         self.root.title(f'{title} (PC)')
         self.side_title.configure(text=heading_text(title.upper(), every_language=True))
-        if self.current_page == 'game':
-            self.refresh_game_patches()
         self.banner_source = None
         self.draw_banner()
         self.set_icon()
@@ -1543,26 +1497,16 @@ class Launcher:
                                                                      'Сначала выберите папку игры.'), fg=MUTED)
 
     def summary(self):
-        self.store_game_patches()
-        title_id, _profile = game_profile_of(self.meta_dir())
-        names = self.app.get('game_patches', {}).get(title_id) or []
-        resolution = dict((v, t[0]) for v, t in RESOLUTION_CHOICES).get(self.var('render_resolution', 'ini').get(), '?')
-        from patches import game_patchable, patch_status
-        if not game_patchable(self.meta_dir()):
-            return _('{} · 60 FPS engine · no patches for this game').format(resolution)
-        text = _('{} · {} FPS engine · {} patches').format(resolution, self.var('engine_fps', 'ini').get(), len(names))
-        # Which patches the game's eboot.bin had is known once the game has started (patches.py).
-        status = patch_status(DATA_DIR / 'out')
-        if status and status.get('skipped'):
-            text += ' · ' + _('{} not found in this eboot.bin at the last start (see Log)').format(len(status['skipped']))
-        return text
+        if not is_game(title_id_of(self.meta_dir())):
+            return only_this_game()
+        count = sum(1 for var in self.patch_vars.values() if var.get())
+        return _('{} third-party patches on').format(count) if count else _('No third-party patches')
 
     def refresh_lists(self):
         if not hasattr(self, 'patches_frame'):
             return
         tk, ttk = self.tk, self.ttk
         from mods import discover
-        from patches import external_patches
         for holder in (self.mods_frame, self.patches_frame):
             for widget in holder.winfo_children():
                 widget.destroy()
@@ -1604,9 +1548,7 @@ class Launcher:
             ttk.Button(presets, text=_('Save', 'Сохранить'), command=self.save_mod_preset).pack(side='left', padx=(6, 0))
             ttk.Button(presets, text=_('Delete', 'Удалить'), command=self.delete_mod_preset).pack(side='left', padx=(6, 0))
         chosen = load_json(DATA_DIR / 'patches.json', {})
-        _title_id, game = game_profile_of(self.meta_dir())
-        found = external_patches(Path(self.var('patches_dir', 'app').get() or DATA_DIR / 'patches'),
-                                 game[2], game[0]) if game else []
+        found = third_party_patches(self.meta_dir(), Path(self.var('patches_dir', 'app').get() or DATA_DIR / 'patches'))
         old = {n: v.get() for n, v in self.patch_vars.items()}
         self.patch_vars = {}
         if not found:
@@ -1672,9 +1614,6 @@ class Launcher:
         """What collect() writes, as data: settings.json, the tsuki.ini values, the mods selection and
         the third-party patches selection. Reads the window and changes nothing."""
         app, ini = dict(self.app), dict(self.ini)
-        if self.game_patch_title:
-            app['game_patches'] = {**app.get('game_patches', {}),
-                                   self.game_patch_title: [n for n, v in self.game_patch_vars.items() if v.get()]}
         for key, var in self.vars.items():
             try:
                 value = var.get()
@@ -1758,7 +1697,6 @@ class Launcher:
             self.status.configure(text=status[0], fg=status[1])
         self.show(page)
         self.refresh_lists()
-        self.refresh_game_patches()
         self.saved = self.gather()
         self.refresh_save_button()
 
@@ -1836,6 +1774,11 @@ class Launcher:
             self.messagebox.showerror(APP_NAME, _('The game dump is incomplete. Missing or empty files:\n\n{}\n\n'
                                                   'Dump the game again, or copy these files from a complete dump.')
                                       .format('\n'.join(describe_missing(missing))))
+            self.show('game')
+            return
+        title_id = title_id_of(self.app['game_dir'])
+        if not is_game(title_id):
+            self.messagebox.showerror(APP_NAME, only_this_game() + '\n\n' + _('The game folder holds {}.').format(title_id or _('no TITLE_ID')))
             self.show('game')
             return
         update_dir = self.app.get('update_dir') or ''

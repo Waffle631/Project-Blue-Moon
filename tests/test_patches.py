@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest import mock
 
 import patches
-from patches import compile_patches, external_patches, external_selection, compile_external, game_profile
+from patches import compile_patches, external_patches, external_selection, compile_external
 
 # A game that does not exist: the patch engine is tested without a real one.
 SYNTH_ID = 'CUSA99990'
@@ -103,34 +103,11 @@ class CompilePatchesTests(unittest.TestCase):
                          [(0x1000, b'\x90\x90'), (0x3001, b'\x90\x90')])
 
 
-class GameProfileTests(unittest.TestCase):
-    """What the launcher's built-in patch page still reads (docs/specs/2026-10-30-spec-8-alpha.md §5)."""
-    def setUp(self):
-        self.xml = synthetic_xml(self)
-        games = mock.patch.object(patches, 'GAMES', [(SYNTH_IDS, self.xml, '01.00', 'Synthetic Game')])
-        games.start()
-        self.addCleanup(games.stop)
-
-    def test_profiles_by_title_id(self):
-        self.assertEqual(game_profile(SYNTH_ID)[1:3], (self.xml, '01.00'))
-        self.assertIsNone(game_profile('CUSA99999'))
-        self.assertIsNone(game_profile(None))
-
-    def test_profile_by_title_for_any_region(self):
-        self.assertEqual(game_profile('CUSA99999', 'Synthetic Game® Remastered')[1], self.xml)
-        self.assertIsNone(game_profile('CUSA99999', 'Another Game'))
-        with mock.patch.object(patches, 'game_sfo', return_value={'TITLE_ID': 'CUSA77777', 'TITLE': 'Synthetic Game'}):
-            self.assertTrue(patches.game_patchable('folder'))
-        self.assertFalse(patches.game_patchable(None))
-        with tempfile.TemporaryDirectory() as folder:
-            self.assertFalse(patches.game_patchable(folder))  # no param.sfo: unknown game
-
-
 class BuiltInProfileTests(unittest.TestCase):
-    def test_without_profile_nothing_applies(self):
-        self.assertEqual(patches.GAMES, [])
-        self.assertIsNone(game_profile('CUSA47999'))
-        self.assertIsNone(game_profile('CUSA47999', 'TSUKIHIME -A piece of blue glass moon-'))
+    def test_no_built_in_profile(self):
+        # Spec 8 §5: the game is known by game_identity, and only third-party files are read.
+        for name in ('GAMES', 'EXCLUSIVE_PREFIX', 'game_profile', 'game_profile_for', 'game_patchable', 'patch_status'):
+            self.assertFalse(hasattr(patches, name), name)
 
 
 class PatchesMainTests(unittest.TestCase):

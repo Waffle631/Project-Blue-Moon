@@ -231,9 +231,6 @@ class GameFilesTest(unittest.TestCase):
             (update / 'sce_sys/param.sfo').write_bytes(BASE_SFO)
             self.assertTrue(launcher.ready_to_play(folder, str(update)))
 
-    # Spec 1a removed the previous game's patch profile (scripts/patches.py GAMES is empty), which the launcher
-    # uses to recognize a game dump; the launcher is cleaned up after the Alpha (docs/tsuki/ROADMAP.md).
-    @unittest.expectedFailure
     def test_system_files_beside_a_pkg_extraction(self):
         # PKG extractors keep the system files (param.sfo, icon0.png, pic1.png, trophy/) in Sc0/
         # next to the game files in Image0/; the port reads them from the game's sce_sys/.
@@ -336,9 +333,6 @@ class GameFilesTest(unittest.TestCase):
             # A drive root has no siblings to look at.
             self.assertIsNone(launcher.system_files_beside(root.anchor))
 
-    # Spec 1a removed the previous game's patch profile (scripts/patches.py GAMES is empty), which the launcher
-    # uses to recognize a game dump; the launcher is cleaned up after the Alpha (docs/tsuki/ROADMAP.md).
-    @unittest.expectedFailure
     def test_play_offers_to_adopt_the_system_files(self):
         import tempfile
         from pathlib import Path
@@ -483,6 +477,99 @@ class GameFilesTest(unittest.TestCase):
             self.assertIn('Access is denied', app.messagebox.showerror.call_args.args[1])
             app.game_changed.assert_called_once()  # what was copied before the failure shows
             app.show.assert_called_with('game')
+
+
+class GameIdentityTest(unittest.TestCase):
+    """Spec 8 §5: the launcher knows the dump by its param.sfo TITLE_ID (scripts/game_identity.py), not by a
+    patch profile, and the built-in patch page of the previous game is gone."""
+
+    def dump(self, root, title_id='CUSA47999'):
+        game = root / title_id
+        (game / 'sce_module').mkdir(parents=True)
+        (game / 'sce_sys').mkdir()
+        (game / 'eboot.bin').write_bytes(b'x')
+        for prx in ('libc.prx', 'libSceFios2.prx'):
+            (game / 'sce_module' / prx).write_bytes(b'x')
+        (game / 'sce_sys/param.sfo').write_bytes(sfo_bytes(TITLE_ID=title_id, APP_VER='01.00'))
+        return game
+
+    def test_title_id_of(self):
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as folder:
+            self.assertEqual(launcher.title_id_of(self.dump(Path(folder))), 'CUSA47999')
+            self.assertIsNone(launcher.title_id_of(Path(folder)))  # no param.sfo
+        self.assertIsNone(launcher.title_id_of(None))
+        self.assertIsNone(launcher.title_id_of(''))
+        for name in ('game_profile_of', 'game_profile', 'refresh_game_patches', 'store_game_patches'):
+            self.assertFalse(hasattr(launcher, name) or hasattr(launcher.Launcher, name), name)
+
+    def test_no_built_in_patches_reach_the_game(self):
+        self.assertNotIn('game_patches', launcher.APP_DEFAULTS)
+        # An old settings.json still has a selection: it does not reach run.py.
+        env = launcher.game_environment({**launcher.APP_DEFAULTS, 'game_dir': 'x',
+                                         'game_patches': {'CUSA47999': ['Skip Any Video With X Button']}})
+        self.assertNotIn('TSUKI_PATCHES', env)
+        self.assertNotIn('TSUKI_PATCHES_ONLY', env)
+
+    def test_third_party_patches_of_this_game(self):
+        import tempfile
+        from pathlib import Path
+
+        xml = """<Patch><TitleID><ID>{}</ID></TitleID>
+<Metadata Title="t" Name="On" Author="a" PatchVer="1.0" AppVer="01.00" AppElf="eboot.bin" isEnabled="true">
+<PatchList><Line Type="bytes" Address="0x00400000" Value="90"/></PatchList></Metadata></Patch>"""
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / 'patches').mkdir()
+            (root / 'patches/tsuki.xml').write_text(xml.format('CUSA47999'))
+            (root / 'patches/other.xml').write_text(xml.format('CUSA00001'))
+            found = launcher.third_party_patches(self.dump(root), root / 'patches')
+            self.assertEqual([key for key, _path, _meta in found], ['tsuki.xml/On'])
+            self.assertEqual(launcher.third_party_patches(self.dump(root, 'CUSA00001'), root / 'patches'), [])
+            self.assertEqual(launcher.third_party_patches(root / 'empty', root / 'patches'), [])
+
+    def test_summary(self):
+        import tempfile
+        from pathlib import Path
+        from unittest import mock
+
+        with tempfile.TemporaryDirectory() as folder:
+            app = launcher.Launcher.__new__(launcher.Launcher)
+            app.meta_dir = mock.Mock(return_value=self.dump(Path(folder)))
+            app.patch_vars = {}
+            self.assertEqual(app.summary(), 'No third-party patches')
+            app.patch_vars = {'a.xml/On': mock.Mock(get=lambda: True), 'a.xml/Off': mock.Mock(get=lambda: False),
+                              'b.xml/On': mock.Mock(get=lambda: True)}
+            self.assertEqual(app.summary(), '2 third-party patches on')
+            app.meta_dir = mock.Mock(return_value=self.dump(Path(folder), 'CUSA00001'))
+            self.assertEqual(app.summary(), 'This build only runs TSUKIHIME -A piece of blue glass moon- (CUSA47999).')
+
+    def test_play_rejects_another_game(self):
+        import tempfile
+        from pathlib import Path
+        from unittest import mock
+
+        for title_id, starts in (('CUSA00001', False), ('CUSA47999', True)):
+            with self.subTest(title_id=title_id), tempfile.TemporaryDirectory() as folder:
+                app = launcher.Launcher.__new__(launcher.Launcher)
+                app.process = None
+                app.app = {**launcher.APP_DEFAULTS, 'game_dir': str(self.dump(Path(folder), title_id))}
+                app.messagebox = mock.Mock()
+                app.ui_calls = queue.Queue()
+                for name in ('collect', 'show', 'set_log', 'play_button', 'status'):
+                    setattr(app, name, mock.Mock())
+                with mock.patch.object(launcher.subprocess, 'Popen', return_value=mock.Mock()) as start, \
+                        mock.patch.object(launcher, 'GameJob'), mock.patch.object(launcher.threading, 'Thread'), \
+                        mock.patch.object(launcher, 'open_play_log', return_value=launcher._NullLog()):
+                    app.play()
+                self.assertEqual(start.called, starts)
+                if not starts:
+                    message = app.messagebox.showerror.call_args.args[1]
+                    self.assertIn('This build only runs TSUKIHIME -A piece of blue glass moon- (CUSA47999).', message)
+                    self.assertIn('CUSA00001', message)
+                    app.show.assert_called_with('game')
 
 
 class GpuChoiceTest(unittest.TestCase):

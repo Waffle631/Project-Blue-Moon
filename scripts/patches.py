@@ -16,7 +16,7 @@ import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from game_identity import APP_VERSION, IDS, TITLE_ID, game_sfo, game_title_id, is_game
+from game_identity import APP_VERSION, IDS, TITLE_ID, game_title_id, is_game
 
 EBOOT_BASE=0x400000
 
@@ -149,38 +149,6 @@ def compile_patches(xml, names, app_version, segments, image=None, skipped=None)
                 raise ValueError(f'{name}: address {offset+EBOOT_BASE:#x} is outside the eboot')
             writes.append((offset,data))
     return writes
-
-
-# There is no built-in patch profile any more: main() reads only third-party files. Until the launcher's
-# built-in patch page goes too (docs/specs/2026-10-30-spec-8-alpha.md §5), it still imports GAMES (empty),
-# game_profile*, game_patchable, patch_status (nothing writes patch_status.json now) and EXCLUSIVE_PREFIX.
-GAMES=[]
-EXCLUSIVE_PREFIX='Resolution Patch'
-
-
-def game_profile(title_id, title=None):
-    """(title IDs, built-in XML, metadata AppVer, title) for a known game, else None."""
-    title=(title or '').replace('®','').replace('™','')
-    return next((g for g in GAMES if title_id in g[0] or (title and g[3] in title)),None)
-
-
-def game_profile_for(game):
-    """The profile of a game folder, by title ID or by the title in its param.sfo."""
-    values=game_sfo(game) if game else {}
-    return game_profile(values.get('TITLE_ID'),values.get('TITLE'))
-
-
-def game_patchable(game):
-    """Whether the built-in patches are tried on this game folder (any region and version)."""
-    return bool(game) and bool(game_profile_for(game))
-
-
-def patch_status(out):
-    """The last start's patch report (patches.py writes it): {'applied': [...], 'skipped': {...}}."""
-    try:
-        return json.loads((Path(out)/'patch_status.json').read_text())
-    except (OSError, ValueError):
-        return None
 
 
 def external_patches(directory, app_version, ids):
