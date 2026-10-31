@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds dist/tsuki-x86_64.AppImage from the Linux build (run `bash build.sh` in the repo root first).
+# Builds dist/project-blue-moon-x86_64.AppImage from the Linux build (run `bash build.sh` in the repo root first).
 # Libraries are bundled with their dependencies, except the ones that must come from the host
 # (glibc, Vulkan loader and drivers, X11/Wayland, GL). The Tk launcher is frozen with PyInstaller, so
 # players need no Python. Needs: ldd, patchelf, curl (appimagetool), python-pyinstaller, tk, pillow, iced-x86.
@@ -15,7 +15,7 @@ mkdir -p "$share/bin/gpu" "$appdir/usr/lib"
 install -m755 out/tsuki-probe out/tsuki-gpu-capabilities "$share/bin/"
 install -m755 out/gpu/libtsukigpu.so "$share/bin/gpu/"
 cp run.py "$share/"
-cp -r scripts patches "$share/"
+cp -r scripts "$share/"
 mkdir -p "$share/launcher"
 # The icon of the AppImage, the launcher and the game window: packaging/linux/tsuki.png when it
 # exists (a local choice), else the launcher's own.
@@ -77,6 +77,6 @@ if [[ -z $tool ]]; then
 fi
 mkdir -p dist
 # Written aside and moved over: replacing a running AppImage in place fails ("Text file busy").
-ARCH=x86_64 "$tool" --appimage-extract-and-run "$appdir" dist/tsuki-x86_64.AppImage.new
-mv -f dist/tsuki-x86_64.AppImage.new dist/tsuki-x86_64.AppImage
-ls -lh dist/tsuki-x86_64.AppImage
+ARCH=x86_64 "$tool" --appimage-extract-and-run "$appdir" dist/project-blue-moon-x86_64.AppImage.new
+mv -f dist/project-blue-moon-x86_64.AppImage.new dist/project-blue-moon-x86_64.AppImage
+ls -lh dist/project-blue-moon-x86_64.AppImage

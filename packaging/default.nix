@@ -9,7 +9,7 @@
 let
   lib = pkgs.lib;
   root = ./..;
-  assetDirs = [ "scripts" "patches" "launcher" ];
+  assetDirs = [ "scripts" "launcher" ];
   # Only what the package needs (the tree also holds builds, profiles and captures).
   wanted = [
     "run.sh" "out" "out/tsuki-probe" "out/tsuki-gpu-capabilities" "out/gpu" "out/gpu/libtsukigpu.so"
@@ -75,7 +75,7 @@ pkgs.stdenv.mkDerivation {
     d=$out/share/tsuki
     mkdir -p $d/bin $out/bin
     cp run.sh $d/
-    cp -r scripts patches launcher $d/
+    cp -r scripts launcher $d/
     install -m755 out/tsuki-probe $d/bin/tsuki-probe
     install -m755 out/tsuki-gpu-capabilities $d/bin/tsuki-gpu-capabilities
     install -Dm755 out/gpu/libtsukigpu.so $d/bin/gpu/libtsukigpu.so

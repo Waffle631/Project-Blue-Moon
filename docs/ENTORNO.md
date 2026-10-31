@@ -253,4 +253,22 @@ copia los tres `.exe` a `out/`. Para ejecutarlos hacen falta las DLL de `out/cro
 `out/cross/llvm-mingw/x86_64-w64-mingw32/bin` (`libc++.dll`, `libunwind.dll`, `libwinpthread-1.dll`).
 
 No hace falta ningún paquete nuevo en la distrobox: el script usa `curl`, `tar`, `xz`, `zstd`, `sha256sum` y
-`python3`, que ya están. `file` no está en la distrobox (sí en el host) y no lo usa ningún script.
+`python3`, que ya están. `file` lo pide appimagetool (sección 9).
+
+## 9. AppImage de Linux
+
+`packaging/linux/build.sh` genera `dist/project-blue-moon-x86_64.AppImage` (~145 MB) desde el build de Linux
+(`bash build.sh` antes). Congela el launcher con PyInstaller, mete las bibliotecas que no pone el sistema en
+`usr/lib` y baja appimagetool (la build `continuous` de su GitHub) a `out/appimagetool-x86_64.AppImage` la primera
+vez, si no está en el `PATH` ni en `$APPIMAGETOOL`. Paquetes que pide en la distrobox (instalados el 2026-10-31):
+
+```bash
+sudo dnf install -y patchelf python3-pip file      # file: appimagetool se niega a funcionar sin él
+python3 -m pip install --user pyinstaller iced-x86==1.21.0
+bash packaging/linux/build.sh                      # exit 0 y la ruta del AppImage
+```
+
+Para mirarlo sin jugar: `dist/project-blue-moon-x86_64.AppImage --appimage-extract` lo deja en `squashfs-root/`
+(hacerlo dentro de una carpeta de `out/`). `squashfs-root/AppRun --script scripts/prepare.py --help` prueba el
+Python congelado sin abrir la ventana; el `ldd` de `usr/share/tsuki/bin/*` solo resuelve con
+`LD_LIBRARY_PATH=squashfs-root/usr/lib`, que es lo que pone el `AppRun`.
