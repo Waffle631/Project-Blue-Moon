@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds dist/tsuki-windows/ (and dist/tsuki-windows.zip): Tsukihime.exe (the launcher, frozen
+# Builds dist/project-blue-moon-windows/ (and its .zip): Project Blue Moon.exe (the launcher, frozen
 # with PyInstaller so players need no Python), tsuki-probe.exe with the MSYS2 CLANG64 DLLs it needs,
 # the preparation scripts and run.py. Run from an MSYS2 CLANG64 shell after `bash build.sh`.
 # Freezing uses a Windows Python 3.10+ (python.org; WINPYTHON overrides) and a private venv in
@@ -23,24 +23,24 @@ if [[ ! -x out/pyenv/Scripts/python.exe ]]; then
     "$python" -m venv out/pyenv
 fi
 out/pyenv/Scripts/python.exe -m pip install -q --disable-pip-version-check pyinstaller pillow iced-x86==1.21.0
-# The scripts run inside Tsukihime.exe (--script): the standard modules they import come along.
+# The scripts run inside Project Blue Moon.exe (--script): the standard modules they import come along.
 hidden=()
 for module in argparse base64 collections hashlib json re shutil struct tempfile xml.etree.ElementTree \
               urllib.request ctypes.wintypes iced_x86; do
     hidden+=(--hidden-import "$module")
 done
 out/pyenv/Scripts/python.exe -m PyInstaller --noconfirm --clean --log-level WARN --windowed --copy-metadata pillow \
-    --name "Tsukihime" --icon "$(cygpath -w "$PWD/launcher/tsuki.ico")" --distpath out/pyi-dist \
+    --name "Project Blue Moon" --icon "$(cygpath -w "$PWD/launcher/tsuki.ico")" --distpath out/pyi-dist \
     --workpath out/pyi-work --specpath out/pyi-work --paths "$(cygpath -w "$PWD/scripts")" "${hidden[@]}" \
     "$(cygpath -w "$PWD/launcher/tsuki_launcher_win.py")"
 
-# The package is assembled in a fresh staging folder and zipped from there; dist/tsuki-windows
+# The package is assembled in a fresh staging folder and zipped from there; dist/project-blue-moon-windows
 # (a playable copy that may hold saves and settings) is only refreshed afterwards.
-dest=out/stage/tsuki-windows
+dest=out/stage/project-blue-moon-windows
 rm -rf -- out/stage
 mkdir -p "$dest/bin" "$dest/launcher"
-cp -r "out/pyi-dist/Tsukihime/." "$dest/"
-llvm-strip -o "$dest/Play Tsukihime.exe" out/tsuki-play.exe
+cp -r "out/pyi-dist/Project Blue Moon/." "$dest/"
+llvm-strip -o "$dest/Play Project Blue Moon.exe" out/tsuki-play.exe
 cp launcher/tsuki.ico launcher/tsuki.png launcher/gowfont.ttf "$dest/launcher/"
 # The executables without debug information (out/ keeps the symbols for crash reports).
 for exe in tsuki-probe.exe tsuki-gpu-capabilities.exe; do
@@ -51,7 +51,7 @@ ldd "$dest/bin/tsuki-probe.exe" "$dest/bin/tsuki-gpu-capabilities.exe" |
     awk '/\/clang64\/bin\// {print $3}' | sort -u | while read -r dll; do
         cp -u "$dll" "$dest/bin/"
     done
-cp -r scripts patches "$dest/"
+cp -r scripts "$dest/"
 cp run.py LICENSE README.md packaging/windows/README-Windows.txt "$dest/"
 find "$dest" -name __pycache__ -prune -exec rm -r {} +
 # No game files and nothing a player made (saves, shader caches built from the game's shaders,
@@ -66,21 +66,21 @@ if [[ -n $forbidden ]]; then
     exit 1
 fi
 mkdir -p dist
-rm -f dist/tsuki-windows.zip
+rm -f dist/project-blue-moon-windows.zip
 (cd out/stage && powershell -NoProfile -Command \
-    "Compress-Archive -Path tsuki-windows -DestinationPath ../../dist/tsuki-windows.zip")
+    "Compress-Archive -Path project-blue-moon-windows -DestinationPath ../../dist/project-blue-moon-windows.zip")
 
-# Refresh dist/tsuki-windows, keeping what players create there (saves, settings, mods), and
+# Refresh dist/project-blue-moon-windows, keeping what players create there (saves, settings, mods), and
 # only while nothing runs from it: deleting a running launcher's files breaks it.
-play=dist/tsuki-windows
+play=dist/project-blue-moon-windows
 running=$(powershell -NoProfile -Command \
     "@(Get-Process | Where-Object { \$_.Path -like '$(cygpath -w "$PWD/$play")\\*' }).Count" | tr -d '\r')
 if [[ ${running:-0} != 0 ]]; then
-    echo "dist/tsuki-windows is in use ($running processes): not refreshed; the zip is ready." >&2
+    echo "dist/project-blue-moon-windows is in use ($running processes): not refreshed; the zip is ready." >&2
 else
     mkdir -p "$play"
     find "$play" -mindepth 1 -maxdepth 1 ! -name user ! -name mods ! -name tsuki.ini \
         ! -name mods.json ! -name patches.json -exec rm -rf {} +
     cp -r "$dest/." "$play/"
 fi
-du -sh "$dest" dist/tsuki-windows.zip
+du -sh "$dest" dist/project-blue-moon-windows.zip

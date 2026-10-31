@@ -83,6 +83,16 @@ class PublicNameTest(unittest.TestCase):
         self.assertIn('Project Blue Moon.exe', text)
         self.assertNotIn('Tsukihime', text)
 
+    def test_the_windows_package_uses_the_public_names(self):
+        script = (ROOT / 'packaging' / 'windows' / 'package.sh').read_text(encoding='utf-8')
+        for name in ('--name "Project Blue Moon"', 'Play Project Blue Moon.exe', 'dist/project-blue-moon-windows.zip',
+                     'out/pyi-dist/Project Blue Moon/'):
+            self.assertIn(name, script)
+        self.assertNotIn('Tsukihime', script)
+        self.assertNotIn('tsuki-windows', script)
+        # patches/ is gone since Spec 1a; copying it stopped the package.
+        self.assertNotIn('patches "$dest/"', script)
+
     def test_the_shortcuts_are_named_after_the_port(self):
         text = (ROOT / 'launcher' / 'tsuki_launcher_win.py').read_text(encoding='utf-8')
         for old in ('Tsukihime.lnk', 'Tsukihime.desktop', 'Tsukihime.exe'):

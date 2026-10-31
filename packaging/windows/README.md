@@ -1,4 +1,4 @@
-# tsuki on Windows
+# Project Blue Moon on Windows
 
 The port builds and runs natively on 64-bit Windows 10 (1903+) / 11 with the same sources as
 on Linux. Players: see `README-Windows.txt` (it ships in the package).
@@ -22,27 +22,38 @@ Then, in the repository:
 
 ```bash
 git submodule update --init --recursive
-bash build.sh                      # out/tsuki-probe.exe, out/tsuki-gpu-capabilities.exe
+bash build.sh                      # out/tsuki-probe.exe, out/tsuki-gpu-capabilities.exe, out/tsuki-play.exe
 TSUKI_GAME_DIR=F:/path/to/CUSA47999 python run.py
 python launcher/tsuki_launcher_win.py
-bash packaging/windows/package.sh  # dist/tsuki-windows/ and .zip: Tsukihime.exe + DLLs
+bash packaging/windows/package.sh  # dist/project-blue-moon-windows/ and .zip: Project Blue Moon.exe + DLLs
 ```
 
 `run.py` is the Windows `run.sh` (same variables; works from a plain Windows Python too).
 The package freezes the launcher with PyInstaller (a private venv in `out/pyenv`, from a
-python.org Python) into `Tsukihime.exe`, which also runs `run.py` (`--run`), the preparation
+python.org Python) into `Project Blue Moon.exe`, which also runs `run.py` (`--run`), the preparation
 scripts (`--script`) and the game without the window (`--play`): players need no Python.
 The venv also receives `iced-x86`, which `scripts/isa_rewrite.py` uses for CPUs without MOVBE,
 BMI1 or LZCNT.
-`Play Tsukihime.exe` (`packaging/windows/play.c`) is a small native program that runs
-`Tsukihime.exe --play` from its folder and waits for it, for players who want to start the
+`Play Project Blue Moon.exe` (`packaging/windows/play.c`) is a small native program that runs
+`Project Blue Moon.exe --play` from its folder and waits for it, for players who want to start the
 game directly with the saved settings.
 From a source tree it adds `C:\msys64\clang64\bin` (or `$MSYS2_ROOT`) to `PATH` for the DLLs.
+
+### Cross build from Linux
+
+The same executables build on Linux, without a Windows PC: `bash build.sh --windows` fetches
+[llvm-mingw](https://github.com/mstorsjo/llvm-mingw) and the MSYS2 CLANG64 packages above into `out/cross/`
+(`tools/cross_windows_env.sh`, pinned versions with their SHA256) and builds `out/tsuki-probe.exe`,
+`out/tsuki-gpu-capabilities.exe` and `out/tsuki-play.exe` in `out/gpu-win` with
+`packaging/windows/cross-toolchain.cmake`. It has the ABI of CLANG64 (clang, libc++, UCRT). To run them, the DLLs
+of `out/cross/sysroot/clang64/bin` and `out/cross/llvm-mingw/x86_64-w64-mingw32/bin` go beside them.
+`package.sh` still needs MSYS2 (`cygpath`, PowerShell and a Windows Python for PyInstaller). Details, in
+Spanish: `docs/ENTORNO.md` §8.
 
 The launcher texts are written in English with the Russian beside them; the other languages
 are in `launcher/tsuki_lang.py` (one list per language in the order of `KEYS`; a missing or
 empty text falls back to English). The icon (`launcher/tsuki.ico`/`.png`) is drawn by
-`packaging/windows/make_icon.py` and built into `Tsukihime.exe`, `tsuki-probe.exe` (the game
+`packaging/windows/make_icon.py` and built into `Project Blue Moon.exe`, `tsuki-probe.exe` (the game
 window) and `tsuki-gpu-capabilities.exe`.
 
 ## What is different from Linux
