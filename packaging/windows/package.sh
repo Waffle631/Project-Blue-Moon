@@ -88,8 +88,9 @@ for exe in tsuki-probe.exe tsuki-gpu-capabilities.exe; do
 done
 # Every DLL the executables load from the CLANG64 tree (SDL3, FFmpeg, Vulkan loader, ...).
 if [[ -n ${cross:-} ]]; then
-    # No ldd for Windows programs here: each import table is followed through llvm-mingw (libc++,
-    # libunwind, winpthreads, which the cross build links) and the sysroot. What neither has is Windows'.
+    # No ldd for Windows programs here: each import table is followed through MSYS2's libc++ and libunwind
+    # (tools/cross_windows_env.sh: the MSYS2 DLLs need its libc++.dll), llvm-mingw (winpthreads, which the cross
+    # build links) and the sysroot. What none has is Windows'.
     declare -A seen
     queue=("$dest/bin/tsuki-probe.exe" "$dest/bin/tsuki-gpu-capabilities.exe")
     while ((${#queue[@]})); do
@@ -98,7 +99,7 @@ if [[ -n ${cross:-} ]]; then
         while read -r dll; do
             [[ ${seen[${dll,,}]:-} ]] && continue
             seen[${dll,,}]=1
-            for dir in "$cross/llvm-mingw/x86_64-w64-mingw32/bin" "$cross/sysroot/clang64/bin"; do
+            for dir in "$cross/runtime/clang64/bin" "$cross/llvm-mingw/x86_64-w64-mingw32/bin" "$cross/sysroot/clang64/bin"; do
                 [[ -f $dir/$dll ]] || continue
                 cp "$dir/$dll" "$dest/bin/"
                 queue+=("$dir/$dll")
@@ -111,6 +112,28 @@ else
         awk '/\/clang64\/bin\// {print $3}' | sort -u | while read -r dll; do
             cp -u "$dll" "$dest/bin/"
         done
+fi
+# Every function a shipped file imports from a shipped DLL must be exported by it. Wine stubs a missing one and
+# goes on; Windows refuses to start the program (0xC0000139, STATUS_ENTRYPOINT_NOT_FOUND).
+missing=$(for file in "$dest"/bin/*.dll "$dest"/bin/*.exe; do
+        echo "FILE ${file##*/}"; "$tools/llvm-objdump" -p "$file"
+    done | awk '
+        /^FILE / {file = tolower($2); table = ""; next}
+        /^Export Table:/ {table = "export"; next}
+        /DLL Name:/ {table = "import"; dll = tolower($3); next}
+        table == "export" && /^[ \t]+[0-9]+[ \t]+0x[0-9a-f]+[ \t]+[^ \t]+/ {exports[file, $3] = 1; next}
+        table == "import" && NF == 2 && $1 ~ /^[0-9]+$/ {imports[++n] = file " " dll " " $2}
+        END {
+            for (key in exports) { split(key, k, SUBSEP); shipped[k[1]] = 1 }
+            for (i = 1; i <= n; i++) {
+                split(imports[i], f, " ")
+                if ((f[2] in shipped) && !((f[2], f[3]) in exports)) print imports[i]
+            }
+        }')
+if [[ -n $missing ]]; then
+    echo "Imports no shipped DLL exports (file, DLL, function):" >&2
+    echo "$missing" >&2
+    exit 1
 fi
 cp -r scripts "$dest/"
 cp run.py LICENSE README.md packaging/windows/README-Windows.txt "$dest/"

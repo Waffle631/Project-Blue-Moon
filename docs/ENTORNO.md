@@ -221,6 +221,10 @@ El port de Windows se compila desde la distrobox, sin un PC con Windows (Spec 8 
 
 - `out/cross/llvm-mingw/`: el compilador, [llvm-mingw](https://github.com/mstorsjo/llvm-mingw) 20261020 para host
   Linux x86_64 y UCRT. Tiene el mismo ABI que MSYS2 CLANG64 (clang, libc++, UCRT) y la misma versión de LLVM (23.1.4).
+- `out/cross/runtime/clang64/bin/`: solo `libc++.dll` y `libunwind.dll` de MSYS2 (lista `RUNTIME` del script), que
+  son las que lleva el paquete. Las DLL de MSYS2 importan `_Unwind_Resume` de `libc++.dll`: la de MSYS2 lo exporta y
+  la de llvm-mingw no (lo tiene solo `libunwind.dll`). Wine rellena esa importación con un stub y sigue; Windows no
+  arranca el programa (código 3221225785, `0xC0000139`, «no se encontró el punto de entrada»).
 - `out/cross/sysroot/clang64/`: los paquetes de MSYS2 CLANG64 de `packaging/windows/README.md` y sus dependencias
   (134 paquetes; el ffmpeg de MSYS2 arrastra la mayoría), extraídos de `repo.msys2.org`. Son los mismos binarios que
   usa un build nativo. Se dejan fuera los que ya trae llvm-mingw (CRT, headers, winpthreads, libc++, libunwind,
@@ -234,8 +238,8 @@ bash build.sh --windows                       # todo lo anterior y el build: out
 cmake -S gpu -B out/gpu-win -G Ninja -DCMAKE_TOOLCHAIN_FILE=$PWD/packaging/windows/cross-toolchain.cmake
 ```
 
-Las versiones son fijas: llvm-mingw en las variables `LLVM_MINGW*` y los paquetes de MSYS2 en la lista `LOCK` del
-final del script, cada uno con su SHA256. MSYS2 retira del repositorio las versiones viejas al cabo de un tiempo: si
+Las versiones son fijas: llvm-mingw en las variables `LLVM_MINGW*` y los paquetes de MSYS2 en las listas `LOCK` y
+`RUNTIME` del final del script, cada uno con su SHA256 (`--update-lock` reescribe las dos). MSYS2 retira del repositorio las versiones viejas al cabo de un tiempo: si
 una descarga da 404, `--update-lock` pasa a las actuales (y conviene subir llvm-mingw a la release con el mismo LLVM
 que el `clang` de MSYS2). Cuando la lista cambia, el sysroot se extrae de nuevo entero.
 
@@ -248,8 +252,9 @@ headers de MSYS2; los de llvm-mingw dan Windows 7 y esconden APIs como `CreateFi
 cambia la carpeta `out/cross`.
 
 `build.sh --windows` compila en `out/gpu-win` (log en `out/gpu-win-build.log`), sin PGO ni LTO, como el build de MSYS2, y
-copia los tres `.exe` a `out/`. Para ejecutarlos hacen falta las DLL de `out/cross/sysroot/clang64/bin` y las de
-`out/cross/llvm-mingw/x86_64-w64-mingw32/bin` (`libc++.dll`, `libunwind.dll`, `libwinpthread-1.dll`).
+copia los tres `.exe` a `out/`. Para ejecutarlos hacen falta las DLL de `out/cross/runtime/clang64/bin` (`libc++.dll`,
+`libunwind.dll`), la `libwinpthread-1.dll` de `out/cross/llvm-mingw/x86_64-w64-mingw32/bin` y las de
+`out/cross/sysroot/clang64/bin`.
 
 No hace falta ningún paquete nuevo en la distrobox: el script usa `curl`, `tar`, `xz`, `zstd`, `sha256sum` y
 `python3`, que ya están. `file` lo pide appimagetool (sección 9).
@@ -264,8 +269,10 @@ En Linux, `package.sh` usa Wine: `wine` si está en el `PATH`, si no el Flatpak 
 la distrobox llama al del host), con el prefijo `out/wine-prefix/` (`WINEPREFIX` lo cambia) y acceso solo al repo.
 La primera vez instala ahí Python 3.14.10 de python.org (el instalador queda en `out/cross/downloads/`, con su SHA256
 en el script; python.org solo publica firmas sigstore) y crea el venv `out/pyenv/` con PyInstaller, Pillow e
-iced-x86. Las DLL salen de las tablas de importación (`llvm-objdump -p`) de llvm-mingw y del sysroot, y el `.zip` se
-hace con Python. Primera pasada, ~40 s; las siguientes, ~16 s.
+iced-x86. Las DLL salen de las tablas de importación (`llvm-objdump -p`), buscadas por este orden en
+`out/cross/runtime`, llvm-mingw (`libwinpthread-1.dll`) y el sysroot. Después, `package.sh` comprueba que cada función
+que un archivo del paquete importa de una DLL del paquete esté en las exportaciones de esa DLL, y si falta alguna
+para con su lista: es el fallo que Wine no enseña. El `.zip` se hace con Python. Primera pasada, ~40 s; las siguientes, ~16 s.
 
 ## 9. AppImage de Linux
 

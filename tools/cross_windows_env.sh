@@ -2,12 +2,15 @@
 # tools/cross_windows_env.sh [--update-lock]: the toolchain for building the Windows port from Linux
 # (docs/specs/2026-10-30-spec-8-alpha.md §4 A1). Everything lives in out/cross/ (not versioned):
 #   llvm-mingw/   the compiler: llvm-mingw for a Linux x86_64 host, UCRT. Same ABI as MSYS2 CLANG64 (clang, libc++,
-#                 UCRT) and the same LLVM version, so the MSYS2 DLLs run against its libc++.dll and libunwind.dll
+#                 UCRT) and the same LLVM version
 #   sysroot/      the MSYS2 CLANG64 packages of packaging/windows/README.md and their dependencies, extracted
 #                 (sysroot/clang64/{bin,include,lib,share}); the same binaries a native MSYS2 build uses
+#   runtime/      only the DLLs of MSYS2's libc++ and libunwind (runtime/clang64/bin), which the package ships: the MSYS2
+#                 DLLs import _Unwind_Resume from libc++.dll, and llvm-mingw's exports it from libunwind.dll only.
+#                 Wine stubs such an import and goes on; Windows refuses to start (0xC0000139)
 #   downloads/    the archives, kept so a second run downloads nothing
-# The versions are fixed: llvm-mingw below, and the MSYS2 packages in the LOCK list at the end, each with its
-# SHA256. --update-lock resolves that list again from the current clang64.db and rewrites it in this file; only the
+# The versions are fixed: llvm-mingw below, and the MSYS2 packages in the LOCK and RUNTIME lists at the end, each with
+# its SHA256. --update-lock resolves both lists again from the current clang64.db and rewrites them in this file; only the
 # libraries of the README are roots, because the build runs Linux's cmake, ninja, pkg-config, glslang and Python
 # (packaging/windows/cross-toolchain.cmake). The packages llvm-mingw already provides (CRT, headers, winpthreads,
 # libc++, libunwind, compiler-rt) are left out: their headers in the sysroot would shadow the compiler's own.
@@ -24,6 +27,7 @@ MSYS2_REPO=https://repo.msys2.org/mingw/clang64
 ROOTS='vulkan-headers vulkan-loader vulkan-memory-allocator sdl3 fmt boost robin-map xxhash ffmpeg zydis
        spirv-tools spirv-headers spirv-cross'
 PROVIDED='crt headers winpthreads libwinpthread libc++ libunwind compiler-rt'
+RUNTIME='libc++ libunwind'
 mkdir -p "$C/downloads"
 
 # fetch <file> <url> <sha256>: downloads into downloads/ unless a file with that checksum is already there.
@@ -41,9 +45,10 @@ if [[ ${1:-} == --update-lock ]]; then
     curl -fsSL --retry 3 -o "$C/downloads/clang64.db" "$MSYS2_REPO/clang64.db"
     zstd -qdcf "$C/downloads/clang64.db" > "$C/downloads/clang64.db.tar"
     # The database is downloaded data: parsed with an isolated interpreter from this script, not run.
-    python3 -I - "$C/downloads/clang64.db.tar" "$SELF" "$ROOTS" "$PROVIDED" <<'EOF'
+    python3 -I - "$C/downloads/clang64.db.tar" "$SELF" "$ROOTS" "$PROVIDED" "$RUNTIME" <<'EOF'
 import re, sys, tarfile
 db, script, roots, provided = sys.argv[1], sys.argv[2], sys.argv[3].split(), set(sys.argv[4].split())
+runtime = sys.argv[5].split()
 prefix = 'mingw-w64-clang-x86_64-'
 packages, provides = {}, {}
 with tarfile.open(db) as tar:
@@ -63,12 +68,14 @@ while queue:
     if name in wanted or bare(name) in provided: continue
     if name not in packages: sys.exit(f'error: {name} no está en clang64.db')
     wanted[name] = packages[name]; queue += packages[name].get('DEPENDS', [])
-lock = ''.join(f"{fields['FILENAME'][0]} {fields['SHA256SUM'][0]}\n" for _, fields in sorted(wanted.items()))
+def listing(fields): return ''.join(f"{f['FILENAME'][0]} {f['SHA256SUM'][0]}\n" for f in fields)
 text = open(script).read()
-text, count = re.subn(r"(<<'LOCK'\n).*?^(?=LOCK$)", lambda m: m.group(1) + lock, text, count=1, flags=re.S | re.M)
-if count != 1: sys.exit(f'error: no se encontró la lista LOCK en {script}')
+for name, fields in (('LOCK', [f for _, f in sorted(wanted.items())]), ('RUNTIME', [packages[prefix + p] for p in runtime])):
+    text, count = re.subn(rf"(<<'{name}'\n).*?^(?={name}$)", lambda m: m.group(1) + listing(fields), text, count=1,
+                          flags=re.S | re.M)
+    if count != 1: sys.exit(f'error: no se encontró la lista {name} en {script}')
+    print(f'{name}: {len(fields)} paquetes escritos en {script}')
 open(script, 'w').write(text)
-print(f'LOCK: {len(wanted)} paquetes escritos en {script}')
 EOF
     rm -f "$C/downloads/clang64.db.tar"; exit 0
 fi
@@ -233,3 +240,23 @@ for line in "${lines[@]}"; do
     echo "${file%-any.pkg.tar.zst}: $state"
 done
 [[ -f $C/sysroot/.lock ]] || echo "$packages" > "$C/sysroot/.lock"
+
+# The libc++ and libunwind DLLs of MSYS2 (header comment): only clang64/bin/*.dll, outside the sysroot, whose
+# headers would shadow the compiler's.
+runtime=$(cat <<'RUNTIME'
+mingw-w64-clang-x86_64-libc++-23.1.4-2-any.pkg.tar.zst 21361dbc52905468fbbcf32c7721274d598d004c9da739c44e1ed90b06583d2c
+mingw-w64-clang-x86_64-libunwind-23.1.4-2-any.pkg.tar.zst a4c8b58137445f4ba6d753838397d78673204af68573c3847b3bd25b741eeba3
+RUNTIME
+)
+mapfile -t lines <<< "$runtime"
+if [[ $(cat "$C/runtime/.lock" 2>/dev/null) != "$runtime" ]]; then rm -rf "$C/runtime"; fi
+mkdir -p "$C/runtime"
+for line in "${lines[@]}"; do
+    read -r file sum <<< "$line"
+    state=$(fetch "$file" "$MSYS2_REPO/$file" "$sum")
+    if [[ ! -f $C/runtime/.lock ]]; then
+        tar --zstd -xf "$C/downloads/$file" -C "$C/runtime" --wildcards 'clang64/bin/*.dll'
+    fi
+    echo "${file%-any.pkg.tar.zst} (runtime): $state"
+done
+[[ -f $C/runtime/.lock ]] || echo "$runtime" > "$C/runtime/.lock"

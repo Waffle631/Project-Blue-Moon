@@ -46,10 +46,13 @@ The same executables build on Linux, without a Windows PC: `bash build.sh --wind
 (`tools/cross_windows_env.sh`, pinned versions with their SHA256) and builds `out/tsuki-probe.exe`,
 `out/tsuki-gpu-capabilities.exe` and `out/tsuki-play.exe` in `out/gpu-win` with
 `packaging/windows/cross-toolchain.cmake`. It has the ABI of CLANG64 (clang, libc++, UCRT). To run them, the DLLs
-of `out/cross/sysroot/clang64/bin` and `out/cross/llvm-mingw/x86_64-w64-mingw32/bin` go beside them.
+of `out/cross/runtime/clang64/bin` (MSYS2's `libc++.dll` and `libunwind.dll`: the MSYS2 DLLs import `_Unwind_Resume`
+from `libc++.dll`, which llvm-mingw's does not export), `out/cross/llvm-mingw/x86_64-w64-mingw32/bin`
+(`libwinpthread-1.dll`) and `out/cross/sysroot/clang64/bin` go beside them.
 `bash packaging/windows/package.sh` then makes the same package on Linux: it installs a python.org Python into a
 Wine prefix (`out/wine-prefix`) on the first run and freezes the launcher there, follows the import tables of the
-`.exe` files for their DLLs, and zips with Python. Wine is `wine` when it is on the `PATH`, else the
+`.exe` files for their DLLs, checks that every function a shipped file imports from a shipped DLL is exported by it
+(Wine runs a program that fails that check; Windows does not), and zips with Python. Wine is `wine` when it is on the `PATH`, else the
 `org.winehq.Wine` Flatpak (`WINE` names another command). Details, in Spanish: `docs/ENTORNO.md` §8.
 
 The launcher texts are written in English with the Russian beside them; the other languages
