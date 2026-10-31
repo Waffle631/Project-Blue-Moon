@@ -69,7 +69,7 @@ void runtime_start(uint64_t flags) {
 }
 /* No stdio: the watchdog (probe.c) writes this line from its signal handler. */
 size_t runtime_gpu_stats_line(char *out, size_t size) {
-    Gow3GpuStats stats; gow3gpu_get_stats(&stats);
+    TsukiGpuStats stats; tsukigpu_get_stats(&stats);
     const char *names[] = {"GPU: submits=", " draws=", " dispatches=", " flips=", " unimplemented="};
     const uint64_t values[] = {stats.submits, stats.draws, stats.dispatches, stats.flips, stats.unimplemented};
     size_t n = 0;
@@ -282,7 +282,7 @@ uintptr_t runtime_resolve(const char *name, int is_data) {
     if (save) return save;
     uintptr_t file = runtime_file_resolve(name);
     if (file) return file;
-    return gow3gpu_resolve(name);
+    return tsukigpu_resolve(name);
 }
 static const struct { const char *nid, *symbol; } import_names[]={
 #include "import_names.inc"

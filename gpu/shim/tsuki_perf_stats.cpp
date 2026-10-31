@@ -14,7 +14,7 @@
 #include <psapi.h>
 #endif
 
-namespace Gow3PerfStats {
+namespace TsukiPerfStats {
 
 namespace {
 
@@ -144,4 +144,4 @@ Sample Latest() {
     return latest;
 }
 
-} // namespace Gow3PerfStats
+} // namespace TsukiPerfStats

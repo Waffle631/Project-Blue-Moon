@@ -12,7 +12,7 @@
 #include "../gpu/shim/tsuki_png.h"
 #include "../gpu/shim/tsuki_screenshot.h"
 
-using namespace Gow3Screenshot;
+using namespace TsukiScreenshot;
 
 static void frame_lists() {
     std::set<std::uint64_t> frames;
@@ -82,7 +82,7 @@ static std::vector<std::uint8_t> Gradient(PixelOrder order) {
     return pixels;
 }
 
-static void CheckGradient(const Gow3Png::Image& image) {
+static void CheckGradient(const TsukiPng::Image& image) {
     assert(image.width == int(kWidth) && image.height == int(kHeight));
     for (std::uint32_t y = 0; y < kHeight; ++y) {
         for (std::uint32_t x = 0; x < kWidth; ++x) {
@@ -97,17 +97,17 @@ static void encoding() {
         const std::vector<std::uint8_t> pixels = Gradient(order);
         std::vector<std::uint8_t> png;
         assert(EncodePng(pixels.data(), kWidth, kHeight, order, png) && png.size() > 8);
-        Gow3Png::Image image;
-        assert(Gow3Png::DecodeRgba(png.data(), png.size(), image));
+        TsukiPng::Image image;
+        assert(TsukiPng::DecodeRgba(png.data(), png.size(), image));
         CheckGradient(image);
     }
     // The order matters: BGRA bytes encoded as RGBA swap red and blue.
     {
         const std::vector<std::uint8_t> pixels = Gradient(PixelOrder::Bgra);
         std::vector<std::uint8_t> png;
-        Gow3Png::Image image;
+        TsukiPng::Image image;
         assert(EncodePng(pixels.data(), kWidth, kHeight, PixelOrder::Rgba, png) &&
-               Gow3Png::DecodeRgba(png.data(), png.size(), image));
+               TsukiPng::DecodeRgba(png.data(), png.size(), image));
         assert(image.rgba[0] == Blue(0, 0) && image.rgba[2] == Red(0, 0) && Red(0, 0) != Blue(0, 0));
     }
     std::vector<std::uint8_t> png = {1};
@@ -119,7 +119,7 @@ static void encoding() {
 
 static void saving() {
     const std::filesystem::path root =
-        std::filesystem::temp_directory_path() / ("gow3-screenshot-test-" + std::to_string(getpid()));
+        std::filesystem::temp_directory_path() / ("tsuki-screenshot-test-" + std::to_string(getpid()));
     std::filesystem::remove_all(root);
     const std::filesystem::path dir = root / "nested" / "baseline"; // created on demand
     const std::vector<std::uint8_t> pixels = Gradient(PixelOrder::Bgra);
@@ -127,8 +127,8 @@ static void saving() {
     std::string error;
     assert(SavePng(dir, 120, pixels.data(), kWidth, kHeight, PixelOrder::Bgra, written, error));
     assert(error.empty() && written == dir / "frame_000120_7x5.png");
-    Gow3Png::Image image;
-    assert(Gow3Png::LoadRgba(written.string().c_str(), image));
+    TsukiPng::Image image;
+    assert(TsukiPng::LoadRgba(written.string().c_str(), image));
     CheckGradient(image);
     // Only the finished file is left behind.
     std::size_t entries = 0;

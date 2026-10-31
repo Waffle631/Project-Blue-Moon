@@ -48,7 +48,7 @@ public:
 
     void Draw(bool is_indexed, u32 index_offset = 0, const PreparedDraw* prepared = nullptr);
 
-    /// gow3: draw preparation workers (vk_draw_prep.h), fed and consumed by Liverpool.
+    /// tsuki: draw preparation workers (vk_draw_prep.h), fed and consumed by Liverpool.
     DrawPreparation& GetDrawPreparation() {
         return *draw_prep;
     }
@@ -84,7 +84,7 @@ public:
         scheduler.WaitHostCopies();
     }
 
-    /// gow3: GPU command thread: waits until the draw recording thread has recorded every
+    /// tsuki: GPU command thread: waits until the draw recording thread has recorded every
     /// draw handed to it (vk_draw_pipe.h); no-op on other threads.
     /// `line`/`function`: the caller, for the statistics of where stage A waits.
     void DrainDrawPipe(u32 reason = DrawPipe::ReasonRasterizer, u32 line = __builtin_LINE(),
@@ -94,7 +94,7 @@ public:
     using OrderedTask = void (*)(Rasterizer& rasterizer, const u8* data);
     /// Returns true when the task was handed to the recording thread (not run yet).
     bool RunInOrder(OrderedTask task, const void* data, u32 size,
-                    u64 toggle = Gow3Toggle::PipelinedTasks);
+                    u64 toggle = TsukiToggle::PipelinedTasks);
     /// Stage A: the draw pipe position after the last handed-over packet, and whether the
     /// recording thread has run everything before a position.
     [[nodiscard]] u64 DrawPipeHead() const {
@@ -159,7 +159,7 @@ private:
     void PrepareRenderState(const GraphicsPipeline* pipeline);
     RenderState BeginRendering(const GraphicsPipeline* pipeline);
     RenderState BeginRenderingFull(const GraphicsPipeline* pipeline);
-    /// gow3: a draw continuing the open render pass with the same inputs gets the same render
+    /// tsuki: a draw continuing the open render pass with the same inputs gets the same render
     /// state (RenderStateMemo); nothing can have broken the pass in between (barriers, copies and
     /// dispatches end it).
     struct BeginSignature {
@@ -188,7 +188,7 @@ private:
     void UpdateDynamicState(const GraphicsPipeline* pipeline, bool is_indexed) const;
     void UpdateViewportScissorState() const;
     void UpdateDepthStencilState() const;
-    /// gow3: the squaring pipeline of a scaled MIN/MAX blend when this draw can use it.
+    /// tsuki: the squaring pipeline of a scaled MIN/MAX blend when this draw can use it.
     vk::Pipeline SquarePass(const GraphicsPipeline& pipeline) const;
     void UpdatePrimitiveState(bool is_indexed) const;
     void UpdateRasterizationState() const;
@@ -242,7 +242,7 @@ private:
     bool BindResources(const Pipeline* pipeline);
     void BindSamplers(const Shader::Info& stage, const PreparedStage* prepared,
                       Shader::Backend::Bindings& binding, u32& write_index);
-    /// gow3: a stage's resolved textures remembered by its prepared T# hashes
+    /// tsuki: a stage's resolved textures remembered by its prepared T# hashes
     /// (TextureSetMemo): a hit only redoes the per-draw effects (binding flags, transitions).
     struct TextureSetEntry {
         VideoCore::ImageId id{}; ///< after the depth redirect; null descriptor when invalid
@@ -276,7 +276,7 @@ private:
     static void RunTextureTask(void* rasterizer);
     static void JoinBindHelper(void* rasterizer);
 
-    /// Display pass: counts the frame (Gow3Stats::gpu_frames) and, with TSUKI_BUFFER_STATS, the
+    /// Display pass: counts the frame (TsukiStats::gpu_frames) and, with TSUKI_BUFFER_STATS, the
     /// lag.
     void NoteFrameStart();
     /// TSUKI_GPU_PROFILE: a timestamp where a render pass starts (vk_gpu_profiler.h).
@@ -284,7 +284,7 @@ private:
     void BindVertexBuffers(const GraphicsPipeline* pipeline,
                            const PreparedDraw* prepared = nullptr);
     void BindIndexBuffer(u32 index_offset = 0);
-    /// gow3: BindVertexBuffers/BindIndexBuffer in two halves: obtaining the buffers
+    /// tsuki: BindVertexBuffers/BindIndexBuffer in two halves: obtaining the buffers
     /// (vertex_binds, index_bind) and recording the binds.
     void ResolveVertexBuffers(const GraphicsPipeline* pipeline, const PreparedDraw* prepared);
     void EmitVertexBuffers();
@@ -321,7 +321,7 @@ private:
     boost::container::static_vector<vk::DescriptorImageInfo, Shader::NUM_IMAGES> image_infos;
     boost::container::static_vector<vk::DescriptorBufferInfo, Shader::NUM_BUFFERS> buffer_infos;
     boost::container::static_vector<VideoCore::ImageId, Shader::NUM_IMAGES> bound_images;
-    /// gow3 diagnostics (TSUKI_DIAG_IMAGES=1, draw pipe off): while a frame capture records, the
+    /// tsuki diagnostics (TSUKI_DIAG_IMAGES=1, draw pipe off): while a frame capture records, the
     /// color targets of a pass are written to files when the next pass or dispatch begins.
     void DiagPassBoundary(bool force);
     std::array<VAddr, 8> diag_addresses{};
@@ -339,11 +339,11 @@ private:
     Pipeline::DescriptorWrites set_writes;
     Shader::PushData push_data;
 
-    // gow3: bindings point at their description instead of copying it (a hot spot): into
+    // tsuki: bindings point at their description instead of copying it (a hot spot): into
     // image_desc_cache for memoized lookups (pinned for the current BindTextures call), else
     // into image_desc_storage.
     using ImageBindingInfo = std::pair<VideoCore::ImageId, const VideoCore::TextureCache::ImageDesc*>;
-    // gow3: texture descriptions depend only on the T# and three resource flags; building
+    // tsuki: texture descriptions depend only on the T# and three resource flags; building
     // them (mip layout sizes) for every binding of every draw was a hot spot.
     struct ImageDescCacheEntry {
         std::array<u64, 4> sharp{};
@@ -366,7 +366,7 @@ private:
     boost::container::static_vector<VideoCore::TextureCache::ImageDesc, Shader::NUM_IMAGES * 2>
         image_desc_storage;
     u64 bind_epoch = 0;
-    // gow3: render/depth target lookups memoized by their raw register bytes while image
+    // tsuki: render/depth target lookups memoized by their raw register bytes while image
     // registrations are unchanged (the descriptions depend only on those registers).
     struct TargetMemo {
         std::array<u8, 256> key{};
@@ -376,7 +376,7 @@ private:
         VideoCore::TextureCache::ImageDesc desc;
     };
     std::array<TargetMemo, 64> target_memo{};
-    // gow3: consecutive draws mostly keep their targets; the slot's description (cb_descs,
+    // tsuki: consecutive draws mostly keep their targets; the slot's description (cb_descs,
     // db_desc) is then still the right one and is neither looked up nor copied.
     struct LastTarget {
         std::array<u8, 256> key{};
@@ -426,7 +426,7 @@ private:
         bool pending;
         bool resolved;
     } draw_inputs{};
-    // gow3: textures of a draw bound on the helper thread while this thread binds buffers.
+    // tsuki: textures of a draw bound on the helper thread while this thread binds buffers.
     static bool BindHelperWanted();
     BindHelper bind_helper{BindHelperWanted()};
     struct TextureTask {
@@ -448,7 +448,7 @@ private:
     bool fault_process_pending{};
     bool attachment_feedback_loop{};
     bool needs_barrier{};
-    // gow3: two-stage draw pipeline (stage B state; the thread is the last member so it
+    // tsuki: two-stage draw pipeline (stage B state; the thread is the last member so it
     // stops first).
     static inline thread_local const AmdGpu::Regs* stage_regs = nullptr;
     static inline thread_local const AmdGpu::ComputeProgram* stage_cs = nullptr;

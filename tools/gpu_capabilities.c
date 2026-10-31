@@ -1,4 +1,4 @@
-/* gow3-gpu-capabilities --list: the Vulkan devices for the launcher's GPU choice, with the game's
+/* tsuki-gpu-capabilities --list: the Vulkan devices for the launcher's GPU choice, with the game's
  * multisampling default on each. */
 #include <stdio.h>
 #include <stdlib.h>
@@ -43,7 +43,7 @@ int main(int argc, char **argv) {
     }
     const VkApplicationInfo app = {
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-        .pApplicationName = "gow3 GPU list",
+        .pApplicationName = "tsuki GPU list",
         .apiVersion = VK_API_VERSION_1_3,
     };
     const VkInstanceCreateInfo create = {
@@ -92,7 +92,7 @@ int main(int argc, char **argv) {
                props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU     ? "discrete"
                : props.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU ? "integrated"
                                                                              : "other",
-               gow3_no_msaa_default(driver.driverID) ? "off" : "on", devices[i] == preferred);
+               tsuki_no_msaa_default(driver.driverID) ? "off" : "on", devices[i] == preferred);
     }
     free(devices);
     vkDestroyInstance(instance, NULL);

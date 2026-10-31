@@ -1,6 +1,6 @@
 # Packaged port: the prebuilt game binaries (build.sh first), the start-up scripts and the GTK4
 # launcher, with their whole Nix closure and Mesa's Vulkan drivers. `bash packaging/appimage.sh`
-# turns it into an AppImage (Steam Deck); `nix-build packaging` alone gives result/bin/gow3.
+# turns it into an AppImage (Steam Deck); `nix-build packaging` alone gives result/bin/tsuki.
 { pkgs ? import <nixpkgs> { }
   # Store paths the prebuilt binaries load libraries from (their RUNPATHs), written by
   # appimage.sh. Nix only finds references to its inputs, and the binaries were built outside.
@@ -12,10 +12,10 @@ let
   assetDirs = [ "scripts" "patches" "launcher" ];
   # Only what the package needs (the tree also holds builds, profiles and captures).
   wanted = [
-    "run.sh" "out" "out/gow3-probe" "out/gow3-gpu-capabilities" "out/gpu" "out/gpu/libgow3gpu.so"
+    "run.sh" "out" "out/tsuki-probe" "out/tsuki-gpu-capabilities" "out/gpu" "out/gpu/libtsukigpu.so"
   ] ++ assetDirs;
   src = builtins.path {
-    name = "gow3-src";
+    name = "tsuki-src";
     path = root;
     filter = path: type:
       let rel = lib.removePrefix (toString root + "/") (toString path);
@@ -30,7 +30,7 @@ let
   # Fonts: bundled DejaVu and Adwaita plus the host's usual font directories, but not the host's
   # /etc/fonts: on NixOS it names fonts in the host's /nix/store, which the AppImage hides behind
   # its own store in some environments (Steam's FHS sandbox), and the launcher showed boxes.
-  fontsConf = pkgs.writeText "gow3-fonts.conf" ''
+  fontsConf = pkgs.writeText "tsuki-fonts.conf" ''
     <?xml version="1.0"?>
     <!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
     <fontconfig>
@@ -39,7 +39,7 @@ let
       <dir>/usr/share/fonts</dir>
       <dir>/usr/local/share/fonts</dir>
       <dir prefix="xdg">fonts</dir>
-      <cachedir prefix="xdg">gow3/fontconfig</cachedir>
+      <cachedir prefix="xdg">tsuki/fontconfig</cachedir>
       <include ignore_missing="yes">${pkgs.fontconfig.out}/etc/fonts/conf.d</include>
     </fontconfig>
   '';
@@ -55,7 +55,7 @@ let
   '';
 in
 pkgs.stdenv.mkDerivation {
-  pname = "gow3";
+  pname = "tsuki";
   version = "0.1";
   inherit src;
   nativeBuildInputs = [ pkgs.makeShellWrapper pkgs.wrapGAppsHook4 pkgs.gobject-introspection ];
@@ -65,36 +65,36 @@ pkgs.stdenv.mkDerivation {
   dontConfigure = true;
   # The binaries live under share/ (next to the scripts run.sh expects): strip them too, which
   # also drops the compiler and header paths their debug info would keep in the closure.
-  stripDebugList = [ "share/gow3/bin/gpu" ];
+  stripDebugList = [ "share/tsuki/bin/gpu" ];
   # patchelf (RPATH shrinking) corrupts the non-PIE game binary's symbol versions; it finds
   # its library through $ORIGIN/gpu and its other libraries through the build's RUNPATH.
   dontPatchELF = true;
   dontWrapGApps = true; # wrapped once below, together with the launcher's own variables
   installPhase = ''
     runHook preInstall
-    d=$out/share/gow3
+    d=$out/share/tsuki
     mkdir -p $d/bin $out/bin
     cp run.sh $d/
     cp -r scripts patches launcher $d/
-    install -m755 out/gow3-probe $d/bin/gow3-probe
-    install -m755 out/gow3-gpu-capabilities $d/bin/gow3-gpu-capabilities
-    install -Dm755 out/gpu/libgow3gpu.so $d/bin/gpu/libgow3gpu.so
+    install -m755 out/tsuki-probe $d/bin/tsuki-probe
+    install -m755 out/tsuki-gpu-capabilities $d/bin/tsuki-gpu-capabilities
+    install -Dm755 out/gpu/libtsukigpu.so $d/bin/gpu/libtsukigpu.so
     runHook postInstall
   '';
   postFixup = ''
-    # bin/gow3 is a static program (tsuki-entry.c) that clears the host's LD_PRELOAD (Steam's
+    # bin/tsuki is a static program (tsuki-entry.c) that clears the host's LD_PRELOAD (Steam's
     # overlay) and similar before the wrapper's own dynamic programs start.
     mkdir -p $out/libexec
-    gcc -O2 -Wall -Werror -static -L${pkgs.glibc.static}/lib -DTARGET="\"$out/libexec/gow3\"" \
-      ${./tsuki-entry.c} -o $out/bin/gow3
-    # The game (settings from the data directory's gow3.ini).
-    makeShellWrapper ${pkgs.python3}/bin/python3 $out/libexec/gow3 \
-      ${common}      --add-flags "$out/share/gow3/launcher/tsuki_vulkan.py ${pkgs.bash}/bin/bash $out/share/gow3/run.sh" \
+    gcc -O2 -Wall -Werror -static -L${pkgs.glibc.static}/lib -DTARGET="\"$out/libexec/tsuki\"" \
+      ${./tsuki-entry.c} -o $out/bin/tsuki
+    # The game (settings from the data directory's tsuki.ini).
+    makeShellWrapper ${pkgs.python3}/bin/python3 $out/libexec/tsuki \
+      ${common}      --add-flags "$out/share/tsuki/launcher/tsuki_vulkan.py ${pkgs.bash}/bin/bash $out/share/tsuki/run.sh" \
       --set TSUKI_PREBUILT 1 \
       --set PYTHON ${pkgs.python3}/bin/python3 \
       --set TSUKI_BUNDLED_VK_DRIVER_FILES ${icds} \
       --prefix PATH : ${lib.makeBinPath [ pkgs.bash pkgs.coreutils ]} \
-      --run 'export TSUKI_DATA_DIR=''${TSUKI_DATA_DIR:-''${XDG_DATA_HOME:-$HOME/.local/share}/gow3}; mkdir -p "$TSUKI_DATA_DIR"'
+      --run 'export TSUKI_DATA_DIR=''${TSUKI_DATA_DIR:-''${XDG_DATA_HOME:-$HOME/.local/share}/tsuki}; mkdir -p "$TSUKI_DATA_DIR"'
   '';
-  meta.mainProgram = "gow3";
+  meta.mainProgram = "tsuki";
 }

@@ -74,9 +74,9 @@ int compat_errno_from_win32(unsigned long error);
 int compat_cpu_times(int who, int64_t *user_us, int64_t *kernel_us);
 /* setjmp/longjmp without SEH unwinding (guest frames have no unwind data) that saves every
  * Win64 callee-saved register, xmm6-15 included. clang's __builtin_longjmp restores a wrong
- * frame pointer on Win64. gow3_longjmp may also be entered from the exception handler. */
-typedef unsigned long long gow3_jmp_buf[32];
-__attribute__((returns_twice)) int gow3_setjmp(gow3_jmp_buf buffer);
-__attribute__((noreturn)) void gow3_longjmp(gow3_jmp_buf buffer, int value);
+ * frame pointer on Win64. tsuki_longjmp may also be entered from the exception handler. */
+typedef unsigned long long tsuki_jmp_buf[32];
+__attribute__((returns_twice)) int tsuki_setjmp(tsuki_jmp_buf buffer);
+__attribute__((noreturn)) void tsuki_longjmp(tsuki_jmp_buf buffer, int value);
 #endif
 #endif

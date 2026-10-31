@@ -33,7 +33,7 @@ public:
     u64 CurrentTime();
     s32 Stop();
     bool SetLooping(bool is_looping);
-    s32 JumpToTime(u64 time); // gow3: Spec 5, task 4
+    s32 JumpToTime(u64 time); // tsuki: Spec 5, task 4
 
 private:
     // Memory Replacement

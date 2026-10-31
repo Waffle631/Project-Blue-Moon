@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// gow3: frame analyzer. Creating the file named by TSUKI_CAPTURE_TRIGGER records the next full
+// tsuki: frame analyzer. Creating the file named by TSUKI_CAPTURE_TRIGGER records the next full
 // frame: every render pass (targets, depth, draw count, shaders, sampled textures) and compute
 // dispatch, in order, plus the buffer that was presented.
 

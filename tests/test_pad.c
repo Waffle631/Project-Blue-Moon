@@ -7,7 +7,7 @@
 #endif
 
 static int capture;
-int gow3gpu_overlay_captures_input(void) { return capture; }
+int tsukigpu_overlay_captures_input(void) { return capture; }
 uintptr_t runtime_lookup(const RuntimeExport *table, size_t count, const char *name) {
     (void)table; (void)count; (void)name;
     return 0;
@@ -114,7 +114,7 @@ static void clock_counts_captured_reads(void) {
 int main(void) {
     const char *tmp=getenv("TMPDIR") ? getenv("TMPDIR") : getenv("TEMP") ? getenv("TEMP") : "/tmp";
     char path[1024];
-    snprintf(path,sizeof(path),"%s/gow3-pad-test-XXXXXX",tmp);
+    snprintf(path,sizeof(path),"%s/tsuki-pad-test-XXXXXX",tmp);
     int fd=mkstemp(path);
     assert(fd>=0);
     close(fd);
@@ -149,7 +149,7 @@ int main(void) {
     desc.nbuttons=SDL_GAMEPAD_BUTTON_COUNT;
     desc.button_mask=(1u<<SDL_GAMEPAD_BUTTON_COUNT)-1;
     desc.axis_mask=(1u<<SDL_GAMEPAD_AXIS_COUNT)-1;
-    desc.name="gow3 test controller";
+    desc.name="tsuki test controller";
     desc.vendor_id=0x1d50;
     desc.product_id=0x6189;
     desc.ntouchpads=1;

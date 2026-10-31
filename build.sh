@@ -3,7 +3,7 @@ set -euo pipefail
 cd -- "$(dirname -- "$0")"
 mkdir -p out
 # Windows: MSYS2 CLANG64 (packages in packaging/windows/README.md). The GPU library is static
-# there and CMake links gow3-probe.exe as well; no PGO (GCC-only flags), LTO off by default.
+# there and CMake links tsuki-probe.exe as well; no PGO (GCC-only flags), LTO off by default.
 case $(uname -s) in
 MINGW*|MSYS*)
     # shellcheck source=msys2-env.sh
@@ -17,12 +17,12 @@ MINGW*|MSYS*)
     cmake -S gpu -B out/gpu -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DTSUKI_PGO=off \
         -DTSUKI_LTO="${TSUKI_LTO:-OFF}" -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ >/dev/null
     echo "GPU library and loader: LTO ${TSUKI_LTO:-OFF}"
-    if ! ninja -C out/gpu gow3-probe gow3-gpu-capabilities gow3-play > out/gpu-build.log 2>&1; then
+    if ! ninja -C out/gpu tsuki-probe tsuki-gpu-capabilities tsuki-play > out/gpu-build.log 2>&1; then
         grep -v '^\[' out/gpu-build.log | tail -40 >&2
         echo 'Build failed (full log: out/gpu-build.log)' >&2; exit 1
     fi
-    cp out/gpu/gow3-probe.exe out/gpu/gow3-gpu-capabilities.exe out/gpu/gow3-play.exe out/
-    echo "Built $PWD/out/gow3-probe.exe"
+    cp out/gpu/tsuki-probe.exe out/gpu/tsuki-gpu-capabilities.exe out/gpu/tsuki-play.exe out/
+    echo "Built $PWD/out/tsuki-probe.exe"
     exit 0
     ;;
 esac
@@ -45,7 +45,7 @@ if ! { command -v pkg-config >/dev/null && pkg-config --exists vulkan sdl3 && co
 fi
 read -r -a includes <<< "$(pkg-config --cflags vulkan sdl3 libavcodec libavutil libswscale)"
 read -r -a libraries <<< "$(pkg-config --libs vulkan sdl3 libavcodec libavutil libswscale)"
-# GPU library (shadPS4 video core + drivers), built by CMake into out/gpu/libgow3gpu.so.
+# GPU library (shadPS4 video core + drivers), built by CMake into out/gpu/libtsukigpu.so.
 # TSUKI_PGO: generate (instrumented build that writes pgo/ while the game runs), use, off.
 # Default: use the profile in pgo/ when there is one. TSUKI_LTO=OFF disables link-time optimization.
 pgo=${TSUKI_PGO:-}
@@ -60,13 +60,13 @@ fi
 cmake -S gpu -B out/gpu -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DTSUKI_PGO="$pgo" \
     -DTSUKI_LTO="${TSUKI_LTO:-ON}" -DTSUKI_PGO_DIR="$PWD/pgo" >/dev/null
 echo "GPU library: PGO $pgo, LTO ${TSUKI_LTO:-ON}"
-# A failed GPU build must stop here: an older libgow3gpu.so would otherwise be used silently.
-if ! ninja -C out/gpu gow3gpu > out/gpu-build.log 2>&1; then
+# A failed GPU build must stop here: an older libtsukigpu.so would otherwise be used silently.
+if ! ninja -C out/gpu tsukigpu > out/gpu-build.log 2>&1; then
     grep -v '^\[' out/gpu-build.log | tail -40 >&2
     echo 'GPU library build failed (full log: out/gpu-build.log)' >&2; exit 1
 fi
 # $ORIGIN/gpu: packaged copies keep the library next to the binary without patching it.
-gpu=(-Lout/gpu -lgow3gpu -Wl,-rpath,'$ORIGIN/gpu' -Wl,-rpath,"$PWD/out/gpu" -rdynamic)
+gpu=(-Lout/gpu -ltsukigpu -Wl,-rpath,'$ORIGIN/gpu' -Wl,-rpath,"$PWD/out/gpu" -rdynamic)
 runtime=(src/runtime*.c)
 # HEVAG (runtime_audiodec_cpu.c): vgmstream's decoder, adapted to this project's -Werror (VENDOR.txt).
 hevag=(third_party/vgmstream_hevag/hevag.c)
@@ -79,10 +79,10 @@ if [[ ! -f out/libatrac9.a || -n $(find third_party/LibAtrac9/C/src -newer out/l
 fi
 # isa_emulate runs inside guest code: no XMM/YMM.
 "$CC" -std=c11 -O2 -g -Wall -Wextra -Werror -mgeneral-regs-only -c src/isa_emulate.c -o out/isa_emulate.o
-"$CC" -std=c11 -O2 -g -Wall -Wextra -Werror -pthread -no-pie "${includes[@]}" -I. -Isrc src/probe.c "${runtime[@]}" src/cpu_check.c src/vulkan_smoke.c out/isa_emulate.o src/isa_rewrite.c "${hevag[@]}" out/libatrac9.a -lm "${gpu[@]}" "${libraries[@]}" -o out/gow3-probe
-echo "Built $PWD/out/gow3-probe"
+"$CC" -std=c11 -O2 -g -Wall -Wextra -Werror -pthread -no-pie "${includes[@]}" -I. -Isrc src/probe.c "${runtime[@]}" src/cpu_check.c src/vulkan_smoke.c out/isa_emulate.o src/isa_rewrite.c "${hevag[@]}" out/libatrac9.a -lm "${gpu[@]}" "${libraries[@]}" -o out/tsuki-probe
+echo "Built $PWD/out/tsuki-probe"
 # GPU list for the launcher (tools/gpu_capabilities.c): links only the Vulkan loader.
-"$CC" -std=c11 -O2 -Wall -Wextra -Werror -Igpu/shadps4 tools/gpu_capabilities.c "${libraries[@]}" -o out/gow3-gpu-capabilities
+"$CC" -std=c11 -O2 -Wall -Wextra -Werror -Igpu/shadps4 tools/gpu_capabilities.c "${libraries[@]}" -o out/tsuki-gpu-capabilities
 if [[ ${1:-} == --test ]]; then
     "$CC" -std=c11 -O2 -g -Wall -Wextra -Werror -pthread "${includes[@]}" -I. -Isrc tests/test_pad.c "${libraries[@]}" -o out/pad-test
     out/pad-test

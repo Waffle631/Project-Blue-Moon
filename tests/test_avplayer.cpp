@@ -59,7 +59,7 @@
 #include "core/libraries/avplayer/avplayer.h"
 
 namespace Libraries::AvPlayer {
-// Exported by libgow3gpu.so (avplayer.cpp); avplayer.h only declares RegisterLib.
+// Exported by libtsukigpu.so (avplayer.cpp); avplayer.h only declares RegisterLib.
 s32 PS4_SYSV_ABI sceAvPlayerAddSource(AvPlayerHandle handle, const char* filename);
 s32 PS4_SYSV_ABI sceAvPlayerClose(AvPlayerHandle handle);
 u64 PS4_SYSV_ABI sceAvPlayerCurrentTime(AvPlayerHandle handle);

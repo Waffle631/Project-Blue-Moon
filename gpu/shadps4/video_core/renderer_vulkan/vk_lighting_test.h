@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// gow3: TSUKI_LIGHTING_TEST=shading,msdepth,dref,bias (or `all`). The four changes of the build
+// tsuki: TSUKI_LIGHTING_TEST=shading,msdepth,dref,bias (or `all`). The four changes of the build
 // below (commit eaa1027f), which its author reports removes the black scanlines on an RX 6600,
 // each behind its own token so a tester can bisect them on the RDNA2 black-lines issue (#65):
 // KrachDev/shadPS4_GOW3, "God of War III Remastered - Lighting, Scanline & AMD Fix" (rename-check: ok)

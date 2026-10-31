@@ -10,7 +10,7 @@ uintptr_t runtime_lookup(const RuntimeExport *table, size_t count, const char *n
 /* Fake bridge: what the window thread has accumulated since the last read. Taking it clears the
  * movement and the wheel like the real one (gpu/shim/tsuki_mouse.h), the buttons are state. */
 static int32_t acc_dx, acc_dy, acc_wheel; static uint32_t acc_buttons; static int present=1;
-int gow3gpu_mouse_read(int32_t *dx, int32_t *dy, int32_t *wheel, uint32_t *buttons) {
+int tsukigpu_mouse_read(int32_t *dx, int32_t *dy, int32_t *wheel, uint32_t *buttons) {
     *dx=acc_dx; *dy=acc_dy; *wheel=acc_wheel; *buttons=acc_buttons; acc_dx=acc_dy=acc_wheel=0; return present;
 }
 

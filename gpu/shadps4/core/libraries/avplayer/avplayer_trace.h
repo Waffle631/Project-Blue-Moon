@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// gow3: TSUKI_TRACE_AVPLAYER=1 writes one stderr line per libSceAvPlayer call the game makes and
+// tsuki: TSUKI_TRACE_AVPLAYER=1 writes one stderr line per libSceAvPlayer call the game makes and
 // per event AvPlayer sends it, to learn the game's real contract (Spec 5, paso 1;
 // docs/avplayer.md). Lines read "AvTrace +<ms> t<tid>: ...", <ms> counted from the first traced
 // call, whose wall clock time the first line gives. With the variable unset a call site costs one

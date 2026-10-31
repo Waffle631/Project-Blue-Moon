@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// gow3: in-game settings menu (Dear ImGui), drawn by the presenter into the swapchain image
+// tsuki: in-game settings menu (Dear ImGui), drawn by the presenter into the swapchain image
 // after the game frame, at display resolution. Insert (keyboard) or R3+L2 (gamepad) opens it;
 // while it is open the game gets no pad/keyboard input. Settings live in tsuki_settings.h.
 
@@ -19,7 +19,7 @@ namespace Vulkan {
 class Instance;
 }
 
-namespace Gow3Overlay {
+namespace TsukiOverlay {
 
 /// Present thread, once: the ImGui context and its Vulkan backend.
 void Init(const Vulkan::Instance& instance, vk::Format format, u32 image_count);
@@ -29,8 +29,8 @@ bool HandleEvent(const SDL_Event& event);
 /// Turns SDL text input on while the menu edits a value (window thread, once per poll).
 void UpdateTextInput(SDL_Window* window);
 
-/// The mouse events seen by HandleEvent, for gow3gpu_mouse_read (guest thread).
-Gow3Mouse::MouseAccumulator& Mouse();
+/// The mouse events seen by HandleEvent, for tsukigpu_mouse_read (guest thread).
+TsukiMouse::MouseAccumulator& Mouse();
 /// Window thread, once per poll: the system cursor shows while the settings menu is open (ImGui's
 /// software cursor was not drawn there, Spec 6 task 6) and stays hidden otherwise.
 void UpdateCursor();
@@ -57,7 +57,7 @@ void SetTextEntry(bool active, const std::string& prompt, const std::string& tex
 /// cancels (Esc/Circle). `pictures`: one per item (empty = none), drawn beside its text.
 /// PollChoice: -1 while open, -2 cancelled, else the chosen index.
 void BeginChoice(const std::string& title, const std::vector<std::string>& items,
-                 std::vector<Gow3Png::Image> pictures, int focus);
+                 std::vector<TsukiPng::Image> pictures, int focus);
 int PollChoice();
 
-} // namespace Gow3Overlay
+} // namespace TsukiOverlay

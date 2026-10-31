@@ -177,8 +177,8 @@ bool AvPlayerState::GetStreamInfo(u32 stream_index, AvPlayerStreamInfo& info) {
 // Called inside GAME thread
 bool AvPlayerState::Start() {
     std::unique_lock lock(m_source_mutex);
-    // gow3: StopLocked, not Stop. Stop takes m_source_mutex shared, which this thread already holds
-    // exclusively: EDEADLK, std::terminate (avplayer-test, start_while_playing).
+    // tsuki: StopLocked, not Stop. Stop takes m_source_mutex shared, which this thread already
+    // holds exclusively: EDEADLK, std::terminate (avplayer-test, start_while_playing).
     if (m_current_state == AvState::Ready || m_current_state == AvState::Stop || StopLocked()) {
         m_eof_stop_event_sent = false;
         SetState(AvState::Starting);
@@ -286,7 +286,7 @@ bool AvPlayerState::Stop() {
     return StopLocked();
 }
 
-// gow3: the caller holds m_source_mutex, shared or exclusive (Start).
+// tsuki: the caller holds m_source_mutex, shared or exclusive (Start).
 bool AvPlayerState::StopLocked() {
     if (m_up_source == nullptr || m_current_state == AvState::Stop) {
         return false;
@@ -354,7 +354,7 @@ bool AvPlayerState::SetLooping(bool is_looping) {
     return true;
 }
 
-// gow3: Spec 5, task 4 (AvPlayerSource::JumpToTime). Only a started playback jumps, in a state the
+// tsuki: Spec 5, task 4 (AvPlayerSource::JumpToTime). Only a started playback jumps, in a state the
 // state machine lets jump; m_source_mutex is held exclusively throughout. A demuxer stopped for the
 // jump at its EOF sets EndOfFile on its way out (OnEOF), which no longer holds once the source has
 // moved, so the state from before the jump comes back without SetState's checks. The game is told
@@ -466,7 +466,7 @@ std::optional<bool> AvPlayerState::OnBufferingCheckEvent(u32 num_frames) {
 // Called inside CONTROLLER thread
 void AvPlayerState::EmitEvent(AvPlayerEvents event_id, void* event_data) {
     LOG_INFO(Lib_AvPlayer, "Sending event to the game: id = {}", magic_enum::enum_name(event_id));
-    // gow3: TSUKI_TRACE_AVPLAYER (avplayer_trace.h). game_obj is the event object the game passed
+    // tsuki: TSUKI_TRACE_AVPLAYER (avplayer_trace.h). game_obj is the event object the game passed
     // to Init/InitEx, which ties the event to its player. With auto_start, StateReady stays here.
     if (AvTraceEnabled()) {
         const auto name = magic_enum::enum_name(event_id);

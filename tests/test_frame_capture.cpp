@@ -68,7 +68,7 @@ int main() {
     // nothing readable at all. Must not dereference `data`.
     FrameCapture::Buffer(0x1234, 1, 0, nullptr, 64);
 
-    const auto dir = std::filesystem::temp_directory_path() / "gow3-frame-capture-test";
+    const auto dir = std::filesystem::temp_directory_path() / "tsuki-frame-capture-test";
     std::filesystem::remove_all(dir);
     setenv("TSUKI_CAPTURE_DIR", dir.c_str(), 1);
     const std::string text = Capture(dir);

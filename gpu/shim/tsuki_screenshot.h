@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// gow3: PNG captures of presented frames, for before/after comparisons of rendering changes
+// tsuki: PNG captures of presented frames, for before/after comparisons of rendering changes
 // (docs/specs/2026-10-14-hito-primer-fotograma.md, H3). No Vulkan here: the presenter copies the
 // image to host memory and hands the pixels to SavePng.
 //   TSUKI_SCREENSHOT_AT=120,600  frames to capture (presentation frame numbers)
@@ -16,7 +16,7 @@
 #include <string_view>
 #include <vector>
 
-namespace Gow3Screenshot {
+namespace TsukiScreenshot {
 
 enum class PixelOrder { Bgra, Rgba }; ///< byte order of each 4-byte pixel; alpha is ignored
 
@@ -62,4 +62,4 @@ bool SavePng(const std::filesystem::path& dir, std::uint64_t frame, const std::u
              std::uint32_t width, std::uint32_t height, PixelOrder order,
              std::filesystem::path& written, std::string& error);
 
-} // namespace Gow3Screenshot
+} // namespace TsukiScreenshot

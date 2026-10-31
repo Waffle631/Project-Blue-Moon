@@ -1,7 +1,7 @@
-# gow3 GPU library: shadPS4 video core + shader recompiler + Gnm/VideoOut
+# tsuki GPU library: shadPS4 video core + shader recompiler + Gnm/VideoOut
 # drivers, adapted to the native_probe runtime through shims in shim/.
 cmake_minimum_required(VERSION 3.24)
-project(gow3gpu LANGUAGES C CXX)
+project(tsukigpu LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -11,20 +11,20 @@ endif()
 # Frame pointers keep the loader's thread dumps (watchdog, SIGUSR2 sampling) walkable.
 add_compile_options(-fno-omit-frame-pointer)
 
-# gow3: link-time optimization (TSUKI_LTO, default on) and profile-guided optimization
+# tsuki: link-time optimization (TSUKI_LTO, default on) and profile-guided optimization
 # (TSUKI_PGO: off, generate = instrumented build writing into TSUKI_PGO_DIR, use = build with that
-# profile). Covers gow3gpu and the static libraries linked into it. No -march: the same build
+# profile). Covers tsukigpu and the static libraries linked into it. No -march: the same build
 # runs on the Steam Deck.
-option(TSUKI_LTO "Link-time optimization of gow3gpu" ON)
+option(TSUKI_LTO "Link-time optimization of tsukigpu" ON)
 set(TSUKI_PGO "off" CACHE STRING "Profile-guided optimization: off, generate, use")
 set(TSUKI_PGO_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../pgo" CACHE PATH "Profile directory")
 if (TSUKI_LTO)
     include(CheckIPOSupported)
-    check_ipo_supported(RESULT gow3_ipo_ok OUTPUT gow3_ipo_error)
-    if (gow3_ipo_ok)
+    check_ipo_supported(RESULT tsuki_ipo_ok OUTPUT tsuki_ipo_error)
+    if (tsuki_ipo_ok)
         set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
     else()
-        message(WARNING "LTO unavailable: ${gow3_ipo_error}")
+        message(WARNING "LTO unavailable: ${tsuki_ipo_error}")
     endif()
 endif()
 if (TSUKI_PGO STREQUAL "generate")
@@ -35,7 +35,7 @@ if (TSUKI_PGO STREQUAL "generate")
 elseif (TSUKI_PGO STREQUAL "use")
     # Partial training keeps unprofiled code optimized normally; counters from concurrent
     # threads can be slightly inconsistent (correction). Functions changed since the profile
-    # (or built differently for it, gow3gpu_init) are compiled without it.
+    # (or built differently for it, tsukigpu_init) are compiled without it.
     add_compile_options(-fprofile-use=${TSUKI_PGO_DIR} -fprofile-partial-training
                         -fprofile-correction -Wno-missing-profile -Wno-coverage-mismatch)
 endif()
@@ -43,7 +43,7 @@ endif()
 find_package(Vulkan REQUIRED)
 find_package(fmt REQUIRED)
 find_package(Boost REQUIRED)
-# gow3 (Windows): MSYS2 has no magic_enum/miniz packages; the submodules are used instead.
+# tsuki (Windows): MSYS2 has no magic_enum/miniz packages; the submodules are used instead.
 find_package(magic_enum QUIET)
 if (NOT magic_enum_FOUND)
     add_library(magic_enum INTERFACE)
@@ -133,50 +133,50 @@ set(COMMON
 file(GLOB AVPLAYER CONFIGURE_DEPENDS shadps4/core/libraries/avplayer/*.cpp)
 pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET libavformat libavcodec libavutil libswscale libswresample)
 file(GLOB SHIM_SOURCES CONFIGURE_DEPENDS shim/*.cpp shim/*/*.cpp)
-# Windows: a DLL cannot leave the runtime_* symbols for gow3-probe.exe to resolve, so the
+# Windows: a DLL cannot leave the runtime_* symbols for tsuki-probe.exe to resolve, so the
 # library is static there and linked into the executable.
 if (WIN32)
     set(TSUKIGPU_KIND STATIC)
 else()
     set(TSUKIGPU_KIND SHARED)
 endif()
-add_library(gow3gpu ${TSUKIGPU_KIND} ${VIDEO_CORE} ${RECOMPILER} ${COMMON} ${SHIM_SOURCES}
+add_library(tsukigpu ${TSUKIGPU_KIND} ${VIDEO_CORE} ${RECOMPILER} ${COMMON} ${SHIM_SOURCES}
     shadps4/core/libraries/gnmdriver/gnmdriver.cpp
     shadps4/core/libraries/videoout/driver.cpp shadps4/core/libraries/videoout/video_out.cpp
     shadps4/core/libraries/kernel/equeue.cpp ${AVPLAYER}
     shadps4/core/libraries/videodec/video_utils.cpp)
-add_dependencies(gow3gpu host_shaders)
+add_dependencies(tsukigpu host_shaders)
 # In-game settings menu: Dear ImGui (third_party/imgui, MIT) with its Vulkan backend, and an
 # embedded Cyrillic font (third_party/fonts).
-target_sources(gow3gpu PRIVATE third_party/imgui/imgui.cpp third_party/imgui/imgui_draw.cpp
+target_sources(tsukigpu PRIVATE third_party/imgui/imgui.cpp third_party/imgui/imgui_draw.cpp
     third_party/imgui/imgui_tables.cpp third_party/imgui/imgui_widgets.cpp
     third_party/imgui/backends/imgui_impl_vulkan.cpp)
-target_include_directories(gow3gpu PRIVATE third_party/imgui third_party/imgui/backends)
-target_compile_definitions(gow3gpu PRIVATE IMGUI_IMPL_VULKAN_NO_PROTOTYPES
+target_include_directories(tsukigpu PRIVATE third_party/imgui third_party/imgui/backends)
+target_compile_definitions(tsukigpu PRIVATE IMGUI_IMPL_VULKAN_NO_PROTOTYPES
     TSUKI_FONT_PATH="${CMAKE_CURRENT_SOURCE_DIR}/third_party/fonts/DejaVuSans.ttf")
 set_source_files_properties(shim/tsuki_overlay.cpp PROPERTIES
     OBJECT_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/fonts/DejaVuSans.ttf)
-target_include_directories(gow3gpu PRIVATE shim shadps4 ${SHADER_INCLUDE} third_party/gcn/include third_party/half/include)
-target_compile_definitions(gow3gpu PRIVATE BOOST_ASIO_STANDALONE NDEBUG)
-target_compile_options(gow3gpu PRIVATE -Wno-deprecated-declarations -Wno-missing-field-initializers)
-# Runtime symbols (runtime_memory_*, runtime_process_*) resolve against gow3-probe.
+target_include_directories(tsukigpu PRIVATE shim shadps4 ${SHADER_INCLUDE} third_party/gcn/include third_party/half/include)
+target_compile_definitions(tsukigpu PRIVATE BOOST_ASIO_STANDALONE NDEBUG)
+target_compile_options(tsukigpu PRIVATE -Wno-deprecated-declarations -Wno-missing-field-initializers)
+# Runtime symbols (runtime_memory_*, runtime_process_*) resolve against tsuki-probe.
 if (NOT WIN32)
-    target_link_options(gow3gpu PRIVATE -Wl,--allow-shlib-undefined)
+    target_link_options(tsukigpu PRIVATE -Wl,--allow-shlib-undefined)
 endif()
-target_link_libraries(gow3gpu PUBLIC Vulkan::Headers fmt::fmt Boost::headers magic_enum::magic_enum
+target_link_libraries(tsukigpu PUBLIC Vulkan::Headers fmt::fmt Boost::headers magic_enum::magic_enum
     tsl::robin_map GPUOpen::VulkanMemoryAllocator PkgConfig::XXHASH PkgConfig::SDL3 PkgConfig::FFMPEG miniz::miniz Zydis::Zydis sirit)
-target_include_directories(gow3gpu PRIVATE third_party/xbyak)
+target_include_directories(tsukigpu PRIVATE third_party/xbyak)
 if (WIN32)
     # Guest code is entered with the System V ABI; NOMINMAX/WIN32_LEAN_AND_MEAN keep
     # <windows.h> out of the way of std::min/max and the Vulkan/SDL headers.
-    target_compile_definitions(gow3gpu PUBLIC NOMINMAX WIN32_LEAN_AND_MEAN)
-    target_compile_options(gow3gpu PRIVATE -include ${CMAKE_CURRENT_SOURCE_DIR}/shim/tsuki_win_compat.h)
-    target_link_libraries(gow3gpu PUBLIC Vulkan::Vulkan ws2_32 bcrypt ntdll synchronization winmm pdh)
+    target_compile_definitions(tsukigpu PUBLIC NOMINMAX WIN32_LEAN_AND_MEAN)
+    target_compile_options(tsukigpu PRIVATE -include ${CMAKE_CURRENT_SOURCE_DIR}/shim/tsuki_win_compat.h)
+    target_link_libraries(tsukigpu PUBLIC Vulkan::Vulkan ws2_32 bcrypt ntdll synchronization winmm pdh)
 else()
-    target_link_libraries(gow3gpu PUBLIC PkgConfig::X11)
+    target_link_libraries(tsukigpu PUBLIC PkgConfig::X11)
 endif()
 
-# gow3 (Windows): gow3gpu is a static library there, so the loader and the HLE runtime are
+# tsuki (Windows): tsukigpu is a static library there, so the loader and the HLE runtime are
 # linked here, where CMake knows its dependencies (build.sh builds them with ninja).
 if (WIN32)
     enable_language(RC)
@@ -185,17 +185,17 @@ if (WIN32)
     add_library(atrac9 STATIC ${TSUKI_ATRAC9})
     target_compile_options(atrac9 PRIVATE -w)
     set_target_properties(atrac9 PROPERTIES C_STANDARD 99 INTERPROCEDURAL_OPTIMIZATION OFF)
-    add_executable(gow3-probe ../src/probe.c ${TSUKI_RUNTIME} ../src/compat_win.c ../src/cpu_check.c ../src/vulkan_smoke.c
+    add_executable(tsuki-probe ../src/probe.c ${TSUKI_RUNTIME} ../src/compat_win.c ../src/cpu_check.c ../src/vulkan_smoke.c
         ../src/isa_rewrite.c ../src/isa_emulate.c ../third_party/vgmstream_hevag/hevag.c
         ../packaging/windows/tsuki-probe.rc)
-    set_target_properties(gow3-probe PROPERTIES C_STANDARD 11 C_EXTENSIONS OFF)
-    target_compile_options(gow3-probe PRIVATE $<$<COMPILE_LANGUAGE:C>:-Wall -Wextra -Werror>)
-    target_include_directories(gow3-probe PRIVATE .. ../src)
-    target_link_libraries(gow3-probe PRIVATE gow3gpu atrac9 onecore bcrypt ws2_32 -pthread)
+    set_target_properties(tsuki-probe PROPERTIES C_STANDARD 11 C_EXTENSIONS OFF)
+    target_compile_options(tsuki-probe PRIVATE $<$<COMPILE_LANGUAGE:C>:-Wall -Wextra -Werror>)
+    target_include_directories(tsuki-probe PRIVATE .. ../src)
+    target_link_libraries(tsuki-probe PRIVATE tsukigpu atrac9 onecore bcrypt ws2_32 -pthread)
     # The PS4 range (64 GiB - 1 TiB) must stay free: no high-entropy ASLR for heaps and stacks.
     # The guest main thread runs on the process stack: 16 MiB, committed (no stack probes).
-    target_link_options(gow3-probe PRIVATE -Wl,--disable-high-entropy-va "SHELL:-Xlinker --stack -Xlinker 16777216,16777216")
-    # gow3: runtime unit tests (ninja -C out/gpu mp3-test videodec-test services-test).
+    target_link_options(tsuki-probe PRIVATE -Wl,--disable-high-entropy-va "SHELL:-Xlinker --stack -Xlinker 16777216,16777216")
+    # tsuki: runtime unit tests (ninja -C out/gpu mp3-test videodec-test services-test).
     add_executable(mp3-test EXCLUDE_FROM_ALL ../tests/test_mp3.c ../src/runtime_mp3.c ../src/compat_win.c)
     add_executable(videodec-test EXCLUDE_FROM_ALL ../tests/test_videodec.c ../src/compat_win.c)
     add_executable(services-test EXCLUDE_FROM_ALL ../tests/test_services.c ../src/compat_win.c)
@@ -238,13 +238,13 @@ if (WIN32)
     target_compile_options(tsc-clock-test PRIVATE -UNDEBUG -Wall -Wextra -Werror)
     target_include_directories(tsc-clock-test PRIVATE .. ../src)
     target_link_libraries(tsc-clock-test PRIVATE bcrypt -pthread)
-    add_executable(gow3-gpu-capabilities ../tools/gpu_capabilities.c ../packaging/windows/tsuki-gpu-capabilities.rc)
-    target_include_directories(gow3-gpu-capabilities PRIVATE shadps4)
-    target_link_libraries(gow3-gpu-capabilities PRIVATE Vulkan::Vulkan)
+    add_executable(tsuki-gpu-capabilities ../tools/gpu_capabilities.c ../packaging/windows/tsuki-gpu-capabilities.rc)
+    target_include_directories(tsuki-gpu-capabilities PRIVATE shadps4)
+    target_link_libraries(tsuki-gpu-capabilities PRIVATE Vulkan::Vulkan)
     # "Play Tsukihime.exe": the game with the launcher's saved settings, no launcher window.
-    add_executable(gow3-play WIN32 ../packaging/windows/play.c ../packaging/windows/play.rc)
-    target_compile_options(gow3-play PRIVATE -municode)
-    target_link_options(gow3-play PRIVATE -municode)
+    add_executable(tsuki-play WIN32 ../packaging/windows/play.c ../packaging/windows/play.rc)
+    target_compile_options(tsuki-play PRIVATE -municode)
+    target_link_options(tsuki-play PRIVATE -municode)
 endif()
 
 # Explicit test targets; neither launches the game nor needs a Vulkan device.
@@ -252,11 +252,11 @@ add_executable(pipeline-binary-cache-test EXCLUDE_FROM_ALL ../tests/test_pipelin
     ../tests/test_gpu_runtime_stubs.cpp)
 target_compile_definitions(pipeline-binary-cache-test PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
 target_include_directories(pipeline-binary-cache-test PRIVATE shim shadps4 third_party/gcn/include)
-target_link_libraries(pipeline-binary-cache-test PRIVATE gow3gpu)
+target_link_libraries(pipeline-binary-cache-test PRIVATE tsukigpu)
 target_compile_options(pipeline-binary-cache-test PRIVATE -fPIC)
 if (WIN32)
     target_sources(pipeline-binary-cache-test PRIVATE ../src/compat_win.c)
-    target_compile_definitions(pipeline-binary-cache-test PRIVATE sigjmp_buf=gow3_jmp_buf)
+    target_compile_definitions(pipeline-binary-cache-test PRIVATE sigjmp_buf=tsuki_jmp_buf)
     target_compile_options(pipeline-binary-cache-test PRIVATE
         -include ${CMAKE_CURRENT_SOURCE_DIR}/../src/compat_win.h)
     target_link_libraries(pipeline-binary-cache-test PRIVATE onecore)
@@ -265,11 +265,11 @@ add_executable(pipeline-binary-initialization-test EXCLUDE_FROM_ALL
     ../tests/test_pipeline_binary_initialization.cpp ../tests/test_gpu_runtime_stubs.cpp)
 target_compile_definitions(pipeline-binary-initialization-test PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
 target_include_directories(pipeline-binary-initialization-test PRIVATE shim shadps4 third_party/gcn/include)
-target_link_libraries(pipeline-binary-initialization-test PRIVATE gow3gpu)
+target_link_libraries(pipeline-binary-initialization-test PRIVATE tsukigpu)
 target_compile_options(pipeline-binary-initialization-test PRIVATE -fPIC)
 if (WIN32)
     target_sources(pipeline-binary-initialization-test PRIVATE ../src/compat_win.c)
-    target_compile_definitions(pipeline-binary-initialization-test PRIVATE sigjmp_buf=gow3_jmp_buf)
+    target_compile_definitions(pipeline-binary-initialization-test PRIVATE sigjmp_buf=tsuki_jmp_buf)
     target_compile_options(pipeline-binary-initialization-test PRIVATE
         -include ${CMAKE_CURRENT_SOURCE_DIR}/../src/compat_win.h)
     target_link_libraries(pipeline-binary-initialization-test PRIVATE onecore)
@@ -280,7 +280,7 @@ if (NOT WIN32)
     add_executable(avplayer-test EXCLUDE_FROM_ALL ../tests/test_avplayer.cpp
         ../tests/test_gpu_runtime_stubs.cpp)
     target_include_directories(avplayer-test PRIVATE shim shadps4 third_party/gcn/include)
-    target_link_libraries(avplayer-test PRIVATE gow3gpu)
+    target_link_libraries(avplayer-test PRIVATE tsukigpu)
     target_compile_options(avplayer-test PRIVATE -fPIC -UNDEBUG -Wall -Wextra -Werror)
 endif()
 set_source_files_properties(../tests/test_pipeline_binary_cache.cpp PROPERTIES

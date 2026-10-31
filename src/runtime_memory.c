@@ -83,7 +83,7 @@ static int pool_fd=-1;
 static unsigned char *backing_base; /* second view of the pool: host writes bypass guest/GPU page protection */
 #define FLEX_SPAN (UINT64_C(1024) * 1024 * 1024)
 static uint64_t flex_bitmap[FLEX_SPAN/PAGE/64];
-/* GPU hooks (gow3gpu): notified outside the lock, in order, after each operation. */
+/* GPU hooks (tsukigpu): notified outside the lock, in order, after each operation. */
 typedef void (*GpuRange)(uintptr_t address, uint64_t size);
 static GpuRange hook_map, hook_unmap, hook_invalidate;
 enum { HOOK_MAP, HOOK_UNMAP, HOOK_INVALIDATE };
@@ -245,7 +245,7 @@ static int pool(void) {
 /* Direct memory occupies [0,POOL_SIZE) of the memfd, flexible memory [POOL_SIZE,+FLEX_SPAN). */
 static int pool(void) {
     if (pool_fd>=0) return 0;
-    pool_fd=memfd_create("gow3-guest-memory", MFD_CLOEXEC);
+    pool_fd=memfd_create("tsuki-guest-memory", MFD_CLOEXEC);
     if (pool_fd<0 || ftruncate(pool_fd,(off_t)(POOL_SIZE+FLEX_SPAN))) return -1;
     void *view=mmap(NULL,POOL_SIZE+FLEX_SPAN,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_NORESERVE,pool_fd,0);
     if (view==MAP_FAILED) return -1;

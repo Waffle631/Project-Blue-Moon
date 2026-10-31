@@ -41,7 +41,7 @@ public:
         return *instance;
     }
 
-    /// gow3: largest VkBuffer the driver allows (2 GiB on AMD's Windows driver).
+    /// tsuki: largest VkBuffer the driver allows (2 GiB on AMD's Windows driver).
     u64 GetMaxBufferSize() const {
         return vk13_props.maxBufferSize;
     }
@@ -245,13 +245,13 @@ public:
         return vk13_features.subgroupSizeControl && vk13_props.maxSubgroupSize >= 64;
     }
 
-    /// gow3: VK_KHR_pipeline_executable_properties is on (TSUKI_WAVE_STATS=1, vk_wave_stats.h).
+    /// tsuki: VK_KHR_pipeline_executable_properties is on (TSUKI_WAVE_STATS=1, vk_wave_stats.h).
     bool IsPipelineExecutableInfoEnabled() const {
         return pipeline_executable_properties &&
                pipeline_executable_features.pipelineExecutableInfo;
     }
 
-    /// gow3: VK_AMD_shader_info is on (statistics and ISA per stage, TSUKI_WAVE_STATS=1).
+    /// tsuki: VK_AMD_shader_info is on (statistics and ISA per stage, TSUKI_WAVE_STATS=1).
     bool IsAmdShaderInfoEnabled() const {
         return amd_shader_info;
     }
@@ -471,7 +471,7 @@ public:
     /// Returns the amount of memory used.
     [[nodiscard]] u64 GetDeviceMemoryUsage() const;
 
-    /// gow3: the driver's current budget of the heaps GetDeviceMemoryUsage counts
+    /// tsuki: the driver's current budget of the heaps GetDeviceMemoryUsage counts
     /// (VK_EXT_memory_budget: what this process can use now, other processes included).
     [[nodiscard]] u64 GetDeviceMemoryBudgetNow() const;
 
@@ -559,8 +559,8 @@ private:
     bool image_2d_view_of_3d{};
     bool image_view_min_lod{};
     bool shader_clock{};
-    bool pipeline_executable_properties{}; // gow3: TSUKI_WAVE_STATS=1 (vk_wave_stats.h)
-    bool amd_shader_info{};                // gow3: with it, VK_AMD_shader_info when present
+    bool pipeline_executable_properties{}; // tsuki: TSUKI_WAVE_STATS=1 (vk_wave_stats.h)
+    bool amd_shader_info{};                // tsuki: with it, VK_AMD_shader_info when present
     bool supports_memory_budget{};
     bool supports_block_texel_view{};
     u64 total_memory_budget{};

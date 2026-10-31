@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// gow3: graphics options of the in-game menu (Insert / R3+L2), kept in gow3.ini. The live ones
+// tsuki: graphics options of the in-game menu (Insert / R3+L2), kept in tsuki.ini. The live ones
 // apply on the next frame; the startup ones (patches, GPU readback modes) are read by run.py and
 // apply through "Apply and restart". The launcher reads and writes the same keys.
 #pragma once
@@ -7,7 +7,7 @@
 #include <array>
 #include <string_view>
 
-namespace Gow3Graphics {
+namespace TsukiGraphics {
 
 enum DisplayMode : int { Windowed = 0, Borderless = 1, Fullscreen = 2, DisplayModeCount };
 inline constexpr std::array<std::string_view, DisplayModeCount> DisplayModeKeys = {
@@ -80,4 +80,4 @@ inline int PresentLimit(int limit, int engine_fps) {
     return limit == 0 ? 0 : EffectiveFps(limit, engine_fps);
 }
 
-} // namespace Gow3Graphics
+} // namespace TsukiGraphics

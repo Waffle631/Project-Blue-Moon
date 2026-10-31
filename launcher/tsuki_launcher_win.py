@@ -2,10 +2,10 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Tsukihime launcher for Windows and Linux (Tkinter).
 
-Every setting of the port in one window: the game folder and saves, gow3.ini (display,
+Every setting of the port in one window: the game folder and saves, tsuki.ini (display,
 overlay, effects), start-up options passed to run.py as environment variables
 (frame rate, presentation, HDR, ...), mods, third-party patches and controls.
-Launcher options live in %APPDATA%/gow3-launcher/settings.json (~/.config/gow3-launcher on Linux).
+Launcher options live in %APPDATA%/tsuki-launcher/settings.json (~/.config/tsuki-launcher on Linux).
 
 Frozen with PyInstaller (packaging/windows/package.sh) the same Tsukihime.exe also runs the
 game without the window (`--play`), run.py (`--run`) and the preparation scripts (`--script`),
@@ -40,7 +40,7 @@ from patches import game_profile, game_sfo  # noqa: E402  (scripts/)
 from prepare import load_sfo  # noqa: E402  (scripts/)
 DATA_DIR = Path(os.environ.get('TSUKI_DATA_DIR', PORT_DIR))
 CONFIG_DIR = (Path(os.environ.get('APPDATA', Path.home())) if WINDOWS else
-              Path(os.environ.get('XDG_CONFIG_HOME') or Path.home() / '.config')) / 'gow3-launcher'
+              Path(os.environ.get('XDG_CONFIG_HOME') or Path.home() / '.config')) / 'tsuki-launcher'
 CONFIG_FILE = CONFIG_DIR / 'settings.json'
 MOD_PRESETS = DATA_DIR / 'mods_presets.json'
 APP_NAME = 'Tsukihime'
@@ -110,7 +110,7 @@ def find_tool(name):
 
 
 def parse_gpu_list(text):
-    """One tuple per line of `gow3-gpu-capabilities --list`: index, name, type and, from the tools
+    """One tuple per line of `tsuki-gpu-capabilities --list`: index, name, type and, from the tools
     that print them, the game's multisampling default on that driver ('off' or 'on') and '1' on
     the GPU the game picks without TSUKI_GPU_ID. Other lines are skipped."""
     rows = [line.split('\t') for line in text.splitlines()]
@@ -135,7 +135,7 @@ def no_msaa_options(gpus, gpu_id):
 
 def list_gpus():
     """The Vulkan GPUs in the order the game numbers them, or [] when the tool cannot tell."""
-    tool = find_tool('gow3-gpu-capabilities.exe')
+    tool = find_tool('tsuki-gpu-capabilities.exe')
     if not tool:
         return []
     try:
@@ -269,7 +269,7 @@ def heading_text(text, every_language=False):
 
 
 # ---------------------------------------------------------------------------------------------
-# Settings. gow3.ini keys (the game reads them, the in-game menu edits them) and the
+# Settings. tsuki.ini keys (the game reads them, the in-game menu edits them) and the
 # launcher's own settings.json (passed to run.py as environment variables).
 
 INI_FLAGS = {'cheat_double_jumps', 'cheat_very_hard', 'show_fps', 'vsync', 'async_shaders', 'deferred_readback',
@@ -375,7 +375,7 @@ def load_json(path, default):
 
 
 def ini_path():
-    return Path(os.environ.get('TSUKI_CONFIG', DATA_DIR / 'gow3.ini'))
+    return Path(os.environ.get('TSUKI_CONFIG', DATA_DIR / 'tsuki.ini'))
 
 
 def load_ini():
@@ -420,7 +420,7 @@ def save_ini(values, lines):
                 continue
         out.append(line)
     if not lines:
-        out.append('# gow3 settings (in-game menu: Insert / R3+L2)')
+        out.append('# tsuki settings (in-game menu: Insert / R3+L2)')
     out += [f'{key}={value}' for key, value in values.items() if key not in written]
     atomic_write(ini_path(), '\n'.join(out) + '\n')
 
@@ -604,21 +604,21 @@ def adopt_system_files(source, game):
     return copied
 
 
-DESKTOP_MARKER = 'X-GOW3-Integration=true'
+DESKTOP_MARKER = 'X-TSUKI-Integration=true'
 
 
 def desktop_entry(command, icon, marker=False):
     """The menu entry; its StartupWMClass is the application id of the launcher and of the game window."""
     return ('[Desktop Entry]\nType=Application\nName=TSUKIHIME -A piece of blue glass moon-\n'
-            f'Exec={command}\nIcon={icon}\nTerminal=false\nCategories=Game;\nStartupWMClass=gow3\n'
+            f'Exec={command}\nIcon={icon}\nTerminal=false\nCategories=Game;\nStartupWMClass=tsuki\n'
             + (DESKTOP_MARKER + '\n' if marker else ''))
 
 
 def integrate_desktop(enabled, appimage, icon_source, data_dir, home=None):
-    """AppImage on Linux: the menu entry the desktop matches the windows (application id gow3) to,
+    """AppImage on Linux: the menu entry the desktop matches the windows (application id tsuki) to,
     which is what shows their icon in the dock. The entry is ours while it carries the marker; one
     without it was written by hand (the Desktop shortcut button) and is left alone."""
-    entry = Path(home or Path.home()) / '.local' / 'share' / 'applications' / 'gow3.desktop'
+    entry = Path(home or Path.home()) / '.local' / 'share' / 'applications' / 'tsuki.desktop'
     try:
         ours = entry.is_file() and DESKTOP_MARKER in entry.read_text(encoding='utf-8', errors='replace')
         if not enabled:
@@ -627,7 +627,7 @@ def integrate_desktop(enabled, appimage, icon_source, data_dir, home=None):
             return None
         if not appimage or (entry.is_file() and not ours):
             return None
-        icon = Path(data_dir) / 'gow3.png'
+        icon = Path(data_dir) / 'tsuki.png'
         icon.parent.mkdir(parents=True, exist_ok=True)
         if not icon.is_file() or icon.read_bytes() != Path(icon_source).read_bytes():
             shutil.copyfile(icon_source, icon)
@@ -775,7 +775,7 @@ class Launcher:
         if sys.platform == 'win32':
             try:  # the taskbar shows this window's icon, not Python's
                 import ctypes
-                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('gow3pc.launcher')
+                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('tsukipc.launcher')
             except (AttributeError, OSError):
                 pass
         root.configure(bg=BG)
@@ -1275,7 +1275,7 @@ class Launcher:
 
     def build_patches(self, f):
         """Community patches of the selected game's built-in XML and third-party patch files, on the
-        Game page. Resolution and frame rate patches follow Performance (gow3.ini; run.py adds them)."""
+        Game page. Resolution and frame rate patches follow Performance (tsuki.ini; run.py adds them)."""
         self.section(f, _('Game patches', 'Патчи игры'))
         self.game_patch_frame = self.ttk.Frame(f)
         self.game_patch_frame.grid(row=self.next_row(f), column=0, columnspan=2, sticky='we')
@@ -1323,7 +1323,7 @@ class Launcher:
 
     def store_game_patches(self):
         """The page's selection into settings (the whole list for this game, without the resolution
-        and frame rate patches: run.py adds those from gow3.ini)."""
+        and frame rate patches: run.py adds those from tsuki.ini)."""
         if not self.game_patch_title:
             return
         self.app.setdefault('game_patches', {})[self.game_patch_title] = \
@@ -1432,7 +1432,7 @@ class Launcher:
         tools = linux_tools()
         self.section(f, _('Linux'), top=4)
         self.check(f, 'desktop_integration', 'app', _('Menu entry and icon (AppImage)'),
-                   _('Creates gow3.desktop in ~/.local/share/applications so the launcher and the game show their '
+                   _('Creates tsuki.desktop in ~/.local/share/applications so the launcher and the game show their '
                      'icon in the dock and the menu. Turning it off removes the entry.'))
         self.row(f, _('Window system'), self.choice(f, 'video_backend', 'app', VIDEO_BACKENDS), restart=True,
                  hint=_('Automatic lets SDL choose. Pick X11 if the window misbehaves on Wayland (it runs through '
@@ -1465,7 +1465,7 @@ class Launcher:
         holder = ttk.Frame(f)
         holder.grid(row=self.next_row(f), column=0, columnspan=2, sticky='w', pady=(6, 0))
         ttk.Button(holder, text=_('Port folder', 'Папка порта'), command=lambda: self.open_path(DATA_DIR)).pack(side='left')
-        ttk.Button(holder, text='gow3.ini', command=lambda: self.open_path(ini_path())).pack(side='left', padx=6)
+        ttk.Button(holder, text='tsuki.ini', command=lambda: self.open_path(ini_path())).pack(side='left', padx=6)
         holder = ttk.Frame(f)
         holder.grid(row=self.next_row(f), column=0, columnspan=2, sticky='w', pady=(10, 0))
         ttk.Button(holder, text=_('Clear shader cache', 'Очистить кэш шейдеров'), command=self.clear_cache).pack(side='left')
@@ -1667,7 +1667,7 @@ class Launcher:
             self.refresh_lists()
 
     def gather(self):
-        """What collect() writes, as data: settings.json, the gow3.ini values, the mods selection and
+        """What collect() writes, as data: settings.json, the tsuki.ini values, the mods selection and
         the third-party patches selection. Reads the window and changes nothing."""
         app, ini = dict(self.app), dict(self.ini)
         if self.game_patch_title:
@@ -1692,7 +1692,7 @@ class Launcher:
         return {'app': app, 'ini': ini, 'mods': mods, 'patches': patches}
 
     def collect(self):
-        """Writes settings.json, gow3.ini, mods.json and patches.json."""
+        """Writes settings.json, tsuki.ini, mods.json and patches.json."""
         state = self.gather()
         _disk, lines = load_ini()
         persisted = {line.split('=', 1)[0].strip() for line in lines
@@ -1984,12 +1984,12 @@ class Launcher:
         launcher = os.environ.get('APPIMAGE') or (sys.executable if FROZEN else '')
         command = f'"{launcher}"' if launcher else f'python3 "{Path(__file__).resolve()}"'
         icon_dir = Path.home() / '.local' / 'share' / 'icons'
-        icon = icon_dir / 'gow3.png'
+        icon = icon_dir / 'tsuki.png'
         try:
             icon_dir.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(PORT_DIR / 'launcher' / 'tsuki.png', icon)
         except OSError:
-            icon = 'gow3'
+            icon = 'tsuki'
         entry = desktop_entry(command, icon)
         folders = [Path.home() / '.local' / 'share' / 'applications']
         try:
@@ -2005,7 +2005,7 @@ class Launcher:
                     continue
                 folder.mkdir(parents=True, exist_ok=True)
                 # In the applications menu the file is named after the window's application id.
-                target = folder / ('gow3.desktop' if folder == folders[0] else 'Tsukihime.desktop')
+                target = folder / ('tsuki.desktop' if folder == folders[0] else 'Tsukihime.desktop')
                 target.write_text(entry, encoding='utf-8')
                 target.chmod(0o755)
                 created.append(str(target))
@@ -2051,7 +2051,7 @@ class Launcher:
 
 
 class GameJob:
-    """A Windows job holding run.py and everything it starts: gow3-probe.exe and the launches made
+    """A Windows job holding run.py and everything it starts: tsuki-probe.exe and the launches made
     by the in-game restart (no longer descendants of the first process)."""
 
     def __init__(self, process):
@@ -2170,7 +2170,7 @@ def main():
     FONT_LOADED = register_font(FONT_FILE)  # titles keep the usual serif without it
     import tkinter as tk
     from tkinter import filedialog, font, messagebox, ttk
-    root = tk.Tk() if WINDOWS else tk.Tk(className='gow3')
+    root = tk.Tk() if WINDOWS else tk.Tk(className='tsuki')
     pick_fonts(font.families(root))
     Launcher(root, tk, ttk, filedialog, messagebox)
     root.mainloop()

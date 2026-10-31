@@ -21,7 +21,7 @@ except ImportError:  # pragma: no cover
 @unittest.skipUnless(sys.platform == 'win32' and tk, 'needs Windows and Tk')
 class LauncherOverTemporaryFiles(unittest.TestCase):
     """A real launcher window over a temporary settings folder: the user's files are never touched."""
-    INI = None  # gow3.ini the launcher opens over, when a test needs one
+    INI = None  # tsuki.ini the launcher opens over, when a test needs one
 
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
@@ -32,9 +32,9 @@ class LauncherOverTemporaryFiles(unittest.TestCase):
         launcher.DATA_DIR = self.tmp / 'data'
         launcher.DATA_DIR.mkdir()
         launcher.LANG = 'en'
-        os.environ['TSUKI_CONFIG'] = str(self.tmp / 'gow3.ini')
+        os.environ['TSUKI_CONFIG'] = str(self.tmp / 'tsuki.ini')
         if self.INI:
-            (self.tmp / 'gow3.ini').write_text(self.INI, encoding='utf-8')
+            (self.tmp / 'tsuki.ini').write_text(self.INI, encoding='utf-8')
         self.root = tk.Tk()
         self.app = launcher.Launcher(self.root, tk, ttk, filedialog, messagebox)
         self.root.update()
@@ -90,7 +90,7 @@ class SaveButtonTest(LauncherOverTemporaryFiles):
 
     def test_save_preserves_external_changes_and_refreshes_the_controls(self):
         self.app.save()
-        path = self.tmp / 'gow3.ini'
+        path = self.tmp / 'tsuki.ini'
         path.write_text(path.read_text(encoding='utf-8').replace('fps_limit=0', 'fps_limit=60') +
                         'external_runtime_key=keep\n', encoding='utf-8')
         self.app.var('vsync', 'ini').set(False)
@@ -104,7 +104,7 @@ class SaveButtonTest(LauncherOverTemporaryFiles):
 
     def test_failed_replace_keeps_files_and_changes_pending(self):
         self.app.save()
-        path = self.tmp / 'gow3.ini'
+        path = self.tmp / 'tsuki.ini'
         before = path.read_bytes(), launcher.CONFIG_FILE.read_bytes()
         self.app.var('vsync', 'ini').set(False)
         with mock.patch.object(launcher.os, 'replace', side_effect=PermissionError('locked')), \
@@ -128,7 +128,7 @@ class SaveButtonTest(LauncherOverTemporaryFiles):
     def test_saving_writes_the_files_and_disables_the_button(self):
         self.app.var('vsync', 'ini').set(False)
         self.app.save()
-        self.assertIn('vsync=0', (self.tmp / 'gow3.ini').read_text(encoding='utf-8').splitlines())
+        self.assertIn('vsync=0', (self.tmp / 'tsuki.ini').read_text(encoding='utf-8').splitlines())
         self.assertTrue(launcher.CONFIG_FILE.is_file())
         self.assertEqual(self.save_state(), 'disabled')
 
@@ -156,7 +156,7 @@ class SaveButtonTest(LauncherOverTemporaryFiles):
     def test_nothing_is_written_before_saving(self):
         self.app.var('vsync', 'ini').set(False)
         self.save_state()
-        self.assertFalse((self.tmp / 'gow3.ini').exists())
+        self.assertFalse((self.tmp / 'tsuki.ini').exists())
 
 
 class HiddenUpscalingTest(LauncherOverTemporaryFiles):

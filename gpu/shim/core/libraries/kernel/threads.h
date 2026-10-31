@@ -1,4 +1,4 @@
-// gow3: host threads that may call guest code (AvPlayer allocator callbacks).
+// tsuki: host threads that may call guest code (AvPlayer allocator callbacks).
 // Each thread gets a guest TCB (GS base, TLS) from the C runtime before running.
 #pragma once
 #include <condition_variable>
@@ -14,7 +14,7 @@
 extern "C" void runtime_thread_attach_host(const char* name);
 
 namespace Libraries::Kernel {
-// gow3: AvPlayer joins one thread from several threads at once: a decoder from the demuxer at EOF
+// tsuki: AvPlayer joins one thread from several threads at once: a decoder from the demuxer at EOF
 // and from the game's sceAvPlayerStop, and every thread joins itself on its way out
 // (avplayer_source.cpp). One std::jthread shared by those calls raced: the second pthread_join of a
 // thread returned EINVAL ("join failed (Invalid argument)", out/run-audiodec-a1.log) or never
@@ -39,7 +39,7 @@ public:
                 std::lock_guard lock(s->mutex);
                 s->id = std::this_thread::get_id();
             }
-            runtime_thread_attach_host("gow3:hle");
+            runtime_thread_attach_host("tsuki:hle");
             func(s->stop.get_token());
             func = nullptr; // what the function owns goes before anyone sees it finished
             std::lock_guard lock(s->mutex);
@@ -91,9 +91,9 @@ private:
         if (s->thread.joinable()) {
             std::thread thread = std::move(s->thread);
             lock.unlock();
-            // gow3: called from guest code, which a C++ exception cannot unwind. Windows (libc++ on
-            // Win32 threads) can fail the join although the thread is fine: log it, let go of the
-            // handle and wait for the function below like any other joiner.
+            // tsuki: called from guest code, which a C++ exception cannot unwind. Windows (libc++
+            // on Win32 threads) can fail the join although the thread is fine: log it, let go of
+            // the handle and wait for the function below like any other joiner.
             try {
                 thread.join();
             } catch (const std::system_error& error) {

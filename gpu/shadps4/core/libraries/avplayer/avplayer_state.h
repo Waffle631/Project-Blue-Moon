@@ -40,7 +40,7 @@ public:
     bool IsActive();
     u64 CurrentTime();
     bool SetLooping(bool is_looping);
-    bool JumpToTime(u64 time); // gow3: Spec 5, task 4
+    bool JumpToTime(u64 time); // tsuki: Spec 5, task 4
 
 private:
     // Event Replacement
@@ -71,7 +71,7 @@ private:
     void UpdateBufferingState();
     void UpdateEndOfFileState();
     bool IsStateTransitionValid(AvState state);
-    bool StopLocked(); // gow3: Stop with m_source_mutex already held
+    bool StopLocked(); // tsuki: Stop with m_source_mutex already held
 
     std::unique_ptr<AvPlayerSource> m_up_source;
 

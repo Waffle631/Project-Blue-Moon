@@ -37,11 +37,11 @@ extern std::unique_ptr<Vulkan::Presenter> presenter;
 extern std::unique_ptr<AmdGpu::Liverpool> liverpool;
 
 namespace Vulkan {
-extern std::atomic<u64> g_gow3_compile_ns;
-extern std::atomic<u32> g_gow3_compiles;
-extern std::atomic<u64> g_gow3_capture_ns, g_gow3_async_ns, g_gow3_compile_wait_ns;
-extern std::atomic<u64> g_gow3_snapshot_ns, g_gow3_guest_wait_ns;
-extern std::atomic<u32> g_gow3_pending_draws;
+extern std::atomic<u64> g_tsuki_compile_ns;
+extern std::atomic<u32> g_tsuki_compiles;
+extern std::atomic<u64> g_tsuki_capture_ns, g_tsuki_async_ns, g_tsuki_compile_wait_ns;
+extern std::atomic<u64> g_tsuki_snapshot_ns, g_tsuki_guest_wait_ns;
+extern std::atomic<u32> g_tsuki_pending_draws;
 } // namespace Vulkan
 
 namespace Libraries::VideoOut {
@@ -97,7 +97,7 @@ void VideoOutDriver::RunPresenter(std::function<void()> work, bool if_idle) {
 }
 
 void VideoOutDriver::SwapThread(std::stop_token token) {
-    Common::SetCurrentThreadName("gow3:Present");
+    Common::SetCurrentThreadName("tsuki:Present");
     while (true) {
         std::function<void()> work;
         {
@@ -301,7 +301,7 @@ int VideoOutDriver::ChangeBufferAttribute(VideoOutPort* port, s32 attributeIndex
 }
 
 void VideoOutDriver::Flip(const Request& req) {
-    // Update HDR status before presenting, then present the frame (gow3: on the swap thread).
+    // Update HDR status before presenting, then present the frame (tsuki: on the swap thread).
     RunPresenter([this, frame = req.frame, hdr = req.port->is_hdr] {
         presenter->SetHDR(hdr);
         presenter->Present(frame);
@@ -309,7 +309,7 @@ void VideoOutDriver::Flip(const Request& req) {
     Vulkan::FrameCapture::OnFlip(req.index >= 0 ? req.port->buffer_slots[req.index].address_left
                                                 : 0);
 
-    // gow3: TSUKI_FRAME_STATS=1 prints flip rate and frame time spread every 5 seconds.
+    // tsuki: TSUKI_FRAME_STATS=1 prints flip rate and frame time spread every 5 seconds.
     static const bool frame_stats = EmulatorSettingsImpl::Flag("TSUKI_FRAME_STATS", false);
     if (frame_stats) {
         using Clock = std::chrono::steady_clock;
@@ -325,16 +325,17 @@ void VideoOutDriver::Flip(const Request& req) {
         // Stall diagnostics: what happened during a long frame.
         static u64 last_gpu_ns, last_images, last_image_bytes, last_buffer_bytes;
         static u64 last_t[6], last_minflt, last_sigf, last_pc, last_pp, last_rc, last_rp;
-        const u64 pc = Gow3Stats::protect_calls.load(), pp = Gow3Stats::protect_pages.load(),
-                  rc = Gow3Stats::protect_revoke_calls.load(), rp = Gow3Stats::protect_revoke_pages.load();
-        const u64 minflt = Gow3Stats::gpu_minor_faults.load(), sigf = Gow3Stats::gpu_signal_faults.load();
+        const u64 pc = TsukiStats::protect_calls.load(), pp = TsukiStats::protect_pages.load(),
+                  rc = TsukiStats::protect_revoke_calls.load(), rp = TsukiStats::protect_revoke_pages.load();
+        const u64 minflt = TsukiStats::gpu_minor_faults.load(), sigf = TsukiStats::gpu_signal_faults.load();
         static u64 last_copy_cpu, last_copy_sys, last_copy_flt;
-        const u64 copy_cpu = Gow3Stats::t_copy_cpu.load(), copy_sys = Gow3Stats::copy_sys_us.load(),
-                  copy_flt = Gow3Stats::copy_minflt.load();
+        const u64 copy_cpu = TsukiStats::t_copy_cpu.load(),
+                  copy_sys = TsukiStats::copy_sys_us.load(),
+                  copy_flt = TsukiStats::copy_minflt.load();
         static u64 last_proc_flt, last_copy_ns, last_copy_bytes, last_rf, last_trf, last_twf;
-        const u64 rf = Gow3Stats::read_faults.load(), trf = Gow3Stats::t_read_faults.load(),
-                  twf = Gow3Stats::t_write_faults.load();
-        // gow3: every frame over 40 ms after the first, at most 10 per 5 s window.
+        const u64 rf = TsukiStats::read_faults.load(), trf = TsukiStats::t_read_faults.load(),
+                  twf = TsukiStats::t_write_faults.load();
+        // tsuki: every frame over 40 ms after the first, at most 10 per 5 s window.
         static bool primed = false;
         static u32 stalls_shown = 0;
         const bool stall = primed && frame_ms > 40.0 && stalls_shown < 10;
@@ -343,10 +344,11 @@ void VideoOutDriver::Flip(const Request& req) {
         // Waits and work inside the long frame (window counters are reset every 5 s, so the
         // previous values are reset with them).
         static u64 last_wait[7];
-        const u64 wait_now[7] = {Gow3Stats::t_readback_wait.load(), Gow3Stats::tick_wait_ns.load(),
-                                 Gow3Stats::sync_recording_ns.load(), Gow3Stats::host_copies_wait_ns.load(),
-                                 u64(Vulkan::g_gow3_compile_ns.load()), u64(Vulkan::g_gow3_compiles.load()),
-                                 Gow3Stats::t_gc.load()};
+        const u64 wait_now[7] = {TsukiStats::t_readback_wait.load(),
+                                 TsukiStats::tick_wait_ns.load(),
+                                 TsukiStats::sync_recording_ns.load(), TsukiStats::host_copies_wait_ns.load(),
+                                 u64(Vulkan::g_tsuki_compile_ns.load()), u64(Vulkan::g_tsuki_compiles.load()),
+                                 TsukiStats::t_gc.load()};
         if (stall) {
             std::printf("Stall: %.1f ms frame; waits: readback %.1f ms, GPU ticks %.1f ms, "
                         "recorder %.1f ms, host copies %.1f ms; %llu compiles %.1f ms; GC %.1f ms\n",
@@ -364,27 +366,27 @@ void VideoOutDriver::Flip(const Request& req) {
         last_rf = rf;
         last_trf = trf;
         last_twf = twf;
-        const u64 copy_ns = Gow3Stats::t_copy.load(), copy_bytes = Gow3Stats::copy_bytes.load();
+        const u64 copy_ns = TsukiStats::t_copy.load(), copy_bytes = TsukiStats::copy_bytes.load();
         u64 proc_flt = 0;
 #ifndef _WIN32
         if (rusage usage{}; getrusage(RUSAGE_SELF, &usage) == 0) {
             proc_flt = usage.ru_minflt;
         }
 #endif
-        const u64 t_now[6] = {Gow3Stats::t_resident.load(), Gow3Stats::t_protect.load(),
-                              Gow3Stats::t_image_create.load(), Gow3Stats::t_refresh.load(),
-                              Gow3Stats::t_staging.load(), Gow3Stats::t_host_wait.load()};
+        const u64 t_now[6] = {TsukiStats::t_resident.load(), TsukiStats::t_protect.load(),
+                              TsukiStats::t_image_create.load(), TsukiStats::t_refresh.load(),
+                              TsukiStats::t_staging.load(), TsukiStats::t_host_wait.load()};
         static u64 last_draws, last_dispatches, last_subs, last_sys, last_user, last_invol, last_vol;
-        const u64 draws = Gow3Stats::draws.load(), dispatches = Gow3Stats::dispatches.load(),
-                  subs = Gow3Stats::submissions.load(), sys_us = Gow3Stats::gpu_sys_us.load(),
-                  user_us = Gow3Stats::gpu_user_us.load(), invol = Gow3Stats::gpu_invol_switches.load(),
-                  vol = Gow3Stats::gpu_vol_switches.load();
+        const u64 draws = TsukiStats::draws.load(), dispatches = TsukiStats::dispatches.load(),
+                  subs = TsukiStats::submissions.load(), sys_us = TsukiStats::gpu_sys_us.load(),
+                  user_us = TsukiStats::gpu_user_us.load(), invol = TsukiStats::gpu_invol_switches.load(),
+                  vol = TsukiStats::gpu_vol_switches.load();
         u64 gpu_ns = 0;
 #ifdef _WIN32
-        // gow3: Windows has no per-thread clock id; the thread's user + kernel time instead.
+        // tsuki: Windows has no per-thread clock id; the thread's user + kernel time instead.
         static HANDLE gpu_thread = nullptr;
         if (!gpu_thread) {
-            if (const unsigned long id = Gow3Stats::gpu_thread_id.load()) {
+            if (const unsigned long id = TsukiStats::gpu_thread_id.load()) {
                 gpu_thread = OpenThread(THREAD_QUERY_LIMITED_INFORMATION, FALSE, id);
             }
         }
@@ -396,15 +398,15 @@ void VideoOutDriver::Flip(const Request& req) {
             gpu_ns = ns(kernel) + ns(user);
         }
 #else
-        if (const int clock = Gow3Stats::gpu_thread_clock.load(); clock != -1) {
+        if (const int clock = TsukiStats::gpu_thread_clock.load(); clock != -1) {
             timespec ts{};
             clock_gettime(static_cast<clockid_t>(clock), &ts);
             gpu_ns = u64(ts.tv_sec) * 1000000000ull + u64(ts.tv_nsec);
         }
 #endif
-        const u64 images = Gow3Stats::images_registered.load();
-        const u64 image_bytes = Gow3Stats::image_upload_bytes.load();
-        const u64 buffer_bytes = Gow3Stats::buffer_upload_bytes.load();
+        const u64 images = TsukiStats::images_registered.load();
+        const u64 image_bytes = TsukiStats::image_upload_bytes.load();
+        const u64 buffer_bytes = TsukiStats::buffer_upload_bytes.load();
         if (stall) {
             std::printf("       GPU thread on CPU %.1f ms; %llu images registered, "
                         "%.1f MB image uploads, %.1f MB buffer uploads\n",
@@ -471,21 +473,21 @@ void VideoOutDriver::Flip(const Request& req) {
         ++frames;
         const double window = std::chrono::duration<double>(now - window_start).count();
         if (window >= 5.0) {
-            const u32 compiles = Vulkan::g_gow3_compiles.exchange(0);
-            const u64 compile_ns = Vulkan::g_gow3_compile_ns.exchange(0);
-            const double capture_ms = Vulkan::g_gow3_capture_ns.exchange(0) / 1e6;
-            const double async_ms = Vulkan::g_gow3_async_ns.exchange(0) / 1e6;
-            const double wait_ms = Vulkan::g_gow3_compile_wait_ns.exchange(0) / 1e6;
-            const double snapshot_ms = Vulkan::g_gow3_snapshot_ns.exchange(0) / 1e6;
-            const double guest_wait_ms = Vulkan::g_gow3_guest_wait_ns.exchange(0) / 1e6;
-            const u32 pending_draws = Vulkan::g_gow3_pending_draws.exchange(0);
+            const u32 compiles = Vulkan::g_tsuki_compiles.exchange(0);
+            const u64 compile_ns = Vulkan::g_tsuki_compile_ns.exchange(0);
+            const double capture_ms = Vulkan::g_tsuki_capture_ns.exchange(0) / 1e6;
+            const double async_ms = Vulkan::g_tsuki_async_ns.exchange(0) / 1e6;
+            const double wait_ms = Vulkan::g_tsuki_compile_wait_ns.exchange(0) / 1e6;
+            const double snapshot_ms = Vulkan::g_tsuki_snapshot_ns.exchange(0) / 1e6;
+            const double guest_wait_ms = Vulkan::g_tsuki_guest_wait_ns.exchange(0) / 1e6;
+            const u32 pending_draws = Vulkan::g_tsuki_pending_draws.exchange(0);
             const u64 direct = Vulkan::Scheduler::direct_recordings.exchange(0);
-            const u64 faults = Gow3Stats::tracker_faults.exchange(0);
+            const u64 faults = TsukiStats::tracker_faults.exchange(0);
             // GPU command thread CPU time per draw: comparable between builds even when the scene
             // (and so the frame rate) differs a little.
             static u64 window_draws = 0, window_gpu_us = 0;
-            const u64 all_draws = Gow3Stats::draws.load();
-            const u64 gpu_us = Gow3Stats::gpu_user_us.load() + Gow3Stats::gpu_sys_us.load();
+            const u64 all_draws = TsukiStats::draws.load();
+            const u64 gpu_us = TsukiStats::gpu_user_us.load() + TsukiStats::gpu_sys_us.load();
             const double us_per_draw = all_draws > window_draws
                                            ? double(gpu_us - window_gpu_us) / (all_draws - window_draws)
                                            : 0.0;
@@ -503,14 +505,14 @@ void VideoOutDriver::Flip(const Request& req) {
                         compile_ns / 1e6, capture_ms, async_ms, wait_ms, snapshot_ms, guest_wait_ms,
                         pending_draws,
                         static_cast<unsigned long long>(direct),
-                        faults / window, static_cast<long long>(Gow3Stats::hot_pages.load()),
+                        faults / window, static_cast<long long>(TsukiStats::hot_pages.load()),
                         us_per_draw, draws_per_frame,
-                        Gow3Stats::gpu_idle_ns.exchange(0) / (window * 1e7),
-                        Gow3Stats::sync_recording_ns.exchange(0) / (window * 1e7),
-                        Gow3Stats::host_copies_wait_ns.exchange(0) / (window * 1e7),
-                        frames ? double(Gow3Stats::host_copy_waits.exchange(0)) / frames : 0.0,
-                        Gow3Stats::copy_threads_wait_ns.exchange(0) / (window * 1e7),
-                        Gow3Stats::tick_wait_ns.exchange(0) / (window * 1e7));
+                        TsukiStats::gpu_idle_ns.exchange(0) / (window * 1e7),
+                        TsukiStats::sync_recording_ns.exchange(0) / (window * 1e7),
+                        TsukiStats::host_copies_wait_ns.exchange(0) / (window * 1e7),
+                        frames ? double(TsukiStats::host_copy_waits.exchange(0)) / frames : 0.0,
+                        TsukiStats::copy_threads_wait_ns.exchange(0) / (window * 1e7),
+                        TsukiStats::tick_wait_ns.exchange(0) / (window * 1e7));
             presenter->GetRasterizer().GetPipelineCache().ReportCompilerStats();
             Vulkan::WaitDiagnostics::Report();
             // Frame pacing: spread of the guest flip intervals (judder that the mean hides).
@@ -652,15 +654,15 @@ void VideoOutDriver::PresentThread(std::stop_token token) {
 
     Common::AccurateTimer timer{vblank_period};
 
-    // gow3: frame limit (see EmulatorSettings::GetFrameLimit). A request waits in the queue
+    // tsuki: frame limit (see EmulatorSettings::GetFrameLimit). A request waits in the queue
     // until its slot; slots advance by one period (no drift) but never lag behind by more.
-    // gow3: the in-game menu changes the limit live (Gow3Settings::fps_limit); TSUKI_FPS_LIMIT
+    // tsuki: the in-game menu changes the limit live (TsukiSettings::fps_limit); TSUKI_FPS_LIMIT
     // and the uncapped presets keep their fixed limit.
     const bool fixed_limit = std::getenv("TSUKI_FPS_LIMIT") || EmulatorSettings.GetVblankFrequency() == 480;
     const auto current_limit = [&] {
-        const auto& s = Gow3Settings::Get();
+        const auto& s = TsukiSettings::Get();
         return fixed_limit ? EmulatorSettings.GetFrameLimit()
-                           : u32(Gow3Graphics::PresentLimit(s.fps_limit, s.applied_engine_fps));
+                           : u32(TsukiGraphics::PresentLimit(s.fps_limit, s.applied_engine_fps));
     };
     u32 frame_limit = current_limit();
     auto frame_period = frame_limit ? std::chrono::nanoseconds(1000000000 / frame_limit)
@@ -679,7 +681,7 @@ void VideoOutDriver::PresentThread(std::stop_token token) {
         return {};
     };
 
-    // gow3: with a frame limit (uncapped presets) a queued flip is presented as soon as it
+    // tsuki: with a frame limit (uncapped presets) a queued flip is presented as soon as it
     // arrives and its slot allows, between vblanks, instead of on the next vblank tick.
     bool immediate_flips = frame_limit != 0;
 

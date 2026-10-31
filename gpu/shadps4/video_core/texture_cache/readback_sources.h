@@ -10,7 +10,7 @@
 
 namespace VideoCore {
 
-// gow3: who asked for a pending image readback to reach RAM. Only used by the
+// tsuki: who asked for a pending image readback to reach RAM. Only used by the
 // TSUKI_PERF_DIAG report, to find the consumer behind the remaining readback waits.
 enum class ReadbackSource : std::uint8_t {
     Unknown,

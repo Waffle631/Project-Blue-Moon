@@ -65,7 +65,7 @@ class StreamMemoryLauncherTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder, \
                 mock.patch.object(launcher, 'CONFIG_DIR', Path(folder)), \
                 mock.patch.object(launcher, 'CONFIG_FILE', Path(folder) / 'settings.json'), \
-                mock.patch.dict(os.environ, {'TSUKI_CONFIG': str(Path(folder) / 'gow3.ini')}):
+                mock.patch.dict(os.environ, {'TSUKI_CONFIG': str(Path(folder) / 'tsuki.ini')}):
             app = launcher.Launcher.__new__(launcher.Launcher)
             app.tk, app.ttk, app.root, app.dpi = tk, ttk, root, 1.0
             app.content, app.pages, app.vars = ttk.Frame(root), {}, {}

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// gow3: TSUKI_WRITE_LOG=1 — a ring of the writes the GPU emulation makes to guest memory (fences,
+// tsuki: TSUKI_WRITE_LOG=1 — a ring of the writes the GPU emulation makes to guest memory (fences,
 // WriteData, buffer and image downloads), dumped when the guest faults: which of them landed
 // where the guest's data got corrupted. Diagnostic only.
 #pragma once
 
 #include <cstdint>
 
-namespace Gow3WriteLog {
+namespace TsukiWriteLog {
 enum Source : std::uint32_t { Backing, WriteData, Fence, FenceIntent, WriteDataIntent, EosIntent };
 bool Enabled();
 /// TSUKI_WRITE_LOG=1: at the write itself (changes the timing of those writes).
@@ -16,4 +16,4 @@ void Note(std::uint64_t address, const void* data, std::uint64_t size, Source so
 void NoteIntent(std::uint64_t address, const void* data, std::uint64_t size, Source source);
 }
 
-extern "C" void gow3gpu_dump_guest_writes(void* ucontext);
+extern "C" void tsukigpu_dump_guest_writes(void* ucontext);

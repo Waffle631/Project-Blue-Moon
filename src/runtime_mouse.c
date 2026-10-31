@@ -1,5 +1,5 @@
 /* libSceMouse on the host mouse. The window thread accumulates SDL events (gpu/shim/tsuki_mouse.h);
- * each sceMouseRead takes what arrived since the previous one through gow3gpu_mouse_read: deltas that
+ * each sceMouseRead takes what arrived since the previous one through tsukigpu_mouse_read: deltas that
  * put the game's cursor where the pointer is.
  *
  * What the game does with it (eboot analysis, docs/specs/2026-10-14-spec-6-2d-raton-saves.md §4):
@@ -73,7 +73,7 @@ static ABI int32_t mouse_read(int32_t handle,unsigned char *data,int32_t count) 
     if (result) return result;
     int32_t dx=0, dy=0, wheel=0; uint32_t buttons=0;
     /* An open menu is the bridge's business (all zero): it alone knows where it left the game's cursor. */
-    int present=gow3gpu_mouse_read(&dx,&dy,&wheel,&buttons) && !disabled; /* drained either way */
+    int present=tsukigpu_mouse_read(&dx,&dy,&wheel,&buttons) && !disabled; /* drained either way */
     MouseData report; memset(&report,0,sizeof(report));
     if (present) { report.timestamp=now_us(); report.connected=1; report.buttons=buttons; report.x_axis=dx; report.y_axis=dy; report.wheel=wheel; }
     memcpy(data,&report,sizeof(report));

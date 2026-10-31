@@ -44,7 +44,7 @@
 #include <vector>
 #include <vk_mem_alloc.h>
 #ifdef MemoryBarrier
-#undef MemoryBarrier // gow3: winnt.h macro (through fmt), clashes with vk::MemoryBarrier
+#undef MemoryBarrier // tsuki: winnt.h macro (through fmt), clashes with vk::MemoryBarrier
 #endif
 
 namespace Vulkan {
@@ -130,7 +130,7 @@ static vk::Rect2D FitImage(s32 frame_width, s32 frame_height, s32 swapchain_widt
                          dst_rect.offset.x, dst_rect.offset.y);
 }
 
-// gow3: screenshot capture and ImGui overlays removed; the port presents directly.
+// tsuki: screenshot capture and ImGui overlays removed; the port presents directly.
 
 Presenter::Presenter(Frontend::WindowSDL& window_, AmdGpu::Liverpool* liverpool_)
     : window{window_}, liverpool{liverpool_},
@@ -156,7 +156,7 @@ Presenter::Presenter(Frontend::WindowSDL& window_, AmdGpu::Liverpool* liverpool_
 
     fsr_pass.Create(device, instance.GetAllocator(), num_images);
     pp_pass.Create(device, swapchain.GetSurfaceFormat().format);
-    Gow3Overlay::Init(instance, swapchain.GetSurfaceFormat().format, num_images);
+    TsukiOverlay::Init(instance, swapchain.GetSurfaceFormat().format, num_images);
 
     const bool binary_cache = EmulatorSettingsImpl::Flag("TSUKI_PIPELINE_BINARIES", true) &&
                               EmulatorSettings.IsPipelineCacheEnabled();
@@ -168,7 +168,7 @@ Presenter::Presenter(Frontend::WindowSDL& window_, AmdGpu::Liverpool* liverpool_
         return;
     }
 
-    // gow3: by default the cached pipelines load while the game runs (a corner note shows the
+    // tsuki: by default the cached pipelines load while the game runs (a corner note shows the
     // progress). Otherwise rebuilding them takes up to minutes before the first game frame:
     // show what is happening instead of a black window.
     const char* background_warmup = std::getenv("TSUKI_BACKGROUND_WARMUP");
@@ -176,7 +176,7 @@ Presenter::Presenter(Frontend::WindowSDL& window_, AmdGpu::Liverpool* liverpool_
         rasterizer->GetPipelineCache().StartBackgroundWarmUp()) {
         return;
     }
-    Gow3Overlay::SetLoading(true, 0, 0);
+    TsukiOverlay::SetLoading(true, 0, 0);
     PresentLoadingFrame();
     auto last = std::chrono::steady_clock::now();
     rasterizer->GetPipelineCache().WarmUp([&](u32 done, u32 total) {
@@ -185,10 +185,10 @@ Presenter::Presenter(Frontend::WindowSDL& window_, AmdGpu::Liverpool* liverpool_
             return;
         }
         last = now;
-        Gow3Overlay::SetLoading(true, done, total);
+        TsukiOverlay::SetLoading(true, done, total);
         PresentLoadingFrame();
     });
-    Gow3Overlay::SetLoading(false, 0, 0);
+    TsukiOverlay::SetLoading(false, 0, 0);
 
 }
 
@@ -349,7 +349,7 @@ static vk::Format GetFrameViewFormat(const Libraries::VideoOut::PixelFormat form
     return {};
 }
 
-// gow3: copies a 32-bit image to host memory and hands the pixels to `sink` on the scheduler's
+// tsuki: copies a 32-bit image to host memory and hands the pixels to `sink` on the scheduler's
 // priority thread once the GPU is done (TSUKI_FRAME_DUMP_TRIGGER raw dumps, PNG screenshots).
 using HostImageSink = std::function<void(const u8* pixels, u32 w, u32 h)>;
 static void CopyToHost(const Instance& instance, Scheduler& scheduler, vk::CommandBuffer cmdbuf,
@@ -379,7 +379,7 @@ static void CopyToHost(const Instance& instance, Scheduler& scheduler, vk::Comma
     });
 }
 
-// gow3: TSUKI_FRAME_DUMP_TRIGGER: the pixels as they are, in TSUKI_DUMP_DIR (default out/dump).
+// tsuki: TSUKI_FRAME_DUMP_TRIGGER: the pixels as they are, in TSUKI_DUMP_DIR (default out/dump).
 static void DumpRaw(const Instance& instance, Scheduler& scheduler, vk::CommandBuffer cmdbuf,
                     vk::Image image, vk::ImageLayout layout, u32 w, u32 h, const char* name,
                     int index) {
@@ -396,16 +396,16 @@ static void DumpRaw(const Instance& instance, Scheduler& scheduler, vk::CommandB
                });
 }
 
-// gow3: byte order of a presented frame for Gow3Screenshot; nothing for formats a PNG would
+// tsuki: byte order of a presented frame for TsukiScreenshot; nothing for formats a PNG would
 // misrepresent (10-bit, HDR), which are reported and never captured with swapped channels.
-static std::optional<Gow3Screenshot::PixelOrder> ScreenshotOrder(vk::Format format) {
+static std::optional<TsukiScreenshot::PixelOrder> ScreenshotOrder(vk::Format format) {
     switch (format) {
     case vk::Format::eB8G8R8A8Unorm:
     case vk::Format::eB8G8R8A8Srgb:
-        return Gow3Screenshot::PixelOrder::Bgra;
+        return TsukiScreenshot::PixelOrder::Bgra;
     case vk::Format::eR8G8B8A8Unorm:
     case vk::Format::eR8G8B8A8Srgb:
-        return Gow3Screenshot::PixelOrder::Rgba;
+        return TsukiScreenshot::PixelOrder::Rgba;
     default:
         return std::nullopt;
     }
@@ -413,17 +413,17 @@ static std::optional<Gow3Screenshot::PixelOrder> ScreenshotOrder(vk::Format form
 
 Frame* Presenter::PrepareFrame(const Libraries::VideoOut::BufferAttributeGroup& attribute,
                                VAddr cpu_address) {
-    // gow3: TSUKI_FRAME_DUMP_TRIGGER=<file>: when the file exists it is removed and this frame's
+    // tsuki: TSUKI_FRAME_DUMP_TRIGGER=<file>: when the file exists it is removed and this frame's
     // guest display buffer and presented image are written to TSUKI_DUMP_DIR (default out/dump)
     // as raw 32-bit pixels (menus and movies included).
     static const char* frame_dump_trigger = std::getenv("TSUKI_FRAME_DUMP_TRIGGER");
     static int frame_dump_index = 0;
     const bool frame_dump = frame_dump_trigger && std::remove(frame_dump_trigger) == 0;
-    // gow3: presentation frame number (one PrepareFrame per guest flip, the first is 1) for
+    // tsuki: presentation frame number (one PrepareFrame per guest flip, the first is 1) for
     // TSUKI_SCREENSHOT_AT and F12 (tsuki_screenshot.h): the presented image is saved as a PNG.
     static u64 presented_frames = 0;
     const u64 frame_number = ++presented_frames;
-    const bool screenshot = Gow3Screenshot::Global().ShouldCapture(frame_number);
+    const bool screenshot = TsukiScreenshot::Global().ShouldCapture(frame_number);
     auto desc = VideoCore::TextureCache::ImageDesc{attribute, cpu_address};
     const VideoCore::ImageId image_id = texture_cache.FindImage(desc);
     texture_cache.UpdateImage(image_id);
@@ -477,18 +477,18 @@ Frame* Presenter::PrepareFrame(const Libraries::VideoOut::BufferAttributeGroup& 
     runtime.FlushBarriers();
     expected_ratio = static_cast<float>(image_size.width) / static_cast<float>(image_size.height);
 
-    // gow3: FSR 1, RCAS and its strength come from the in-game menu, every frame.
-    const auto& graphics = Gow3Settings::Get();
+    // tsuki: FSR 1, RCAS and its strength come from the in-game menu, every frame.
+    const auto& graphics = TsukiSettings::Get();
     fsr_settings.enable = graphics.fsr1;
     fsr_settings.use_rcas = graphics.rcas;
-    fsr_settings.rcas_attenuation = Gow3Graphics::RcasAttenuation(graphics.rcas_strength);
-    Gow3Settings::Get().image_width = int(image_size.width);
-    Gow3Settings::Get().image_height = int(image_size.height);
-    Gow3Settings::Get().window_width = int(frame->width);
-    Gow3Settings::Get().window_height = int(frame->height);
-    Gow3Settings::Get().rcas_applied =
+    fsr_settings.rcas_attenuation = TsukiGraphics::RcasAttenuation(graphics.rcas_strength);
+    TsukiSettings::Get().image_width = int(image_size.width);
+    TsukiSettings::Get().image_height = int(image_size.height);
+    TsukiSettings::Get().window_width = int(frame->width);
+    TsukiSettings::Get().window_height = int(frame->height);
+    TsukiSettings::Get().rcas_applied =
         fsr_settings.use_rcas &&
-        Gow3Graphics::FsrPassRuns(fsr_settings.enable, true, int(image_size.width), int(image_size.height),
+        TsukiGraphics::FsrPassRuns(fsr_settings.enable, true, int(image_size.width), int(image_size.height),
                                   int(frame->width), int(frame->height));
     image_view = fsr_pass.Render(cmdbuf, image_view, image_size, {frame->width, frame->height},
                                  fsr_settings, frame->is_hdr);
@@ -525,8 +525,9 @@ Frame* Presenter::PrepareFrame(const Libraries::VideoOut::BufferAttributeGroup& 
                    [frame_number, order = *screenshot_order](const u8* pixels, u32 w, u32 h) {
                        std::filesystem::path written;
                        std::string error;
-                       if (Gow3Screenshot::SavePng(Gow3Screenshot::OutputDirectory(), frame_number,
-                                                   pixels, w, h, order, written, error)) {
+                       if (TsukiScreenshot::SavePng(TsukiScreenshot::OutputDirectory(),
+                                                    frame_number, pixels, w, h, order, written,
+                                                    error)) {
                            // Straight to stderr: the default GPU log level hides LOG_INFO.
                            std::fprintf(stderr, "Screenshot: %s (frame %llu)\n",
                                         written.string().c_str(),
@@ -544,13 +545,13 @@ Frame* Presenter::PrepareFrame(const Libraries::VideoOut::BufferAttributeGroup& 
     SubmitInfo info{};
     draw_scheduler.Flush(info);
 
-    // gow3: the GPU command thread runs at most TSUKI_FRAMES_AHEAD (default 1) guest frames
+    // tsuki: the GPU command thread runs at most TSUKI_FRAMES_AHEAD (default 1) guest frames
     // ahead of the GPU: it waits here for the frame that many flips back. When the GPU is the
     // bottleneck it finishes frames at an even rate; without this bound the command thread ran
     // ahead and then blocked wherever a resource ran out, so flips (and the guest's frame
     // timing) came in bursts: 12.5/25 ms alternation at 80 FPS. 0 turns it off.
-    // The in-game menu changes it live (Gow3Settings::frames_queued; TSUKI_FRAMES_AHEAD at start).
-    const u32 frames_ahead = u32(std::max(0, Gow3Settings::Get().frames_queued.load()));
+    // The in-game menu changes it live (TsukiSettings::frames_queued; TSUKI_FRAMES_AHEAD at start).
+    const u32 frames_ahead = u32(std::max(0, TsukiSettings::Get().frames_queued.load()));
     if (!frames_ahead) {
         recent_frame_ticks.clear();
     } else {
@@ -680,7 +681,7 @@ void Presenter::PresentLoadingFrame() {
                            range);
     barrier(vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eColorAttachmentOptimal,
             vk::AccessFlagBits::eTransferWrite, vk::AccessFlagBits::eColorAttachmentWrite);
-    Gow3Overlay::Render(cmdbuf, swapchain.ImageView(), extent);
+    TsukiOverlay::Render(cmdbuf, swapchain.ImageView(), extent);
     barrier(vk::ImageLayout::eColorAttachmentOptimal, vk::ImageLayout::ePresentSrcKHR,
             vk::AccessFlagBits::eColorAttachmentWrite, {});
     SubmitInfo info{};
@@ -696,9 +697,9 @@ void Presenter::PresentLoadingFrame() {
 }
 
 void Presenter::Present(Frame* frame, bool is_reusing_frame, bool is_game_frame) {
-    // gow3: counted before the early returns (minimized window, lost swapchain image).
+    // tsuki: counted before the early returns (minimized window, lost swapchain image).
     if (!is_reusing_frame && is_game_frame) {
-        Gow3Stats::flips.fetch_add(1, std::memory_order_relaxed);
+        TsukiStats::flips.fetch_add(1, std::memory_order_relaxed);
     }
     // Free the frame for reuse
     const auto free_frame = [&] {
@@ -710,7 +711,7 @@ void Presenter::Present(Frame* frame, bool is_reusing_frame, bool is_game_frame)
         }
     };
 
-    // gow3: a minimized window has no pixels on Windows (0x0); keep the swapchain and skip
+    // tsuki: a minimized window has no pixels on Windows (0x0); keep the swapchain and skip
     // presenting until the window is restored.
     if (window.GetWidth() == 0 || window.GetHeight() == 0) {
         free_frame();
@@ -740,7 +741,7 @@ void Presenter::Present(Frame* frame, bool is_reusing_frame, bool is_game_frame)
     ASSERT_MSG(reset_result == vk::Result::eSuccess,
                "Unexpected error resetting present done fence: {}", vk::to_string(reset_result));
 
-    // gow3: the game frame is blitted (letterboxed) straight into the swapchain image.
+    // tsuki: the game frame is blitted (letterboxed) straight into the swapchain image.
     const vk::Image swapchain_image = swapchain.Image();
     auto& scheduler = present_scheduler;
     const auto cmdbuf = scheduler.CommandBuffer();
@@ -798,8 +799,8 @@ void Presenter::Present(Frame* frame, bool is_reusing_frame, bool is_game_frame)
                          vk::ImageLayout::eTransferDstOptimal,
                          MakeImageBlitFit(frame->width, frame->height, extent.width, extent.height),
                          vk::Filter::eLinear);
-        // gow3: the settings menu / FPS counter over the frame, at display resolution.
-        const bool overlay = Gow3Overlay::Visible();
+        // tsuki: the settings menu / FPS counter over the frame, at display resolution.
+        const bool overlay = TsukiOverlay::Visible();
         const std::array post_barriers{
             vk::ImageMemoryBarrier{
                 .srcAccessMask = vk::AccessFlagBits::eTransferWrite,
@@ -829,7 +830,7 @@ void Presenter::Present(Frame* frame, bool is_reusing_frame, bool is_game_frame)
                                vk::PipelineStageFlagBits::eAllCommands,
                                vk::DependencyFlagBits::eByRegion, {}, {}, post_barriers);
         if (overlay) {
-            Gow3Overlay::Render(cmdbuf, swapchain.ImageView(), extent);
+            TsukiOverlay::Render(cmdbuf, swapchain.ImageView(), extent);
             const vk::ImageMemoryBarrier to_present{
                 .srcAccessMask = vk::AccessFlagBits::eColorAttachmentWrite,
                 .dstAccessMask = vk::AccessFlagBits::eNone,

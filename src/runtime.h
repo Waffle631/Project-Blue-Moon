@@ -4,10 +4,10 @@
 #include <stddef.h>
 #ifdef _WIN32
 #include "compat_win.h"
-/* No signals on Windows: the exception handler resumes the thread in gow3_longjmp
+/* No signals on Windows: the exception handler resumes the thread in tsuki_longjmp
  * (gpu/shim/tsuki_toggles.h uses the same buffer type). */
-typedef gow3_jmp_buf sigjmp_buf;
-#define sigsetjmp(buffer, save) gow3_setjmp(buffer)
+typedef tsuki_jmp_buf sigjmp_buf;
+#define sigsetjmp(buffer, save) tsuki_setjmp(buffer)
 #else
 #include <setjmp.h>
 #endif

@@ -8,8 +8,8 @@ import sys
 import tempfile
 import unittest
 
-EXE = ROOT / 'out/gow3-probe'
-HOST_EXE = ROOT / ('out/gow3-probe' + ('.exe' if sys.platform == 'win32' else ''))
+EXE = ROOT / 'out/tsuki-probe'
+HOST_EXE = ROOT / ('out/tsuki-probe' + ('.exe' if sys.platform == 'win32' else ''))
 
 
 def package(code, relocs=(), names=(), capabilities=None):

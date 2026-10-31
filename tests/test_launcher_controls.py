@@ -88,7 +88,7 @@ class ControlMapTest(unittest.TestCase):
         self.assertEqual(env['TSUKI_PERF_DIAG'], '0')
         self.assertNotIn('TSUKI_FRAME_CAPTURE_KEY', {k for k in env if k not in __import__('os').environ})
         self.assertEqual(launcher.game_environment({**settings, 'frame_capture_key': True})['TSUKI_FRAME_CAPTURE_KEY'], '1')
-        # Graphics options live in gow3.ini (run.py and the in-game menu), not in the environment.
+        # Graphics options live in tsuki.ini (run.py and the in-game menu), not in the environment.
         for name in ('TSUKI_FULLSCREEN', 'TSUKI_PRESENT_MODE', 'TSUKI_FPS_LIMIT', 'TSUKI_ASYNC_SHADERS',
                      'TSUKI_DEFERRED_READBACK', 'TSUKI_STALE_READBACK', 'TSUKI_FSR1', 'TSUKI_RCAS'):
             self.assertNotIn(name, {k for k in env if k not in __import__('os').environ})
@@ -503,7 +503,7 @@ class GpuChoiceTest(unittest.TestCase):
         from unittest import mock
         with mock.patch.object(launcher, 'find_tool', return_value=None):
             self.assertEqual(launcher.list_gpus(), [])
-        with mock.patch.object(launcher, 'find_tool', return_value='gow3-gpu-capabilities.exe'):
+        with mock.patch.object(launcher, 'find_tool', return_value='tsuki-gpu-capabilities.exe'):
             with mock.patch.object(launcher.subprocess, 'run', side_effect=subprocess.TimeoutExpired('x', 5)):
                 self.assertEqual(launcher.list_gpus(), [])
             with mock.patch.object(launcher.subprocess, 'run', side_effect=OSError):

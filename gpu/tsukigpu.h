@@ -13,41 +13,41 @@ typedef struct {
     uint32_t sdk_version;       /* from the eboot's procparam */
     uint32_t psf_attributes;    /* param.sfo ATTRIBUTE */
     int32_t width, height;      /* initial window size */
-} Gow3GpuConfig;
+} TsukiGpuConfig;
 /* Registers kernel event queues (needed with or without graphics). */
-void gow3gpu_register_kernel(void);
+void tsukigpu_register_kernel(void);
 /* Creates window, Vulkan device, presenter and GPU command processor. */
-int gow3gpu_init(const Gow3GpuConfig *config);
+int tsukigpu_init(const TsukiGpuConfig *config);
 /* Function for an imported NID ("NID#lib#mod"), or 0 when the GPU library does not provide it. */
-uintptr_t gow3gpu_resolve(const char *scoped_nid);
+uintptr_t tsukigpu_resolve(const char *scoped_nid);
 /* Called first by the loader's SIGSEGV handler: 1 when a GPU page-tracking fault was handled. */
-int gow3gpu_handle_fault(void *ucontext, void *address);
+int tsukigpu_handle_fault(void *ucontext, void *address);
 /* TSUKI_WRITE_LOG=1: prints the logged GPU-side writes to guest memory near the fault. */
-void gow3gpu_dump_guest_writes(void *ucontext);
+void tsukigpu_dump_guest_writes(void *ucontext);
 /* Keyboard text entry through the game window (IME dialog). begin returns 0 when
  * no window exists; poll returns 0 typing, 1 confirmed, 2 cancelled (UTF-8 text). */
-int gow3gpu_text_input_begin(const char *initial_utf8, const char *prompt_utf8);
-int gow3gpu_text_input_poll(char *out_utf8, uint64_t size);
+int tsukigpu_text_input_begin(const char *initial_utf8, const char *prompt_utf8);
+int tsukigpu_text_input_poll(char *out_utf8, uint64_t size);
 /* A list for the player to choose from, drawn over the game (save list). images: a PNG path per
  * item drawn beside it (NULL array or entry: none). begin: 0 when no window exists.
  * poll: -1 while open, -2 cancelled, else the chosen index. */
-int gow3gpu_choice_begin(const char *title, const char *const *items, const char *const *images, int count, int focus);
-int gow3gpu_choice_poll(void);
+int tsukigpu_choice_begin(const char *title, const char *const *items, const char *const *images, int count, int focus);
+int tsukigpu_choice_poll(void);
 /* 1 while the in-game settings menu is open: the game's pad input is held neutral. */
-int gow3gpu_overlay_captures_input(void);
+int tsukigpu_overlay_captures_input(void);
 /* libSceMouse source. Returns the deltas that bring the game's 640x448 cursor to the pointer since
  * the previous call, the whole wheel notches since then and the held buttons (0x1 left, 0x2 right,
  * 0x4 middle, 0x8/0x10 SDL X1/X2); gpu/shim/tsuki_mouse.h has the rules. While a menu, the text
  * entry or the save list captures the input everything is 0. Result: 1 when SDL has a mouse, 0 when
  * not. Any pointer may be NULL. */
-int gow3gpu_mouse_read(int32_t *dx, int32_t *dy, int32_t *wheel, uint32_t *buttons);
+int tsukigpu_mouse_read(int32_t *dx, int32_t *dy, int32_t *wheel, uint32_t *buttons);
 /* Counters for the final GPU: line (runtime_report and the watchdog): command buffer
  * submissions, draws, dispatches, guest flips presented, and warnings logged as unimplemented
  * (only those passing TSUKI_GPU_LOG). Atomic loads only: safe in a signal handler. */
-typedef struct { uint64_t submits, draws, dispatches, flips, unimplemented; } Gow3GpuStats;
-void gow3gpu_get_stats(Gow3GpuStats *out);
+typedef struct { uint64_t submits, draws, dispatches, flips, unimplemented; } TsukiGpuStats;
+void tsukigpu_get_stats(TsukiGpuStats *out);
 /* Number of symbols registered by the vendored libraries (diagnostics). */
-unsigned gow3gpu_symbol_count(void);
+unsigned tsukigpu_symbol_count(void);
 #ifdef __cplusplus
 }
 #endif

@@ -166,11 +166,11 @@ public:
     bool GetVideoData(AvPlayerFrameInfoEx& video_info);
     u64 CurrentTime();
     bool IsActive();
-    bool JumpToTime(u64 time); // gow3: Spec 5, task 4
+    bool JumpToTime(u64 time); // tsuki: Spec 5, task 4
 
 private:
     u64 DurationMillis() const;
-    s64 ElapsedMillis() const; // gow3: Spec 5, task 7
+    s64 ElapsedMillis() const; // tsuki: Spec 5, task 7
     AvPlayerStreamInfo CreateStreamInfo(u32 stream_index);
 
     static void ReleaseAVPacket(AVPacket* packet);
@@ -215,7 +215,7 @@ private:
     std::atomic_bool m_is_looping = false;
     std::atomic_bool m_is_paused = false;
     std::atomic_bool m_is_eof = false;
-    // gow3: ms the decoders skip up to after JumpToTime, 0 once they are there.
+    // tsuki: ms the decoders skip up to after JumpToTime, 0 once they are there.
     std::atomic<u64> m_video_jump_target = 0;
     std::atomic<u64> m_audio_jump_target = 0;
 
@@ -260,8 +260,9 @@ private:
     std::optional<std::chrono::high_resolution_clock::time_point> m_start_time{};
     std::chrono::high_resolution_clock::time_point m_pause_time{};
     std::chrono::high_resolution_clock::duration m_pause_duration{};
-    // gow3: the clock of a looping clip without audio runs on from Start, so the loops whose frames
-    // the game already took are taken off it; m_last_video_ts tells when the next frame starts one.
+    // tsuki: the clock of a looping clip without audio runs on from Start, so the loops whose
+    // frames the game already took are taken off it; m_last_video_ts tells when the next frame
+    // starts one.
     std::atomic<u64> m_loop_base_ms = 0;
     std::optional<u64> m_last_video_ts{};
 };

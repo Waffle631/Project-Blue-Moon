@@ -83,7 +83,7 @@ bool AvPlayerSource::Init(const AvPlayerInitData& init_data, std::string_view pa
             return false;
         }
     } else {
-        // gow3: guest paths are translated by the port's file system (runtime_file.c).
+        // tsuki: guest paths are translated by the port's file system (runtime_file.c).
         char host[1024];
         if (runtime_file_translate(std::string(path).c_str(), host, sizeof(host)) != 0) {
             LOG_ERROR(Lib_AvPlayer, "Cannot translate guest path {}", path);
@@ -311,7 +311,7 @@ bool AvPlayerSource::Stop() {
         return false;
     }
 
-    // gow3: no m_up_data_streamer->Reset() here. It rewound the FileReplacement position under
+    // tsuki: no m_up_data_streamer->Reset() here. It rewound the FileReplacement position under
     // FFmpeg's AVIOContext while the demuxer was still reading, so the decoders got the start of the
     // file as stream data ("Invalid NAL unit size"; avplayer-test, stop_right_after_start_and_twice),
     // and the AVIOContext kept believing it was elsewhere. A later Start seeks through
@@ -379,7 +379,7 @@ bool AvPlayerSource::GetVideoData(AvPlayerFrameInfoEx& video_info) {
 
     const auto current_time = CurrentTime();
     const auto& new_frame = m_video_frames.Front();
-    // gow3: in a looping clip without audio, a timestamp that goes back starts the next loop. Its
+    // tsuki: in a looping clip without audio, a timestamp that goes back starts the next loop. Its
     // frames are due one duration later than their timestamps say; against the clock capped at the
     // duration they all were due at once, and titlebg1.mp4 ran 3.3 times too fast from its second
     // loop on (avplayer-test, loops_back_on_the_clock).
@@ -509,7 +509,7 @@ u64 AvPlayerSource::CurrentTime() {
     return m_duration != 0 && current_time > m_duration ? m_duration : current_time;
 }
 
-// gow3: wall time since Start, less the pauses, without the cap at the duration (Spec 5, task 7).
+// tsuki: wall time since Start, less the pauses, without the cap at the duration (Spec 5, task 7).
 s64 AvPlayerSource::ElapsedMillis() const {
     using namespace std::chrono;
     if (!m_start_time.has_value()) {
@@ -524,8 +524,8 @@ bool AvPlayerSource::IsActive() {
            m_video_frames.Size() != 0 || m_audio_frames.Size() != 0;
 }
 
-// gow3: sceAvPlayerJumpToTime was a stub that returned OK without moving (Spec 5, task 4); the game
-// jumps to CurrentTime() + ~1 s right before it stops a video early (docs/avplayer.md §1). The
+// tsuki: sceAvPlayerJumpToTime was a stub that returned OK without moving (Spec 5, task 4); the
+// game jumps to CurrentTime() + ~1 s right before it stops a video early (docs/avplayer.md §1). The
 // threads stop as in Stop, the file seeks to the keyframe at or before `time`, packets and codecs
 // are flushed, queued frames give their buffers back, the clock moves to `time` and the threads
 // start again; the decoders skip what ends before `time` (SkipBeforeJumpTarget). Past the end, the
@@ -586,7 +586,7 @@ bool AvPlayerSource::JumpToTime(u64 time) {
     return true;
 }
 
-// gow3: JumpToTime seeks to the keyframe at or before its target, so each decoder skips the frames
+// tsuki: JumpToTime seeks to the keyframe at or before its target, so each decoder skips the frames
 // that end by the target, up to the first one that does not. A timestamp that goes back means the
 // source looped before getting there (a stream shorter than the clip): the target is over too.
 // `duration` is a frame's, in `time_base` (0 if unknown); `last` is the decoder's last skipped one.
@@ -665,7 +665,7 @@ void AvPlayerSource::DemuxerThread(std::stop_token stop) {
                 if (m_is_looping) {
                     LOG_INFO(Lib_AvPlayer, "EOF reached in demuxer. Looping the source...");
                     m_state.OnWarning(ORBIS_AVPLAYER_ERROR_WAR_LOOPING_BACK);
-                    // gow3: no avio_seek(pb, 0) first. Through the FileReplacement AVIOContext it
+                    // tsuki: no avio_seek(pb, 0) first. Through the FileReplacement AVIOContext it
                     // made the MOV demuxer read the moov again ("Found duplicated MOOV Atom"),
                     // after which every read was EOF and every seek failed: the demuxer spun here,
                     // one WAR_LOOPING_BACK per turn, and the clip froze after its first loop
@@ -816,14 +816,14 @@ void AvPlayerSource::VideoDecoderThread(std::stop_token stop) {
     Common::SetCurrentThreadName("shadPS4:AvVideoDecoder");
 
     LOG_INFO(Lib_AvPlayer, "Video Decoder Thread started");
-    s64 skipped = std::numeric_limits<s64>::min(); // gow3: SkipBeforeJumpTarget
-    // gow3: at EOF the decoder is drained with a null packet. It holds back as many frames as the
+    s64 skipped = std::numeric_limits<s64>::min(); // tsuki: SkipBeforeJumpTarget
+    // tsuki: at EOF the decoder is drained with a null packet. It holds back as many frames as the
     // stream reorders (has_b_frames: 1 or 2 in 75 of the game's 134 videos), and without the drain
     // a video with B-frames ended without its last frames (avplayer-test,
     // plays_to_end_with_b_frames; 148 of 150).
     bool draining = false;
     while ((!m_is_eof || m_video_packets.Size() != 0 || !draining) && !stop.stop_requested()) {
-        // gow3: also wake at EOF, which the demuxer notifies; otherwise a decoder that has drained
+        // tsuki: also wake at EOF, which the demuxer notifies; otherwise a decoder that has drained
         // its packets sleeps on, the demuxer never gets past joining it and OnEOF (the StateStop of
         // a natural end) never comes. The audio decoder of a video-only clip always slept there.
         if (m_video_packets.Size() == 0 && !m_video_packets_cv.Wait(stop, [this] {
@@ -831,7 +831,7 @@ void AvPlayerSource::VideoDecoderThread(std::stop_token stop) {
             })) {
             continue;
         }
-        // gow3: EOF read before Pop: the demuxer pushes nothing after it sets m_is_eof, so an
+        // tsuki: EOF read before Pop: the demuxer pushes nothing after it sets m_is_eof, so an
         // empty queue then means that the last packet has been sent.
         const bool eof = m_is_eof;
         const auto packet = m_video_packets.Pop();
@@ -867,7 +867,7 @@ void AvPlayerSource::VideoDecoderThread(std::stop_token stop) {
                     return;
                 }
             } else {
-                // gow3: after JumpToTime, what ends before the target is decoded but not shown.
+                // tsuki: after JumpToTime, what ends before the target is decoded but not shown.
                 if (m_video_jump_target != 0) {
                     const auto index = m_streams[m_video_stream_index.value()].ffmpeg_index;
                     const auto& stream = *m_avformat_context->streams[index];
@@ -967,9 +967,9 @@ void AvPlayerSource::AudioDecoderThread(std::stop_token stop) {
     Common::SetCurrentThreadName("shadPS4:AvAudioDecoder");
 
     LOG_INFO(Lib_AvPlayer, "Audio Decoder Thread started");
-    s64 skipped = std::numeric_limits<s64>::min(); // gow3: SkipBeforeJumpTarget
+    s64 skipped = std::numeric_limits<s64>::min(); // tsuki: SkipBeforeJumpTarget
     while ((!m_is_eof || m_audio_packets.Size() != 0) && !stop.stop_requested()) {
-        // gow3: also wake at EOF (see VideoDecoderThread).
+        // tsuki: also wake at EOF (see VideoDecoderThread).
         if (m_audio_packets.Size() == 0 && !m_audio_packets_cv.Wait(stop, [this] {
                 return m_audio_packets.Size() != 0 || m_is_eof;
             })) {
@@ -1006,7 +1006,7 @@ void AvPlayerSource::AudioDecoderThread(std::stop_token stop) {
                     return;
                 }
             } else {
-                // gow3: after JumpToTime (see the video decoder).
+                // tsuki: after JumpToTime (see the video decoder).
                 if (m_audio_jump_target != 0) {
                     const auto index = m_streams[m_audio_stream_index.value()].ffmpeg_index;
                     const auto& stream = *m_avformat_context->streams[index];

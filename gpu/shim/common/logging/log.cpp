@@ -1,4 +1,4 @@
-// gow3: see log.h.
+// tsuki: see log.h.
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -23,9 +23,9 @@ void Write(std::string_view log_class, Level level, const char* file, int line, 
            std::string&& message) {
     static std::mutex mutex;
     static const char* names[] = {"Trace", "Debug", "Info", "Warning", "Error", "Critical"};
-    // gow3: counted for the GPU: line of runtime_report ("Unimplemented"/"unimplemented").
+    // tsuki: counted for the GPU: line of runtime_report ("Unimplemented"/"unimplemented").
     if (level >= Level::warn && message.find("nimplemented") != std::string::npos)
-        Gow3Stats::unimplemented.fetch_add(1, std::memory_order_relaxed);
+        TsukiStats::unimplemented.fetch_add(1, std::memory_order_relaxed);
     const char* base = std::strrchr(file, '/');
     std::scoped_lock lock{mutex};
     std::fprintf(stderr, "GPU [%.*s] <%s> %s:%d %s: %s\n", int(log_class.size()), log_class.data(),

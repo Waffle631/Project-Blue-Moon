@@ -29,7 +29,7 @@ std::mutex Scheduler::submit_mutex;
 
 Scheduler::Scheduler(const Instance& instance, bool threaded_recording)
     : instance{instance}, work_semaphore{instance}, command_pool{instance, &work_semaphore} {
-    // gow3: TSUKI_VK_RECORD_THREAD=0 records on the calling thread.
+    // tsuki: TSUKI_VK_RECORD_THREAD=0 records on the calling thread.
     const char* env = std::getenv("TSUKI_VK_RECORD_THREAD");
     if (threaded_recording && !(env && env[0] == '0')) {
         record_chunk = AcquireChunk();
@@ -224,10 +224,10 @@ void Scheduler::SignalAfterHostCopies(std::function<void()> signal) {
         signal();
         return;
     }
-    Gow3Copy::FlushBatch();
+    TsukiCopy::FlushBatch();
     deferred_signals_issued.fetch_add(1, std::memory_order_relaxed);
     Record([signal = std::move(signal), done = deferred_signals_done](vk::CommandBuffer) mutable {
-        Gow3Copy::AfterCopies([signal = std::move(signal), done = std::move(done)] {
+        TsukiCopy::AfterCopies([signal = std::move(signal), done = std::move(done)] {
             signal();
             done->fetch_add(1, std::memory_order_release);
         });
@@ -238,29 +238,29 @@ void Scheduler::SignalAfterHostCopies(std::function<void()> signal) {
 void Scheduler::WaitDeferredSignals() {
     const u64 issued = deferred_signals_issued.load(std::memory_order_relaxed);
     if (deferred_signals_done->load(std::memory_order_acquire) >= issued ||
-        Gow3Toggle::Disabled(Gow3Toggle::OrderedGuestWrites)) {
+        TsukiToggle::Disabled(TsukiToggle::OrderedGuestWrites)) {
         return;
     }
-    Gow3Stats::WaitTimer timer{Gow3Stats::host_copies_wait_ns};
+    TsukiStats::WaitTimer timer{TsukiStats::host_copies_wait_ns};
     KickRecording(true);
     while (deferred_signals_done->load(std::memory_order_acquire) < issued) {
         // Helps the copy threads the signals wait for.
-        Gow3Copy::WaitAsync();
+        TsukiCopy::WaitAsync();
         std::this_thread::yield();
     }
 }
 
 void Scheduler::WaitHostCopies() {
     if (host_copies_done.load(std::memory_order_acquire) < host_copies_issued) {
-        Gow3Stats::WaitTimer timer{Gow3Stats::host_copies_wait_ns};
-        Gow3Stats::host_copy_waits.fetch_add(1, std::memory_order_relaxed);
+        TsukiStats::WaitTimer timer{TsukiStats::host_copies_wait_ns};
+        TsukiStats::host_copy_waits.fetch_add(1, std::memory_order_relaxed);
         KickRecording(true);
         while (host_copies_done.load(std::memory_order_acquire) < host_copies_issued) {
             std::this_thread::yield();
         }
     }
-    Gow3Stats::WaitTimer timer{Gow3Stats::copy_threads_wait_ns};
-    Gow3Copy::WaitAsync();
+    TsukiStats::WaitTimer timer{TsukiStats::copy_threads_wait_ns};
+    TsukiCopy::WaitAsync();
 }
 
 void Scheduler::KickRecording(bool force) {
@@ -303,19 +303,19 @@ void Scheduler::SyncRecording() {
         return;
     }
     KickRecording(true);
-    Gow3Stats::WaitTimer timer{Gow3Stats::sync_recording_ns};
+    TsukiStats::WaitTimer timer{TsukiStats::sync_recording_ns};
     std::unique_lock lk{recorder_mutex};
     recorder_idle_cv.wait(lk, [this] { return recorder_queue.empty() && !recorder_busy; });
 }
 
 void Scheduler::RecorderThread(std::stop_token stoken) {
-    Common::SetCurrentThreadName("gow3:VkRecorder");
+    Common::SetCurrentThreadName("tsuki:VkRecorder");
     while (true) {
         // Spin briefly before sleeping: the next chunk usually follows within microseconds,
         // and a sleeping recorder costs the GPU thread a wake-up syscall per kick. With few
         // hardware threads (Steam Deck: 8) the spin would take time from guest threads.
         static const auto spin_time = std::chrono::microseconds(
-            Gow3Threads::Available() >= 12 ? 200 : 20);
+            TsukiThreads::Available() >= 12 ? 200 : 20);
         const auto spin_until = std::chrono::steady_clock::now() + spin_time;
         for (u32 spins = 1; queued_chunks.load(std::memory_order_acquire) == 0; ++spins) {
             __builtin_ia32_pause();
@@ -389,7 +389,7 @@ void Scheduler::Wait(u64 tick, std::source_location caller, u64 submit_ns) {
         SubmitInfo info{};
         Flush(info);
     }
-    Gow3Stats::WaitTimer timer{Gow3Stats::tick_wait_ns};
+    TsukiStats::WaitTimer timer{TsukiStats::tick_wait_ns};
     const auto submitted = diagnose ? std::chrono::steady_clock::now() : start;
     work_semaphore.Wait(tick);
     if (diagnose) {
@@ -405,14 +405,14 @@ void Scheduler::PopPendingOperations() {
         return; // every draw comes here
     }
     std::unique_lock lk(pending_ops_mutex);
-    // gow3: this runs on every draw and dispatch. Querying the timeline semaphore is an
+    // tsuki: this runs on every draw and dispatch. Querying the timeline semaphore is an
     // ioctl, so it is skipped when nothing waits and done once per 32 calls (~0.3 ms; reading
     // the clock per draw instead was itself a hot spot).
     if (pending_ops.empty()) {
         return;
     }
     if (!work_semaphore.IsFree(pending_ops.front().gpu_tick)) {
-        if ((++pending_polls & 31) != 0 && !Gow3Toggle::Disabled(Gow3Toggle::PendingPollLimit)) {
+        if ((++pending_polls & 31) != 0 && !TsukiToggle::Disabled(TsukiToggle::PendingPollLimit)) {
             return;
         }
         work_semaphore.Refresh();

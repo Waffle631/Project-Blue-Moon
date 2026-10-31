@@ -9,18 +9,18 @@
 #include <string_view>
 #include <utility>
 
-namespace Gow3Settings {
+namespace TsukiSettings {
 
 namespace {
 
 const char* Path() {
     const char* env = std::getenv("TSUKI_CONFIG");
-    return env && env[0] ? env : "gow3.ini";
+    return env && env[0] ? env : "tsuki.ini";
 }
 
-namespace P = Gow3PerfStats;
+namespace P = TsukiPerfStats;
 
-/// The overlay's items in gow3.ini. An old overlay_upscaler key (Spec 7 §10) is ignored, like the
+/// The overlay's items in tsuki.ini. An old overlay_upscaler key (Spec 7 §10) is ignored, like the
 /// deleted temporal upscaler's keys (§12).
 constexpr std::pair<const char*, unsigned> OverlayKeys[] = {
     {"overlay_fps", P::Fps}, {"overlay_frametime", P::FrameTime}, {"overlay_gpu", P::Gpu},
@@ -58,11 +58,11 @@ void Set(Values& v, const std::string& key, const std::string& value) {
     if (key == "show_fps") {
         v.show_fps = i != 0;
     } else if (key == "display_mode") {
-        v.display_mode = Gow3Graphics::ParseDisplayMode(value);
+        v.display_mode = TsukiGraphics::ParseDisplayMode(value);
     } else if (key == "vsync") {
         v.vsync = i != 0;
     } else if (key == "fps_limit") {
-        v.fps_limit = Gow3Graphics::ParseFpsLimit(i);
+        v.fps_limit = TsukiGraphics::ParseFpsLimit(i);
     } else if (key == "async_shaders") {
         v.async_shaders = i != 0;
     } else if (key == "fsr1") {
@@ -70,13 +70,13 @@ void Set(Values& v, const std::string& key, const std::string& value) {
     } else if (key == "rcas") {
         v.rcas = i != 0;
     } else if (key == "rcas_strength") {
-        v.rcas_strength = Gow3Graphics::ParseRcasStrength(value.empty() ? -1 : i);
+        v.rcas_strength = TsukiGraphics::ParseRcasStrength(value.empty() ? -1 : i);
     } else if (key == "frames_queued") {
-        v.frames_queued = Gow3Graphics::ParseFramesQueued(value.empty() ? -1 : i);
+        v.frames_queued = TsukiGraphics::ParseFramesQueued(value.empty() ? -1 : i);
     } else if (key == "render_resolution") {
-        v.render_resolution = Gow3Graphics::ParseResolution(value);
+        v.render_resolution = TsukiGraphics::ParseResolution(value);
     } else if (key == "engine_fps") {
-        v.engine_fps = Gow3Graphics::ParseEngineFps(i);
+        v.engine_fps = TsukiGraphics::ParseEngineFps(i);
     } else if (key == "deferred_readback") {
         v.deferred_readback = i != 0;
     } else if (key == "stale_readback") {
@@ -123,7 +123,7 @@ void Load() {
     v.startup_render_resolution = v.render_resolution;
     v.startup_engine_fps = v.engine_fps;
     const char* applied = std::getenv("TSUKI_ENGINE_FPS");
-    v.applied_engine_fps = applied && applied[0] ? Gow3Graphics::ParseEngineFps(std::atoi(applied))
+    v.applied_engine_fps = applied && applied[0] ? TsukiGraphics::ParseEngineFps(std::atoi(applied))
                                                  : v.engine_fps.load();
     v.startup_deferred_readback = v.deferred_readback;
     v.startup_stale_readback = v.stale_readback;
@@ -144,7 +144,7 @@ void Save() {
         std::printf("Settings: cannot write %s\n", Path());
         return;
     }
-    std::fprintf(file, "# gow3 settings (in-game menu: Insert / R3+L2)\nshow_fps=%d\n", int(v.show_fps.load()));
+    std::fprintf(file, "# tsuki settings (in-game menu: Insert / R3+L2)\nshow_fps=%d\n", int(v.show_fps.load()));
     for (const auto& [name, bit] : OverlayKeys) {
         std::fprintf(file, "%s=%d\n", name, (v.overlay_items & bit) ? 1 : 0);
     }
@@ -156,13 +156,13 @@ void Save() {
                  "fsr1=%d\nrcas=%d\nrcas_strength=%d\nframes_queued=%d\n"
                  "render_resolution=%s\nengine_fps=%d\ndeferred_readback=%d\nstale_readback=%d\n"
                  "restart_unconfirmed=%d\n",
-                 Gow3Graphics::DisplayModeKeys[std::clamp(v.display_mode.load(), 0, 2)].data(),
+                 TsukiGraphics::DisplayModeKeys[std::clamp(v.display_mode.load(), 0, 2)].data(),
                  int(v.vsync.load()), v.fps_limit.load(), int(v.async_shaders.load()),
                  int(v.fsr1.load()), int(v.rcas.load()), v.rcas_strength.load(), v.frames_queued.load(),
-                 Gow3Graphics::Resolutions[std::clamp(v.render_resolution.load(), 0, 5)].data(),
+                 TsukiGraphics::Resolutions[std::clamp(v.render_resolution.load(), 0, 5)].data(),
                  v.engine_fps.load(), int(v.deferred_readback.load()), int(v.stale_readback.load()),
                  int(v.restart_unconfirmed.load()));
     std::fclose(file);
 }
 
-} // namespace Gow3Settings
+} // namespace TsukiSettings

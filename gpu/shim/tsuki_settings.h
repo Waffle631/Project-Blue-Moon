@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// gow3: user settings changed at run time from the in-game menu (tsuki_overlay.h) and kept
-// in gow3.ini (TSUKI_CONFIG overrides the path). Environment variables override the file at
+// tsuki: user settings changed at run time from the in-game menu (tsuki_overlay.h) and kept
+// in tsuki.ini (TSUKI_CONFIG overrides the path). Environment variables override the file at
 // start. Readers load the atomics every frame; writers are the menu and Load().
 
 #pragma once
@@ -9,14 +9,14 @@
 #include <cstdint>
 #include "tsuki_perf_stats.h"
 
-namespace Gow3Settings {
+namespace TsukiSettings {
 
 struct Values {
     std::atomic<bool> show_fps{false};
     /// Performance overlay (tsuki_perf_stats.h): items shown, font size and background opacity
     /// in percent, corner (0 top left, 1 top right, 2 bottom left, 3 bottom right), layout
     /// (0 one line, 1 one item per line). menu_tab: the menu's last tab.
-    std::atomic<unsigned> overlay_items{Gow3PerfStats::DefaultItems};
+    std::atomic<unsigned> overlay_items{TsukiPerfStats::DefaultItems};
     std::atomic<int> overlay_scale{100}, overlay_corner{1}, overlay_opacity{50}, overlay_layout{0};
     std::atomic<int> menu_tab{0};
     // Graphics (tsuki_graphics.h). Live: applied on the next frame.
@@ -57,4 +57,4 @@ bool GraphicsNeedRestart();
 /// Writes the file (menu changes).
 void Save();
 
-} // namespace Gow3Settings
+} // namespace TsukiSettings

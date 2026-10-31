@@ -10,7 +10,7 @@ import graphics_options as g
 class GraphicsOptionsTest(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
-        self.ini = Path(self.temp.name) / 'gow3.ini'
+        self.ini = Path(self.temp.name) / 'tsuki.ini'
         self.state = Path(self.temp.name) / 'state.json'
 
     def tearDown(self):

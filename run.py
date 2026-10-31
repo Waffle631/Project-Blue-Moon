@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Prepares the game image and starts gow3-probe (Windows and Linux; run.sh wraps it on Linux).
+"""Prepares the game image and starts tsuki-probe (Windows and Linux; run.sh wraps it on Linux).
 
 Environment variables (TSUKI_GAME_DIR, TSUKI_DATA_DIR, TSUKI_PATCHES, TSUKI_MODS_*,
-TSUKI_USER_DIR, ...). Extra arguments go to gow3-probe.
+TSUKI_USER_DIR, ...). Extra arguments go to tsuki-probe.
 The in-game "Apply and restart" runs this script again through TSUKI_RESTART_COMMAND;
 `--after PID` waits for the previous game process to end first (its GPU device and memory).
 """
@@ -56,7 +56,7 @@ def no_console():
 
 
 def parse_cpu_features(output):
-    """Instruction sets `gow3-probe --cpu-features` reports missing ([] when complete)."""
+    """Instruction sets `tsuki-probe --cpu-features` reports missing ([] when complete)."""
     for line in output.splitlines():
         if line.startswith('CPU: missing '):
             return [name.strip() for name in line[len('CPU: missing '):].split(',') if name.strip()]
@@ -125,7 +125,7 @@ def main():
     data = Path(env.get('TSUKI_DATA_DIR', PORT))
     out = data / 'out'
     out.mkdir(parents=True, exist_ok=True)
-    env.setdefault('TSUKI_CONFIG', str(data / 'gow3.ini'))
+    env.setdefault('TSUKI_CONFIG', str(data / 'tsuki.ini'))
     # Values this script derived on the previous start ("Apply and restart" inherits them) are
     # derived again from the new options.
     for key in env.pop('TSUKI_DERIVED', '').split(','):
@@ -138,9 +138,9 @@ def main():
         print('Graphics: the last restart never reached the game; previous options restored', flush=True)
     env.update(graphics_options.environment(graphics))
 
-    probe = Path(env['TSUKI_PROBE']) if env.get('TSUKI_PROBE') else find_executable('gow3-probe' + EXE_SUFFIX)
+    probe = Path(env['TSUKI_PROBE']) if env.get('TSUKI_PROBE') else find_executable('tsuki-probe' + EXE_SUFFIX)
     if not probe or not probe.is_file():
-        fail(f'gow3-probe{EXE_SUFFIX} not found: build it with build.sh or use a packaged build.')
+        fail(f'tsuki-probe{EXE_SUFFIX} not found: build it with build.sh or use a packaged build.')
     # Development builds run from the MSYS2 tree: its CLANG64 DLLs (SDL3, FFmpeg, ...).
     if WINDOWS and not (probe.parent / 'SDL3.dll').is_file():
         clang64 = Path(env.get('MSYS2_ROOT', r'C:\msys64')) / 'clang64' / 'bin'
@@ -196,7 +196,7 @@ def main():
         # an application id the desktop entry matches, so the shell shows the same icon.
         icon_file = game / 'sce_sys' / 'icon0.png'
         if not WINDOWS:
-            env.setdefault('SDL_APP_ID', 'gow3')
+            env.setdefault('SDL_APP_ID', 'tsuki')
             if (PORT / 'launcher' / 'tsuki.png').is_file():
                 icon_file = PORT / 'launcher' / 'tsuki.png'
         try:
@@ -208,7 +208,7 @@ def main():
             pass
         if profile:
             names = selected_patches(profile[1], profile[2], env.get('TSUKI_PATCHES', ''), env.get('TSUKI_PATCHES_ONLY') == '1')
-            # gow3.ini decides the resolution and frame rate patches (in-game menu, launcher).
+            # tsuki.ini decides the resolution and frame rate patches (in-game menu, launcher).
             names = graphics_options.patch_names(names, graphics)
             names = graphics_options.restrict_to_available(names, patches.available_patches(profile[1], profile[2]))
             env['TSUKI_PATCHES'] = ';'.join(names)

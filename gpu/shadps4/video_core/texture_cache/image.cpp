@@ -126,7 +126,7 @@ Image::Image(const Vulkan::Instance& instance, Vulkan::Runtime& runtime_,
              Common::SlotVector<ImageView>& slot_image_views_, const ImageInfo& info_)
     : guest_begin{info_.guest_address}, guest_end{info_.guest_address + info_.guest_size},
       info{info_}, runtime{&runtime_}, slot_image_views{&slot_image_views_} {
-    Gow3Stats::Timer timer{Gow3Stats::t_image_create};
+    TsukiStats::Timer timer{TsukiStats::t_image_create};
     if (info.pixel_format == vk::Format::eUndefined) {
         return;
     }
@@ -165,7 +165,7 @@ Image::Image(const Vulkan::Instance& instance, Vulkan::Runtime& runtime_,
     };
     auto image_format_properties =
         instance.GetPhysicalDevice().getImageFormatProperties2(format_info);
-    // gow3: storage usage is speculative (see ImageUsageFlags). Drivers that refuse it for a
+    // tsuki: storage usage is speculative (see ImageUsageFlags). Drivers that refuse it for a
     // format (AMD's Windows driver for BC6H) get the image without it: creating the unsupported
     // combination anyway loses the device a few frames later.
     if (image_format_properties.result == vk::Result::eErrorFormatNotSupported &&

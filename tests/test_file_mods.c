@@ -21,7 +21,7 @@ static int lines_of(const char *text) { int n=0; for (; *text; ++text) n+=*text=
 int main(void) {
     setenv("TSUKI_FILE_TRACE","1",1); /* read once, so before the first open */
     unsetenv("TSUKI_AUDIO_TRACE");
-    char root[]="/tmp/gow3-mod-files-XXXXXX";
+    char root[]="/tmp/tsuki-mod-files-XXXXXX";
     assert(mkdtemp(root));
     char game[512],user[512],source[512],link[512];
     snprintf(game,sizeof(game),"%s/game",root);

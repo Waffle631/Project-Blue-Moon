@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// gow3: speculative draw preparation on worker threads (see vk_draw_prep.h).
+// tsuki: speculative draw preparation on worker threads (see vk_draw_prep.h).
 
 #include <algorithm>
 #include <chrono>
@@ -52,7 +52,7 @@ u32 DefaultWorkerCount() {
     }
     // Workers are SCHED_IDLE and claim whole buffers, so more of them only use more idle
     // cores: half the hardware threads (Steam Deck 4, 16-thread desktop 8).
-    return std::clamp<u32>(Gow3Threads::Available() / 2, 1, 8);
+    return std::clamp<u32>(TsukiThreads::Available() / 2, 1, 8);
 }
 
 /// Flattened user data of one submission: chunks never move, so the GPU thread can read a
@@ -203,7 +203,7 @@ DrawPreparation::DrawPreparation(PipelineCache& pipeline_cache_)
         workers.emplace_back([this, i](std::stop_token stop) { WorkerLoop(stop, i); });
     }
     std::printf("GPU: draw preparation workers: %u (+1 scanner, %u hardware threads)\n",
-                worker_count, Gow3Threads::Available());
+                worker_count, TsukiThreads::Available());
 }
 
 DrawPreparation::~DrawPreparation() {
@@ -295,7 +295,7 @@ const PreparedDraw* DrawPreparation::NextDraw() {
         return nullptr;
     }
     const PreparedDraw* draw = &current->draws[current_draw++];
-    if (Gow3Toggle::Disabled(Gow3Toggle::DrawPreparation)) {
+    if (TsukiToggle::Disabled(TsukiToggle::DrawPreparation)) {
         return nullptr;
     }
     return draw;
@@ -322,8 +322,8 @@ void DrawPreparation::Collect() {
 }
 
 void DrawPreparation::ScannerLoop(std::stop_token stop) {
-    Common::SetCurrentThreadName("gow3:DrawScan");
-    Gow3Threads::MakeBackground();
+    Common::SetCurrentThreadName("tsuki:DrawScan");
+    TsukiThreads::MakeBackground();
     std::unique_ptr<AmdGpu::Regs> regs;
     u64 checksum = 0;
     u64 next_seq = 0;
@@ -376,8 +376,8 @@ void DrawPreparation::ScannerLoop(std::stop_token stop) {
 }
 
 void DrawPreparation::WorkerLoop(std::stop_token stop, u32 index) {
-    Common::SetCurrentThreadName(("gow3:DrawPrep" + std::to_string(index)).c_str());
-    Gow3Threads::MakeBackground();
+    Common::SetCurrentThreadName(("tsuki:DrawPrep" + std::to_string(index)).c_str());
+    TsukiThreads::MakeBackground();
     auto regs = std::make_unique<AmdGpu::Regs>();
     constexpr u64 NoPosition = ~0ull;
     u64 position = NoPosition; ///< `regs` holds the state at the start of this buffer

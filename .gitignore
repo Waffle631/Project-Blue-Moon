@@ -5,7 +5,7 @@ user/
 Tsukihime/
 *.mp4
 !tests/data/*.mp4
-gow3.ini
+tsuki.ini
 # Spec 7 rename inventory, local only (plan task 4)
 tools/rename_map.txt
 pgo/

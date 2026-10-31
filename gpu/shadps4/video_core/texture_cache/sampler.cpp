@@ -51,7 +51,7 @@ Sampler::Sampler(const Vulkan::Instance& instance, const AmdGpu::Sampler& sample
         .addressModeU = LiverpoolToVK::ClampMode(sampler.clamp_x),
         .addressModeV = LiverpoolToVK::ClampMode(sampler.clamp_y),
         .addressModeW = LiverpoolToVK::ClampMode(sampler.clamp_z),
-        // gow3: within the device limit on both sides (Vulkan valid usage).
+        // tsuki: within the device limit on both sides (Vulkan valid usage).
         .mipLodBias = std::clamp(sampler.LodBias(), -instance.MaxSamplerLodBias(),
                                  instance.MaxSamplerLodBias()),
         .anisotropyEnable = anisotropy_enable,

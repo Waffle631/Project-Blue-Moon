@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// gow3: the Vulkan drivers where the game's multisampled images are created single-sampled
+// tsuki: the Vulkan drivers where the game's multisampled images are created single-sampled
 // unless TSUKI_NO_MSAA says otherwise (tsuki_msaa.h). Plain C: vk_instance.cpp decides with it
 // and tools/gpu_capabilities.c prints it per GPU (`--list`) for the launcher to show.
 //
@@ -11,6 +11,6 @@
 
 #include <vulkan/vulkan_core.h>
 
-static inline int gow3_no_msaa_default(VkDriverId driver) {
+static inline int tsuki_no_msaa_default(VkDriverId driver) {
     return driver == VK_DRIVER_ID_AMD_PROPRIETARY || driver == VK_DRIVER_ID_INTEL_PROPRIETARY_WINDOWS;
 }

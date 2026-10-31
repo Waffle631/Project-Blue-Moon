@@ -128,7 +128,7 @@ bool TextureCache::ResolveReadbacks(VAddr address, u64 size, bool assume_locks,
                 }
             }
         }
-        Gow3Stats::Timer readback_timer{Gow3Stats::t_readback_wait};
+        TsukiStats::Timer readback_timer{TsukiStats::t_readback_wait};
         if (const u64 tick = pending_readbacks.RequiredTick(address, size)) {
             ++readbacks_waited;
             waited = !scheduler.IsFree(tick);
@@ -157,7 +157,7 @@ void TextureCache::CancelReadbacks(VAddr address, u64 size) {
     });
 }
 
-// gow3: every copy is recorded first and the GPU is waited for once, not once per image.
+// tsuki: every copy is recorded first and the GPU is waited for once, not once per image.
 void TextureCache::ProcessDownloadImages() {
     if (deferred_readbacks) {
         // Upload workers must finish reading RAM before these pages become inaccessible.
@@ -368,7 +368,7 @@ void TextureCache::DiagDumpImage(ImageId image_id, const char* tag) {
     }
 }
 
-// gow3: images sharing guest memory (aliases), ported from cuesta4/shadPS4 (eltutz) commit
+// tsuki: images sharing guest memory (aliases), ported from cuesta4/shadPS4 (eltutz) commit
 // 189ca3b6. A write to one is copied into the others before they are read, as on the PS4,
 // where they are the same memory.
 static bool Covers(const Extent3D& extent, const ImageInfo& info) {
@@ -919,7 +919,7 @@ ImageId TextureCache::FindImage(ImageDesc& desc, bool exact_fmt) {
         cached.format == info.pixel_format && cached.type == info.type &&
         cached.exact_fmt == exact_fmt && cached.binding == desc.type &&
         cached.levels == info.resources.levels && cached.layers == info.resources.layers &&
-        !Gow3Toggle::Disabled(Gow3Toggle::FindImageCache)) {
+        !TsukiToggle::Disabled(TsukiToggle::FindImageCache)) {
         Image& image = slot_images[cached.image_id];
         image.tick_accessed_last = scheduler.CurrentTick();
         TouchImage(image);
@@ -1074,7 +1074,7 @@ ImageView& TextureCache::FindTexture(ImageId image_id, const ImageDesc& desc, Vi
     if (desc.type == BindingType::Storage) {
         PublishAliasWrite(image_id);
     }
-    if (memo && !Gow3Toggle::Disabled(Gow3Toggle::TextureViewMemo)) {
+    if (memo && !TsukiToggle::Disabled(TsukiToggle::TextureViewMemo)) {
         if (memo->image_id == image_id && memo->backing == image.backing && memo->view_id) {
             return slot_image_views[memo->view_id];
         }
@@ -1162,7 +1162,7 @@ void TextureCache::RefreshImage(Image& image) {
     }
     ResolveReadbacks(image.info.guest_address, image.info.guest_size, true,
                      ReadbackSource::ImageRefresh);
-    Gow3Stats::Timer timer{Gow3Stats::t_refresh};
+    TsukiStats::Timer timer{TsukiStats::t_refresh};
 
     RENDERER_TRACE;
     TRACE_HINT(fmt::format("{:x}:{:x}", image.info.guest_address, image.info.guest_size));
@@ -1192,7 +1192,7 @@ void TextureCache::RefreshImage(Image& image) {
     const bool is_gpu_modified = True(image.flags & ImageFlagBits::GpuModified);
     const bool is_gpu_dirty = True(image.flags & ImageFlagBits::GpuDirty);
 
-    Gow3Stats::image_upload_bytes.fetch_add(image.info.guest_size, std::memory_order_relaxed);
+    TsukiStats::image_upload_bytes.fetch_add(image.info.guest_size, std::memory_order_relaxed);
     boost::container::small_vector<vk::BufferImageCopy, 14> image_copies;
     for (u32 m = 0; m < num_mips; m++) {
         const u32 width = std::max(image.info.size.width >> m, 1u);
@@ -1264,7 +1264,7 @@ vk::Sampler TextureCache::GetSampler(const AmdGpu::Sampler& sampler,
 }
 
 void TextureCache::RegisterImage(ImageId image_id) {
-    Gow3Stats::images_registered.fetch_add(1, std::memory_order_relaxed);
+    TsukiStats::images_registered.fetch_add(1, std::memory_order_relaxed);
     Image& image = slot_images[image_id];
     ASSERT_MSG(False(image.flags & ImageFlagBits::Registered),
                "Trying to register an already registered image");
@@ -1432,10 +1432,10 @@ void TextureCache::UntrackImageTail(ImageId image_id) {
 }
 
 void TextureCache::GarbageCollectImages() {
-    Gow3Stats::Timer gc_timer{Gow3Stats::t_gc};
+    TsukiStats::Timer gc_timer{TsukiStats::t_gc};
     if (instance.CanReportMemoryUsage()) {
         total_used_memory = instance.GetDeviceMemoryUsage();
-        // gow3: on integrated GPUs (Steam Deck) the usage covers system-memory heaps holding
+        // tsuki: on integrated GPUs (Steam Deck) the usage covers system-memory heaps holding
         // much more than images (buffers backing guest memory), and the startup budget left
         // ~1 GB after its 8 GB system reserve: usage stayed above the critical mark, so the
         // collector evicted images used two or three frames ago on every submission and wrote
@@ -1488,7 +1488,7 @@ void TextureCache::GarbageCollectImages() {
             return false;
         }
         if (download) {
-            // gow3: synchronously, while the image still protects its pages. A deferred
+            // tsuki: synchronously, while the image still protects its pages. A deferred
             // write-back landed after FreeImage had unprotected them, over whatever the game
             // had meanwhile stored there (e.g. its heap after unloading an area).
             DownloadImageMemory(image_id, true);
@@ -1519,7 +1519,7 @@ void TextureCache::GarbageCollectImages() {
         configure(true);
         lru_cache.ForEachItemBelow(gc_tick - ticks_to_destroy, clean_up);
     }
-    // gow3: evictions under memory pressure, at most every 5 s (TSUKI_FRAME_STATS or not).
+    // tsuki: evictions under memory pressure, at most every 5 s (TSUKI_FRAME_STATS or not).
     if (pressured || gc_downloads != 0) {
         const auto now = std::chrono::steady_clock::now();
         if (now - gc_report_time >= std::chrono::seconds(5)) {

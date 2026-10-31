@@ -59,7 +59,7 @@ void AddBuffers(Entry& entry) {
 bool pass_open = false;
 std::mutex display_mutex;
 std::vector<VAddr> display_buffers;
-// gow3: read on every draw; the game registers a handful of display buffers once.
+// tsuki: read on every draw; the game registers a handful of display buffers once.
 std::array<std::atomic<VAddr>, 16> display_list{};
 std::atomic<u32> display_count{0};
 
@@ -249,7 +249,7 @@ void FrameCapture::BeginPass(const VideoCore::ImageInfo* const* colors, u32 num_
                                         display_buffers.end();
         }
     }
-    // gow3: frame boundaries in the command stream: the pass that writes a display buffer as its
+    // tsuki: frame boundaries in the command stream: the pass that writes a display buffer as its
     // only target.
     display = display && targets.size() == 1;
     const bool new_pass = !(pass_open && !entries.empty() && !entries.back().compute &&

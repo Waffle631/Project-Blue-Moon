@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Standalone checks of the mouse accumulator behind gow3gpu_mouse_read: no window or SDL video needed.
+// Standalone checks of the mouse accumulator behind tsukigpu_mouse_read: no window or SDL video needed.
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
 #include "gpu/shim/tsuki_mouse.h"
 
-using Gow3Mouse::MouseAccumulator;
-using Gow3Mouse::kPush;
+using TsukiMouse::MouseAccumulator;
+using TsukiMouse::kPush;
 
 struct Read {
     int32_t dx, dy, wheel;

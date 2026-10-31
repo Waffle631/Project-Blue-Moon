@@ -1,4 +1,4 @@
-// gow3.ini graphics keys (tsuki_settings.cpp, tsuki_graphics.h).
+// tsuki.ini graphics keys (tsuki_settings.cpp, tsuki_graphics.h).
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
@@ -11,13 +11,13 @@
 #define _putenv_s(name, value) setenv(name, value, 1) // "" counts as unset for Load()
 #endif
 
-namespace G = Gow3Graphics;
+namespace G = TsukiGraphics;
 
 // Spec 7 §12: the settings keep no field of the deleted temporal upscaler.
 template <class T>
 concept HasUpscaler = requires(T t) { t.upscaler; } || requires(T t) { t.preset; } ||
                       requires(T t) { t.output_res; } || requires(T t) { t.object_motion; };
-static_assert(!HasUpscaler<Gow3Settings::Values>);
+static_assert(!HasUpscaler<TsukiSettings::Values>);
 
 static std::string Read(const char* path) {
     std::ifstream in(path);
@@ -51,24 +51,24 @@ int main() {
     }
     _putenv_s("TSUKI_CONFIG", path);
     _putenv_s("TSUKI_ASYNC_SHADERS", "");
-    auto& v = Gow3Settings::Get();
-    Gow3Settings::Load();
+    auto& v = TsukiSettings::Get();
+    TsukiSettings::Load();
     assert(v.display_mode == G::Borderless && !v.vsync && v.fps_limit == 240 && !v.async_shaders);
     assert(v.render_resolution == 3 && v.engine_fps == 240 && !v.deferred_readback && v.stale_readback);
     assert(v.fsr1 && !v.rcas && v.rcas_strength == 40 && v.frames_queued == 2);
-    assert(!Gow3Settings::GraphicsNeedRestart());
+    assert(!TsukiSettings::GraphicsNeedRestart());
     assert(v.applied_engine_fps == 240);  // no TSUKI_ENGINE_FPS: the configured rate
     _putenv_s("TSUKI_ENGINE_FPS", "60");    // run.py: the frame rate patch did not apply
-    Gow3Settings::Load();
-    assert(v.engine_fps == 240 && v.applied_engine_fps == 60 && !Gow3Settings::GraphicsNeedRestart());
+    TsukiSettings::Load();
+    assert(v.engine_fps == 240 && v.applied_engine_fps == 60 && !TsukiSettings::GraphicsNeedRestart());
     _putenv_s("TSUKI_ENGINE_FPS", "");
     v.engine_fps = 120;
-    assert(Gow3Settings::GraphicsNeedRestart());
+    assert(TsukiSettings::GraphicsNeedRestart());
     v.fps_limit = 60;  // live: no restart because of it
     v.engine_fps = 240;
-    assert(!Gow3Settings::GraphicsNeedRestart());
+    assert(!TsukiSettings::GraphicsNeedRestart());
 
-    Gow3Settings::Save();
+    TsukiSettings::Save();
     const std::string saved = Read(path);
     for (const char* line : {"display_mode=borderless\n", "vsync=0\n", "fps_limit=60\n", "async_shaders=0\n",
                              "render_resolution=1440p\n", "engine_fps=240\n", "deferred_readback=0\n",
@@ -84,19 +84,19 @@ int main() {
     }
     _putenv_s("TSUKI_ASYNC_SHADERS", "1");  // the environment still wins at start
     v.async_shaders = false;
-    Gow3Settings::Load();
+    TsukiSettings::Load();
     assert(v.display_mode == G::Windowed && v.fps_limit == 0 && v.render_resolution == 0 && v.engine_fps == 120);
     assert(v.rcas_strength == 75 && v.frames_queued == 1);
     assert(v.async_shaders);
     {
-        // An old gow3.ini with removed keys: ignored, and not written back.
+        // An old tsuki.ini with removed keys: ignored, and not written back.
         std::ofstream out(path);
         out << "cheat_health=1\nred_orb_multiplier=5.0\ndamage_taken=0.5\nenemy_health_bar=1\nvsync=0\n";
     }
     v.vsync = true;
-    Gow3Settings::Load();
+    TsukiSettings::Load();
     assert(!v.vsync);
-    Gow3Settings::Save();
+    TsukiSettings::Save();
     const std::string old = Read(path);
     for (const char* key : {"cheat_", "orb_multiplier", "damage_", "enemy_health_bar"}) {
         assert(old.find(key) == std::string::npos);
@@ -111,9 +111,9 @@ int main() {
                "overlay_upscaler=1\nfsr1=1\nrcas=0\nrcas_strength=40\nrender_resolution=720p\n";
     }
     v.fsr1 = false;
-    Gow3Settings::Load();
+    TsukiSettings::Load();
     assert(v.fsr1 && !v.rcas && v.rcas_strength == 40 && v.render_resolution == 2 && !(v.overlay_items & 1u << 2));
-    Gow3Settings::Save();
+    TsukiSettings::Save();
     const std::string temporal = Read(path);
     for (const char* key : {"upscaler", "preset=", "jitter", "reactive", "object_motion", "debug_view", "output_res",
                             "sharpen", "sharpness", "fsr4_", "live_resolution"}) {
@@ -123,7 +123,7 @@ int main() {
     assert(temporal.find("rcas_strength=40\n") != std::string::npos);
     assert(temporal.find("render_resolution=720p\n") != std::string::npos);
     // A fresh Values has the overlay's default items: FPS and frametime, not the old upscaler bit.
-    const Gow3Settings::Values fresh;
+    const TsukiSettings::Values fresh;
     assert(fresh.overlay_items == 3u);
     {
         // Spec 7: the old TSUKI_* names are not aliases.
@@ -131,11 +131,11 @@ int main() {
         out << "fsr1=0\n";
     }
     _putenv_s("GOW3_FSR1", "1"); // rename-check: ok
-    Gow3Settings::Load();
+    TsukiSettings::Load();
     assert(!v.fsr1);
     _putenv_s("GOW3_FSR1", ""); // rename-check: ok
     _putenv_s("TSUKI_FSR1", "1");
-    Gow3Settings::Load();
+    TsukiSettings::Load();
     assert(v.fsr1);
     _putenv_s("TSUKI_FSR1", "");
     std::remove(path);

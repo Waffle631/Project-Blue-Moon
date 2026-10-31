@@ -191,7 +191,7 @@ static void sample_host(PadData *d) {
     d->connected=1; d->connected_count=connected_count ? connected_count : 1;
     d->timestamp=now_us();
     SDL_Gamepad *g=current_gamepad();
-    if (gow3gpu_overlay_captures_input()) return; /* settings menu open: neutral input */
+    if (tsukigpu_overlay_captures_input()) return; /* settings menu open: neutral input */
     const bool *k=SDL_WasInit(SDL_INIT_VIDEO) ? SDL_GetKeyboardState(NULL) : NULL;
     load_button_maps();
     if (g) {
@@ -367,7 +367,7 @@ static int hold_after_capture;
 static void sample(PadData *d) {
     ++pad_reads; /* before the menu's early return: the replay clock counts every read */
     sample_host(d);
-    if (gow3gpu_overlay_captures_input()) { hold_after_capture=1; return; }
+    if (tsukigpu_overlay_captures_input()) { hold_after_capture=1; return; }
     record_sample(d);
     read_inject();
     replay_sample(d);

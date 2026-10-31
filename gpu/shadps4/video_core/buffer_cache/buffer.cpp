@@ -33,7 +33,7 @@ std::string_view BufferTypeName(MemoryType type) {
     }
 }
 
-/// gow3: where the stream buffer lives (TSUKI_STREAM_MEMORY). Every draw copies its small
+/// tsuki: where the stream buffer lives (TSUKI_STREAM_MEMORY). Every draw copies its small
 /// read-only buffers from guest memory into it on the Vulkan recording thread. "device"
 /// (shadPS4's choice) is VRAM written through the PCIe BAR: cheap with AMD Smart Access Memory
 /// on a desktop, but on a laptop NVIDIA GPU these writes took half of that thread's time and

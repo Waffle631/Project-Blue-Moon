@@ -62,7 +62,7 @@ Rasterizer::Rasterizer(const Instance& instance_, Scheduler& scheduler_, Runtime
         constant_ring = std::make_unique<ConstantRing>(instance, scheduler);
         draw_pipe = std::make_unique<DrawPipe>(&RunDrawPacket, this);
     }
-    // gow3: this thread joins the texture binding helper before it changes image state.
+    // tsuki: this thread joins the texture binding helper before it changes image state.
     runtime.SetImageAccessHook(&JoinBindHelper, this);
     scheduler.SetSubmitCallback([this](Vulkan::SubmitInfo& info) {
         runtime.FlushBarriers();
@@ -170,7 +170,7 @@ VideoCore::ImageId Rasterizer::FindTargetMemoized(VideoCore::TextureCache::Image
     };
     (append(parts), ...);
     const u64 generation = texture_cache.RegistryGeneration();
-    const bool memo_enabled = !Gow3Toggle::Disabled(Gow3Toggle::TextureBindingMemo);
+    const bool memo_enabled = !TsukiToggle::Disabled(TsukiToggle::TextureBindingMemo);
     if (memo_enabled && last.generation == generation && last.key_size == key_size &&
         std::memcmp(last.key.data(), key.data(), key_size) == 0) {
         texture_cache.MarkFound(last.image_id);
@@ -297,7 +297,7 @@ void Rasterizer::EliminateFastClear() {
     ScopeMarkerEnd();
 }
 
-// gow3: two-stage draw pipeline (vk_draw_pipe.h). Packet layout, 8-byte aligned parts:
+// tsuki: two-stage draw pipeline (vk_draw_pipe.h). Packet layout, 8-byte aligned parts:
 // DrawPacket, u16 block indices, u32 block words (RegDirty::BlockWords each), then per stage a
 // PacketStage with its user data and flattened user data, then (verification) the full file.
 namespace {
@@ -348,16 +348,16 @@ bool Rasterizer::DrawPipeWanted() {
     }
     // Stage B spins while draws flow. Measured ahead with 16 threads (+19%) and with 4 cores /
     // 8 threads (taskset, Steam Deck-like: +18%).
-    return Gow3Threads::Available() >= 8;
+    return TsukiThreads::Available() >= 8;
 }
 
 bool Rasterizer::UseDrawPipe() const {
-    return draw_pipe && !host_markers_enabled && !Gow3Toggle::Disabled(Gow3Toggle::DrawPipeline);
+    return draw_pipe && !host_markers_enabled && !TsukiToggle::Disabled(TsukiToggle::DrawPipeline);
 }
 
 bool Rasterizer::OnStageA() const {
 #ifdef _WIN32
-    // gow3 (Windows): libc++ compares std::thread::id through winpthreads' pthread_equal,
+    // tsuki (Windows): libc++ compares std::thread::id through winpthreads' pthread_equal,
     // which asks the kernel (GetThreadId) for both threads: two system calls per check, many
     // per draw. The numeric thread id comes from the TEB.
     return static_cast<u32>(gettid()) == liverpool->GetGpuCommandProcessorThreadId();
@@ -451,7 +451,7 @@ bool Rasterizer::PendingWriteOverlaps(VAddr address, u64 size) {
 void Rasterizer::CollectRingBindings(const Shader::Info& stage, const PreparedDraw* prepared,
                            boost::container::static_vector<RingBinding, Shader::NUM_BUFFERS>& out) {
     const PreparedStage* prepared_stage = nullptr;
-    if (prepared && !Gow3Toggle::Disabled(Gow3Toggle::PreparedResources)) {
+    if (prepared && !TsukiToggle::Disabled(TsukiToggle::PreparedResources)) {
         for (u32 i = 0; i < prepared->num_stages; ++i) {
             const auto& candidate = prepared->stages[i];
             if (&candidate.program->info == &stage &&
@@ -547,7 +547,7 @@ void Rasterizer::PostDraw(const Pipeline* pipeline, const PreparedDraw* used_pre
         if (stage) {
             auto& ring = rings[num_stages];
             ring.clear();
-            if (constant_ring && !Gow3Toggle::Disabled(Gow3Toggle::ConstantRing)) {
+            if (constant_ring && !TsukiToggle::Disabled(TsukiToggle::ConstantRing)) {
                 CollectRingBindings(*stage, used_prepared, ring);
             }
             ++num_stages;
@@ -648,7 +648,7 @@ void Rasterizer::RetireSubmission() {
 }
 
 bool Rasterizer::RunInOrder(OrderedTask task, const void* data, u32 size, u64 toggle) {
-    if (!UseDrawPipe() || Gow3Toggle::Disabled(toggle)) {
+    if (!UseDrawPipe() || TsukiToggle::Disabled(toggle)) {
         DrainDrawPipe(DrawPipe::ReasonRasterizer);
         task(*this, static_cast<const u8*>(data));
         return false;
@@ -875,13 +875,13 @@ bool Rasterizer::FilterDrawPasses() const {
 
 void Rasterizer::Draw(bool is_indexed, u32 index_offset, const PreparedDraw* prepared) {
     RENDERER_TRACE;
-    Gow3Stats::draws.fetch_add(1, std::memory_order_relaxed);
+    TsukiStats::draws.fetch_add(1, std::memory_order_relaxed);
 
-    // gow3: with the draw pipeline this thread only selects the pipeline and hands the draw
+    // tsuki: with the draw pipeline this thread only selects the pipeline and hands the draw
     // to the recording thread (DrawRecord there); draws FilterDraw handles itself run here.
     const bool pipelined = UseDrawPipe();
     if (pipelined && !FilterDrawPasses() &&
-        !Gow3Toggle::Disabled(Gow3Toggle::PipelinedMemoryWrites)) {
+        !TsukiToggle::Disabled(TsukiToggle::PipelinedMemoryWrites)) {
         PostDraw(nullptr, nullptr, false, 0);
         return;
     }
@@ -948,7 +948,7 @@ void Rasterizer::DrawRecord(const GraphicsPipeline* pipeline, const PreparedDraw
     }
     DiagPassBoundary(false);
     const auto& regs = Regs();
-    // gow3: the pass copying a finished frame to a display buffer starts a GPU frame (profiler,
+    // tsuki: the pass copying a finished frame to a display buffer starts a GPU frame (profiler,
     // statistics). Until Spec 7 §12 the temporal upscaler's camera tracking gated it, so it never ran.
     if (regs.color_buffers[0] && FrameCapture::IsDisplayBuffer(regs.color_buffers[0].Address())) {
         NoteFrameStart();
@@ -957,7 +957,7 @@ void Rasterizer::DrawRecord(const GraphicsPipeline* pipeline, const PreparedDraw
 
     PrepareRenderState(pipeline);
     const PreparedDraw* draw_prepared = bind_prepared;
-    // gow3: vertex and index buffers are resolved while the helper binds textures (their
+    // tsuki: vertex and index buffers are resolved while the helper binds textures (their
     // commands are recorded after BeginRendering, as before).
     draw_inputs = {pipeline, draw_prepared, index_offset, is_indexed, true, false};
     const bool bound = BindResources(pipeline);
@@ -1038,10 +1038,10 @@ void Rasterizer::DrawIndirect(bool is_indexed, VAddr arg_address, u32 offset, u3
                               u32 max_count, VAddr count_address, u16 vertex_sgpr_offset,
                               u16 instance_sgpr_offset) {
     RENDERER_TRACE;
-    // gow3: like direct draws, handed to the recording thread after the pipeline selection
+    // tsuki: like direct draws, handed to the recording thread after the pipeline selection
     // (else the GPU thread waited here for a whole frame of queued draws).
     const bool pipelined = UseDrawPipe() && FilterDrawPasses() &&
-                           !Gow3Toggle::Disabled(Gow3Toggle::PipelinedIndirectDraws);
+                           !TsukiToggle::Disabled(TsukiToggle::PipelinedIndirectDraws);
     if (!pipelined) {
         DrainDrawPipe();
         scheduler.PopPendingOperations();
@@ -1143,9 +1143,9 @@ void Rasterizer::DrawIndirectRecord(const GraphicsPipeline* pipeline, bool is_in
 
 void Rasterizer::DispatchDirect() {
     RENDERER_TRACE;
-    Gow3Stats::dispatches.fetch_add(1, std::memory_order_relaxed);
-    // gow3: like draws, handed to the draw recording thread after the pipeline selection.
-    const bool pipelined = UseDrawPipe() && !Gow3Toggle::Disabled(Gow3Toggle::PipelinedDispatch);
+    TsukiStats::dispatches.fetch_add(1, std::memory_order_relaxed);
+    // tsuki: like draws, handed to the draw recording thread after the pipeline selection.
+    const bool pipelined = UseDrawPipe() && !TsukiToggle::Disabled(TsukiToggle::PipelinedDispatch);
     if (!pipelined) {
         DrainDrawPipe();
     }
@@ -1211,7 +1211,7 @@ void Rasterizer::DispatchRecord(const ComputePipeline* pipeline) {
     });
     DebugState.IncDispatch();
 
-    // gow3 diagnostics: TSUKI_DIAG_IMAGES=1 writes the images a dispatch read and wrote, after
+    // tsuki diagnostics: TSUKI_DIAG_IMAGES=1 writes the images a dispatch read and wrote, after
     // it, while a frame capture records (TSUKI_CAPTURE_TRIGGER).
     static const bool diag_images = [] {
         const char* env = std::getenv("TSUKI_DIAG_IMAGES");
@@ -1232,8 +1232,8 @@ void Rasterizer::DispatchRecord(const ComputePipeline* pipeline) {
 
 void Rasterizer::DispatchIndirect(VAddr address, u32 offset, u32 size) {
     RENDERER_TRACE;
-    // gow3: handed to the recording thread like direct dispatches.
-    const bool pipelined = UseDrawPipe() && !Gow3Toggle::Disabled(Gow3Toggle::PipelinedIndirectDraws);
+    // tsuki: handed to the recording thread like direct dispatches.
+    const bool pipelined = UseDrawPipe() && !TsukiToggle::Disabled(TsukiToggle::PipelinedIndirectDraws);
     if (!pipelined) {
         DrainDrawPipe();
     }
@@ -1313,7 +1313,7 @@ void Rasterizer::OnSubmit() {
 
 const PreparedStage* Rasterizer::FindPreparedStage(const Shader::Info& stage) const {
     // Sharps a draw-preparation worker read from the same flattened user data.
-    if (!bind_prepared || Gow3Toggle::Disabled(Gow3Toggle::PreparedResources)) {
+    if (!bind_prepared || TsukiToggle::Disabled(TsukiToggle::PreparedResources)) {
         return nullptr;
     }
     for (u32 i = 0; i < bind_prepared->num_stages; ++i) {
@@ -1340,9 +1340,9 @@ bool Rasterizer::BindHelperWanted() {
 
 bool Rasterizer::HelperEligible(const Pipeline* pipeline) const {
     if (pipeline->IsCompute() || !bind_helper.Available() || FrameCapture::Active() ||
-        Gow3Toggle::Disabled(Gow3Toggle::TextureBindHelper) ||
-        Gow3Toggle::Disabled(Gow3Toggle::TextureBindingMemo) ||
-        Gow3Toggle::Disabled(Gow3Toggle::UpdateImageFastPath)) {
+        TsukiToggle::Disabled(TsukiToggle::TextureBindHelper) ||
+        TsukiToggle::Disabled(TsukiToggle::TextureBindingMemo) ||
+        TsukiToggle::Disabled(TsukiToggle::UpdateImageFastPath)) {
         return false;
     }
     for (const auto* stage : pipeline->GetStages()) {
@@ -1471,7 +1471,7 @@ bool Rasterizer::BindResources(const Pipeline* pipeline) {
             uses_dma |= stage->uses_dma;
         }
     } else {
-        // gow3: textures on the helper, buffers here. Without mip arrays every stage's
+        // tsuki: textures on the helper, buffers here. Without mip arrays every stage's
         // descriptors are [buffers][images][samplers], one each, so both sides know their
         // binding numbers and descriptor write slots up front.
         struct BufferStage {
@@ -1512,7 +1512,7 @@ bool Rasterizer::BindResources(const Pipeline* pipeline) {
             auto& stage = buffer_stages[i];
             BindBuffers(*stage.info, stage.prepared, stage.binding, push_data, stage.write_index);
         }
-        if (draw_inputs.pending && !Gow3Toggle::Disabled(Gow3Toggle::EarlyDrawInputs)) {
+        if (draw_inputs.pending && !TsukiToggle::Disabled(TsukiToggle::EarlyDrawInputs)) {
             ResolveVertexBuffers(draw_inputs.pipeline, draw_inputs.prepared);
             if (draw_inputs.is_indexed) {
                 ResolveIndexBuffer(draw_inputs.index_offset);
@@ -1545,7 +1545,7 @@ void Rasterizer::BindVertexBuffers(const GraphicsPipeline* pipeline, const Prepa
 }
 
 void Rasterizer::EmitVertexBuffers() {
-    // gow3: only the used entries go into the recording chunk (the static vectors hold 32 of
+    // tsuki: only the used entries go into the recording chunk (the static vectors hold 32 of
     // each: ~3 KiB copied per draw).
     auto& v = vertex_binds;
     const bool dynamic_input = instance.IsVertexInputDynamicState();
@@ -1600,7 +1600,7 @@ void Rasterizer::ResolveVertexBuffers(const GraphicsPipeline* pipeline,
     const PreparedVertexInputs* ready =
         prepared && prepared->vertex.valid && instance.IsVertexInputDynamicState() && fetch &&
                 fetch->attributes.size() == prepared->vertex.count && !FrameCapture::Active() &&
-                !Gow3Toggle::Disabled(Gow3Toggle::PreparedResources)
+                !TsukiToggle::Disabled(TsukiToggle::PreparedResources)
             ? &prepared->vertex
             : nullptr;
     if (ready) {
@@ -1900,7 +1900,7 @@ void Rasterizer::BindBuffers(const Shader::Info& stage, const PreparedStage* pre
         const RingBinding* ring = num_ring_stages ? FindRingBinding(stage, buffer_index) : nullptr;
         if (ring) {
             // Copied by the GPU command thread into the constant ring (read-only).
-            // gow3: dump the ring's own copy, not the guest address. A binding whose bytes came
+            // tsuki: dump the ring's own copy, not the guest address. A binding whose bytes came
             // from the host keeps `address` as a label only, and it can be zero; IsValidGpuMapping
             // merely range checks against the 40 bit GPU limit, so zero passed through and the
             // dump read address zero (crash on the frame capture key).
@@ -2021,7 +2021,7 @@ Rasterizer::ImageDescCacheEntry& Rasterizer::CachedImageDescEntry(const AmdGpu::
     const auto matches = [&](const ImageDescCacheEntry& e) {
         return e.flags == flags && e.sharp == key;
     };
-    const bool disabled = Gow3Toggle::Disabled(Gow3Toggle::ImageDescCache);
+    const bool disabled = TsukiToggle::Disabled(TsukiToggle::ImageDescCache);
     ImageDescCacheEntry* slot = nullptr;
     if (!disabled && matches(set[0])) {
         slot = &set[0];
@@ -2040,7 +2040,7 @@ Rasterizer::ImageDescCacheEntry& Rasterizer::CachedImageDescEntry(const AmdGpu::
     slot->last_use = ++desc_use_counter;
     auto& entry = *slot;
     if (entry.flags != flags || entry.sharp != key ||
-        Gow3Toggle::Disabled(Gow3Toggle::ImageDescCache)) {
+        TsukiToggle::Disabled(TsukiToggle::ImageDescCache)) {
         entry.desc = VideoCore::TextureCache::ImageDesc{sharp, res};
         entry.sharp = key;
         entry.flags = flags;
@@ -2084,7 +2084,7 @@ void Rasterizer::BindTextures(const Shader::Info& stage, const PreparedStage* pr
         const auto& image_desc = stage.images[image_index];
         const auto tsharp =
             prepared ? prepared->image_sharps[image_index] : image_desc.GetSharp(stage);
-        // gow3: a hash lookup per texture per draw for a diagnostic only.
+        // tsuki: a hash lookup per texture per draw for a diagnostic only.
         static const bool warn_meta = std::getenv("TSUKI_WARN_META_TEXTURE") != nullptr;
         if (warn_meta && texture_cache.IsMeta(tsharp.Address())) {
             LOG_WARNING(Render_Vulkan, "Unexpected metadata read by a shader (texture)");
@@ -2123,11 +2123,11 @@ void Rasterizer::BindTextures(const Shader::Info& stage, const PreparedStage* pr
             prepared ? CachedImageDescEntry(tsharp, image_desc, prepared->image_hashes[image_index])
                      : CachedImageDescEntry(tsharp, image_desc);
         for (auto i = 0; i < num_bindings; i++) {
-            // gow3: a plain binding (no mip override) of the same T# resolves to the same image
+            // tsuki: a plain binding (no mip override) of the same T# resolves to the same image
             // while no image was registered or unregistered.
             if (mip_fallback_mode == Shader::MipStorageFallbackMode::None &&
                 desc_entry.found_generation == texture_cache.RegistryGeneration() &&
-                !Gow3Toggle::Disabled(Gow3Toggle::TextureBindingMemo)) {
+                !TsukiToggle::Disabled(TsukiToggle::TextureBindingMemo)) {
                 desc_entry.pinned = bind_epoch;
                 auto& [image_id, _] =
                     image_bindings.emplace_back(desc_entry.found_id, &desc_entry.found_desc);
@@ -2293,7 +2293,7 @@ void Rasterizer::BindSamplers(const Shader::Info& stage, const PreparedStage* pr
             prepared ? prepared->sampler_sharps[sampler_index] : sampler.GetSharp(stage);
         const auto vk_sampler = texture_cache.GetSampler(ssharp, Regs().ta_bc_base, sampler.is_depth);
         if (FrameCapture::Active()) {
-            // gow3: the analyzer lists what the guest asked for beside what Vulkan got (Spec 6, A2).
+            // tsuki: the analyzer lists what the guest asked for beside what Vulkan got (Spec 6, A2).
             FrameCapture::SamplerUsed(ssharp, LiverpoolToVK::Filter(ssharp.xy_mag_filter),
                                       LiverpoolToVK::Filter(ssharp.xy_min_filter),
                                       LiverpoolToVK::MipFilter(ssharp.mip_filter),
@@ -2339,7 +2339,7 @@ bool Rasterizer::BindTexturesFromSet(const Shader::Info& stage, const PreparedSt
                                      u32 first_image_idx, bool& barrier, TextureSet*& slot) {
     const u32 count = static_cast<u32>(stage.images.size());
     if (!prepared || count == 0 || count > TextureSet::MaxImages ||
-        Gow3Toggle::Disabled(Gow3Toggle::TextureSetMemo) || FrameCapture::Active()) {
+        TsukiToggle::Disabled(TsukiToggle::TextureSetMemo) || FrameCapture::Active()) {
         return false;
     }
     for (const auto& image : stage.images) {
@@ -2407,9 +2407,9 @@ bool Rasterizer::BindTexturesFromSet(const Shader::Info& stage, const PreparedSt
 }
 
 RenderState Rasterizer::BeginRendering(const GraphicsPipeline* pipeline) {
-    // gow3: RenderStateMemo (see BeginMemo).
-    const bool memo_on = !Gow3Toggle::Disabled(Gow3Toggle::RenderStateMemo) && !FrameCapture::Active();
-    if (Gow3Stats::enabled && ((begin_memo_hits + begin_memo_misses) & 0x3FFFF) == 0x3FFFF) {
+    // tsuki: RenderStateMemo (see BeginMemo).
+    const bool memo_on = !TsukiToggle::Disabled(TsukiToggle::RenderStateMemo) && !FrameCapture::Active();
+    if (TsukiStats::enabled && ((begin_memo_hits + begin_memo_misses) & 0x3FFFF) == 0x3FFFF) {
         std::printf("Render state memo: %llu hits, %llu misses; texture sets: %llu hits, %llu "
                     "misses\n",
                     static_cast<unsigned long long>(begin_memo_hits),
@@ -2462,7 +2462,7 @@ RenderState Rasterizer::BeginRendering(const GraphicsPipeline* pipeline) {
 
 RenderState Rasterizer::BeginRenderingFull(const GraphicsPipeline* pipeline) {
     attachment_feedback_loop = false;
-    // gow3: frame analyzer census of this pass (sample counts and path, stencil, clears).
+    // tsuki: frame analyzer census of this pass (sample counts and path, stencil, clears).
     const bool census_on = FrameCapture::Active();
     PassCensus::State census;
     const auto& regs = Regs();
@@ -3011,7 +3011,7 @@ void Rasterizer::UpdateDepthStencilState() const {
     dynamic_state.SetDepthBiasEnabled(depth_bias_enabled);
     if (depth_bias_enabled) {
         const bool front = regs.polygon_control.enable_polygon_offset_front;
-        // gow3: TSUKI_LIGHTING_TEST=bias passes the slope scale as the guest gives it.
+        // tsuki: TSUKI_LIGHTING_TEST=bias passes the slope scale as the guest gives it.
         const float slope = front ? regs.poly_offset.front_scale : regs.poly_offset.back_scale;
         dynamic_state.SetDepthBias(
             front ? regs.poly_offset.front_offset : regs.poly_offset.back_offset,
@@ -3225,7 +3225,7 @@ void Rasterizer::NoteFrameStart() {
     if (auto* profiler = GpuProfiler::Get()) {
         profiler->BeginFrame();
     }
-    const u64 frame = Gow3Stats::gpu_frames.fetch_add(1, std::memory_order_relaxed) + 1;
+    const u64 frame = TsukiStats::gpu_frames.fetch_add(1, std::memory_order_relaxed) + 1;
     // TSUKI_BUFFER_STATS=1: how many earlier frames the GPU has not finished when the GPU thread
     // starts a frame — the lag that decides whether guest memory can be read in place.
     static const bool stats = [] {

@@ -3,7 +3,7 @@
 # (docs/specs/2026-10-14-spec-6-2d-raton-saves.md A1, A4). Everything lives in out/route/ (not versioned):
 #   save/       fixed copy of a save (save/savedata/...); every run starts from it in a fresh user/, so neither
 #               the user's own user/ nor its user/savedata_backups/ is touched
-#   gow3.ini    the route's settings: the defaults, except async_shaders=0 (a shader still compiling would skip a draw)
+#   tsuki.ini    the route's settings: the defaults, except async_shaders=0 (a shader still compiling would skip a draw)
 #   pad.txt     the recording (TSUKI_PAD_RECORD, clocked in pad reads: src/runtime_pad.c)
 #   frames.txt  how each frame is compared (tools/compare_route.sh); record writes it from the F12 captures
 #   record/, <name>/, <name>.log   the captures and the log of each run
@@ -33,8 +33,8 @@ frame_list() { awk '{ sub(/#.*/, ""); if (NF) { if ($1 !~ /^[0-9]+$/) exit 1; pr
 missing() { local n; for n in ${1//,/ }; do compgen -G "$R/$name/frame_$(printf '%06d' "$n")_*.png" > /dev/null || echo "$n"; done; }
 
 rm -rf "$R/user" && mkdir -p "$R/user" && cp -a "$R/save/." "$R/user/" || { echo "error: no se pudo restaurar $R/user/" >&2; exit 2; }
-[[ -f $R/gow3.ini ]] || printf '%s\n' '# gow3 settings of the recorded route (tools/route.sh): the defaults, except async_shaders' \
-    render_resolution=native engine_fps=120 deferred_readback=1 stale_readback=1 async_shaders=0 > "$R/gow3.ini"
+[[ -f $R/tsuki.ini ]] || printf '%s\n' '# tsuki settings of the recorded route (tools/route.sh): the defaults, except async_shaders' \
+    render_resolution=native engine_fps=120 deferred_readback=1 stale_readback=1 async_shaders=0 > "$R/tsuki.ini"
 log=$R/$name.log; extra=()
 if [[ $name == record ]]; then
     extra=(TSUKI_PAD_RECORD="$R/pad.txt" TSUKI_SCREENSHOT_DIR="$R/record")
@@ -44,11 +44,11 @@ else
 fi
 # Nothing scripted from the caller's shell gets in: only this run's input reaches the game.
 env -u TSUKI_PAD_FILE -u TSUKI_PAD_RECORD -u TSUKI_PAD_REPLAY -u TSUKI_SCREENSHOT_AT -u TSUKI_SCREENSHOT_DIR \
-    TSUKI_GAME_DIR=Tsukihime/CUSA47999 TSUKI_FULLSCREEN=1 TSUKI_MOUSE=0 TSUKI_USER_DIR="$R/user" TSUKI_CONFIG="$R/gow3.ini" \
+    TSUKI_GAME_DIR=Tsukihime/CUSA47999 TSUKI_FULLSCREEN=1 TSUKI_MOUSE=0 TSUKI_USER_DIR="$R/user" TSUKI_CONFIG="$R/tsuki.ini" \
     TSUKI_FILE_TRACE=1 "${extra[@]}" python3 run.py > "$log" 2>&1 &
 game=$!
 # SIGTERM is the window close (report and exit); never pkill -f, which would match this script too.
-close() { pkill -TERM -x gow3-probe; wait "$game"; }
+close() { pkill -TERM -x tsuki-probe; wait "$game"; }
 stopped() { grep -q -E 'STOP:|Fault:' "$log"; }
 echo "route $name: log in $log"
 if [[ $name == record ]]; then

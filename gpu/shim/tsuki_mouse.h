@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// gow3: mouse state for libSceMouse. The window thread feeds SDL events in; the guest thread takes
-// them out through gow3gpu_mouse_read. Header only and free of ImGui/Vulkan so a test can use it.
+// tsuki: mouse state for libSceMouse. The window thread feeds SDL events in; the guest thread takes
+// them out through tsukigpu_mouse_read. Header only and free of ImGui/Vulkan so a test can use it.
 
 #pragma once
 
@@ -9,7 +9,7 @@
 #include <mutex>
 #include <SDL3/SDL_mouse.h>
 
-namespace Gow3Mouse {
+namespace TsukiMouse {
 
 /// The game's cursor space: it adds the reported deltas to its own cursor and clamps it to
 /// 0..0x27f and 0..0x1bf (docs/specs/2026-10-14-spec-6-2d-raton-saves.md §4). A push larger than
@@ -95,4 +95,4 @@ private:
     uint32_t held = 0;
 };
 
-} // namespace Gow3Mouse
+} // namespace TsukiMouse

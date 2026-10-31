@@ -11,7 +11,7 @@ extern "C" {
 #include <libavcodec/avcodec.h>
 }
 
-namespace Gow3Screenshot {
+namespace TsukiScreenshot {
 
 namespace {
 constexpr std::uint32_t kMaxSide = 16384; // Vulkan's usual maxImageDimension2D
@@ -150,4 +150,4 @@ bool SavePng(const std::filesystem::path& dir, std::uint64_t frame, const std::u
     return true;
 }
 
-} // namespace Gow3Screenshot
+} // namespace TsukiScreenshot

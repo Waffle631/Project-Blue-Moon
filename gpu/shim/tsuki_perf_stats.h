@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// gow3: numbers for the performance overlay (tsuki_overlay.cpp). A thread started once samples
+// tsuki: numbers for the performance overlay (tsuki_overlay.cpp). A thread started once samples
 // CPU, RAM, GPU use (Windows counters) and VRAM (VK_EXT_memory_budget) twice a second;
 // a value that cannot be measured stays negative and shows as "n/a".
 
@@ -14,9 +14,9 @@ namespace Vulkan {
 class Instance;
 }
 
-namespace Gow3PerfStats {
+namespace TsukiPerfStats {
 
-/// Overlay items (Gow3Settings::Values::overlay_items). Bit 2 was the temporal upscaler's name,
+/// Overlay items (TsukiSettings::Values::overlay_items). Bit 2 was the temporal upscaler's name,
 /// removed with the upscaler's options (Spec 7 §10); it stays free so the other bits keep their meaning.
 enum Item : unsigned {
     Fps = 1u << 0,
@@ -104,4 +104,4 @@ void Start(const Vulkan::Instance& instance);
 /// The latest CPU, RAM, GPU and VRAM values (the caller fills FPS and frametime).
 Sample Latest();
 
-} // namespace Gow3PerfStats
+} // namespace TsukiPerfStats

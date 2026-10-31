@@ -16,7 +16,7 @@ namespace Libraries::AvPlayer {
 
 namespace {
 
-// gow3: TSUKI_TRACE_AVPLAYER (avplayer_trace.h). The game polls GetVideoData(Ex), GetAudioData,
+// tsuki: TSUKI_TRACE_AVPLAYER (avplayer_trace.h). The game polls GetVideoData(Ex), GetAudioData,
 // IsActive and CurrentTime every frame, so those are counted per player and only their useful
 // calls are traced: frames delivered, IsActive changes, CurrentTime once a second. Close prints the
 // totals.
@@ -335,7 +335,7 @@ s32 PS4_SYSV_ABI sceAvPlayerJumpToTime(AvPlayerHandle handle, uint64_t time) {
     if (handle == nullptr) {
         return Invalid("JumpToTime", handle);
     }
-    // gow3: no longer a stub that returned OK without moving (Spec 5, task 4;
+    // tsuki: no longer a stub that returned OK without moving (Spec 5, task 4;
     // AvPlayerSource::JumpToTime). It stops and restarts the decoding threads like Stop, so it
     // guards against exceptions the same way.
     const long long begin = AvTraceEnabled() ? AvTraceMs() : 0;
@@ -447,11 +447,11 @@ s32 PS4_SYSV_ABI sceAvPlayerStop(AvPlayerHandle handle) {
     if (handle == nullptr) {
         return Invalid("Stop", handle);
     }
-    // gow3: a begin line, because Stop is where the game hung (Spec 5, §2).
+    // tsuki: a begin line, because Stop is where the game hung (Spec 5, §2).
     AvTrace("Stop h=%p begin", handle);
     const long long begin = AvTraceEnabled() ? AvTraceMs() : 0;
     s32 result;
-    // gow3: guest code calls this and cannot unwind a C++ exception.
+    // tsuki: guest code calls this and cannot unwind a C++ exception.
     try {
         result = handle->Stop();
     } catch (const std::exception& error) {

@@ -78,7 +78,7 @@ def configure(env, manifest_dirs=MANIFEST_DIRS, library_dirs=LIBRARY_DIRS):
     # cache. exec preserves process/signal behavior; the cache survives launch.
     key = hashlib.sha256(f"{driver}:{driver.stat().st_mtime_ns}".encode()).hexdigest()[:16]
     data_dir = Path(env.get("TSUKI_DATA_DIR") or
-                    str(Path(env.get("XDG_DATA_HOME", str(Path.home() / ".local/share"))) / "gow3"))
+                    str(Path(env.get("XDG_DATA_HOME", str(Path.home() / ".local/share"))) / "tsuki"))
     cache = data_dir / "vulkan" / "nvidia" / key
     libraries = cache / "lib"
     libraries.mkdir(parents=True, exist_ok=True)
@@ -116,7 +116,7 @@ def main():
     except OSError as error:
         # Startup diagnostics should identify driver/cache failures rather than
         # falling through to an unrelated Vulkan assertion.
-        print(f"gow3: cannot prepare NVIDIA driver: {error}", file=sys.stderr)
+        print(f"tsuki: cannot prepare NVIDIA driver: {error}", file=sys.stderr)
         return 1
     if "--vulkan-info" in sys.argv[1:]:
         tool = os.environ.get("TSUKI_VULKANINFO", "vulkaninfo")
