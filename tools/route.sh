@@ -3,7 +3,7 @@
 # (docs/specs/2026-10-14-spec-6-2d-raton-saves.md A1, A4). Everything lives in out/route/ (not versioned):
 #   save/       fixed copy of a save (save/savedata/...); every run starts from it in a fresh user/, so neither
 #               the user's own user/ nor its user/savedata_backups/ is touched
-#   tsuki.ini    the route's settings: the defaults, except async_shaders=0 (a shader still compiling would skip a draw)
+#   tsuki.ini   the route's settings: the defaults, except async_shaders=0 (a shader still compiling would skip a draw)
 #   pad.txt     the recording (TSUKI_PAD_RECORD, clocked in pad reads: src/runtime_pad.c)
 #   frames.txt  how each frame is compared (tools/compare_route.sh); record writes it from the F12 captures
 #   record/, <name>/, <name>.log   the captures and the log of each run
