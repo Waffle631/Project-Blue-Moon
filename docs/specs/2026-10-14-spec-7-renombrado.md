@@ -112,6 +112,7 @@ fotogramas `eye` (2700, 2890: el menú de carga sobre `titlebg1.mp4`) quedan a o
 - **Corrección del inventario.** La afirmación de que `GOW3_FSR4_PROFILE` solo se leía en el parche `0001` era falsa:
   `fsr411/fsr411.cpp` también la lee, como perfilador propio del FSR 4.1.1 conservado. Se aplicó la regla de los
   diagnósticos del código que se queda (§10): pasó a `TSUKI_FSR4_PROFILE`. La del parche se borra con él.
+  *(Ese mismo día el usuario decidió borrar todo el FSR 4.1.1, con su perfilador: §10, «FSR 4.1.1 fuera».)*
 - Tests de que la variable vieja no tiene efecto, rojos antes del cambio y verdes después:
   - `test_services.c`: `GOW3_LANGUAGE=8` deja el idioma en 1, y `TSUKI_LANGUAGE=8` lo cambia a 8;
   - `test_graphics_settings.cpp`: `GOW3_FSR1=1` no enciende `fsr1`, y `TSUKI_FSR1=1` sí.
@@ -267,7 +268,7 @@ Lo que hay que quitar (punto de partida; se rehace el inventario al empezar):
   aparte, porque también la usa el escalado de escena. `GOW3_FSR4_PROFILE` y `GOW3_FSR4_STATS` solo se leen dentro
   del parche `0001` de FSR-Vulkan: se van con él en el paso 6 del §4 (**[D]** 2026-10-30, §2), nunca se renombran.
   (*Corregido en la tarea 5: `fsr411/fsr411.cpp` también lee `GOW3_FSR4_PROFILE`. Es un diagnóstico del código
-  conservado y pasó a `TSUKI_FSR4_PROFILE`; ver §4.*)
+  conservado y pasó a `TSUKI_FSR4_PROFILE`; ver §4. Después se borró con todo el FSR 4.1.1: «FSR 4.1.1 fuera».*)
 - El ítem «Upscaler» del overlay sale de `DefaultItems` **y** del valor inicial `overlay_items{7}` de
   `Gow3Settings` (`gow3_settings.h:44`), que repite a mano los bits 0-2. Si no, el bit 2 sigue encendido por
   defecto (**[D]** 2026-10-30).
@@ -335,7 +336,8 @@ y el submódulo `fsr-vulkan`. El usuario decidió conservarlo (2026-10-28).
   `tools/fsr4_verify.sh`, `tools/fsr4_post_lds.pl`, `tools/fsr4_pass11_guard.pl`, `tools/Fsr4SpirvCrossFixes.pm`,
   `tools/fsr4cap/` (12 archivos), `gpu/tools/fsr4_bench.cpp` con su target `fsr4-bench` y la línea de
   `tools/fsr4cap/*.exe` en `.gitignore`. También `tools/soak.sh`, un resto de GoW3 («entra en el nivel y gira la
-  cámara»). El código del upscaler (`vk_fsr4.cpp`, `fsr411/`, el submódulo) se queda; sus comentarios ya no mandan a
+  cámara»). El código del upscaler (`vk_fsr4.cpp`, `fsr411/`, el submódulo) se queda (*`fsr411/`
+  se borró después: «FSR 4.1.1 fuera»*); sus comentarios ya no mandan a
   las herramientas borradas. `fsr4_shaders/` y `fsr4_411/` siguen en `.gitignore`, porque el código conservado los
   busca ahí y protegen copias locales.
 - Launcher:
@@ -386,6 +388,25 @@ Criterios de aceptación:
 - [x] FSR 1 y RCAS siguen funcionando como antes. `graphics-settings-test` lee y guarda `fsr1`, `rcas` y
   `rcas_strength`, y el usuario vio sus controles en el menú Insert (2026-10-30).
 - [x] Suites verdes; las capturas de la línea base y el recorrido grabado no cambian (`t2` y `tras10`).
+
+**FSR 4.1.1 fuera ([D] 2026-10-30, después de la tarea 5 del plan).** El usuario decide borrar el FSR 4.1.1 entero, no
+solo su perfilador. Es la única pieza del upscaler que ya no podría funcionar aunque se volviera a encender:
+necesita la carpeta `fsr4_411/` (SPIR-V y pesos del modelo), y esa carpeta solo la producía `tools/fsr4cap`, que la
+tarea 3 borró. El resto del upscaler (FSR 3.1, FSR 4 v07, DLSS, TAA) se queda, según la decisión del 2026-10-28.
+- Borrado: `fsr411/` (845 líneas, con el perfilador `TSUKI_FSR4_PROFILE`). También `Record411` en `vk_fsr4.cpp`,
+  `UpscalerFsr411` (TAA y DLSS pasan a 3 y 4; el número no se guarda en ningún lado desde la §10),
+  `fsr411_supported`, el segundo argumento de `ConfigureUpscalerSupport` y `IsFsr411Supported`. Además,
+  `fsr4_411/` del `.gitignore`.
+- Con él se va `VK_VALVE_shader_mixed_float_dot_product`: la extensión y su estructura de características, que solo
+  usaba el FSR 4.1.1. Era la razón de instalar Vulkan-Headers 1.4.344 en `/usr/local`. La biblioteca de GPU compila
+  ahora con los 1.4.341 de Fedora 44 (probado en un árbol aparte, con `-isystem` hacia `/usr/include/vulkan`), y
+  `docs/ENTORNO.md` y `CLAUDE.md` ya no los piden.
+- Pruebas:
+  - `upscaler-support-test` recorre los upscalers sin el 4.1.1;
+  - `build.sh --test` verde (12 PASS) y los 33 tests C++ de Linux compilan;
+  - Python: 284 tests OK;
+  - el recorrido (`out/route/spec7-fsr411/`) coincide con `out/baseline/6a/`, sin `STOP:` ni `Fault:`. Es la prueba
+    de que crear el dispositivo Vulkan sin esa extensión no cambia nada.
 
 ## 11. Añadido: quitar «God of War III», no solo los nombres `gow3`
 
