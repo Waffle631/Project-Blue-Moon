@@ -6,9 +6,9 @@
 #include "common/assert.h"
 #include "common/logging/log.h"
 #include "sdl_window.h"
-#include "gow3_overlay.h"
-#include "gow3_graphics.h"
-#include "gow3_settings.h"
+#include "tsuki_overlay.h"
+#include "tsuki_graphics.h"
+#include "tsuki_settings.h"
 
 namespace Frontend {
 
@@ -63,7 +63,7 @@ WindowSDL::WindowSDL(s32 width_, s32 height_, const char* title) : width{width_}
     }
     ApplyDisplayMode(Gow3Settings::Get().display_mode);
     // gow3: the SDL cursor is hidden while the game runs: it draws its own where the pointer is
-    // (absolute position, gow3_mouse.h). The settings menu shows it (Gow3Overlay::UpdateCursor).
+    // (absolute position, tsuki_mouse.h). The settings menu shows it (Gow3Overlay::UpdateCursor).
     SDL_HideCursor();
     int w = 0, h = 0;
     SDL_GetWindowSizeInPixels(window, &w, &h);

@@ -1,4 +1,4 @@
-/* libSceMouse on the host mouse. The window thread accumulates SDL events (gpu/shim/gow3_mouse.h);
+/* libSceMouse on the host mouse. The window thread accumulates SDL events (gpu/shim/tsuki_mouse.h);
  * each sceMouseRead takes what arrived since the previous one through gow3gpu_mouse_read: deltas that
  * put the game's cursor where the pointer is.
  *
@@ -8,7 +8,7 @@
  * It reads buttons (+12), xAxis (+16), yAxis (+20) and wheel (+24); there is no Close, and no
  * call site compares a result with 0x80DF....: the codes only reach the log. */
 #include "runtime.h"
-#include "gpu/gow3gpu.h"
+#include "gpu/tsukigpu.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

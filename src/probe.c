@@ -8,7 +8,7 @@
 #include "runtime.h"
 #include "cpu_check.h"
 #include "isa_rewrite.h"
-#include "gpu/gow3gpu.h"
+#include "gpu/tsukigpu.h"
 #if !defined(__x86_64__) || !defined(__GNUC__)
 #error This prototype requires x86-64 GCC or Clang (including MinGW).
 #endif

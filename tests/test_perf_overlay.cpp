@@ -1,12 +1,12 @@
-// Performance overlay text and settings (gow3_perf_stats.h, gow3_settings.cpp).
+// Performance overlay text and settings (tsuki_perf_stats.h, tsuki_settings.cpp).
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
 #include <sstream>
 #include <string>
-#include "gow3_perf_stats.h"
-#include "gow3_settings.h"
+#include "tsuki_perf_stats.h"
+#include "tsuki_settings.h"
 #ifndef _WIN32
 #define _putenv_s(name, value) setenv(name, value, 1)
 #endif

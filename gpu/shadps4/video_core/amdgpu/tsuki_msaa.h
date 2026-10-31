@@ -2,7 +2,7 @@
 // gow3: guest multisampled images created and sampled as single-sampled ones.
 // Guest sizes and addresses still use the real sample count (GuestNumSamples).
 //
-// On with AMD's and Intel's Windows drivers (gow3_msaa_default.h); TSUKI_NO_MSAA=0 or 1 decides
+// On with AMD's and Intel's Windows drivers (tsuki_msaa_default.h); TSUKI_NO_MSAA=0 or 1 decides
 // otherwise (vk_instance.cpp).
 
 #pragma once

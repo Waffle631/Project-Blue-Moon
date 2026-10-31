@@ -197,8 +197,8 @@ def main():
         icon_file = game / 'sce_sys' / 'icon0.png'
         if not WINDOWS:
             env.setdefault('SDL_APP_ID', 'gow3')
-            if (PORT / 'launcher' / 'gow3.png').is_file():
-                icon_file = PORT / 'launcher' / 'gow3.png'
+            if (PORT / 'launcher' / 'tsuki.png').is_file():
+                icon_file = PORT / 'launcher' / 'tsuki.png'
         try:
             from PIL import Image
             with Image.open(icon_file) as icon:
@@ -231,7 +231,7 @@ def main():
             env['TSUKI_VBLANK_HZ'] = '60'
             derived.append('TSUKI_VBLANK_HZ')
         # Without the frame rate patch the engine steps 1/60 s per frame: the present thread must
-        # not flip faster (gow3_graphics.h PresentLimit), or the game speeds up.
+        # not flip faster (tsuki_graphics.h PresentLimit), or the game speeds up.
         env['TSUKI_ENGINE_FPS'] = str(engine_fps)
         derived.append('TSUKI_ENGINE_FPS')
         print(f'Engine frame rate: {engine_fps} FPS'

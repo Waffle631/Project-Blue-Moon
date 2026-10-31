@@ -7,8 +7,8 @@
 #include <cstdlib>
 #include <cstring>
 
-#include "gow3_threads.h"
-#include "gow3_toggles.h"
+#include "tsuki_threads.h"
+#include "tsuki_toggles.h"
 #include "common/thread.h"
 #include "video_core/amdgpu/liverpool.h"
 #include "video_core/amdgpu/pm4_cmds.h"

@@ -23,7 +23,7 @@ let
         || lib.any (dir: lib.hasPrefix (dir + "/") rel) assetDirs;
   };
   python = pkgs.python3.withPackages (ps: [ ps.pygobject3 ]);
-  # Mesa comes with the package. gow3_vulkan.py adds the host NVIDIA ICD and
+  # Mesa comes with the package. tsuki_vulkan.py adds the host NVIDIA ICD and
   # only its vendor libraries (matching the host's kernel module).
   icds = lib.concatMapStringsSep ":" (name: "${pkgs.mesa}/share/vulkan/icd.d/${name}")
     [ "radeon_icd.x86_64.json" "intel_icd.x86_64.json" ];
@@ -82,14 +82,14 @@ pkgs.stdenv.mkDerivation {
     runHook postInstall
   '';
   postFixup = ''
-    # bin/gow3 is a static program (gow3-entry.c) that clears the host's LD_PRELOAD (Steam's
+    # bin/gow3 is a static program (tsuki-entry.c) that clears the host's LD_PRELOAD (Steam's
     # overlay) and similar before the wrapper's own dynamic programs start.
     mkdir -p $out/libexec
     gcc -O2 -Wall -Werror -static -L${pkgs.glibc.static}/lib -DTARGET="\"$out/libexec/gow3\"" \
-      ${./gow3-entry.c} -o $out/bin/gow3
+      ${./tsuki-entry.c} -o $out/bin/gow3
     # The game (settings from the data directory's gow3.ini).
     makeShellWrapper ${pkgs.python3}/bin/python3 $out/libexec/gow3 \
-      ${common}      --add-flags "$out/share/gow3/launcher/gow3_vulkan.py ${pkgs.bash}/bin/bash $out/share/gow3/run.sh" \
+      ${common}      --add-flags "$out/share/gow3/launcher/tsuki_vulkan.py ${pkgs.bash}/bin/bash $out/share/gow3/run.sh" \
       --set TSUKI_PREBUILT 1 \
       --set PYTHON ${pkgs.python3}/bin/python3 \
       --set TSUKI_BUNDLED_VK_DRIVER_FILES ${icds} \

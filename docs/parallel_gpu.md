@@ -87,7 +87,7 @@ todo el fotograma, sobre todo en el kernel, subiendo 50–400 MB de texturas y b
 Hallazgos, en el orden en que se corrigieron:
 
 1. Las copias guest-a-staging se ejecutaban en un solo hilo (el hilo de grabación; las texturas en el hilo de
-   GPU). Ahora empiezan de inmediato en hilos de copia (`Gow3Copy::Async`, `gow3_copy.cpp`);
+   GPU). Ahora empiezan de inmediato en hilos de copia (`Gow3Copy::Async`, `tsuki_copy.cpp`);
    las copias pequeñas se agrupan por hilo (un despertar por cada ~512 KiB — uno por copia costaba un 25 % de FPS).
    Los fences visibles para el guest y el envío a la cola las esperan (`Scheduler::WaitHostCopies`),
    lo que mantiene la corrección del parpadeo de la UI (el guest reutilizaba buffers antes de que se ejecutaran las copias diferidas).
@@ -140,7 +140,7 @@ por debajo de 12 hilos de hardware (Steam Deck: sin workers). Ahora:
   buffer escaneado más cercano por delante del hilo de GPU, alcanzan su estado inicial aplicando los deltas
   desde su último buffer (o desde el estado de cola de la cola), y preparan sus draws.
   Más workers significan ahora más buffers preparados en paralelo, no más reproducción duplicada.
-- Todos los ayudantes son SCHED_IDLE (`gow3_threads.h`): solo toman núcleos ociosos. Si el scanner
+- Todos los ayudantes son SCHED_IDLE (`tsuki_threads.h`): solo toman núcleos ociosos. Si el scanner
   se queda sin recursos (CPU ocupada), el hilo de GPU lo rebasa desde su propio estado de registros una vez que el retraso
   supera 64 buffers, en lugar de encolar sin límite (`scanner rebases` en las estadísticas).
 - Los hilos de copia usan el mismo recuento de afinidad (camino crítico, prioridad normal).

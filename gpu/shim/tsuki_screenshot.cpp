@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-#include "gow3_screenshot.h"
+#include "tsuki_screenshot.h"
 
 #include <charconv>
 #include <cstdio>

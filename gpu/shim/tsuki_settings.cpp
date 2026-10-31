@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-#include "gow3_settings.h"
-#include "gow3_graphics.h"
+#include "tsuki_settings.h"
+#include "tsuki_graphics.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -52,7 +52,7 @@ void Set(Values& v, const std::string& key, const std::string& value) {
         return;
     }
     if (key == "menu_tab") {
-        v.menu_tab = i >= 0 && i <= 2 ? i : 0; // gow3_overlay.cpp: Image, Performance, Overlay
+        v.menu_tab = i >= 0 && i <= 2 ? i : 0; // tsuki_overlay.cpp: Image, Performance, Overlay
         return;
     }
     if (key == "show_fps") {

@@ -11,9 +11,9 @@
 #endif
 #include <functional>
 
-#include "gow3_copy.h"
+#include "tsuki_copy.h"
 #include "video_core/renderer_vulkan/vk_gpu_profiler.h"
-#include "gow3_toggles.h"
+#include "tsuki_toggles.h"
 #include "video_core/renderer_vulkan/vk_wait_diagnostics.h"
 #include "common/assert.h"
 #include "common/debug.h"
@@ -21,7 +21,7 @@
 #include "imgui/renderer/texture_manager.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
-#include "gow3_threads.h"
+#include "tsuki_threads.h"
 
 namespace Vulkan {
 

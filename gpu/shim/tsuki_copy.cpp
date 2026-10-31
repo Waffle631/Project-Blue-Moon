@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-#include "gow3_copy.h"
-#include "gow3_threads.h"
+#include "tsuki_copy.h"
+#include "tsuki_threads.h"
 
 #include <algorithm>
 #include <atomic>
@@ -13,7 +13,7 @@
 #include <thread>
 #include <vector>
 
-#include "gow3_toggles.h"
+#include "tsuki_toggles.h"
 #include "common/thread.h"
 
 namespace Gow3Copy {

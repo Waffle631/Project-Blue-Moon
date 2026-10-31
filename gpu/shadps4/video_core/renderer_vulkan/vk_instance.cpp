@@ -12,8 +12,8 @@
 #include "common/types.h"
 #include "imgui/renderer/imgui_core.h"
 #include "sdl_window.h"
-#include "video_core/amdgpu/gow3_msaa.h"
-#include "video_core/amdgpu/gow3_msaa_default.h"
+#include "video_core/amdgpu/tsuki_msaa.h"
+#include "video_core/amdgpu/tsuki_msaa_default.h"
 #include "video_core/renderer_vulkan/liverpool_to_vk.h"
 #include "video_core/renderer_vulkan/vk_amd_paths.h"
 #include "video_core/renderer_vulkan/vk_instance.h"
@@ -762,7 +762,7 @@ void Instance::CollectDeviceParameters() {
     driver_id = driver.driverID;
     vendor_name = driver.driverName.data();
 
-    // gow3: see video_core/amdgpu/gow3_msaa.h; the default per driver is gow3_msaa_default.h.
+    // gow3: see video_core/amdgpu/tsuki_msaa.h; the default per driver is tsuki_msaa_default.h.
     const char* no_msaa_env = std::getenv("TSUKI_NO_MSAA");
     const bool no_msaa = no_msaa_env && *no_msaa_env
                              ? *no_msaa_env == '1'

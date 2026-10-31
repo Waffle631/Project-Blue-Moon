@@ -154,7 +154,7 @@ target_sources(gow3gpu PRIVATE third_party/imgui/imgui.cpp third_party/imgui/img
 target_include_directories(gow3gpu PRIVATE third_party/imgui third_party/imgui/backends)
 target_compile_definitions(gow3gpu PRIVATE IMGUI_IMPL_VULKAN_NO_PROTOTYPES
     TSUKI_FONT_PATH="${CMAKE_CURRENT_SOURCE_DIR}/third_party/fonts/DejaVuSans.ttf")
-set_source_files_properties(shim/gow3_overlay.cpp PROPERTIES
+set_source_files_properties(shim/tsuki_overlay.cpp PROPERTIES
     OBJECT_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/fonts/DejaVuSans.ttf)
 target_include_directories(gow3gpu PRIVATE shim shadps4 ${SHADER_INCLUDE} third_party/gcn/include third_party/half/include)
 target_compile_definitions(gow3gpu PRIVATE BOOST_ASIO_STANDALONE NDEBUG)
@@ -170,7 +170,7 @@ if (WIN32)
     # Guest code is entered with the System V ABI; NOMINMAX/WIN32_LEAN_AND_MEAN keep
     # <windows.h> out of the way of std::min/max and the Vulkan/SDL headers.
     target_compile_definitions(gow3gpu PUBLIC NOMINMAX WIN32_LEAN_AND_MEAN)
-    target_compile_options(gow3gpu PRIVATE -include ${CMAKE_CURRENT_SOURCE_DIR}/shim/gow3_win_compat.h)
+    target_compile_options(gow3gpu PRIVATE -include ${CMAKE_CURRENT_SOURCE_DIR}/shim/tsuki_win_compat.h)
     target_link_libraries(gow3gpu PUBLIC Vulkan::Vulkan ws2_32 bcrypt ntdll synchronization winmm pdh)
 else()
     target_link_libraries(gow3gpu PUBLIC PkgConfig::X11)
@@ -187,7 +187,7 @@ if (WIN32)
     set_target_properties(atrac9 PROPERTIES C_STANDARD 99 INTERPROCEDURAL_OPTIMIZATION OFF)
     add_executable(gow3-probe ../src/probe.c ${TSUKI_RUNTIME} ../src/compat_win.c ../src/cpu_check.c ../src/vulkan_smoke.c
         ../src/isa_rewrite.c ../src/isa_emulate.c ../third_party/vgmstream_hevag/hevag.c
-        ../packaging/windows/gow3-probe.rc)
+        ../packaging/windows/tsuki-probe.rc)
     set_target_properties(gow3-probe PROPERTIES C_STANDARD 11 C_EXTENSIONS OFF)
     target_compile_options(gow3-probe PRIVATE $<$<COMPILE_LANGUAGE:C>:-Wall -Wextra -Werror>)
     target_include_directories(gow3-probe PRIVATE .. ../src)
@@ -238,7 +238,7 @@ if (WIN32)
     target_compile_options(tsc-clock-test PRIVATE -UNDEBUG -Wall -Wextra -Werror)
     target_include_directories(tsc-clock-test PRIVATE .. ../src)
     target_link_libraries(tsc-clock-test PRIVATE bcrypt -pthread)
-    add_executable(gow3-gpu-capabilities ../tools/gpu_capabilities.c ../packaging/windows/gow3-gpu-capabilities.rc)
+    add_executable(gow3-gpu-capabilities ../tools/gpu_capabilities.c ../packaging/windows/tsuki-gpu-capabilities.rc)
     target_include_directories(gow3-gpu-capabilities PRIVATE shadps4)
     target_link_libraries(gow3-gpu-capabilities PRIVATE Vulkan::Vulkan)
     # "Play Tsukihime.exe": the game with the launcher's saved settings, no launcher window.
@@ -289,11 +289,11 @@ add_executable(mouse-accumulator-test EXCLUDE_FROM_ALL ../tests/test_mouse_accum
 target_compile_options(mouse-accumulator-test PRIVATE -UNDEBUG -Wall -Wextra -Werror)
 target_include_directories(mouse-accumulator-test PRIVATE ..)
 target_link_libraries(mouse-accumulator-test PRIVATE PkgConfig::SDL3)
-add_executable(png-decode-test EXCLUDE_FROM_ALL ../tests/test_png_decode.cpp shim/gow3_png.cpp)
+add_executable(png-decode-test EXCLUDE_FROM_ALL ../tests/test_png_decode.cpp shim/tsuki_png.cpp)
 target_compile_options(png-decode-test PRIVATE -UNDEBUG -Wall -Wextra -Werror)
 target_link_libraries(png-decode-test PRIVATE PkgConfig::FFMPEG)
-add_executable(screenshot-test EXCLUDE_FROM_ALL ../tests/test_screenshot.cpp shim/gow3_screenshot.cpp
-    shim/gow3_png.cpp)
+add_executable(screenshot-test EXCLUDE_FROM_ALL ../tests/test_screenshot.cpp shim/tsuki_screenshot.cpp
+    shim/tsuki_png.cpp)
 target_compile_options(screenshot-test PRIVATE -UNDEBUG -Wall -Wextra -Werror)
 target_link_libraries(screenshot-test PRIVATE PkgConfig::FFMPEG)
 add_executable(aliasing-test EXCLUDE_FROM_ALL ../tests/test_aliasing.cpp
@@ -356,7 +356,7 @@ target_compile_options(depth-stencil-state-test PRIVATE -UNDEBUG)
 target_include_directories(depth-stencil-state-test PRIVATE shim shadps4 third_party/gcn/include)
 target_link_libraries(depth-stencil-state-test PRIVATE Vulkan::Headers fmt::fmt Boost::headers magic_enum::magic_enum)
 add_executable(perf-overlay-test EXCLUDE_FROM_ALL ../tests/test_perf_overlay.cpp
-    shim/gow3_settings.cpp)
+    shim/tsuki_settings.cpp)
 target_include_directories(perf-overlay-test PRIVATE shim)
 target_compile_options(perf-overlay-test PRIVATE -UNDEBUG)
 add_executable(readback-queue-test EXCLUDE_FROM_ALL ../tests/test_readback_queue.cpp)
@@ -366,7 +366,7 @@ add_executable(wait-diagnostics-test EXCLUDE_FROM_ALL ../tests/test_wait_diagnos
 target_include_directories(wait-diagnostics-test PRIVATE shadps4)
 target_compile_options(wait-diagnostics-test PRIVATE -UNDEBUG)
 add_executable(graphics-settings-test EXCLUDE_FROM_ALL ../tests/test_graphics_settings.cpp
-    shim/gow3_settings.cpp)
+    shim/tsuki_settings.cpp)
 target_include_directories(graphics-settings-test PRIVATE shim)
 target_compile_options(graphics-settings-test PRIVATE -UNDEBUG)
 add_executable(readback-sources-test EXCLUDE_FROM_ALL ../tests/test_readback_sources.cpp)

@@ -9,8 +9,8 @@
 #include <unistd.h>
 #include <vector>
 
-#include "../gpu/shim/gow3_png.h"
-#include "../gpu/shim/gow3_screenshot.h"
+#include "../gpu/shim/tsuki_png.h"
+#include "../gpu/shim/tsuki_screenshot.h"
 
 using namespace Gow3Screenshot;
 

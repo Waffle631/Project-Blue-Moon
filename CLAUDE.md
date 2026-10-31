@@ -109,7 +109,7 @@ with before/after captures; the rename to `tsuki` is Spec 7, done last).
   - The pixelated save-slot thumbnail is the game's own: it builds it on the CPU from `allpac2.mrg` into a
     512×256 one-mip texture, which Vulkan samples as the guest asks. The user decided to leave it as is
     (2026-10-28).
-  - Mouse: `src/runtime_mouse.c`. The window thread accumulates SDL events (`gpu/shim/gow3_mouse.h`) and
+  - Mouse: `src/runtime_mouse.c`. The window thread accumulates SDL events (`gpu/shim/tsuki_mouse.h`) and
     `sceMouseRead` takes them through `gow3gpu_mouse_read`. The game's cursor lives in a 640×448 space, so
     the bridge sends deltas that put that cursor where the host pointer is, not the raw SDL deltas. While
     the Insert menu is open the game sees a connected mouse with no movement and no buttons.
@@ -218,9 +218,9 @@ TEB TLS slot on Windows, patched by `patch_tcb_loads`).
 - `gpu/shadps4/` — vendored shadPS4 (commit and backports in `gpu/VENDOR.txt`) plus cuesta4's
   rendering fixes for the previous game. Every local change is marked with a `gow3:` comment; keep doing that.
 - `gpu/shim/` — glue replacing the parts of shadPS4's emulator core (`core/`, `common/`), the SDL
-  window, the ImGui in-game menu/perf overlay (`gow3_overlay.cpp`), settings (`gow3_settings.cpp`,
+  window, the ImGui in-game menu/perf overlay (`tsuki_overlay.cpp`), settings (`tsuki_settings.cpp`,
   `gow3.ini`).
-- `gpu/gow3gpu.h` — the C interface between loader/runtime and the GPU library.
+- `gpu/tsukigpu.h` — the C interface between loader/runtime and the GPU library.
 - Linux: `libgow3gpu.so` loaded via rpath `$ORIGIN/gpu`; Windows: static, linked into `gow3-probe.exe`.
 - Many behaviours are toggled by `TSUKI_*` environment variables (diagnostics, readbacks,
   multisampling); `run.py` and `scripts/graphics_options.py` derive them from the
@@ -242,7 +242,7 @@ TEB TLS slot on Windows, patched by `patch_tcb_loads`).
     `ui_trigger_vs`)~~ (task 3b).
   - ~~The `TSUKI_READBACK_LINEAR=1` default in `run.py`~~ (task 4, 2026-10-25). The option stays.
 
-  Not the previous game's code, so it stays: the vendor-based guest MSAA decision (`gow3_msaa_default.h`, a
+  Not the previous game's code, so it stays: the vendor-based guest MSAA decision (`tsuki_msaa_default.h`, a
   workaround for AMD's and Intel's Windows drivers; user decision of 2026-10-25).
 - Pad touchpad semantics (photo mode / pause) in `runtime_pad.c`; title/serial defaults in
   `probe.c`; launcher, Steam shortcut and packaging identity.

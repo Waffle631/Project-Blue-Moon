@@ -13,7 +13,7 @@
 #include <cstdlib>
 #include <ctime>
 #ifndef _WIN32
-#include <unistd.h> // gettid; Windows gets it from the force-included gow3_win_compat.h
+#include <unistd.h> // gettid; Windows gets it from the force-included tsuki_win_compat.h
 #endif
 
 namespace Libraries::AvPlayer {

@@ -15,9 +15,9 @@
 #include <sys/resource.h>
 #endif
 #include "common/assert.h"
-#include "gow3_toggles.h"
-#include "gow3_settings.h"
-#include "gow3_graphics.h"
+#include "tsuki_toggles.h"
+#include "tsuki_settings.h"
+#include "tsuki_graphics.h"
 #include "video_core/renderer_vulkan/vk_frame_capture.h"
 #include "common/debug.h"
 #include "common/thread.h"

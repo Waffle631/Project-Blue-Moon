@@ -24,7 +24,7 @@ Then, in the repository:
 git submodule update --init --recursive
 bash build.sh                      # out/gow3-probe.exe, out/gow3-gpu-capabilities.exe
 TSUKI_GAME_DIR=F:/path/to/CUSA47999 python run.py
-python launcher/gow3_launcher_win.py
+python launcher/tsuki_launcher_win.py
 bash packaging/windows/package.sh  # dist/gow3-windows/ and .zip: Tsukihime.exe + DLLs
 ```
 
@@ -40,8 +40,8 @@ game directly with the saved settings.
 From a source tree it adds `C:\msys64\clang64\bin` (or `$MSYS2_ROOT`) to `PATH` for the DLLs.
 
 The launcher texts are written in English with the Russian beside them; the other languages
-are in `launcher/gow3_lang.py` (one list per language in the order of `KEYS`; a missing or
-empty text falls back to English). The icon (`launcher/gow3.ico`/`.png`) is drawn by
+are in `launcher/tsuki_lang.py` (one list per language in the order of `KEYS`; a missing or
+empty text falls back to English). The icon (`launcher/tsuki.ico`/`.png`) is drawn by
 `packaging/windows/make_icon.py` and built into `Tsukihime.exe`, `gow3-probe.exe` (the game
 window) and `gow3-gpu-capabilities.exe`.
 

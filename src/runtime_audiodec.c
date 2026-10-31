@@ -357,7 +357,7 @@ static const RuntimeExport exports[]={
 };
 uintptr_t runtime_audiodec_resolve(const char *name) { return RUNTIME_LOOKUP(exports,name); }
 /* Every way out of the game goes through runtime_report and then exits without closing files (closing
-   the window: _Exit in gpu/shim/gow3gpu.cpp): the dumps of the decoders still alive go to disk here,
+   the window: _Exit in gpu/shim/tsukigpu.cpp): the dumps of the decoders still alive go to disk here,
    with tables taken for writing so that no Decode or ClearContext is halfway through writing them. */
 void runtime_audiodec_report(void) {
     pthread_rwlock_wrlock(&tables); pthread_mutex_lock(&lock);

@@ -1,13 +1,13 @@
-#include "gow3_write_log.h"
+#include "tsuki_write_log.h"
 // gow3: glue between the C loader and the vendored shadPS4 video core.
-#include "gow3_overlay.h"
-#include "gow3_png.h"
-#include "gow3_settings.h"
-#include "gow3_copy.h"
+#include "tsuki_overlay.h"
+#include "tsuki_png.h"
+#include "tsuki_settings.h"
+#include "tsuki_copy.h"
 #ifndef _WIN32
 #include <sys/resource.h>
 #endif
-#include "gow3_toggles.h"
+#include "tsuki_toggles.h"
 #include <algorithm>
 #include <atomic>
 #include <condition_variable>
@@ -21,7 +21,7 @@
 #include <thread>
 #include <vector>
 #include <SDL3/SDL.h>
-#include "../gow3gpu.h"
+#include "../tsukigpu.h"
 #include "common/elf_info.h"
 #include "common/logging/log.h"
 #include "core/libraries/kernel/orbis_error.h"

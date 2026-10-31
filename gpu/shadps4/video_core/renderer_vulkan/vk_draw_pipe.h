@@ -12,7 +12,7 @@
 #pragma once
 
 #include <cstdlib>
-#include "gow3_threads.h"
+#include "tsuki_threads.h"
 
 #include <array>
 #include <atomic>

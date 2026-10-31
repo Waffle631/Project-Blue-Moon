@@ -51,7 +51,7 @@ NEW_GROUP = {} if WINDOWS else {'start_new_session': True}
 UI_FONT, MONO_FONT, SERIF_FONT = 'Segoe UI', 'Consolas', 'Georgia'
 # This build, shown on the Advanced page.
 VERSION = '2.1.8'
-# The title font, next to gow3.ico; main() registers it for this process only.
+# The title font, next to tsuki.ico; main() registers it for this process only.
 # It is the God of War face, kept until the Alpha with the icon and the colors (Spec 7 §11; rename-check: ok).
 FONT_FILE = PORT_DIR / 'launcher' / 'gowfont.ttf'
 FR_PRIVATE = 0x10
@@ -148,11 +148,11 @@ def list_gpus():
 
 # ---------------------------------------------------------------------------------------------
 # Languages: every text is written in English with the Russian next to it; the other
-# languages are in gow3_lang.py, keyed by the English text.
+# languages are in tsuki_lang.py, keyed by the English text.
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import button_icons  # noqa: E402
-import gow3_lang  # noqa: E402
+import tsuki_lang  # noqa: E402
 
 LANG = 'en'
 FONT_LOADED = False  # set by main() for the window; the command-line roles never need the font
@@ -201,7 +201,7 @@ def _(en, ru=None):
         return _(en[:-len(WARN)], ru and ru.removesuffix(WARN)) + WARN
     if LANG == 'ru':
         return ru or en
-    return gow3_lang.table(LANG).get(en) or en
+    return tsuki_lang.table(LANG).get(en) or en
 
 
 def environment_language():
@@ -219,7 +219,7 @@ def windows_language():
         primary = ctypes.windll.kernel32.GetUserDefaultUILanguage() & 0x3ff
     except (AttributeError, OSError):
         return 'en'
-    return gow3_lang.WINDOWS_LANGUAGES.get(primary, 'en')
+    return tsuki_lang.WINDOWS_LANGUAGES.get(primary, 'en')
 
 
 def register_font(path):
@@ -355,7 +355,7 @@ DRAW_PIPE = [('', ('Auto (8+ threads)', 'Авто (8+ потоков)')), ('1', 
 READBACKS = [('', ('Relaxed (default)', 'Relaxed (по умолчанию)')), ('0', ('Off', 'Выключены')),
              ('2', ('Precise',))]
 # TSUKI_NO_MSAA: '' leaves the game's own default, off on AMD's and Intel's Windows drivers
-# (video_core/amdgpu/gow3_msaa_default.h); no_msaa_options names the chosen card in Automatic.
+# (video_core/amdgpu/tsuki_msaa_default.h); no_msaa_options names the chosen card in Automatic.
 NO_MSAA = [('', ('Automatic',)), ('1', ('Off (fixes black lines)',)), ('0', ('On',))]
 NO_MSAA_HINT = ("The game's 2-sample depth buffer, read as a texture by its lighting. AMD's and Intel's Windows "
                 'drivers read it wrong and the lighting shows black lines, so Automatic turns multisampling off '
@@ -365,7 +365,7 @@ STREAM_MEMORY = [('cached', ('System RAM (cached, default)',)),
                  ('host', ('System RAM (uncached)',)),
                  ('device', ('GPU memory (previous behavior)',))]
 FRAMES_QUEUED = [('1', ('1 (lowest latency)',)), ('2', ('2',)), ('0', ('Unlimited',))]
-UI_LANGUAGES = gow3_lang.LANGUAGE_NAMES
+UI_LANGUAGES = tsuki_lang.LANGUAGE_NAMES
 
 def load_json(path, default):
     try:
@@ -642,7 +642,7 @@ def integrate_desktop(enabled, appimage, icon_source, data_dir, home=None):
 
 def steam_icon(game):
     """Picture of the Steam shortcut's icon: the launcher's own on Linux, the game's on Windows."""
-    return Path(game) / 'sce_sys' / 'icon0.png' if WINDOWS else PORT_DIR / 'launcher' / 'gow3.png'
+    return Path(game) / 'sce_sys' / 'icon0.png' if WINDOWS else PORT_DIR / 'launcher' / 'tsuki.png'
 
 
 def steam_launch_command():
@@ -813,7 +813,7 @@ class Launcher:
 
     def set_icon(self):
         game_icon = Path(self.meta_dir() or '.') / 'sce_sys' / 'icon0.png'
-        self.icon = window_icon(self.root, self.tk, game_icon, PORT_DIR / 'launcher' / 'gow3.png',
+        self.icon = window_icon(self.root, self.tk, game_icon, PORT_DIR / 'launcher' / 'tsuki.png',
                                 CONFIG_DIR / 'game_icon.ico')
 
     # ---- look --------------------------------------------------------------------------------
@@ -1968,7 +1968,7 @@ class Launcher:
         else:  # a source tree: the launcher script with the windowless Python
             pythonw = Path(sys.executable).with_name('pythonw.exe')
             target = str(pythonw if pythonw.exists() else sys.executable)
-            arguments, icon = Path(__file__).resolve(), PORT_DIR / 'launcher' / 'gow3.ico'
+            arguments, icon = Path(__file__).resolve(), PORT_DIR / 'launcher' / 'tsuki.ico'
         script = ('$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath("Desktop")'
                   '+"\\Tsukihime.lnk");'
                   f'$s.TargetPath="{target}";$s.WorkingDirectory="{PORT_DIR}";$s.IconLocation="{icon}";'
@@ -1987,7 +1987,7 @@ class Launcher:
         icon = icon_dir / 'gow3.png'
         try:
             icon_dir.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(PORT_DIR / 'launcher' / 'gow3.png', icon)
+            shutil.copyfile(PORT_DIR / 'launcher' / 'tsuki.png', icon)
         except OSError:
             icon = 'gow3'
         entry = desktop_entry(command, icon)
@@ -2158,7 +2158,7 @@ def main():
     LANG = settings.get('ui_language') or windows_language()
     if not WINDOWS:
         integrate_desktop(settings.get('desktop_integration', True), os.environ.get('APPIMAGE'),
-                          PORT_DIR / 'launcher' / 'gow3.png', DATA_DIR)
+                          PORT_DIR / 'launcher' / 'tsuki.png', DATA_DIR)
     # Without a usable game folder there is nothing to play yet: open the launcher instead.
     if '--play' in args and ready_to_play(settings['game_dir'], settings.get('update_dir') or ''):
         sys.exit(play_without_window(settings))

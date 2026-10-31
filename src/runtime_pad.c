@@ -13,7 +13,7 @@
  * unless mapped. */
 #define _GNU_SOURCE
 #include "runtime.h"
-#include "gpu/gow3gpu.h"
+#include "gpu/tsukigpu.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

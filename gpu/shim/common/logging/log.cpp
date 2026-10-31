@@ -4,7 +4,7 @@
 #include <cstring>
 #include <mutex>
 #include "common/logging/log.h"
-#include "gow3_toggles.h"
+#include "tsuki_toggles.h"
 
 namespace Common::Log {
 static Level threshold() {

@@ -10,7 +10,7 @@
 #include <ranges>
 #include <string>
 #include <unordered_set>
-#include "gow3_threads.h"
+#include "tsuki_threads.h"
 
 #include "common/hash.h"
 #include "common/thread.h"
@@ -22,7 +22,7 @@
 #include "shader_recompiler/info.h"
 #include "shader_recompiler/recompiler.h"
 #include "shader_recompiler/runtime_info.h"
-#include "gow3_settings.h"
+#include "tsuki_settings.h"
 #include "video_core/amdgpu/liverpool.h"
 #include "video_core/cache_storage.h"
 #include "video_core/renderer_vulkan/liverpool_to_vk.h"

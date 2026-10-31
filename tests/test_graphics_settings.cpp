@@ -1,12 +1,12 @@
-// gow3.ini graphics keys (gow3_settings.cpp, gow3_graphics.h).
+// gow3.ini graphics keys (tsuki_settings.cpp, tsuki_graphics.h).
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
 #include <sstream>
 #include <string>
-#include "gow3_graphics.h"
-#include "gow3_settings.h"
+#include "tsuki_graphics.h"
+#include "tsuki_settings.h"
 #ifndef _WIN32
 #define _putenv_s(name, value) setenv(name, value, 1) // "" counts as unset for Load()
 #endif

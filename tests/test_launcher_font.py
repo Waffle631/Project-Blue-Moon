@@ -5,12 +5,12 @@ from pathlib import Path
 
 from paths import ROOT
 sys.path.insert(0, str(ROOT / 'launcher'))
-import gow3_launcher_win as launcher  # noqa: E402
+import tsuki_launcher_win as launcher  # noqa: E402
 
 
 class FontFileTest(unittest.TestCase):
     def test_font_file_is_a_launcher_asset_under_port_dir(self):
-        # Frozen builds find launcher assets next to the exe (PORT_DIR / 'launcher'), like gow3.ico.
+        # Frozen builds find launcher assets next to the exe (PORT_DIR / 'launcher'), like tsuki.ico.
         self.assertEqual(launcher.FONT_FILE, launcher.PORT_DIR / 'launcher' / 'gowfont.ttf')
         self.assertTrue(launcher.FONT_FILE.is_file())
 

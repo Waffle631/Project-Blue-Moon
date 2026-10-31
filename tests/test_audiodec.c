@@ -706,7 +706,7 @@ static void report_counts(void) {
     assert(after.decoders==before.decoders+1 && after.frames==before.frames+6 && after.errors==before.errors+2);
 }
 /* Every way out of the game goes through runtime_report and then exits without closing files (closing
-   the window: _Exit in gpu/shim/gow3gpu.cpp), so a decoder still alive then, the music at least, has
+   the window: _Exit in gpu/shim/tsukigpu.cpp), so a decoder still alive then, the music at least, has
    its dump and notes on disk after the report (task 8, run a4). */
 static void au_dump_is_on_disk_after_the_report(void) {
     const Clip *c=need("vse_mono_small",__func__); if (!c) return;

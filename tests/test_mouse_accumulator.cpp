@@ -3,7 +3,7 @@
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
-#include "gpu/shim/gow3_mouse.h"
+#include "gpu/shim/tsuki_mouse.h"
 
 using Gow3Mouse::MouseAccumulator;
 using Gow3Mouse::kPush;

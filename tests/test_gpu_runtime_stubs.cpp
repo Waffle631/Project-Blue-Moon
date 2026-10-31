@@ -22,6 +22,6 @@ uint64_t runtime_process_time_counter() { return runtime_process_time_us() * 100
 uint64_t runtime_read_tsc() { return runtime_process_time_counter(); }
 int32_t* runtime_errno() { std::abort(); }
 int runtime_memory_write_backing(uintptr_t, const void*, uint64_t) { std::abort(); }
-void runtime_report() { std::abort(); } // only when the game window closes (gow3gpu.cpp)
+void runtime_report() { std::abort(); } // only when the game window closes (tsukigpu.cpp)
 }
 

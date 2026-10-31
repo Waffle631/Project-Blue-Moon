@@ -7,8 +7,8 @@ from unittest import mock
 
 from paths import ROOT
 sys.path.insert(0, str(ROOT / 'launcher'))
-import gow3_lang  # noqa: E402
-import gow3_launcher_win as launcher  # noqa: E402
+import tsuki_lang  # noqa: E402
+import tsuki_launcher_win as launcher  # noqa: E402
 
 
 class UpscalerSettingsTest(unittest.TestCase):
@@ -30,10 +30,10 @@ class UpscalerSettingsTest(unittest.TestCase):
 
     def test_no_upscaler_texts_left_to_translate(self):
         for text in ('Upscaler', 'Upscaling', 'Quality preset', 'Download FSR 4 assets', 'FSR 3.1 (every GPU)'):
-            self.assertNotIn(text, gow3_lang.KEYS)
-        self.assertNotIn('Enable the upscaler (experimental)', gow3_lang.EXTRA['pt'])
-        for language in gow3_lang.TRANSLATIONS:
-            gow3_lang.table(language)  # every table still matches KEYS
+            self.assertNotIn(text, tsuki_lang.KEYS)
+        self.assertNotIn('Enable the upscaler (experimental)', tsuki_lang.EXTRA['pt'])
+        for language in tsuki_lang.TRANSLATIONS:
+            tsuki_lang.table(language)  # every table still matches KEYS
 
 
 if __name__ == '__main__':

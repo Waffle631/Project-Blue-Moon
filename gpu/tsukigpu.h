@@ -37,9 +37,9 @@ int gow3gpu_choice_poll(void);
 int gow3gpu_overlay_captures_input(void);
 /* libSceMouse source. Returns the deltas that bring the game's 640x448 cursor to the pointer since
  * the previous call, the whole wheel notches since then and the held buttons (0x1 left, 0x2 right,
- * 0x4 middle, 0x8/0x10 SDL X1/X2); gpu/shim/gow3_mouse.h has the rules. While a menu, the text entry
- * or the save list captures the input everything is 0. Result: 1 when SDL has a mouse, 0 when not.
- * Any pointer may be NULL. */
+ * 0x4 middle, 0x8/0x10 SDL X1/X2); gpu/shim/tsuki_mouse.h has the rules. While a menu, the text
+ * entry or the save list captures the input everything is 0. Result: 1 when SDL has a mouse, 0 when
+ * not. Any pointer may be NULL. */
 int gow3gpu_mouse_read(int32_t *dx, int32_t *dy, int32_t *wheel, uint32_t *buttons);
 /* Counters for the final GPU: line (runtime_report and the watchdog): command buffer
  * submissions, draws, dispatches, guest flips presented, and warnings logged as unimplemented

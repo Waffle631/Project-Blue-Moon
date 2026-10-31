@@ -30,9 +30,9 @@ for module in argparse base64 collections hashlib json re shutil struct tempfile
     hidden+=(--hidden-import "$module")
 done
 out/pyenv/Scripts/python.exe -m PyInstaller --noconfirm --clean --log-level WARN --windowed --copy-metadata pillow \
-    --name "Tsukihime" --icon "$(cygpath -w "$PWD/launcher/gow3.ico")" --distpath out/pyi-dist \
+    --name "Tsukihime" --icon "$(cygpath -w "$PWD/launcher/tsuki.ico")" --distpath out/pyi-dist \
     --workpath out/pyi-work --specpath out/pyi-work --paths "$(cygpath -w "$PWD/scripts")" "${hidden[@]}" \
-    "$(cygpath -w "$PWD/launcher/gow3_launcher_win.py")"
+    "$(cygpath -w "$PWD/launcher/tsuki_launcher_win.py")"
 
 # The package is assembled in a fresh staging folder and zipped from there; dist/gow3-windows
 # (a playable copy that may hold saves and settings) is only refreshed afterwards.
@@ -41,7 +41,7 @@ rm -rf -- out/stage
 mkdir -p "$dest/bin" "$dest/launcher"
 cp -r "out/pyi-dist/Tsukihime/." "$dest/"
 llvm-strip -o "$dest/Play Tsukihime.exe" out/gow3-play.exe
-cp launcher/gow3.ico launcher/gow3.png launcher/gowfont.ttf "$dest/launcher/"
+cp launcher/tsuki.ico launcher/tsuki.png launcher/gowfont.ttf "$dest/launcher/"
 # The executables without debug information (out/ keeps the symbols for crash reports).
 for exe in gow3-probe.exe gow3-gpu-capabilities.exe; do
     llvm-strip --strip-debug -o "$dest/bin/$exe" "out/$exe"

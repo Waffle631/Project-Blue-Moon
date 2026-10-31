@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "gow3_copy.h"
+#include "tsuki_copy.h"
 
 #include <deque>
 #include <boost/container/small_vector.hpp>

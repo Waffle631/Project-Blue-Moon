@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-#include "gow3_overlay.h"
+#include "tsuki_overlay.h"
 
 #include <algorithm>
 #include <atomic>
@@ -14,10 +14,10 @@
 #include <vector>
 
 #include <SDL3/SDL.h>
-#include "gow3_settings.h"
-#include "gow3_graphics.h"
-#include "gow3_perf_stats.h"
-#include "gow3_screenshot.h"
+#include "tsuki_settings.h"
+#include "tsuki_graphics.h"
+#include "tsuki_perf_stats.h"
+#include "tsuki_screenshot.h"
 
 extern "C" void runtime_restart(void); // src/probe.c: starts run.py again, ends this process
 #include "common/elf_info.h"
@@ -842,7 +842,7 @@ bool HandleEvent(const SDL_Event& event) {
             Vulkan::FrameCapture::Request();
             return true;
         }
-        // PNG of the next presented frame (gow3_screenshot.h); always on, unlike F11.
+        // PNG of the next presented frame (tsuki_screenshot.h); always on, unlike F11.
         if (down && !event.key.repeat && event.key.key == SDLK_F12) {
             Gow3Screenshot::Global().RequestNow();
             return true;

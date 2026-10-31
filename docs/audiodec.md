@@ -483,7 +483,7 @@ Lo que muestran los corpus:
   - del corpus, un `clear` corrido, uno perdido y una configuración cambiada.
 
 **[V] Volcados al cerrar.** Al cerrar la ventana, el juego termina en `runtime_report` y `_Exit(0)`
-(`gpu/shim/gow3gpu.cpp`) sin cerrar archivos. SDL convierte `SIGTERM` en el mismo cierre.
+(`gpu/shim/tsukigpu.cpp`) sin cerrar archivos. SDL convierte `SIGTERM` en el mismo cierre.
 - En `a4`, la música seguía viva al cerrar y perdió su `.txt` y el final de su `.au`, que estaban en
   el búfer de stdio.
 - Desde la tarea 8, `runtime_audiodec_report` escribe a disco los volcados de los decodificadores vivos.

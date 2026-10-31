@@ -12,11 +12,11 @@
 #include "video_core/buffer_cache/buffer.h"
 #include "video_core/renderdoc.h"
 #include "video_core/renderer_vulkan/vk_platform.h"
-#include "gow3_overlay.h"
-#include "gow3_screenshot.h"
-#include "gow3_settings.h"
-#include "gow3_graphics.h"
-#include "gow3_toggles.h"
+#include "tsuki_overlay.h"
+#include "tsuki_screenshot.h"
+#include "tsuki_settings.h"
+#include "tsuki_graphics.h"
+#include "tsuki_toggles.h"
 #include "video_core/renderer_vulkan/vk_presenter.h"
 #include "video_core/renderer_vulkan/vk_warmup_inbox.h"
 #include "video_core/renderer_vulkan/vk_rasterizer.h"
@@ -420,7 +420,7 @@ Frame* Presenter::PrepareFrame(const Libraries::VideoOut::BufferAttributeGroup& 
     static int frame_dump_index = 0;
     const bool frame_dump = frame_dump_trigger && std::remove(frame_dump_trigger) == 0;
     // gow3: presentation frame number (one PrepareFrame per guest flip, the first is 1) for
-    // TSUKI_SCREENSHOT_AT and F12 (gow3_screenshot.h): the presented image is saved as a PNG.
+    // TSUKI_SCREENSHOT_AT and F12 (tsuki_screenshot.h): the presented image is saved as a PNG.
     static u64 presented_frames = 0;
     const u64 frame_number = ++presented_frames;
     const bool screenshot = Gow3Screenshot::Global().ShouldCapture(frame_number);

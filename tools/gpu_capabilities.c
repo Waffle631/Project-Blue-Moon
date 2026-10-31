@@ -5,7 +5,7 @@
 #include <string.h>
 #include <vulkan/vulkan.h>
 
-#include "video_core/amdgpu/gow3_msaa_default.h"
+#include "video_core/amdgpu/tsuki_msaa_default.h"
 
 static VkDeviceSize largest_local_heap(VkPhysicalDevice device) {
     VkPhysicalDeviceMemoryProperties memory;
@@ -69,7 +69,7 @@ int main(int argc, char **argv) {
         return 1;
     }
     /* The launcher's GPU choice: index (as TSUKI_GPU_ID), name, type, the game's default for
-     * its multisampling on that driver ("off" or "on", gow3_msaa_default.h) and 1 on the GPU
+     * its multisampling on that driver ("off" or "on", tsuki_msaa_default.h) and 1 on the GPU
      * the game picks without TSUKI_GPU_ID. */
     VkPhysicalDevice preferred = devices[0];
     for (uint32_t i = 1; i < count; ++i)
