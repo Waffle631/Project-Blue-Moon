@@ -36,7 +36,7 @@ class GameIdentityTests(unittest.TestCase):
 
     def test_is_game_by_title_id(self):
         self.assertTrue(is_game('CUSA47999'))
-        self.assertFalse(is_game('CUSA01623'))
+        self.assertFalse(is_game('CUSA99999'))
         self.assertFalse(is_game(None))
         self.assertFalse(is_game(''))
 

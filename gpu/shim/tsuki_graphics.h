@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // tsuki: graphics options of the in-game menu (Insert / R3+L2), kept in tsuki.ini. The live ones
-// apply on the next frame; the startup ones (patches, GPU readback modes) are read by run.py and
+// apply on the next frame; the startup ones (GPU readback modes) are read by run.py and
 // apply through "Apply and restart". The launcher reads and writes the same keys.
 #pragma once
 
@@ -18,11 +18,8 @@ inline constexpr std::array<const char*, DisplayModeCount> DisplayModeNames = {
 /// Present rate limits; 0 = unlimited.
 inline constexpr std::array<int, 5> FpsLimits = {30, 60, 120, 240, 0};
 
-/// Game patch suffixes ("Resolution Patch - <name>"); "native" is no resolution patch.
-inline constexpr std::array<std::string_view, 6> Resolutions = {"native", "480p", "720p",
-                                                                "1440p", "1800p", "4K"};
-/// Engine frame rate ceilings: 60 is the game's own, 120 and 240 are frame rate patches.
-inline constexpr std::array<int, 3> EngineFps = {60, 120, 240};
+/// The game's own frame rate: its engine steps 1/60 s per frame, so presenting faster speeds it up.
+inline constexpr int kEngineFps = 60;
 
 template <typename T, std::size_t N>
 constexpr int IndexOf(const std::array<T, N>& values, const T& value, int fallback) {
@@ -38,14 +35,6 @@ inline int ParseDisplayMode(std::string_view text) {
 /// A listed limit, else unlimited.
 inline int ParseFpsLimit(int value) {
     return IndexOf(FpsLimits, value, -1) >= 0 ? value : 0;
-}
-/// Index into Resolutions; unknown text is native.
-inline int ParseResolution(std::string_view text) {
-    return IndexOf(Resolutions, text, 0);
-}
-/// A listed ceiling, else 120 (the default patch).
-inline int ParseEngineFps(int value) {
-    return IndexOf(EngineFps, value, -1) >= 0 ? value : 120;
 }
 
 /// Frames the GPU command thread may queue ahead of the GPU; 0 = unbounded.
@@ -69,15 +58,14 @@ inline bool FsrPassRuns(bool fsr1, bool rcas, int in_w, int in_h, int out_w, int
     return (fsr1 && upscale) || (rcas && same);
 }
 
-/// What the present limit really allows: the engine ceiling caps it.
-inline int EffectiveFps(int limit, int engine_fps) {
-    return limit == 0 || limit > engine_fps ? engine_fps : limit;
+/// What the present limit really allows: the game's own rate caps it.
+inline int EffectiveFps(int limit) {
+    return limit == 0 || limit > kEngineFps ? kEngineFps : limit;
 }
 
-/// The present thread's frame limit: never above the engine rate the patches applied, since the
-/// engine steps a fixed time per frame and faster flips speed the game up. 0 stays vblank paced.
-inline int PresentLimit(int limit, int engine_fps) {
-    return limit == 0 ? 0 : EffectiveFps(limit, engine_fps);
+/// The present thread's frame limit: never above the game's own rate. 0 stays vblank paced.
+inline int PresentLimit(int limit) {
+    return limit == 0 ? 0 : EffectiveFps(limit);
 }
 
 } // namespace TsukiGraphics

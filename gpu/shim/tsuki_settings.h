@@ -33,18 +33,12 @@ struct Values {
     /// Set by the presenter: the game's image and the window it is shown in, in pixels.
     std::atomic<int> image_width{0}, image_height{0}, window_width{0}, window_height{0};
     std::atomic<int> frames_queued{1};
-    // Startup: run.py turns them into patches and environment variables; "Apply and restart".
-    std::atomic<int> render_resolution{0};
-    std::atomic<int> engine_fps{120};
+    // Startup: run.py turns them into environment variables; "Apply and restart".
     std::atomic<bool> deferred_readback{true};
     std::atomic<bool> stale_readback{true};
     /// Set before an "Apply and restart"; cleared once the new launch shows the game. run.py
     /// restores the previous startup options when a launch never cleared it.
     std::atomic<bool> restart_unconfirmed{false};
-    int startup_render_resolution = 0, startup_engine_fps = 120;
-    /// The engine rate this launch really runs at (run.py's TSUKI_ENGINE_FPS): 60 when the frame
-    /// rate patch does not apply to this game build.
-    std::atomic<int> applied_engine_fps{120};
     bool startup_deferred_readback = true, startup_stale_readback = true;
 };
 

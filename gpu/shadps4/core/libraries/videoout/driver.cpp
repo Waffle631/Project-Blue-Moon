@@ -662,7 +662,7 @@ void VideoOutDriver::PresentThread(std::stop_token token) {
     const auto current_limit = [&] {
         const auto& s = TsukiSettings::Get();
         return fixed_limit ? EmulatorSettings.GetFrameLimit()
-                           : u32(TsukiGraphics::PresentLimit(s.fps_limit, s.applied_engine_fps));
+                           : u32(TsukiGraphics::PresentLimit(s.fps_limit));
     };
     u32 frame_limit = current_limit();
     auto frame_period = frame_limit ? std::chrono::nanoseconds(1000000000 / frame_limit)

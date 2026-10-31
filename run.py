@@ -187,7 +187,6 @@ def main():
                 isa_args = ['--isa-rewrite', str(out / 'isa-rewrite.bin')]
         run_script('content_profile.py', game, '--out', out, '--sku', env.get('TSUKI_CONTENT_SKU', 'full'))
 
-        engine_fps = 60
         # The window shows the game's icon (BMP: the format SDL loads without extra libraries); on
         # Linux the launcher's own icon (the AppImage ships the one chosen when it was built) and
         # an application id the desktop entry matches, so the shell shows the same icon.
@@ -209,13 +208,6 @@ def main():
         if 'TSUKI_VBLANK_HZ' not in env:
             env['TSUKI_VBLANK_HZ'] = '60'
             derived.append('TSUKI_VBLANK_HZ')
-        # Without the frame rate patch the engine steps 1/60 s per frame: the present thread must
-        # not flip faster (tsuki_graphics.h PresentLimit), or the game speeds up.
-        env['TSUKI_ENGINE_FPS'] = str(engine_fps)
-        derived.append('TSUKI_ENGINE_FPS')
-        print(f'Engine frame rate: {engine_fps} FPS'
-              + ('' if engine_fps > 60 or graphics['engine_fps'] == '60' else
-                 ' (the frame rate patch was not found in this eboot.bin)'), flush=True)
         env['TSUKI_DERIVED'] = ','.join(derived)
 
         # The in-game restart starts this script again once this process is gone.

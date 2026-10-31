@@ -73,10 +73,6 @@ void Set(Values& v, const std::string& key, const std::string& value) {
         v.rcas_strength = TsukiGraphics::ParseRcasStrength(value.empty() ? -1 : i);
     } else if (key == "frames_queued") {
         v.frames_queued = TsukiGraphics::ParseFramesQueued(value.empty() ? -1 : i);
-    } else if (key == "render_resolution") {
-        v.render_resolution = TsukiGraphics::ParseResolution(value);
-    } else if (key == "engine_fps") {
-        v.engine_fps = TsukiGraphics::ParseEngineFps(i);
     } else if (key == "deferred_readback") {
         v.deferred_readback = i != 0;
     } else if (key == "stale_readback") {
@@ -120,20 +116,13 @@ void Load() {
             Set(v, key, value);
         }
     }
-    v.startup_render_resolution = v.render_resolution;
-    v.startup_engine_fps = v.engine_fps;
-    const char* applied = std::getenv("TSUKI_ENGINE_FPS");
-    v.applied_engine_fps = applied && applied[0] ? TsukiGraphics::ParseEngineFps(std::atoi(applied))
-                                                 : v.engine_fps.load();
     v.startup_deferred_readback = v.deferred_readback;
     v.startup_stale_readback = v.stale_readback;
 }
 
 bool GraphicsNeedRestart() {
     const auto& v = Get();
-    return v.render_resolution != v.startup_render_resolution ||
-           v.engine_fps != v.startup_engine_fps ||
-           v.deferred_readback != v.startup_deferred_readback ||
+    return v.deferred_readback != v.startup_deferred_readback ||
            v.stale_readback != v.startup_stale_readback;
 }
 
@@ -154,13 +143,12 @@ void Save() {
     std::fprintf(file,
                  "display_mode=%s\nvsync=%d\nfps_limit=%d\nasync_shaders=%d\n"
                  "fsr1=%d\nrcas=%d\nrcas_strength=%d\nframes_queued=%d\n"
-                 "render_resolution=%s\nengine_fps=%d\ndeferred_readback=%d\nstale_readback=%d\n"
+                 "deferred_readback=%d\nstale_readback=%d\n"
                  "restart_unconfirmed=%d\n",
                  TsukiGraphics::DisplayModeKeys[std::clamp(v.display_mode.load(), 0, 2)].data(),
                  int(v.vsync.load()), v.fps_limit.load(), int(v.async_shaders.load()),
                  int(v.fsr1.load()), int(v.rcas.load()), v.rcas_strength.load(), v.frames_queued.load(),
-                 TsukiGraphics::Resolutions[std::clamp(v.render_resolution.load(), 0, 5)].data(),
-                 v.engine_fps.load(), int(v.deferred_readback.load()), int(v.stale_readback.load()),
+                 int(v.deferred_readback.load()), int(v.stale_readback.load()),
                  int(v.restart_unconfirmed.load()));
     std::fclose(file);
 }
