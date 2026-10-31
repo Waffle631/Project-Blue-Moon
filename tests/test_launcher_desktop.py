@@ -56,5 +56,38 @@ class DesktopIntegrationTest(unittest.TestCase):
         self.assertFalse(self.entry.exists())
 
 
+class PublicNameTest(unittest.TestCase):
+    # Spec 8 §5: the port presents itself as "Project Blue Moon", not under the game's trademark; the
+    # texts that ask for the dump still name the game.
+    def test_the_launcher_and_its_entries_say_project_blue_moon(self):
+        self.assertEqual(launcher.APP_NAME, 'Project Blue Moon')
+        self.assertIn('\nName=Project Blue Moon\n', launcher.desktop_entry('x', 'y'))
+        packaged = (ROOT / 'packaging' / 'linux' / 'tsuki.desktop').read_text(encoding='utf-8')
+        self.assertIn('\nName=Project Blue Moon\n', packaged)
+        self.assertIn('Comment=PC port of TSUKIHIME -A piece of blue glass moon- (bring your own game dump)', packaged)
+
+    def test_choosing_the_dump_keeps_the_port_name_on_the_window(self):
+        # The cover under it is the dump's, with the game's logo, serial and version.
+        from unittest import mock
+        app = launcher.Launcher.__new__(launcher.Launcher)
+        for name in ('root', 'side_title', 'meta_dir', 'draw_banner', 'set_icon', 'refresh_status'):
+            setattr(app, name, mock.Mock())
+        with mock.patch.object(launcher, 'game_info', return_value=('TSUKIHIME -A piece of blue glass moon-', '01.00')):
+            app.game_changed()
+        app.root.title.assert_not_called()
+        app.side_title.configure.assert_not_called()
+        app.draw_banner.assert_called_once()
+
+    def test_play_starts_the_renamed_launcher(self):
+        text = (ROOT / 'packaging' / 'windows' / 'play.c').read_text(encoding='utf-8')
+        self.assertIn('Project Blue Moon.exe', text)
+        self.assertNotIn('Tsukihime', text)
+
+    def test_the_shortcuts_are_named_after_the_port(self):
+        text = (ROOT / 'launcher' / 'tsuki_launcher_win.py').read_text(encoding='utf-8')
+        for old in ('Tsukihime.lnk', 'Tsukihime.desktop', 'Tsukihime.exe'):
+            self.assertNotIn(old, text)
+
+
 if __name__ == '__main__':
     unittest.main()

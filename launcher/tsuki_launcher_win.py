@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Tsukihime launcher for Windows and Linux (Tkinter).
+"""Project Blue Moon launcher for Windows and Linux (Tkinter): the port of TSUKIHIME -A piece of blue
+glass moon- (CUSA47999).
 
 Every setting of the port in one window: the game folder and saves, tsuki.ini (display,
 overlay, effects), start-up options passed to run.py as environment variables
-(frame rate, presentation, HDR, ...), mods, third-party patches and controls.
+(presentation, HDR, ...), mods, third-party patches and controls.
 Launcher options live in %APPDATA%/tsuki-launcher/settings.json (~/.config/tsuki-launcher on Linux).
 
-Frozen with PyInstaller (packaging/windows/package.sh) the same Tsukihime.exe also runs the
+Frozen with PyInstaller (packaging/windows/package.sh) the same Project Blue Moon.exe also runs the
 game without the window (`--play`), run.py (`--run`) and the preparation scripts (`--script`),
 so a packaged port needs no Python installation.
 """
@@ -43,7 +44,7 @@ CONFIG_DIR = (Path(os.environ.get('APPDATA', Path.home())) if WINDOWS else
               Path(os.environ.get('XDG_CONFIG_HOME') or Path.home() / '.config')) / 'tsuki-launcher'
 CONFIG_FILE = CONFIG_DIR / 'settings.json'
 MOD_PRESETS = DATA_DIR / 'mods_presets.json'
-APP_NAME = 'Tsukihime'
+APP_NAME = 'Project Blue Moon'
 MAX_LOG_LINES = 6000
 NO_WINDOW = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
 # The game and everything it starts form one process group, ended together (GameJob).
@@ -489,7 +490,7 @@ def describe_missing(missing):
 
 
 def ready_to_play(game_dir, update_dir=''):
-    """Whether --play (Steam, "Play Tsukihime.exe") may start the game at once; anything
+    """Whether --play (Steam, "Play Project Blue Moon.exe") may start the game at once; anything
     the Play button would refuse opens the launcher window instead."""
     if update_dir and same_folder(update_dir, game_dir or '.'):
         return False
@@ -580,7 +581,7 @@ DESKTOP_MARKER = 'X-TSUKI-Integration=true'
 
 def desktop_entry(command, icon, marker=False):
     """The menu entry; its StartupWMClass is the application id of the launcher and of the game window."""
-    return ('[Desktop Entry]\nType=Application\nName=TSUKIHIME -A piece of blue glass moon-\n'
+    return (f'[Desktop Entry]\nType=Application\nName={APP_NAME}\n'
             f'Exec={command}\nIcon={icon}\nTerminal=false\nCategories=Game;\nStartupWMClass=tsuki\n'
             + (DESKTOP_MARKER + '\n' if marker else ''))
 
@@ -742,7 +743,7 @@ class Launcher:
         self.banner_source = self.banner_image = None
         self.ui_calls = queue.Queue()  # work for the Tk thread from helper threads
         self.mod_order, self.mod_vars, self.patch_vars = [], {}, {}
-        root.title(f'{APP_NAME} (PC)')
+        root.title(APP_NAME)
         if sys.platform == 'win32':
             try:  # the taskbar shows this window's icon, not Python's
                 import ctypes
@@ -1406,11 +1407,7 @@ class Launcher:
 
     # ---- state -------------------------------------------------------------------------------
     def game_changed(self):
-        folder = self.meta_dir()
-        info = game_info(folder)
-        title = info[0] if info else APP_NAME
-        self.root.title(f'{title} (PC)')
-        self.side_title.configure(text=heading_text(title.upper(), every_language=True))
+        # The window keeps the port's name (Spec 8 §5); the dump's cover shows the game's logo and serial.
         self.banner_source = None
         self.draw_banner()
         self.set_icon()
@@ -1835,7 +1832,7 @@ class Launcher:
                                                  'минут будет подтормаживать, пока кэш собирается заново.'))
 
     def shortcut(self):
-        """Tsukihime.lnk on the desktop (a .desktop entry in the menu and on the desktop on Linux)."""
+        """Project Blue Moon.lnk on the desktop (a .desktop entry in the menu and on the desktop on Linux)."""
         if not WINDOWS:
             self.linux_shortcut()
             return
@@ -1846,7 +1843,7 @@ class Launcher:
             target = str(pythonw if pythonw.exists() else sys.executable)
             arguments, icon = Path(__file__).resolve(), PORT_DIR / 'launcher' / 'tsuki.ico'
         script = ('$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath("Desktop")'
-                  '+"\\Tsukihime.lnk");'
+                  f'+"\\{APP_NAME}.lnk");'
                   f'$s.TargetPath="{target}";$s.WorkingDirectory="{PORT_DIR}";$s.IconLocation="{icon}";'
                   + (f"$s.Arguments='\"{arguments}\"';" if arguments else '') + '$s.Save()')
         result = subprocess.run(['powershell', '-NoProfile', '-Command', script], capture_output=True,
@@ -1881,7 +1878,7 @@ class Launcher:
                     continue
                 folder.mkdir(parents=True, exist_ok=True)
                 # In the applications menu the file is named after the window's application id.
-                target = folder / ('tsuki.desktop' if folder == folders[0] else 'Tsukihime.desktop')
+                target = folder / ('tsuki.desktop' if folder == folders[0] else f'{APP_NAME}.desktop')
                 target.write_text(entry, encoding='utf-8')
                 target.chmod(0o755)
                 created.append(str(target))

@@ -35,6 +35,14 @@ class VdfTests(unittest.TestCase):
         self.assertGreaterEqual(expected, 0x80000000)
 
 
+class NameTests(unittest.TestCase):
+    def test_the_shortcut_and_its_logo_say_project_blue_moon(self):
+        # Spec 8 §5: the public name, not the game's trademark.
+        self.assertEqual(steam.APP_NAME, 'Project Blue Moon')
+        self.assertEqual(steam.LOGO_TITLE, 'PROJECT BLUE MOON')
+        self.assertNotIn('TSUKIHIME', steam.LOGO_SUBTITLE)
+
+
 class PlatformTests(unittest.TestCase):
     def test_windows_looks_in_the_registry_folder_then_the_usual_ones(self):
         class Key:

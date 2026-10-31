@@ -15,9 +15,9 @@ import shutil
 import struct
 import subprocess
 
-APP_NAME = 'TSUKIHIME -A piece of blue glass moon-'
+APP_NAME = 'Project Blue Moon'
 # The logo's two lines.
-LOGO_TITLE, LOGO_SUBTITLE = 'TSUKIHIME', 'A PIECE OF BLUE GLASS MOON'
+LOGO_TITLE, LOGO_SUBTITLE = 'PROJECT BLUE MOON', 'UNOFFICIAL PC PORT'
 CAPSULE = (600, 900)    # vertical capsule: <id>p.png
 WIDE = (920, 430)       # horizontal capsule: <id>.png
 HERO = (1920, 620)      # library background: <id>_hero.png
