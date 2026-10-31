@@ -82,7 +82,7 @@ static int language(void) { const char *v=getenv("TSUKI_LANGUAGE"); return v ? a
 static ABI int32_t system_param(int32_t id,int32_t *value) {
     if (!value) return SYSTEM_PARAMETER;
     switch (id) {
-    case 1: {                                   /* language (1 = English US, 8 = Russian) */
+    case 1: {                                   /* language: the game reads 0 ja, 10 zt, 11 zc, others en */
         *value=language();
         static unsigned calls;                  /* the first query is logged: it says which language the run got */
         pthread_mutex_lock(&lock); unsigned n=++calls; pthread_mutex_unlock(&lock);

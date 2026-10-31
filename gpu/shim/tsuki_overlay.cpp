@@ -280,7 +280,7 @@ void ImageTab() {
     ImGui::SeparatorText("Scaling and sharpening");
     if (BeginRows("##scaling")) {
         CheckRow("Upscale with FSR 1", s.fsr1,
-                 "Enlarges a smaller game image to the window. For more FPS: Render resolution 720p + FSR 1.");
+                 "Enlarges a smaller game image to the window.");
         ImGui::BeginDisabled(rcas_blocked);
         CheckRow("Sharpening (RCAS)", s.rcas,
                  rcas_blocked && downscaling ? "No effect: the game's image is larger than the window."

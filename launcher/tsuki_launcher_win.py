@@ -272,13 +272,10 @@ def heading_text(text, every_language=False):
 # Settings. tsuki.ini keys (the game reads them, the in-game menu edits them) and the
 # launcher's own settings.json (passed to run.py as environment variables).
 
-INI_FLAGS = {'cheat_double_jumps', 'cheat_very_hard', 'show_fps', 'vsync', 'async_shaders', 'deferred_readback',
-             'stale_readback'}
+INI_FLAGS = {'show_fps', 'vsync', 'async_shaders', 'deferred_readback', 'stale_readback'}
 # The graphics keys are also in the in-game menu (Insert / R3+L2); run.py reads the startup ones.
 INI_DEFAULTS = {'show_fps': '1', 'display_mode': 'windowed', 'vsync': '1', 'fps_limit': '0',
-                'async_shaders': '1', 'deferred_readback': '1', 'stale_readback': '1',
-                'render_resolution': 'native', 'engine_fps': '120',
-                'frames_queued': '1', 'cheat_very_hard': '0', 'cheat_double_jumps': '0'}
+                'async_shaders': '1', 'deferred_readback': '1', 'stale_readback': '1', 'frames_queued': '1'}
 DISPLAY_MODES = [('windowed', ('Windowed',)), ('borderless', ('Borderless',)), ('fullscreen', ('Fullscreen',))]
 FPS_LIMITS = [('30', ('30',)), ('60', ('60',)), ('120', ('120',)), ('240', ('240',)), ('0', ('Unlimited',))]
 # The sidebar's pages, top to bottom, and the methods that refresh a page's lists when it is shown.
@@ -286,21 +283,22 @@ PAGES = ('home', 'graphics', 'performance', 'game', 'advanced')
 PAGE_REFRESH = {'home': ('refresh_status',), 'game': ('refresh_lists',)}
 APP_DEFAULTS = {'ui_language': 'en', 'game_dir': os.environ.get('TSUKI_GAME_DIR', str(PORT_DIR.parent / 'CUSA47999') if WINDOWS else ''), 'update_dir': '',
                 'video_backend': 'auto', 'gamemode': False, 'mangohud': False, 'desktop_integration': True, 'user_dir': '',
-                'mods_dir': '', 'mods_enabled': True, 'patches_dir': '', 'language': '1',
+                'mods_dir': '', 'mods_enabled': False, 'patches_dir': '', 'language': '1',
                 'player_name': '', 'hdr': False, 'draw_pipe': '', 'readbacks': '', 'no_msaa': '', 'stream_memory': 'cached',
                 'gpu_id': '', 'background_warmup': True, 'parallel_warmup': True, 'pipeline_binary_cache': True,
                 'perf_diag': False, 'frame_capture_key': False, 'frame_stats': False, 'gpu_profile': False,
                 'vk_validation': False, 'close_on_play': False,
                 'controls': {}, 'pad_style': 'playstation'}
 
-# PS4 button, default key, default gamepad button (SDL names; src/runtime_pad.c). L2/R2 come
-# from the analog triggers and the left touchpad click (photo mode) from L1 + the right click's
-# button; neither is remapped on the gamepad.
+# PS4 button, default key, default gamepad button (SDL names; src/runtime_pad.c). None: no box of that
+# kind, as L2/R2 come from the analog triggers and the left touchpad click from the gamepad's own
+# touchpad; '': a box with no default. Both touchpad sides press the one touchpad click, and the
+# runtime maps nothing to the right side unless asked (Backspace and Back/View press nothing).
 CONTROLS = [('cross', 'Space', 'a'), ('circle', 'Left Shift', 'b'), ('square', 'E', 'x'),
             ('triangle', 'Q', 'y'), ('l1', '1', 'leftshoulder'), ('r1', '3', 'rightshoulder'),
             ('l2', 'R', None), ('r2', 'F', None), ('l3', 'Z', 'leftstick'),
             ('r3', 'C', 'rightstick'), ('options', 'Return', 'start'),
-            ('touchpad_left', 'Tab', None), ('touchpad_right', 'Backspace', 'back'),
+            ('touchpad_left', 'Tab', None), ('touchpad_right', '', ''),
             ('up', 'I', 'dpup'), ('down', 'K', 'dpdown'), ('left', 'J', 'dpleft'), ('right', 'L', 'dpright')]
 PS_BUTTON_NAMES = {'cross': 'Cross', 'circle': 'Circle', 'square': 'Square', 'triangle': 'Triangle',
                    'l1': 'L1', 'r1': 'R1', 'l2': 'L2', 'r2': 'R2', 'l3': 'L3', 'r3': 'R3',
@@ -324,7 +322,7 @@ def control_changes(values, kind):
     """The buttons whose chosen key or SDL gamepad name differs from the default."""
     column = 1 if kind == 'key' else 2
     return {row[0]: values[row[0]].strip() for row in CONTROLS
-            if row[column] and values.get(row[0], '').strip()
+            if row[column] is not None and values.get(row[0], '').strip()
             and values[row[0]].strip().casefold() != row[column].casefold()}
 
 
@@ -338,7 +336,8 @@ def control_values(controls, kind):
     if 'touchpad' in chosen and 'touchpad_left' not in values:
         values['touchpad_left'] = chosen['touchpad']
     return {button: values[button] for button, key, pad in CONTROLS
-            if (key if kind == 'key' else pad) and isinstance(values.get(button), str) and values[button].strip()}
+            if (key if kind == 'key' else pad) is not None and isinstance(values.get(button), str)
+            and values[button].strip()}
 
 
 def control_map(controls, kind):
@@ -347,9 +346,10 @@ def control_map(controls, kind):
     return ','.join(f'{button}={chosen[button].strip()}' for button, _key, _pad in CONTROLS
                     if button in chosen and not set(chosen[button]) & set(',='))
 
-LANGUAGES = [('1', ('English', 'Английский')), ('8', ('Russian', 'Русский')), ('0', ('Japanese', 'Японский')),
-             ('2', ('French', 'Французский')), ('3', ('Spanish', 'Испанский')), ('4', ('German', 'Немецкий')),
-             ('5', ('Italian', 'Итальянский'))]
+# The system languages the game tells apart (eboot +0x41755, spec 8 §5): 0 Japanese, 11 Simplified
+# and 10 Traditional Chinese; any other value is English.
+LANGUAGES = [('1', ('English', 'Английский')), ('0', ('Japanese', 'Японский')),
+             ('11', ('Simplified Chinese',)), ('10', ('Traditional Chinese',))]
 DRAW_PIPE = [('', ('Auto (8+ threads)', 'Авто (8+ потоков)')), ('1', ('On', 'Включён')),
              ('0', ('Off (more stable)', 'Выключен (стабильнее)'))]
 READBACKS = [('', ('Relaxed (default)', 'Relaxed (по умолчанию)')), ('0', ('Off', 'Выключены')),
@@ -659,6 +659,9 @@ def title_id_of(folder):
     return game_title_id(folder) if folder else None
 
 
+OTHER_GAME_EXIT = 30  # src/probe.c: the dump is not this game
+
+
 def only_this_game():
     """src/probe.c starts no other game (exit code 30)."""
     return _('This build only runs {} ({}).').format(TITLE, TITLE_ID)
@@ -690,7 +693,7 @@ def game_environment(s):
     env['TSUKI_MODS_ENABLED'] = '1' if s['mods_enabled'] else '0'
     env['TSUKI_PATCHES_DIR'] = s['patches_dir'] or str(DATA_DIR / 'patches')
     env['TSUKI_PATCHES_CONFIG'] = str(DATA_DIR / 'patches.json')
-    env['TSUKI_LANGUAGE'] = s['language']
+    env['TSUKI_LANGUAGE'] = s['language'] if s.get('language') in dict(LANGUAGES) else '1'  # older lists had more
     if str(s['player_name']).strip():
         env['TSUKI_USER_NAME'] = str(s['player_name']).strip()
     if s['hdr']:
@@ -727,9 +730,6 @@ def game_environment(s):
 # The previous game's colors, kept until the Alpha (Spec 7 §11): near black, ash and blood red.
 BG, PANEL, CARD, LINE = '#0d0b0b', '#161212', '#1d1717', '#2a2222'
 TEXT, MUTED, ACCENT, ACCENT_HI = '#e6e0d8', '#8a817a', '#a4161a', '#c81e25'
-RESOLUTION_CHOICES = [('native', ('Native (1080p)',)), ('480p', ('480p',)), ('720p', ('720p',)),
-                      ('1440p', ('1440p',)), ('1800p', ('1800p',)), ('4K', ('4K',))]
-ENGINE_FPS_CHOICES = [('60', ('60 (original)',)), ('120', ('120',)), ('240', ('240',))]
 
 
 def window_icon(root, tk, game_icon, own_icon, ico_file):
@@ -1078,9 +1078,7 @@ class Launcher:
         ttk.Label(quick, text=heading_text(_('Quick settings', 'Основное').upper()), style='Section.TLabel').grid(
             row=0, column=0, columnspan=4, sticky='w')
         tk.Frame(quick, bg=LINE, height=1).grid(row=1, column=0, columnspan=4, sticky='we', pady=(2, 6))
-        items = ((_('Display mode'), 'display_mode', DISPLAY_MODES), (_('Frame rate limit'), 'fps_limit', FPS_LIMITS),
-                 (_('Render resolution'), 'render_resolution', RESOLUTION_CHOICES),
-                 (_('Engine frame rate'), 'engine_fps', ENGINE_FPS_CHOICES))
+        items = ((_('Display mode'), 'display_mode', DISPLAY_MODES), (_('Frame rate limit'), 'fps_limit', FPS_LIMITS))
         for index, (title, key, options) in enumerate(items):
             r, c = 2 + index // 2, (index % 2) * 2
             ttk.Label(quick, text=title).grid(row=r, column=c, sticky='w', pady=6, padx=(0, 12))
@@ -1153,14 +1151,9 @@ class Launcher:
         f = self.scrolled_page('performance', _('Performance'), _('Frame rate and speed options.'))
         self.section(f, _('Frame rate', 'Частота кадров'), top=4)
         self.row(f, _('Frame rate limit'), self.choice(f, 'fps_limit', 'ini', FPS_LIMITS),
-                 _('The engine frame rate (below) is the highest it can go.'))
+                 _("The game's own rate, 60 FPS, is the highest it can go."))
         self.row(f, _('Frames queued'), self.choice(f, 'frames_queued', 'ini', FRAMES_QUEUED),
                  _('1 is the lowest input latency; more can raise FPS when the graphics card is the limit.'))
-        self.row(f, _('Engine frame rate'), self.choice(f, 'engine_fps', 'ini', ENGINE_FPS_CHOICES),
-                 _('The highest frame rate the game itself runs at (a game patch).'), restart=True)
-        self.row(f, _('Render resolution'), self.choice(f, 'render_resolution', 'ini', RESOLUTION_CHOICES),
-                 _('The size the game draws at; higher is sharper and slower. A resolution patch replaces the '
-                   'texture fix and reserves the memory it needs.'), restart=True)
         self.section(f, _('Shaders'))
         self.check(f, 'pipeline_binary_cache', 'app', _('Use pipeline binary cache (A/B test)'),
                    _('Reuse saved Vulkan pipelines. Disable to compare FPS with normal compilation. '
@@ -1204,13 +1197,7 @@ class Launcher:
 
     def build_game(self):
         f = self.scrolled_page('game', _('Game', 'Игра'), _('Your game dump, saves and the game patches.'))
-        self.section(f, _('Cheats'), top=4)
-        self.check(f, 'cheat_double_jumps', 'ini', _('Infinite Double Jumps'),
-                   _('Repeat air jumps without landing. Also available in the in-game Cheats menu.'))
-        self.check(f, 'cheat_very_hard', 'ini', _('Unlock Very Hard'),
-                   _('Select Very Hard without completing the game. Does not change existing save difficulty. '
-                     'In-game: enable before opening New Game.'))
-        self.section(f, _('Folders'))
+        self.section(f, _('Folders'), top=4)
         self.folder(f, 'game_dir', _('Game folder', 'Папка игры'),
                     _('Choose the folder with eboot.bin', 'Выберите папку с eboot.bin'),
                     _('Your own dump of the game (eboot.bin, sce_module, sce_sys): '
@@ -1338,7 +1325,7 @@ class Launcher:
             pad_icon = icon_canvas(table)
             pad_icon.grid(row=r, column=3, sticky='w', padx=(0, 6))
             self.pad_icons[button] = pad_icon
-            if pad:
+            if pad is not None:
                 box = ttk.Combobox(table, state='readonly', width=22, values=list(labels.values()))
                 box.set(labels.get(pad_name, pad_name))
 
@@ -1348,16 +1335,16 @@ class Launcher:
                 box.bind('<<ComboboxSelected>>', chosen)
                 self.pad_boxes[button] = box
             else:
-                fixed = (_('L1 + Touchpad right') if button == 'touchpad_left'
+                fixed = (_('Touchpad click') if button == 'touchpad_left'
                          else _('{} trigger').format(PS_BUTTON_NAMES[button]))
                 box = ttk.Label(table, text=fixed, style='Muted.TLabel')
             box.grid(row=r, column=4, sticky='w')
             self.draw_pad_icon(button)
         self.note(f, _('Keys use SDL names: letters, digits, Space, Return, Tab, Left Shift, Left Ctrl, Left Alt, '
                        'Backspace, Up, Down, Left, Right, F1 to F12. A name the game does not know keeps the default '
-                       '(the log says which). L2/R2 on the gamepad stay on the triggers. Touchpad right opens the '
-                       'game\'s pause menu; Touchpad left (photo mode) is L1 + Touchpad right on the gamepad. Insert '
-                       'and R3+L2 always open the port\'s menu. Applied when the game starts.'))
+                       '(the log says which). L2/R2 on the gamepad stay on the triggers. Both touchpad sides press the '
+                       'touchpad click; Touchpad right has no key or button unless you choose one. Insert and R3+L2 '
+                       'always open the port\'s menu. Applied when the game starts.'))
         self.ttk.Button(f, text=_('Reset to defaults'), command=self.reset_controls).grid(
             row=self.next_row(f), column=0, sticky='w', pady=(14, 0))
 
@@ -1844,6 +1831,8 @@ class Launcher:
                     if self.job:
                         self.job.close()
                     self.refresh_status()
+                    if item[0] == OTHER_GAME_EXIT:
+                        self.messagebox.showerror(APP_NAME, only_this_game())
                 else:
                     if 'Entering original x86-64 code' in item:
                         self.status.configure(text=_('The game is running.', 'Игра запущена.'), fg=TEXT)

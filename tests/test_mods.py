@@ -135,10 +135,9 @@ class ModTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             mods.selected(self.moddir, config)
 
-    @unittest.skipIf(os.name == 'nt', 'the fake probe is a shebang script')
-    def test_run_uses_overlay_propagates_exit_and_cleans_view(self):
-        self.mod('A')
-        # run.py with the game preparation scripts stubbed out: the fake game is not a SELF.
+    def run_port(self, **extra):
+        """run.py with the game preparation scripts stubbed out (the fake game is not a SELF), and
+        what its fake probe mounted."""
         port = self.root / 'port'
         shutil.copytree(ROOT / 'scripts', port / 'scripts')
         shutil.copy(ROOT / 'run.py', port / 'run.py')
@@ -153,10 +152,25 @@ class ModTests(unittest.TestCase):
         probe.chmod(0o755)
         env = dict(os.environ, TSUKI_PROBE=str(probe),
             TSUKI_DATA_DIR=str(self.root), TSUKI_GAME_DIR=str(self.game),
-            TSUKI_MODS_DIR=str(self.moddir), TSUKI_MODS_ENABLED='1', TSUKI_MODS_CONFIG=str(self.root/'mods.json'))
-        result = subprocess.run([sys.executable, 'run.py'], cwd=port, env=env, capture_output=True, timeout=30)
+            TSUKI_MODS_DIR=str(self.moddir), TSUKI_MODS_CONFIG=str(self.root/'mods.json'))
+        env.pop('TSUKI_MODS_ENABLED', None)
+        result = subprocess.run([sys.executable, 'run.py'], cwd=port, env={**env, **extra}, capture_output=True,
+                                timeout=30)
         self.assertEqual(result.returncode, 7, result.stderr)
-        mounted = json.loads((self.root / 'mounted.json').read_text())
+        return json.loads((self.root / 'mounted.json').read_text())
+
+    @unittest.skipIf(os.name == 'nt', 'the fake probe is a shebang script')
+    def test_run_uses_overlay_propagates_exit_and_cleans_view(self):
+        self.mod('A')
+        mounted = self.run_port(TSUKI_MODS_ENABLED='1')
         self.assertEqual(mounted['content'], 'mod')
         self.assertFalse(Path(mounted['path']).exists())
         self.assertEqual((self.assets/'a.wad').read_bytes(), b'original')
+
+    @unittest.skipIf(os.name == 'nt', 'the fake probe is a shebang script')
+    def test_run_loads_no_mods_unless_asked(self):
+        # Spec 8 §5: run.py, like the launcher, leaves mods off when TSUKI_MODS_ENABLED is not set.
+        self.mod('A')
+        mounted = self.run_port()
+        self.assertEqual(mounted['content'], 'original')
+        self.assertEqual(Path(mounted['path']), self.game)

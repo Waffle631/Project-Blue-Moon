@@ -171,7 +171,7 @@ def main():
     game = Path(run_script('mods.py', game, '--out', out,
                            '--mods-dir', env.get('TSUKI_MODS_DIR', data / 'mods'),
                            '--config', env.get('TSUKI_MODS_CONFIG', data / 'mods.json'),
-                           '--enabled', env.get('TSUKI_MODS_ENABLED', '1'), capture=True).strip())
+                           '--enabled', env.get('TSUKI_MODS_ENABLED', '0'), capture=True).strip())
     mod_view = game if game.resolve() != original_game else None
     try:
         run_script('prepare.py', game, '--out', out)

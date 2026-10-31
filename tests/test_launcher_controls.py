@@ -26,11 +26,30 @@ BASE_SFO = sfo_bytes(TITLE_ID='CUSA47999', APP_VER='01.00')
 
 
 class ControlMapTest(unittest.TestCase):
-    def test_new_cheats_default_to_disabled(self):
-        self.assertEqual(launcher.INI_DEFAULTS['cheat_double_jumps'], '0')
-        self.assertEqual(launcher.INI_DEFAULTS['cheat_very_hard'], '0')
-        self.assertIn('cheat_double_jumps', launcher.INI_FLAGS)
-        self.assertIn('cheat_very_hard', launcher.INI_FLAGS)
+    def test_no_options_of_deleted_features(self):
+        # Spec 8 §5: the cheats and the previous game's resolution and frame rate patches are gone.
+        for key in (*launcher.INI_DEFAULTS, *launcher.INI_FLAGS):
+            self.assertFalse(key.startswith('cheat_') or key in ('render_resolution', 'engine_fps'), key)
+        for name in ('RESOLUTION_CHOICES', 'ENGINE_FPS_CHOICES'):
+            self.assertFalse(hasattr(launcher, name), name)
+
+    def test_old_settings_keys_are_ignored(self):
+        import json
+        import tempfile
+        from pathlib import Path
+
+        old = {'game_patches': {'CUSA47999': ['Skip Any Video With X Button']}, 'cheat_very_hard': '1',
+               'render_resolution': '4K', 'engine_fps': '240', 'language': '1'}
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'settings.json'
+            path.write_text(json.dumps(old), encoding='utf-8')
+            settings = {**launcher.APP_DEFAULTS, **launcher.load_json(path, {}), 'game_dir': 'x'}
+        env = launcher.game_environment(settings)
+        added = {name: value for name, value in env.items() if os.environ.get(name) != value}
+        for name, value in added.items():
+            self.assertFalse(any(word in name for word in ('CHEAT', 'ENGINE', 'RESOLUTION')), name)
+            self.assertNotIn(value, ('4K', '240', 'Skip Any Video With X Button'), name)
+        self.assertNotIn('TSUKI_PATCHES', env)
 
     def test_pipeline_binary_cache_switch(self):
         settings = {**launcher.APP_DEFAULTS}
@@ -61,10 +80,40 @@ class ControlMapTest(unittest.TestCase):
     def test_touchpad_sides_are_separate_buttons(self):
         rows = {b: (k, p) for b, k, p in launcher.CONTROLS}
         self.assertNotIn('touchpad', rows)
-        self.assertEqual(rows['touchpad_left'], ('Tab', None))  # photo mode: L1 + the right-click button
-        self.assertEqual(rows['touchpad_right'], ('Backspace', 'back'))  # pause menu
+        self.assertEqual(rows['touchpad_left'], ('Tab', None))  # the gamepad's own touchpad click
         self.assertEqual(launcher.control_map({'pad': {'touchpad_right': 'guide'}}, 'pad'), 'touchpad_right=guide')
         self.assertEqual(launcher.control_map({'key': {'touchpad_right': 'Delete'}}, 'key'), 'touchpad_right=Delete')
+
+    def test_touchpad_right_has_no_default(self):
+        # Spec 8 §5: src/runtime_pad.c presses nothing on Backspace or Back/View, so the launcher shows no
+        # default for it; a key or button chosen for it is still a change.
+        rows = {b: (k, p) for b, k, p in launcher.CONTROLS}
+        self.assertEqual(rows['touchpad_right'], ('', ''))
+        keys = {b: k or '' for b, k, _p in launcher.CONTROLS}
+        pads = {b: p or '' for b, _k, p in launcher.CONTROLS}
+        self.assertEqual(launcher.control_changes(keys, 'key'), {})
+        self.assertEqual(launcher.control_changes(pads, 'pad'), {})
+        self.assertEqual(launcher.control_changes({**keys, 'touchpad_right': 'Backspace'}, 'key'),
+                         {'touchpad_right': 'Backspace'})
+        self.assertEqual(launcher.control_changes({**pads, 'touchpad_right': 'back'}, 'pad'), {'touchpad_right': 'back'})
+        self.assertEqual(launcher.control_values({'pad': {'touchpad_right': 'back'}}, 'pad'), {'touchpad_right': 'back'})
+
+    def test_game_languages(self):
+        # Spec 8 §5: the eboot (+0x41755) turns 0 into Japanese, 11 into Simplified and 10 into Traditional
+        # Chinese, and any other value into English.
+        self.assertEqual([(v, t[0]) for v, t in launcher.LANGUAGES],
+                         [('1', 'English'), ('0', 'Japanese'), ('11', 'Simplified Chinese'),
+                          ('10', 'Traditional Chinese')])
+        for saved, sent in (('8', '1'), ('', '1'), (None, '1'), ('0', '0'), ('11', '11'), ('10', '10')):
+            with self.subTest(saved=saved):
+                env = launcher.game_environment({**launcher.APP_DEFAULTS, 'language': saved})
+                self.assertEqual(env['TSUKI_LANGUAGE'], sent)
+
+    def test_mods_off_by_default(self):
+        self.assertIs(launcher.APP_DEFAULTS['mods_enabled'], False)
+        self.assertEqual(launcher.game_environment(dict(launcher.APP_DEFAULTS))['TSUKI_MODS_ENABLED'], '0')
+        self.assertEqual(launcher.game_environment({**launcher.APP_DEFAULTS, 'mods_enabled': True})['TSUKI_MODS_ENABLED'],
+                         '1')
 
     def test_saved_touchpad_key_moves_to_the_left_side(self):
         # Settings saved before the sides were split named the left click 'touchpad'.
@@ -104,12 +153,12 @@ class ControlMapTest(unittest.TestCase):
             self.assertIn(key, launcher.APP_DEFAULTS)
         env = launcher.game_environment({**launcher.APP_DEFAULTS, 'player_name': ' Shiki '})
         self.assertEqual(env['TSUKI_USER_NAME'], 'Shiki')
-        for key in ('display_mode', 'fps_limit', 'render_resolution', 'engine_fps'):
+        for key in ('display_mode', 'fps_limit'):
             self.assertIn(key, launcher.INI_DEFAULTS)
 
     def test_graphics_defaults_match_the_game(self):
         d = launcher.INI_DEFAULTS
-        self.assertEqual((d['display_mode'], d['vsync'], d['fps_limit'], d['engine_fps']), ('windowed', '1', '0', '120'))
+        self.assertEqual((d['display_mode'], d['vsync'], d['fps_limit']), ('windowed', '1', '0'))
         self.assertEqual([v for v, _t in launcher.FPS_LIMITS], ['30', '60', '120', '240', '0'])
         self.assertEqual(d['frames_queued'], '1')
         self.assertEqual([v for v, _t in launcher.FRAMES_QUEUED], ['1', '2', '0'])
@@ -570,6 +619,27 @@ class GameIdentityTest(unittest.TestCase):
                     self.assertIn('This build only runs TSUKIHIME -A piece of blue glass moon- (CUSA47999).', message)
                     self.assertIn('CUSA00001', message)
                     app.show.assert_called_with('game')
+
+
+    def test_exit_code_30_names_the_game(self):
+        # src/probe.c exits with 30 when the dump is another game: the launcher says so in its own message.
+        from unittest import mock
+
+        for code, shown in ((30, True), (0, False), (1, False)):
+            with self.subTest(code=code):
+                app = launcher.Launcher.__new__(launcher.Launcher)
+                app.process, app.job = mock.Mock(), None
+                app.output, app.ui_calls = queue.Queue(), queue.Queue()
+                app.messagebox = mock.Mock()
+                for name in ('append', 'refresh_status', 'root'):
+                    setattr(app, name, mock.Mock())
+                app.output.put((code,))
+                app.drain_output()
+                self.assertIsNone(app.process)
+                self.assertEqual(app.messagebox.showerror.called, shown)
+                if shown:
+                    self.assertEqual(app.messagebox.showerror.call_args.args[1],
+                                     'This build only runs TSUKIHIME -A piece of blue glass moon- (CUSA47999).')
 
 
 class GpuChoiceTest(unittest.TestCase):
