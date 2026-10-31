@@ -1,8 +1,9 @@
 # Spec 7 — Renombrar `gow3` a `tsuki`
 
-Fecha: 2026-10-14, ampliada el 2026-10-25 (§9), el 2026-10-28 (§10) y el 2026-10-30 (§11). Estado: **borrador para aprobación**; tareas 0 (rama
+Fecha: 2026-10-14, ampliada el 2026-10-25 (§9), el 2026-10-28 (§10) y el 2026-10-30 (§11 y §12). Estado: **borrador para aprobación**; tareas 0 (rama
 `tsuki/spec-7` y línea base, §4), 1 (`tools/check_rename.sh`, §6), 2 y 3 (§10 completa), 4 (inventario, prosa y
-§11) y 5 (variables `TSUKI_*`, §4 paso 2) del plan hechas el 2026-10-30. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 7".
+§11), 5 (variables `TSUKI_*`, §4 paso 2) y 5.5 (borrar el upscaler temporal y el escalado, §12) del plan hechas el
+2026-10-30. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 7".
 Depende de: Spec 6 (el recorrido grabado y las capturas son el oráculo del renombrado) y Spec 1b. El renombrado va
 al final. Antes de que la Spec 6 se cerrara sin la 1b (2026-10-28), esta dependencia llegaba a través de la 6.
 
@@ -99,7 +100,7 @@ fotogramas `eye` (2700, 2890: el menú de carga sobre `titlebg1.mp4`) quedan a o
    nunca los quita, así que antes de tocarlos se revierten los tres del árbol de trabajo del submódulo con
    `git apply --reverse`. Hasta este paso, los pasos 2 a 4 no tocan `gpu/patches/`: cambiar un parche con su
    versión vieja aplicada hace fallar `git apply` en `build.sh`. Comprobar que `build.sh` aplica `0002` y `0003`
-   al submódulo limpio.
+   al submódulo limpio. *(Sin objeto desde el §12, 2026-10-30: el submódulo y los tres parches se borraron.)*
 7. **Métricas del overlay en Linux** (§9), con el renombrado ya comprobado por el §7.
 
 **Hecho, paso 2 (tarea 5 del plan, 2026-10-30):**
@@ -279,7 +280,7 @@ Orden: **antes** del renombrado (paso 1 del §4), en su propio commit, para no r
 van a quitar. El oráculo no cambia: `run.py` ya fuerza `GOW3_UPSCALER=none`, así que las capturas y el recorrido
 grabado tienen que salir iguales.
 
-Fuera de esta spec: borrar el código del upscaler temporal, `CameraMotion`, `ObjectMotion`, los shaders de movimiento
+*(Cambiado el 2026-10-30, §12: el usuario decidió borrar también ese código.)* Fuera de esta spec: borrar el código del upscaler temporal, `CameraMotion`, `ObjectMotion`, los shaders de movimiento
 y el submódulo `fsr-vulkan`. El usuario decidió conservarlo (2026-10-28).
 
 **Hecho, núcleo (tarea 2 del plan, 2026-10-30):** el juego ya no tiene forma de encender el upscaler temporal.
@@ -503,3 +504,126 @@ Criterios de aceptación:
   un test lo comprueba (`test_no_updater`).
 - [x] `README.md`, `README.pt-BR.md`, `packaging/windows/README-Windows.txt`, el icono y `launcher/gowfont.ttf` no
   cambian de contenido en esta spec (`git diff ef0c90c` vacío para ellos al cerrar la tarea 4).
+
+## 12. Añadido: borrar el upscaler temporal y el escalado de escena
+
+**[D]** 2026-10-30, después de la tarea 5 del plan: el usuario pide borrar FSR 3.1, FSR 4 y DLSS en una tarea 5.5,
+antes del `git mv` de la tarea 6, y TAA también si no se puede usar. No se puede (hechos 1 y 2), así que se va el
+upscaler temporal entero. En el inventario apareció que el escalado de escena tampoco puede correr sin él (hecho 3).
+El usuario preguntó si sin ese código se podría escalar el juego a 2K o 4K (respuesta: punto «Lo que se queda») y
+decidió borrarlo también. Esto cambia dos decisiones anteriores: la del 2026-10-28 (§10, conservar el código del
+upscaler) y la de la Spec 1b (§2.2, conservar el escalado a 1920×1080).
+
+Hechos (**[V]** 2026-10-30, en `f58d344`):
+
+1. `TemporalUpscaler` empieza con `enabled = Gow3Settings::TemporalUpscalerAvailable` (`vk_temporal_upscaler.cpp:176`),
+   una constante `false` desde la §10. TAA es uno de sus modos (`UpscalerTaa`), así que tampoco corre.
+2. `CameraMotion::Enabled()` es `debug_overlay || for_upscaler`. `for_upscaler` es la misma constante, y nada pone
+   `debug_overlay` a verdadero. `OnGBufferPass` y `OnConstants` no tienen llamadas desde la Spec 1b.
+3. El escalado de escena (`SceneTargets`, `vk_scene_resolution.*`, `scene_resolution.h`) solo cambia de tamaño en
+   `SceneTargets::SetSize`. Lo llama únicamente `TemporalUpscaler::OnFrameStart`, que el rasterizador solo llama si
+   `camera_motion->Enabled()`. Además, una pasada solo se reduce con `upscaler->RasterScaling()`. La Spec 1b ya lo
+   había anotado: «Solo corre con el upscaler activo».
+4. `ObjectMotion` se crea en cada arranque, pero con el upscaler apagado imprime `Object motion: off` y deja
+   `Shader::MotionVectors::positions_address` en 0. Así, `vk_pipeline_cache.cpp` nunca elige las variantes de
+   shader con vectores de movimiento.
+5. FSR 1 (EASU) y RCAS (`host_passes/fsr_pass.cpp`, `host_shaders/fsr/`, `fsr.comp`) son de shadPS4 y corren al
+   presentar. No dependen de FSR-Vulkan ni de ninguna pieza de esta lista.
+6. Las características de Vulkan que se activaron para el upscaler se ven en la historia: `0403703` activó
+   `shaderStorageImageWriteWithoutFormat` y `37c8eac` añadió `VK_KHR_compute_shader_derivatives` y
+   `shaderIntegerDotProduct`. DLSS añade sus propias extensiones de instancia y de dispositivo (`Dlss::Get()`).
+   `shaderStorageImageWriteWithoutFormat` también cubre la capacidad que declara el recompilador para los shaders
+   del juego con imágenes de almacenamiento (`emit_spirv.cpp:280`), así que se queda, con el comentario corregido.
+
+Se borra (lo exclusivo del upscaler y del escalado; inventario del paso 2 de la tarea 5.5):
+
+- El submódulo `gpu/third_party/fsr-vulkan` (con su entrada en `.gitmodules`), `gpu/patches/fsr-vulkan/` y
+  `gpu/dlss_bridge/`. La regla de no tocar submódulos (§5) no se aplica a este: se quita entero. Con él se van los
+  parches que el §4 paso 6 iba a revertir y comentar, así que ese paso queda sin objeto.
+- En `renderer_vulkan/`: `vk_temporal_upscaler.*`, `vk_fsr4.*`, `vk_dlss.*`, `vk_camera_motion.*`,
+  `vk_object_motion.*`, `motion_history.h`, `ui_composition.h`, `vk_scene_resolution.*` y `scene_resolution.h`.
+- Los shaders `taa.comp`, `taa_sharpen.comp`, `camera_motion.comp`, `upscale_merge.comp`, `upscale_reactive.comp` y
+  `depth_resample.frag`, y sus `add_host_shader`.
+- En el recompilador, los vectores de movimiento de objetos (`MotionVectors`, `motion_vectors` de VS/FS, su emisión
+  SPIR-V) y lo que solo servía al escalado: `PushData::motion_param` y `scene_size`, la conversión de `FragCoord` al
+  tamaño reducido e `ImageResource::needs_native`. Las versiones de la caché de shaders en disco suben, porque cambia
+  lo que se serializa.
+- En el rasterizador, la caché de pipelines, `vk_runtime`, `vk_presenter`, `vk_draw_prep` y `texture_cache/image.h`:
+  los ganchos al upscaler y a los proxies de escena (`motion_vectors` de la clave de pipeline,
+  `TSUKI_MOTION_SELECT_LOG`, `TSUKI_SCENE_DEBUG`, `buffers_hash`, `scene_proxy`, `draw_jitter`, `target_scale`, el
+  sesgo de mip de escena y la salida a tamaño de upscaler). Los interruptores `SceneAttachmentsOnly`,
+  `SampleSceneProxies`, `SceneHalfRes`, `Taa*` y `SceneMipBias`, y los contadores `reduced_draws`/`scene_draws`.
+- En `vk_instance`/`vk_platform`: `VK_KHR_compute_shader_derivatives`, `shaderIntegerDotProduct`,
+  `IsFsr4Int8Supported`, los accesores que solo usaba el upscaler y las extensiones de DLSS.
+- En `Gow3Settings`: `TemporalUpscalerAvailable`, los enums `Upscaler`, `Preset` y `DebugView`, las resoluciones de
+  salida, los campos del upscaler (`upscaler`, `preset`, `sharpen`, `sharpness`, `jitter`, `reactive*`,
+  `object_motion`, `debug_view`, `output_res`, `active_render_*`, `fsr4_*`, `dlss_*`, `startup_*` del upscaler) y
+  sus funciones (`ConfigureUpscalerSupport`, `ConfigureDlssSupport`, `FixedRenderSession`, `RenderPreset`,
+  `ResolutionNeedsRestart`, `PresetScale`, `PresetName`, `UpscalerName`). El `.ini` sigue ignorando las claves
+  viejas.
+- `TSUKI_RENDER_RES`, que solo leían el upscaler y `FixedRenderSession`.
+- `packaging/windows/build_dlss.sh` y los tests de lo borrado: `test_upscaler_support.cpp`, `test_camera_motion.cpp`,
+  `test_motion_history.cpp`, `test_motion_shaders.cpp`, `test_taa_shader.cpp`, `test_ui_composition.cpp` y
+  `test_scene_resolution.cpp`, con sus objetivos de CMake.
+
+Lo que se queda:
+
+- FSR 1 y RCAS, con el menú Insert y `TSUKI_FSR1` (hecho 5). Son lo que hoy escala la imagen de 1080p del juego a la
+  ventana o a una pantalla de 1440p o 4K, y siguen igual. Renderizar internamente a 2K o 4K, con más detalle real, no
+  lo hacía este código sin el upscaler. Si algún día se quiere, será una función nueva con su propia spec, y el
+  código borrado queda en la historia de git como punto de partida. Para Tsukihime ganaría poco: sus sprites, fondos
+  y fuentes son bitmaps hechos para 1080p.
+- `render_resolution` del `.ini`, del menú y del launcher, que elige un parche de resolución del XML (`graphics_options.py`) y
+  no es del upscaler.
+- `test_launcher_upscale.py`, que comprueba que el launcher no vuelve a tener controles del upscaler (§10).
+- `docs/gow3/` (historia) y los README del jugador (Alpha, §11 punto 6).
+
+Criterios de aceptación:
+
+- [x] Ninguno de los archivos de la lista existe. `.gitmodules` no tiene `fsr-vulkan`, y `build.sh` no lo nombra ni
+  aplica parches. Un test de Python lo comprueba (`test_no_temporal_upscaler.py`).
+- [x] `graphics-settings-test` comprueba que `fsr1`, `rcas`, `rcas_strength` y `render_resolution` se leen y se
+  guardan, y que las claves viejas del upscaler se ignoran. `Gow3Settings::Values` no tiene `upscaler`.
+- [x] `rm -rf out/gpu && bash build.sh --test` verde; compilan todos los objetivos `*-test` de Linux; Python verde.
+- [x] El recorrido grabado coincide con `out/baseline/6a/`, sin `STOP:` ni `Fault:`.
+- [x] El `git grep` del inventario (`fsr ?3|fsr ?4|ffx|dlss|ngx|fsr-vulkan|taa|temporal|camera_?motion|object_?motion|jitter|reactive|upscal|scene_?targets|scene_resolution`)
+  solo encuentra historia, FSR 1/RCAS y el test del §10. `check_rename.sh` no empeora.
+- [ ] FSR 1 y RCAS siguen funcionando en el menú Insert (lo comprueba el usuario a mano).
+
+**Hecho (tarea 5.5 del plan, 2026-10-30):**
+
+- Inventario: el del plan, ampliado en el paso 2 con lo que encontró el `git grep`:
+  - los vectores de movimiento también estaban en el recompilador. Se borraron `MotionVectors`, `motion_vectors` de
+    VS/FS y de la clave de pipeline, su emisión SPIR-V, la selección de `vk_pipeline_cache.cpp` y `buffers_hash` de
+    `vk_draw_prep`;
+  - el escalado dejaba su huella en cada shader de fragmentos que lee `FragCoord` (multiplicaba por
+    `1920 / scene_size`, 1 sin escalar) y en `ImageResource::needs_native`. Las dos vuelven al código de shadPS4,
+    con `PushData` de 120 bytes como antes;
+  - el sesgo de mip de escena llegaba hasta la caché de samplers (`extra_lod_bias`). Se quitó; el `clamp` del sesgo
+    del S# a los límites del dispositivo se queda, marcado con `gow3:`;
+  - `shaderIntegerDotProduct`, `VK_KHR_compute_shader_derivatives`, `IsFsr4Int8Supported`,
+    `IsShaderFloat16Enabled`, `IsSubgroupSizeControlEnabled` y las extensiones de DLSS se fueron.
+    `shaderStorageImageWriteWithoutFormat` se queda, con el comentario corregido (hecho 6).
+- **Hallazgo:** `NoteFrameStart()` (empieza el fotograma de `TSUKI_GPU_PROFILE` y de `TSUKI_BUFFER_STATS`, y cuenta
+  `Gow3Stats::gpu_frames`) solo se llamaba dentro del bloque de la cámara del upscaler, así que con este juego nunca
+  corría. Ahora la llama el pase que copia el fotograma a un búfer de pantalla, sin más condición. Solo cambian esos
+  diagnósticos; el render no.
+- El presentador vuelve al código de shadPS4 para la imagen del juego (sin la salida a tamaño de upscaler), y el
+  rasterizador al viewport y al scissor sin escala ni jitter.
+- Las versiones de la caché de shaders y de pipelines en disco suben (`ShaderMetaVersion` 8, `PipelineKeyVersion`
+  6): la primera ejecución las reconstruye.
+- Tamaño: el commit del código y los documentos borra 8162 líneas y añade 164, en 85 rutas (el submódulo cuenta
+  como una).
+- Resultados:
+  - tests rojos antes del código: `test_no_temporal_upscaler.py` (el submódulo existía) y el `static_assert` de
+    `graphics-settings-test` (`Values` tenía `upscaler`);
+  - `rm -rf out/gpu && bash build.sh` sin avisos; `build.sh --test` 12 PASS;
+  - los 26 objetivos `*-test` de Linux (33 menos los 7 borrados) compilan y pasan; `avplayer-test` necesita una
+    carpeta de datos como argumento;
+  - Python: 286 tests OK (los 284 de antes y los 2 nuevos), 35 omitidos, 4 fallos esperados;
+  - el recorrido grabado (`out/route/spec7-t55/`) coincide con `out/baseline/6a/`: 6 fotogramas idénticos y los dos
+    del menú de carga iguales a ojo. El log no tiene `STOP:`, `Fault:`, `Object motion` ni `Upscaler`;
+  - `check_rename.sh` baja de 1579 a 1348 líneas;
+  - `tools/rename_map.txt` pierde las 16 entradas de DLSS.
+- Documentos: `CLAUDE.md`, `docs/ENTORNO.md`, una nota de historia al principio de `docs/parallel_gpu.md` y el
+  roadmap. Los README del jugador siguen nombrando los upscalers temporales hasta la Alpha (§11).
