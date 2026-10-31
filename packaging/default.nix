@@ -9,7 +9,6 @@
 let
   lib = pkgs.lib;
   root = ./..;
-  # The temporal upscaler cannot be switched on, so the FSR 4 assets do not go in.
   assetDirs = [ "scripts" "patches" "launcher" ];
   # Only what the package needs (the tree also holds builds, profiles and captures).
   wanted = [

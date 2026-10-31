@@ -13,6 +13,12 @@
 
 namespace G = Gow3Graphics;
 
+// Spec 7 §12: the settings keep no field of the deleted temporal upscaler.
+template <class T>
+concept HasUpscaler = requires(T t) { t.upscaler; } || requires(T t) { t.preset; } ||
+                      requires(T t) { t.output_res; } || requires(T t) { t.object_motion; };
+static_assert(!HasUpscaler<Gow3Settings::Values>);
+
 static std::string Read(const char* path) {
     std::ifstream in(path);
     std::stringstream s;
@@ -96,37 +102,29 @@ int main() {
         assert(old.find(key) == std::string::npos);
     }
     {
-        // Spec 7 §10: neither gow3.ini nor the environment can switch the temporal upscaler on, and
-        // Save() does not write its keys (its code stays, with no inputs since Spec 1b).
+        // Spec 7 §12: the temporal upscaler is deleted. Its old keys are ignored and Save() does not
+        // write them; FSR 1 is spatial and stays.
         std::ofstream out(path);
         out << "upscaler=fsr3\npreset=2\njitter=0\nreactive=1\nobject_motion=0\nreactive_scale=4\n"
                "reactive_threshold=0.5\nreactive_max=0.5\ndebug_view=2\noutput_res=2560x1440\nsharpen=0\n"
                "sharpness=1.5\nfsr4_auto_exposure=0\nfsr4_invert_jitter=1\nlive_resolution=1\n"
-               "overlay_upscaler=1\nfsr1=1\n";
-    }
-    for (const char* env : {"TSUKI_UPSCALER=fsr3", "TSUKI_UPSCALE_PRESET=3", "TSUKI_JITTER=0", "TSUKI_REACTIVE=1",
-                            "TSUKI_OBJECT_MOTION=0", "TSUKI_FSR_SHARPNESS=1.5", "TSUKI_REACTIVE_SCALE=4"}) {
-        const std::string pair = env;
-        _putenv_s(pair.substr(0, pair.find('=')).c_str(), pair.substr(pair.find('=') + 1).c_str());
+               "overlay_upscaler=1\nfsr1=1\nrcas=0\nrcas_strength=40\nrender_resolution=720p\n";
     }
     v.fsr1 = false;
     Gow3Settings::Load();
-    assert(v.upscaler == Gow3Settings::UpscalerOff && v.startup_upscaler == Gow3Settings::UpscalerOff);
-    assert(v.preset == Gow3Settings::NativeAA && v.jitter && !v.reactive && v.object_motion);
-    assert(v.reactive_scale == 1.0f && v.debug_view == Gow3Settings::DebugNone);
-    assert(v.output_res == Gow3Settings::OutputDefault && v.sharpen && v.sharpness == 0.3f);
-    assert(v.fsr4_auto_exposure && !v.fsr4_invert_jitter && !(v.overlay_items & 1u << 2));
-    assert(v.fsr1);  // FSR 1 is spatial and stays
+    assert(v.fsr1 && !v.rcas && v.rcas_strength == 40 && v.render_resolution == 2 && !(v.overlay_items & 1u << 2));
     Gow3Settings::Save();
     const std::string temporal = Read(path);
     for (const char* key : {"upscaler", "preset=", "jitter", "reactive", "object_motion", "debug_view", "output_res",
                             "sharpen", "sharpness", "fsr4_", "live_resolution"}) {
         assert(temporal.find(key) == std::string::npos);
     }
-    assert(temporal.find("fsr1=1\n") != std::string::npos);
+    assert(temporal.find("fsr1=1\n") != std::string::npos && temporal.find("rcas=0\n") != std::string::npos);
+    assert(temporal.find("rcas_strength=40\n") != std::string::npos);
+    assert(temporal.find("render_resolution=720p\n") != std::string::npos);
     // A fresh Values has the overlay's default items: FPS and frametime, not the old upscaler bit.
     const Gow3Settings::Values fresh;
-    assert(fresh.overlay_items == 3u && fresh.upscaler == Gow3Settings::UpscalerOff);
+    assert(fresh.overlay_items == 3u);
     {
         // Spec 7: the old TSUKI_* names are not aliases.
         std::ofstream out(path);

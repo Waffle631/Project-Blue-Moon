@@ -105,10 +105,13 @@ la rama `gow3`).
 - Heurísticas de GPU del juego anterior: `gbuffer_draw` y la constante de cámara de 864 bytes en
   `vk_rasterizer.cpp`; los hashes fijos de shaders del upscaler temporal; `TSUKI_READBACK_LINEAR=1` por defecto en
   `run.py`. *(Spec 1b, ✅ 2026-10-28)* El escalado a 1920×1080 **se conserva**: el proyecto trabaja de base a 1080p.
+  *(Solo corría con el upscaler temporal; la Spec 7 los borró los dos, §12 de su spec, 2026-10-30.)*
   La decisión de MSAA por vendor también se conserva: es un parche para dos drivers de Windows, no del juego
   (decisión del 2026-10-25).
 
 Lo que no es del juego anterior sino genérico (loader, runtime, núcleo de shadPS4, upscalers) se conserva.
+*(Los upscalers temporales se borraron después en la Spec 7, §12 de su spec: sin entradas de este juego ya no
+podían correr. FSR 1 y RCAS se quedan.)*
 
 **Por qué el borrado va en dos tandas:** los hooks, patches y tests no tocan el renderizador y quitan
 ruido del log, así que se borran pronto. Las heurísticas están dentro del núcleo de GPU
@@ -186,7 +189,7 @@ motivos están en la sección "Hito".
 | 7b | Audio HEVAG (`libSceAudiodecCpu`): efectos de `vag.mrg`, con investigación previa | **Spec 4b** | Spec 4a (música y voces) | sin estimar, sin tope (real: 1 día, el 21 de octubre) | ✅ Concluida el 2026-10-21 (`QueryMemSize`, `InitDecoder` y `Decode` sobre el HEVAG de vgmstream, con el estado en la memoria de trabajo del guest; **los efectos de `vag.mrg` suenan bien**; 240 voces sin errores en el menú de título; queda la revisión adversarial de la tarea 13 del plan) |
 | 8 | Vídeo (AvPlayer) | **Spec 5** | Specs 2 y 3 | 2–3 días (antes 2–4; real: 1 día de plan, el 24 de octubre, y el cierre el 25, más el estudio del cuelgue del 21) | ✅ Concluida el 2026-10-25 (**arreglado el cuelgue en `sceAvPlayerStop` del título del capítulo 1**, confirmado en el juego tres de tres veces y en el recorrido final; en el juego, el opening llega entero y sincronizado según el usuario, el prólogo a tiempo real, saltar el logo no cuelga y el fondo del menú de título ya no se acelera; los 134 vídeos se reproducen fuera del juego; queda la revisión adversarial, tarea 8 paso 4; sección Spec 5) |
 | 9 | 2D correcto, ratón y saves | **Spec 6** | Hito (empieza), Specs 3, 4 y 5 (cierra) | 1–3 semanas (real: del 25 al 28 de octubre) | ✅ Concluida el 2026-10-28 (ratón, saves, idioma y render 2D; línea base `out/baseline/6a/` aprobada por el usuario y repetible con `tools/route.sh`; la miniatura pixelada es del juego y se deja; la comprobación tras la Spec 1b pasa a la 1b, decisión del usuario) |
-| 10 | Renombrar el proyecto a `tsuki` | **Spec 7** | Specs 6 y 1b | 2–3 días | ⬜ Pendiente (desbloqueada el 2026-10-28; ampliada con las opciones del upscaler temporal, §10 de su spec) |
+| 10 | Renombrar el proyecto a `tsuki` | **Spec 7** | Specs 6 y 1b | 2–3 días | ⬜ Pendiente (desbloqueada el 2026-10-28; ampliada con las opciones del upscaler temporal, §10 de su spec, y con su borrado, §12) |
 
 **Total: 8 specs (la 4 en dos partes) y 1 hito** (pueden crecer según lo que aparezca al ejecutar el juego).
 
@@ -708,7 +711,7 @@ tiene forma de comprobarse. Por eso esta spec va después del hito.
   `TSUKI_USER_DIR` propio y `TSUKI_MOUSE=0`, porque desde la Spec 6 la partida de `user/` cambió y el juego ve un ratón.
 - Consecuencia: sin `gbuffer_draw`, `CameraMotion` se queda sin entradas, y el upscaler temporal (FSR 3.1/4, DLSS,
   TAA) ya no puede escalar con Tsukihime. **[D] 2026-10-28:** el código se queda; las opciones que lo encienden se
-  quitan en la Spec 7 (§10 de su spec).
+  quitan en la Spec 7 (§10 de su spec). *(Cambiado el 2026-10-30: la Spec 7 borró también el código, §12.)*
 
 ---
 
@@ -1042,7 +1045,7 @@ está en la spec (§3). Las configuraciones y saves antiguos no se migran (no ha
 1. Inventario cerrado de nombres viejos → nuevos, con comprobación de colisiones. Los submódulos `gpu/third_party/*`
    no se tocan; de los parches de `gpu/patches/fsr-vulkan/`, el `0001` (perfilado de FSR 4) se borra, y en `0002` y
    `0003` (cabeceras para compilar en Windows) cambia la marca de los comentarios (decisión del usuario,
-   2026-10-30). Un análisis previo no encontró nombres de variable construidos dinámicamente; se vuelve a comprobar
+   2026-10-30). *(Sin objeto desde el §12: el submódulo `fsr-vulkan` y sus parches se borraron.)* Un análisis previo no encontró nombres de variable construidos dinámicamente; se vuelve a comprobar
    al empezar.
 2. Variables de entorno y de compilación en C, C++, Python y documentos a la vez, sin dejar alias ni lectura de los
    nombres viejos. *(Hecho el 2026-10-30, tarea 5 del plan: `TSUKI_*`. Dos tests comprueban que el nombre viejo ya
@@ -1087,6 +1090,14 @@ proyectos se quedan; el actualizador del launcher se borra, porque bajaba el por
 jugador, el icono, la fuente de títulos y la paleta del launcher esperan a la Alpha.
 - [x] `tools/check_rename.sh` no encuentra el nombre ni los seriales del juego anterior fuera de las excepciones, y
   el launcher no tiene actualizador. *(2026-10-30, tarea 4 del plan.)*
+
+**Añadido el 2026-10-30** (spec §12): borrar el upscaler temporal entero (FSR 3.1, FSR 4, DLSS y TAA), que no podía
+correr con este juego, y el escalado de escena que solo él encendía. Se van el submódulo `fsr-vulkan` y sus parches,
+el puente de DLSS, los vectores de movimiento (también en el recompilador de shaders) y los scene targets reducidos.
+FSR 1 y RCAS se quedan: escalan la imagen de 1080p del juego a la ventana. Renderizar internamente a 2K o 4K sería
+una función nueva, con su spec. Va antes del `git mv` (tarea 5.5 del plan).
+- [x] Nada del upscaler temporal ni del escalado de escena queda en el árbol, y el recorrido grabado sale igual.
+  *(2026-10-30, tarea 5.5 del plan.)*
 
 ---
 

@@ -41,23 +41,12 @@ public:
         return *instance;
     }
 
-    /// Returns the current physical device
-    /// gow3: device features the temporal upscaler reports as enabled.
-    bool IsStorageImageWriteWithoutFormatEnabled() const {
-        return features.shaderStorageImageWriteWithoutFormat;
-    }
-    bool IsShaderFloat16Enabled() const {
-        return vk12_features.shaderFloat16;
-    }
-    bool IsSubgroupSizeControlEnabled() const {
-        return vk13_features.subgroupSizeControl;
-    }
-
-    /// Largest VkBuffer the driver allows (2 GiB on AMD's Windows driver).
+    /// gow3: largest VkBuffer the driver allows (2 GiB on AMD's Windows driver).
     u64 GetMaxBufferSize() const {
         return vk13_props.maxBufferSize;
     }
 
+    /// Returns the current physical device
     vk::PhysicalDevice GetPhysicalDevice() const {
         return physical_device;
     }
@@ -295,15 +284,6 @@ public:
     }
 
     /// Returns true when the shaderSubgroupClock feature of
-    /// gow3: the FSR 4 v07 INT8/DOT4 shaders can run (Float16, Int8, Int16, packed int8 dot
-    /// products, linear compute derivatives, extended storage image formats).
-    bool IsFsr4Int8Supported() const {
-        return vk12_features.shaderFloat16 && vk12_features.shaderInt8 && features.shaderInt16 &&
-               vk13_features.shaderIntegerDotProduct && compute_shader_derivatives &&
-               compute_shader_derivatives_features.computeDerivativeGroupLinear &&
-               features.shaderStorageImageExtendedFormats;
-    }
-
     /// VK_KHR_shader_clock is supported.
     bool IsShaderSubgroupClockSupported() const {
         return shader_clock && shader_clock_features.shaderSubgroupClock;
@@ -540,7 +520,6 @@ private:
     vk::PhysicalDeviceImage2DViewOf3DFeaturesEXT image_2d_view_of_3d_features;
     vk::PhysicalDevicePrimitiveTopologyListRestartFeaturesEXT list_restart_features;
     vk::PhysicalDeviceShaderClockFeaturesKHR shader_clock_features;
-    vk::PhysicalDeviceComputeShaderDerivativesFeaturesKHR compute_shader_derivatives_features;
     vk::PhysicalDevicePipelineExecutablePropertiesFeaturesKHR pipeline_executable_features;
     vk::DriverIdKHR driver_id;
     vk::UniqueDebugUtilsMessengerEXT debug_callback{};
@@ -582,7 +561,6 @@ private:
     bool shader_clock{};
     bool pipeline_executable_properties{}; // gow3: TSUKI_WAVE_STATS=1 (vk_wave_stats.h)
     bool amd_shader_info{};                // gow3: with it, VK_AMD_shader_info when present
-    bool compute_shader_derivatives{};
     bool supports_memory_budget{};
     bool supports_block_texel_view{};
     u64 total_memory_budget{};

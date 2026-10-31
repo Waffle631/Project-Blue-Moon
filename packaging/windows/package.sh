@@ -3,9 +3,7 @@
 # with PyInstaller so players need no Python), gow3-probe.exe with the MSYS2 CLANG64 DLLs it needs,
 # the preparation scripts and run.py. Run from an MSYS2 CLANG64 shell after `bash build.sh`.
 # Freezing uses a Windows Python 3.10+ (python.org; WINPYTHON overrides) and a private venv in
-# out/pyenv with PyInstaller and Pillow (the game icon and the Steam pictures need it). The
-# temporal upscalers cannot be switched on, so neither the FSR 4 assets nor the DLSS runtime are
-# packaged.
+# out/pyenv with PyInstaller and Pillow (the game icon and the Steam pictures need it).
 set -euo pipefail
 cd -- "$(dirname -- "$0")/../.."
 source ./msys2-env.sh
@@ -60,7 +58,7 @@ find "$dest" -name __pycache__ -prune -exec rm -r {} +
 # settings, logs) may ship: stop when one is found.
 forbidden=$(find "$dest" \( -iname eboot.bin -o -iname sce_module -o -iname sce_sys -o -iname savedata \
     -o -iname user -o -iname cache -o -iname '*.log' -o -iname gow3.ini -o -iname settings.json \
-    -o -iname mods.json -o -iname patches.json -o -iname fsr4_shaders -o -iname 'nvngx_dlss*.dll' \
+    -o -iname mods.json -o -iname patches.json \
     -o -iname '*.spv' -o -iname '*.pkg' -o -iname '*.sprx' -o -iname '*.prx' \) -print)
 if [[ -n $forbidden ]]; then
     echo "Package holds files that must not ship:" >&2

@@ -8,7 +8,6 @@ Tsukihime/
 gow3.ini
 # Spec 7 rename inventory, local only (plan task 4)
 tools/rename_map.txt
-fsr4_shaders/
 pgo/
 *.png
 last_run.log

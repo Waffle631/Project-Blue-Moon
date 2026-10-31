@@ -55,21 +55,8 @@ enum : std::uint64_t {
     RenderStateMemo = 1ull << 44,
     TextureSetMemo = 1ull << 45,
     PipelinedIndirectDraws = 1ull << 46,
-    SceneAttachmentsOnly = 1ull << 47,
-    SampleSceneProxies = 1ull << 48,
     OrderedGuestWrites = 1ull << 49,
-    SceneHalfRes = 1ull << 50, ///< live scaling also reduces the 960x540 post targets
     UpdateImageFastPath = 1u << 30,
-    // TAA A/B in one run: optional techniques, off by default (no measured gain, 2026-10-02).
-    TaaTonemapBlend = 1ull << 51,
-    TaaClip = 1ull << 52,
-    TaaVariance = 1ull << 53,
-    TaaFilter = 1ull << 54,
-    // On by default (bit set: off): history of a thin feature this jitter phase missed is kept
-    // when nothing moves. Static-camera flicker of railings/window bars p99.9 -45% (2026-10-03).
-    TaaKeepNearerHistory = 1ull << 55,
-    SceneMipBias = 1ull << 57, ///< negative LOD bias of G-buffer samplers at reduced scene sizes
-    // Bits 20-29 are used as raw debug toggles by the camera/object motion and the upscaler.
 };
 inline bool Disabled(std::uint64_t bit) {
     return (__atomic_load_n(&runtime_disabled_optimizations, __ATOMIC_RELAXED) & bit) != 0;
@@ -117,8 +104,6 @@ struct Timer {
 };
 /// Wall time the GPU command thread waited for guest submissions (ns).
 inline std::atomic<std::uint64_t> gpu_idle_ns{0};
-/// Draws recorded into the reduced scene targets, and draws after the scene started.
-inline std::atomic<std::uint64_t> reduced_draws{0}, scene_draws{0};
 /// Wall time spent blocked in the scheduler (ns): waiting for the recording thread to drain,
 /// for host copies before a submission or fence, and for GPU ticks.
 inline std::atomic<std::uint64_t> sync_recording_ns{0}, host_copies_wait_ns{0}, tick_wait_ns{0},

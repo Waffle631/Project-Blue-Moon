@@ -3,6 +3,10 @@
 Objetivo: eliminar el cuello de botella de un solo núcleo del procesador de comandos de GPU emulado
 (`shadPS4:GpuCommandProcessor`, ~100 % de un núcleo mientras el resto de la CPU está ocioso).
 
+*Nota (2026-10-30, Spec 7 §12):* las mediciones son del juego anterior. El upscaler temporal (FSR 3/4, TAA, DLSS),
+los vectores de movimiento de objetos y los scene targets reducidos que aparecen abajo se borraron del árbol; sus
+cifras y sus costes quedan como historia.
+
 ## Mediciones (el juego original del port base, escena de prueba, ~70 FPS, `TSUKI_DCB_STATS=1`)
 
 | | |
@@ -230,7 +234,7 @@ Estado tras este trabajo, quieto, `TSUKI_FPS_LIMIT=0`, FSR 4: 82–85 FPS; hilo 
 
 ## LTO y PGO (2026-09-30)
 
-`build.sh` compila `libgow3gpu` con LTO (`-flto=auto`, también para sirit y FSR-Vulkan enlazados
+`build.sh` compila `libgow3gpu` con LTO (`-flto=auto`, también para sirit, enlazado
 en ella) y, cuando `pgo/` contiene un perfil, con `-fprofile-use` (`-fprofile-partial-training
 -fprofile-correction`; las funciones modificadas desde el perfil se compilan sin él). Sin `-march`:
 la misma build funciona en la Steam Deck.
@@ -362,8 +366,8 @@ de movimiento.
 - `TSUKI_PIPE_VERIFY=N`: cada N-ésimo paquete lleva también el archivo de registros completo y la etapa B informa de
   las palabras en que su copia difiere (ninguna vista en el juego, menús incluidos).
 - `TSUKI_DRAW_PIPE=0/1` anula el valor predeterminado (activado con 8+ hilos de hardware). La máscara de toggles es ahora de 64
-  bits (los bits 20-29 son toggles de depuración sin procesar de los vectores de movimiento y el upscaler, que las
-  primeras mediciones de abajo también alternaron): 1 << 37 todo el pipeline, 1 << 38 fences en la etapa B,
+  bits (los bits 20-29 eran toggles de depuración sin procesar de los vectores de movimiento y el upscaler, que las
+  primeras mediciones de abajo también alternaron; libres desde la Spec 7 §12): 1 << 37 todo el pipeline, 1 << 38 fences en la etapa B,
   1 << 39 WaitRegMem sobre fences pendientes, 1 << 40 dispatches, 1 << 41 fences señalizados por el hilo de
   grabación, 1 << 42 WriteData/DmaData/draws especiales/flip IRQ en la etapa B, 1 << 36 constant
   ring. `Frame stats` añade una línea `Draw pipe`: draws, vaciados que esperaron y por qué, etapa A esperando,

@@ -20,7 +20,8 @@ const char* Path() {
 
 namespace P = Gow3PerfStats;
 
-/// The overlay's items in gow3.ini. An old overlay_upscaler key (Spec 7 §10) is ignored.
+/// The overlay's items in gow3.ini. An old overlay_upscaler key (Spec 7 §10) is ignored, like the
+/// deleted temporal upscaler's keys (§12).
 constexpr std::pair<const char*, unsigned> OverlayKeys[] = {
     {"overlay_fps", P::Fps}, {"overlay_frametime", P::FrameTime}, {"overlay_gpu", P::Gpu},
     {"overlay_cpu", P::Cpu}, {"overlay_ram", P::Ram},             {"overlay_vram", P::Vram},
@@ -119,10 +120,6 @@ void Load() {
             Set(v, key, value);
         }
     }
-    v.startup_preset = v.preset;
-    v.startup_upscaler = v.upscaler;
-    v.startup_object_motion = v.object_motion;
-    v.startup_output_res = v.output_res;
     v.startup_render_resolution = v.render_resolution;
     v.startup_engine_fps = v.engine_fps;
     const char* applied = std::getenv("TSUKI_ENGINE_FPS");
@@ -138,51 +135,6 @@ bool GraphicsNeedRestart() {
            v.engine_fps != v.startup_engine_fps ||
            v.deferred_readback != v.startup_deferred_readback ||
            v.stale_readback != v.startup_stale_readback;
-}
-
-void ConfigureUpscalerSupport(bool fsr4) {
-    auto& v = Get();
-    v.fsr4_supported = fsr4;
-    const int requested = v.upscaler;
-    if (requested == UpscalerFsr4 && !v.fsr4_supported) {
-        v.fsr4_problem = "GPU does not support the selected FSR 4 shaders; using FSR 3.1";
-        std::printf("Upscaler: %s unsupported on this GPU; falling back to FSR 3.1 before the first frame\n",
-                    UpscalerName(requested));
-        v.upscaler = UpscalerFsr3;
-    }
-}
-
-void ConfigureDlssSupport(bool available, const char* problem) {
-    auto& v = Get();
-    v.dlss_supported = available;
-    static std::string kept;
-    kept = problem ? problem : "";
-    v.dlss_problem = available || kept.empty() ? nullptr : kept.c_str();
-    if (v.upscaler == UpscalerDlss && !available) {
-        std::printf("Upscaler: DLSS unavailable (%s); falling back to FSR 3.1\n",
-                    kept.empty() ? "gow3_dlss.dll or nvngx_dlss.dll missing" : kept.c_str());
-        v.upscaler = UpscalerFsr3;
-    }
-}
-
-bool FixedRenderSession() {
-    const char* size = std::getenv("TSUKI_RENDER_RES");
-    return size && size[0];
-}
-
-int RenderPreset() {
-    const auto& v = Get();
-    return FixedRenderSession() ? v.startup_preset :
-        v.upscaler == UpscalerTaa ? NativeAA : v.preset.load();
-}
-
-bool ResolutionNeedsRestart() {
-    const auto& v = Get();
-    // TAA needs the live path (native guest targets): run.sh selects it on restart.
-    return FixedRenderSession() &&
-        (v.preset != v.startup_preset || v.output_res != v.startup_output_res ||
-         (v.upscaler == UpscalerOff) != (v.startup_upscaler == UpscalerOff) ||
-         (v.upscaler == UpscalerTaa) != (v.startup_upscaler == UpscalerTaa));
 }
 
 void Save() {
@@ -211,22 +163,6 @@ void Save() {
                  v.engine_fps.load(), int(v.deferred_readback.load()), int(v.stale_readback.load()),
                  int(v.restart_unconfirmed.load()));
     std::fclose(file);
-}
-
-float PresetScale(int preset) {
-    static constexpr float scales[PresetCount] = {1.0f, 1.5f, 1.7f, 2.0f, 3.0f};
-    return scales[std::clamp(preset, 0, PresetCount - 1)];
-}
-
-const char* PresetName(int preset) {
-    static constexpr const char* names[PresetCount] = {"Native AA", "Quality", "Balanced",
-                                                       "Performance", "Ultra Performance"};
-    return names[std::clamp(preset, 0, PresetCount - 1)];
-}
-
-const char* UpscalerName(int upscaler) {
-    static constexpr const char* names[UpscalerCount] = {"off", "fsr3", "fsr4", "taa", "dlss"};
-    return names[std::clamp(upscaler, 0, UpscalerCount - 1)];
 }
 
 } // namespace Gow3Settings

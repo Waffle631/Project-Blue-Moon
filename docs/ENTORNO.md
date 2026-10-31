@@ -70,7 +70,9 @@ Notas:
 
 - `magic_enum` y `miniz` **no** se instalan: Fedora trae versiones distintas y `gpu/CMakeLists.txt`
   usa los submódulos (`gpu/third_party/`) cuando no encuentra el paquete del sistema. `xbyak`,
-  `sirit`, `imgui` y `fsr-vulkan` también vienen como submódulo o vendorizados.
+  `sirit` e `imgui` también vienen como submódulo o vendorizados. (El submódulo `fsr-vulkan` se borró con el
+  upscaler temporal, Spec 7 §12; un clon anterior puede conservar `.git/modules/gpu/third_party/fsr-vulkan`, que
+  ya no se usa.)
 - `zydis-devel` solo trae `zydis.pc`; `gpu/CMakeLists.txt` lo usa vía pkg-config cuando no hay
   paquete de CMake.
 - `ffmpeg-free-devel` basta para compilar, pero no decodifica H.264 sin openh264 (falla

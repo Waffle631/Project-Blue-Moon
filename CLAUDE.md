@@ -22,8 +22,8 @@ of the previous game's codebase. Some sections below still describe code inherit
 Features only the previous game used (orb/damage hooks, actors, enemy health bar, its patches XML, GPU heuristics,
 touchpad semantics, its own tests; Specs 1a and 1b removed them) must be **deleted** from the tree, not disabled,
 isolated or adapted: no dead code behind a switch. The previous game stops being a supported title on this
-branch (history stays in git and in the branch `gow3`). Generic code (loader, runtime, shadPS4 core,
-upscalers) stays. Order of work and acceptance criteria: `docs/tsuki/ROADMAP.md` (kernel Spec 2 first; Spec 1a deletes
+branch (history stays in git and in the branch `gow3`). Generic code (loader, runtime, shadPS4 core)
+stays; the temporal upscalers it carried went too once they could not run (Spec 7 §12). Order of work and acceptance criteria: `docs/tsuki/ROADMAP.md` (kernel Spec 2 first; Spec 1a deletes
 hooks/patches early; a "first frame" milestone gates Spec 1b, which deletes the renderer heuristics
 with before/after captures; the rename to `tsuki` is Spec 7, done last).
 
@@ -82,14 +82,16 @@ with before/after captures; the rename to `tsuki` is Spec 7, done last).
     game. `readback_linear_images` is a shadPS4 option and stays: off by default, and
     `TSUKI_READBACK_LINEAR=1` still turns it on;
   - **not deleted:** the vendor-based guest MSAA decision, which is a Windows driver workaround and cannot be
-    tested on RADV, and the 1920×1080 scaling, which is the project's base resolution.
+    tested on RADV. The 1920×1080 scene scaling was kept here too, but it only ran with the temporal upscaler and
+    went with it (Spec 7 §12).
 
   Without `gbuffer_draw`, `CameraMotion` has no inputs (`OnGBufferPass`/`OnConstants` have no callers), so
-  `CameraMotion`, `ObjectMotion` and the temporal upscaler (FSR 3.1/4, DLSS, TAA) can no longer run with this game.
-  The user decided (2026-10-28) to keep that code and to remove the options that switch it on; Spec 7 §10 did it
-  (2026-10-30): no launcher control, `gow3.ini` key, `run.py` switch or env var turns it on
-  (`Gow3Settings::TemporalUpscalerAvailable = false`), and the standalone FSR 4 tools (`tools/fsr4*`, `fsr4cap/`,
-  `fsr4-bench`) were deleted. FSR 1 and RCAS are spatial and stay.
+  `CameraMotion`, `ObjectMotion` and the temporal upscaler (FSR 3.1/4, DLSS, TAA) could no longer run with this game.
+  Spec 7 §10 removed the options that switched it on (2026-10-30), and then §12 (user decision, 2026-10-30) deleted
+  the code: the upscaler, the camera and object motion vectors (also in the shader recompiler), the reduced-size
+  scene targets (`SceneTargets`), the DLSS bridge and the `fsr-vulkan` submodule with its patches. The recorded
+  route still matches `out/baseline/6a/`. FSR 1 and RCAS are shadPS4's, spatial, run at present time and stay:
+  they scale the game's 1080p image to the window.
 - Spec 6 (2D, mouse, saves, language) is closed (2026-10-28): blocks B, C and D were done on 2026-10-25 and block A,
   the 2D render baseline, on 2026-10-28 (branch `tsuki/spec-6bcd`, fast-forward merged into `tsuki/main`).
   - The user closed it without waiting for Spec 1b. Replaying the route after Spec 1b's deletions and matching
@@ -145,8 +147,7 @@ there CMake builds `gow3-probe.exe` too and the C tests are CMake targets (`mp3-
 Packaging: `packaging/windows/package.sh`, `packaging/linux/build.sh` (AppImage).
 
 Build output of the GPU library goes to `out/gpu-build.log`; on failure only its tail is printed.
-Submodules (`gpu/third_party/*`, `third_party/LibAtrac9`) are initialized by `build.sh` if missing,
-and `gpu/patches/fsr-vulkan/*.patch` are applied to the FSR-Vulkan submodule working tree.
+Submodules (`gpu/third_party/*`, `third_party/LibAtrac9`) are initialized by `build.sh` if missing.
 
 Tests:
 
@@ -223,7 +224,7 @@ TEB TLS slot on Windows, patched by `patch_tcb_loads`).
 - Linux: `libgow3gpu.so` loaded via rpath `$ORIGIN/gpu`; Windows: static, linked into `gow3-probe.exe`.
 - Many behaviours are toggled by `TSUKI_*` environment variables (diagnostics, readbacks,
   multisampling); `run.py` and `scripts/graphics_options.py` derive them from the
-  launcher/`gow3.ini`. Temporal upscalers/motion vectors cannot be switched on (Spec 7 §10).
+  launcher/`gow3.ini`. There are no temporal upscalers or motion vectors (deleted, Spec 7 §12).
   `run.py` turns on deferred and stale image readback by default (`TSUKI_DEFERRED_READBACK`,
   `TSUKI_STALE_READBACK`, `scripts/graphics_options.py:14-15`), so CPU reads of GPU-written images use the
   previous frame's copy.
@@ -236,14 +237,13 @@ TEB TLS slot on Windows, patched by `patch_tcb_loads`).
   `tools/make_signatures.py` still generates `Pattern`/`At` signatures.
 - GPU heuristics (Spec 1b, closed 2026-10-28), all removed:
   - ~~`gbuffer_draw` and the 864-byte camera constant buffer in `vk_rasterizer.cpp`~~ (task 3). The 864-byte
-    classifier in `motion_history.h:45` stays, with the now unreachable `CameraMotion`/`ObjectMotion`.
+    classifier in `motion_history.h` went later with `CameraMotion`/`ObjectMotion` (Spec 7 §12).
   - ~~The temporal upscaler's hard-coded shader hashes (`UiComposition::MovieShader`, `trigger_hash`,
     `ui_trigger_vs`)~~ (task 3b).
   - ~~The `TSUKI_READBACK_LINEAR=1` default in `run.py`~~ (task 4, 2026-10-25). The option stays.
 
-  Not the previous game's code, so they stay: the 1920×1080 scene scaling (the project's base resolution), and the
-  vendor-based guest MSAA decision (`gow3_msaa_default.h`, a workaround for AMD's and Intel's Windows drivers;
-  user decision of 2026-10-25).
+  Not the previous game's code, so it stays: the vendor-based guest MSAA decision (`gow3_msaa_default.h`, a
+  workaround for AMD's and Intel's Windows drivers; user decision of 2026-10-25).
 - Pad touchpad semantics (photo mode / pause) in `runtime_pad.c`; title/serial defaults in
   `probe.c`; launcher, Steam shortcut and packaging identity.
 
