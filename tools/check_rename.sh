@@ -3,8 +3,8 @@
 # (docs/specs/2026-10-14-spec-7-renombrado.md §6), any case: each content match as "path:line:text", then each
 # path with gow3 in it. Since §11 it also lists the previous game's name ("god of war") and serials (CUSA01623,
 # CUSA01715). Exceptions: docs/gow3/, docs/plans/ and docs/specs/ (history with the names of their time), the
-# submodules, pgo/, this script and its test, the player READMEs (rewritten for the Alpha), lines marked
-# "rename-check: ok" (a test that checks an old variable no longer works has to name it), "gow3 contributors" on a
+# submodules, pgo/, this script and its test, lines marked "rename-check: ok" (a test that checks an old variable no
+# longer works has to name it; the README credit to the previous game's port), "gow3 contributors" on a
 # copyright line, the path docs/gow3/ anywhere, and in CLAUDE.md and docs/tsuki/ROADMAP.md the branch `gow3` and the
 # relative path ../gow3/.
 # Exit 0 with no output when nothing is left, 1 when something is, 2 on an error.
@@ -13,8 +13,7 @@ set -u
 repo=${1:-$(dirname -- "$(realpath -- "$0")")/..}
 git -C "$repo" rev-parse --git-dir > /dev/null 2>&1 || { echo "error: $repo no es un repositorio git" >&2; exit 2; }
 skip=(':!docs/gow3' ':!docs/plans' ':!docs/specs' ':!gpu/third_party' ':!pgo'
-      ':!tools/check_rename.sh' ':!tests/test_check_rename.py'
-      ':!README.md' ':!README.pt-BR.md' ':!packaging/windows/README-Windows.txt')
+      ':!tools/check_rename.sh' ':!tests/test_check_rename.py')
 old='gow3|god of war|cusa01623|cusa01715'
 # The allowed phrases are removed before searching again, so another old name on the same line still counts.
 found=$({

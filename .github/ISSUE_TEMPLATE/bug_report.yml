@@ -10,9 +10,29 @@ body:
   - type: input
     id: version
     attributes:
-      label: Port version
-      description: Shown in the launcher title bar (e.g. v2.1.7)
-      placeholder: v2.1.7
+      label: Port release
+      description: The name of the release you downloaded, or the commit if you built it yourself
+      placeholder: Alpha 1
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Linux (AppImage)
+        - Windows 10/11 (.zip)
+        - Windows package under Wine/Proton
+        - Built from source
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "Windows 11 24H2, Fedora 44 (KDE, Wayland)"
     validations:
       required: true
 
@@ -54,8 +74,8 @@ body:
   - type: textarea
     id: log
     attributes:
-      label: user/last_run.log
-      description: Attach the file from the port's folder (drag and drop it here). Required for crashes, black screens, graphics glitches and performance issues.
+      label: last_run.log
+      description: "Attach the file (drag and drop it here). The port writes it on every start: next to Project Blue Moon.exe in `user\\` on Windows, in `~/.local/share/tsuki/user/` with the AppImage, or in the Saves folder chosen in the launcher. Required for crashes, black screens, graphics glitches and performance issues."
     validations:
       required: false
 
@@ -63,6 +83,6 @@ body:
     id: screenshots
     attributes:
       label: Screenshots or video
-      description: Especially for visual glitches, attach the raw in-game capture, not a photo of the screen when possible.
+      description: Especially for visual glitches. Say which scene it is (chapter, the line of text on screen).
     validations:
       required: false

@@ -9,7 +9,7 @@ SCRIPT=ROOT/'tools/check_rename.sh'
 # Spec 7 §6 (docs/specs/2026-10-14-spec-7-renombrado.md): check_rename.sh fails on any old name left in the tracked
 # tree, in a file's contents or in its path, except in the history folders, the submodules, pgo/, the branch
 # mention in CLAUDE.md and the roadmap, and lines marked "rename-check: ok". Since §11 it also fails on the previous
-# game's name and serials, except in the player READMEs (rewritten for the Alpha) and "gow3 contributors" credits.
+# game's name and serials, except in "gow3 contributors" credits; since Spec 8 §6 the player READMEs are checked too.
 class CheckRenameTests(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory(); self.repo=Path(self.tmp.name)
@@ -88,15 +88,19 @@ class CheckRenameTests(unittest.TestCase):
         self.assertEqual(r.returncode,1,r.stderr)
         for match in ('src/a.c:1:','tests/b.py:1:','docs/c.md:1:'): self.assertIn(match,r.stdout)
 
-    def test_player_readmes_excepted(self):
+    # Spec 8 §6: the player READMEs were rewritten for the Alpha, so an old name in any of them fails too.
+    def test_player_readmes_checked(self):
         text='God of War III Remastered (CUSA01623): run bin\\gow3-probe.exe\n'
-        for path in ('README.md','README.pt-BR.md','packaging/windows/README-Windows.txt'): self.write(path,text)
-        r=self.check()
-        self.assertEqual((r.returncode,r.stdout),(0,''),r.stderr)
-        self.write('packaging/windows/README.md',text) # a developer README follows the rename
+        paths=('README.md','README.es.md','packaging/windows/README-Windows.txt')
+        for path in paths: self.write(path,text)
         r=self.check()
         self.assertEqual(r.returncode,1,r.stderr)
-        self.assertEqual(r.stdout,'packaging/windows/README.md:1:'+text)
+        for path in paths: self.assertIn(path+':1:',r.stdout)
+
+    def test_readme_credit_marked(self):
+        self.write('README.md','- Felipe Prado: [the port](https://github.com/FelipePrado0/gow3_pc). <!-- rename-check: ok -->\n')
+        r=self.check()
+        self.assertEqual((r.returncode,r.stdout),(0,''),r.stderr)
 
     def test_contributors_credit_excepted(self):
         self.write('gpu/x/LICENSE.txt','Copyright (c) 2026 gow3 contributors\n')

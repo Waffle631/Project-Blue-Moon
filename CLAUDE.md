@@ -119,12 +119,12 @@ with before/after captures; the rename to `tsuki` is Spec 7, done last).
 - Spec 7 (rename to `tsuki`) is closed (2026-10-30; branch `tsuki/spec-7`, fast-forward merged into `tsuki/main`): `TSUKI_*` variables, `tsuki_*`
   files, `tsuki-probe`, `libtsukigpu.so`, `tsuki.ini`, the `tsuki:` mark. No old name is read and nothing is migrated:
   an `.ini` with the old name left in the root is ignored. `bash build.sh --test` ends with `tools/check_rename.sh`, which fails when
-  an old name comes back (exceptions: `docs/gow3/`, `docs/specs/`, the player READMEs, the branch `gow3`; full list in
-  the script). The user confirmed the title in the window and the Insert menu. The
+  an old name comes back (exceptions: `docs/gow3/`, `docs/specs/`, the branch `gow3`, lines marked `rename-check: ok`;
+  full list in the script; since Spec 8 the player READMEs are checked too). The user confirmed the title in the window and the Insert menu. The
   performance overlay now measures CPU, RAM, GPU and VRAM on Linux too (spec §9): `/proc/self/statm`, process CPU time,
   and `drm-engine-gfx` from the fdinfo of the process's `/dev/dri` descriptors (`tsuki_perf_stats.h`).
-- Spec 8 (public Alpha) was approved on 2026-10-30. It has no plan yet; the spec is
-  `docs/specs/2026-10-30-spec-8-alpha.md`. The Alpha goes to a new GitHub repository (it does not exist yet). The user
+- Spec 8 (public Alpha) was approved on 2026-10-30 and is being implemented on the branch `tsuki/spec-8`; the spec is
+  `docs/specs/2026-10-30-spec-8-alpha.md` and its progress is written there task by task. The Alpha goes to a new GitHub repository (it does not exist yet). The user
   creates it and uploads the release (AppImage + Windows `.zip`); the spec pushes nothing and adds no remotes.
   User decisions:
   - The public name is **"Project Blue Moon"**, so the port does not present itself under the game's trademark.
@@ -136,7 +136,10 @@ with before/after captures; the rename to `tsuki` is Spec 7, done last).
     Windows.
   - The launcher must recognise the dump and the packaging must build. This pulls in the launcher, packaging and
     patch-name cleanup that was planned for after the Alpha.
-  - The READMEs are rewritten for this project; `README.pt-BR.md` becomes `README.es.md` (Spanish).
+  - The READMEs are rewritten for this project (done: `README.md`, `README.es.md` in Spanish, which replaced
+    `README.pt-BR.md`, and `packaging/windows/README-Windows.txt`). Their repository links use the one placeholder
+    `https://github.com/OWNER/REPO`, also in `.github/ISSUE_TEMPLATE/`, which the user replaces when the repository
+    exists.
   - The title font (`launcher/gowfont.ttf`), the launcher palette and the icon are not changed by the spec. It only
     lists their files (§7), and having them changed by the user is a criterion for publishing.
 - Target language: **English**. The game ships ja/en/zc/zt (`ft_*.mrg` fonts, `*_en.mp4` videos)
@@ -296,7 +299,7 @@ bound to a GOT slot (`--linked`: `out/boot-linked.bin`, which includes `libc.prx
 - C is compiled with `-std=c11 -Wall -Wextra -Werror`; code style is dense (short lines joined with
   `;`, few braces) — match the surrounding file. Comments explain why, often referencing the
   file that depends on a contract.
-- User-facing docs: `README.md` (English) and `README.pt-BR.md` must stay in sync (Spec 8 replaces the latter with
-  `README.es.md`, in Spanish);
+- User-facing docs: `README.md` (English) and `README.es.md` (Spanish) must stay in sync, with
+  `packaging/windows/README-Windows.txt` for the Windows package;
   progress lives in `docs/tsuki/ROADMAP.md` (Spanish; `docs/gow3/ROADMAP.md` is the previous game's, in Portuguese).
 - Repo is only local, so u can do commits or create a branch to test something
