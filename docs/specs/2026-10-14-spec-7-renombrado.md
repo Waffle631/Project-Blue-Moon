@@ -224,8 +224,8 @@ branch» (`CLAUDE.md:25`) no es una de las formas del punto 4: hay que escribirl
   `TSUKI_GAME_DIR=Tsukihime/CUSA47999 python3 run.py` repite el recorrido grabado con el mismo log (sin
   `STOP:` ni `Fault:`).
 - [x] Las capturas de píxeles de la línea base coinciden antes y después (`tools/compare_captures.sh`).
-- [ ] La ventana y el menú Insert muestran el título leído del `param.sfo`. *(El código y el log lo dicen; falta que
-  el usuario lo vea.)*
+- [x] La ventana y el menú Insert muestran el título leído del `param.sfo`. *(Lo confirmó el usuario a ojo el
+  2026-10-30.)*
 - [x] Un test comprueba que una variable `GOW3_*` ya no tiene efecto (por ejemplo, `GOW3_LANGUAGE=8`
   no cambia el idioma, `TSUKI_LANGUAGE=8` sí).
 
@@ -257,7 +257,8 @@ branch» (`CLAUDE.md:25`) no es una de las formas del punto 4: hay que escribirl
   se restauró después (`cmp` igual).
 - Título: la ventana (`gpu/shim/tsukigpu.cpp`, `config->title`) y la cabecera del menú Insert
   (`tsuki_overlay.cpp`, `ElfInfo::Title()`) usan el título del `param.sfo`, y el log empieza por `TSUKIHIME A piece
-  of blue glass moon`. Las capturas no incluyen el overlay, así que falta que el usuario lo vea.
+  of blue glass moon`. Las capturas no incluyen el overlay; el usuario lo vio en la ventana y en el menú Insert y lo
+  confirmó el mismo día.
 - Pendiente de Windows, sin poder compilarse ni probarse aquí: `build.sh` en MSYS2 (`tsuki-probe.exe`,
   `libtsukigpu.a`), `packaging/windows/*` (`dist/tsuki-windows/`, el icono en los `.exe`), el launcher de Tk
   (`%APPDATA%\tsuki-launcher`) y `tsuki_setjmp`/`tsuki_longjmp`. El AppImage de Linux tampoco se empaquetó.
