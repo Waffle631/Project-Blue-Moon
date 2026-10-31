@@ -123,6 +123,22 @@ with before/after captures; the rename to `tsuki` is Spec 7, done last).
   the script). The user confirmed the title in the window and the Insert menu. The
   performance overlay now measures CPU, RAM, GPU and VRAM on Linux too (spec §9): `/proc/self/statm`, process CPU time,
   and `drm-engine-gfx` from the fdinfo of the process's `/dev/dri` descriptors (`tsuki_perf_stats.h`).
+- Spec 8 (public Alpha) was approved on 2026-10-30. It has no plan yet; the spec is
+  `docs/specs/2026-10-30-spec-8-alpha.md`. The Alpha goes to a new GitHub repository (it does not exist yet). The user
+  creates it and uploads the release (AppImage + Windows `.zip`); the spec pushes nothing and adds no remotes.
+  User decisions:
+  - The public name is **"Project Blue Moon"**, so the port does not present itself under the game's trademark.
+    It covers the launcher's `APP_NAME`, the `.exe` names, shortcuts, `.desktop`, Steam and package names.
+    Internal `tsuki_*`/`TSUKI_*` names stay, and text that names the dump a player needs still says TSUKIHIME (CUSA47999).
+  - The prologue criterion is approved without a new recording.
+  - Windows is in the Alpha. It is cross-built from Linux (llvm-mingw + MSYS2 CLANG64 packages in `out/cross/`,
+    `build.sh --windows`, exit code 0) and tried under the `org.winehq.Wine` Flatpak; the user then tests it on real
+    Windows.
+  - The launcher must recognise the dump and the packaging must build. This pulls in the launcher, packaging and
+    patch-name cleanup that was planned for after the Alpha.
+  - The READMEs are rewritten for this project; `README.pt-BR.md` becomes `README.es.md` (Spanish).
+  - The title font (`launcher/gowfont.ttf`), the launcher palette and the icon are not changed by the spec. It only
+    lists their files (§7), and having them changed by the user is a criterion for publishing.
 - Target language: **English**. The game ships ja/en/zc/zt (`ft_*.mrg` fonts, `*_en.mp4` videos)
   and picks it from the system language (`sceSystemServiceParamGetInt`); `runtime_services.c`
   already reports 1 = English (US) unless `TSUKI_LANGUAGE` overrides it, and logs the first query. Japanese
@@ -130,7 +146,7 @@ with before/after captures; the rename to `tsuki` is Spec 7, done last).
   that open alone does not mean the game picked Japanese.
 - Roadmap (Spanish): `docs/tsuki/ROADMAP.md` — stages, specs and the full missing-API table.
 - Dev/test machine: Bazzite 44 (Fedora-based, immutable), KDE Plasma 6 on Wayland, Ryzen 5 7600,
-  16 GiB RAM, **AMD Radeon RX 6650 XT** (RADV). Linux is the primary platform; Windows comes later.
+  16 GiB RAM, **AMD Radeon RX 6650 XT** (RADV). Linux is the primary platform; Windows is part of the Alpha (Spec 8).
 - Build environment: everything is built and tested inside the Fedora 44 distrobox `ps4dev`
   (the host is immutable; no `rpm-ostree`). Claude Code runs in the VS Code Flatpak, which cannot
   see `distrobox`, so run commands as
@@ -271,13 +287,15 @@ bound to a GOT slot (`--linked`: `out/boot-linked.bin`, which includes `libc.prx
 
 ## Conventions
 
-- Development happens on `tsuki/main` (the previous game's was the branch `gow3`); `main` receives tested merges.
+- Development happens on `tsuki/main`, the main branch (the previous game's was the branch `gow3`). `main` is kept as
+  history and is not touched, so the repository this was forked from is left alone (user decision, 2026-10-30).
 - Commit messages are in **Spanish**, `Tipo(Ámbito): descripción` (e.g. `Feat(Kernel): implementar event flags`,
   `Fix(GPU): ...`, `Test(GPU): ...`, `Docs(Spec1b): ...`), body explaining the cause. This has been the user's rule
   since 2026-10-17; older commits from the previous game's era are in Portuguese.
 - C is compiled with `-std=c11 -Wall -Wextra -Werror`; code style is dense (short lines joined with
   `;`, few braces) — match the surrounding file. Comments explain why, often referencing the
   file that depends on a contract.
-- User-facing docs: `README.md` (English) and `README.pt-BR.md` must stay in sync;
+- User-facing docs: `README.md` (English) and `README.pt-BR.md` must stay in sync (Spec 8 replaces the latter with
+  `README.es.md`, in Spanish);
   progress lives in `docs/tsuki/ROADMAP.md` (Spanish; `docs/gow3/ROADMAP.md` is the previous game's, in Portuguese).
 - Repo is only local, so u can do commits or create a branch to test something

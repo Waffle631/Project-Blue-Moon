@@ -9,10 +9,10 @@ port del juego anterior ([docs/gow3/ROADMAP.md](../gow3/ROADMAP.md)), que a su v
 | Rama | `tsuki/main` (sobre el código del port del juego anterior) |
 | Juego objetivo | TSUKIHIME -A piece of blue glass moon-, **CUSA47999**, versión **01.00** (`HP3279-CUSA47999_00-GAME000TSUKIHIME`) |
 | Idioma objetivo | **Inglés** (el runtime ya reporta inglés al juego: `TSUKI_LANGUAGE`, valor 1 por defecto) |
-| Plataforma | Linux primero (máquina de desarrollo), Windows 10/11 después; Vulkan 1.3 |
+| Plataforma | Linux (máquina de desarrollo) y Windows 10/11, los dos en la Alpha (Spec 8); Vulkan 1.3 |
 | Máquina de pruebas | Bazzite 44 (KDE Plasma 6.7, Wayland), AMD Ryzen 5 7600, 16 GB, **AMD Radeon RX 6650 XT** |
 | Dump | `Tsukihime/CUSA47999/` (sin versionar, ~45 GB) |
-| Última actualización | 2026-10-30 (**Spec 7 cerrada**, renombrado a `tsuki`; rama `tsuki/spec-7` fusionada en `tsuki/main` con fast-forward). **Hechas las cinco capas del renombrado:** variables `TSUKI_*`, archivos `tsuki_*`, símbolos y clases (`TsukiSettings`, `tsukigpu_*`), binarios (`tsuki-probe`), biblioteca de la GPU (`libtsukigpu.so`), `tsuki.ini`, la marca `tsuki:` en shadPS4 y esta documentación. Antes, la misma spec borró el upscaler temporal (FSR 3.1/4, DLSS y TAA, §12 de su spec); FSR 1 y RCAS siguen. Comprobado: el recorrido grabado y los fotogramas oráculo del arranque salen idénticos, y `build.sh --test` termina con `tools/check_rename.sh`. El usuario confirmó el título. El overlay de rendimiento ya mide en Linux CPU, RAM, GPU y VRAM (§9 de su spec). Windows sin probar. Hitos anteriores: Spec 1b y Spec 6 cerradas el 2026-10-28; Spec 5 el 2026-10-25; Spec 4 (4a ATRAC9 y 4b HEVAG) el 2026-10-21; Spec 1a y Spec 3 el 2026-10-19; primer fotograma el 2026-10-18; Spec 2 el 2026-10-17; el orden de las specs se revisó el 2026-10-14 tras un análisis adversarial. Quedan pendientes las revisiones adversariales de lo implementado en la Spec 4 (tarea 13 de su plan) y en la Spec 5 (tarea 8, paso 4), y 4 tests del launcher marcados como fallo esperado hasta después de la Alpha. El detalle de cada hito está en su sección de la etapa 5 y en su spec; el relato fechado completo, en la historia de git de este archivo. |
+| Última actualización | 2026-10-31 (**Spec 8 aprobada** el 2026-10-30, sin plan todavía: la Alpha pública con el nombre **"Project Blue Moon"**. Cubre los criterios de la Alpha, con el prólogo aprobado por el usuario; Windows, con build cruzado desde Linux y prueba con Wine; el launcher y el empaquetado; los README; y la lista de archivos estéticos que el usuario cambia antes de publicar. Sección "Spec 8"). Antes, el 2026-10-30, **Spec 7 cerrada** ( renombrado a `tsuki`; rama `tsuki/spec-7` fusionada en `tsuki/main` con fast-forward). **Hechas las cinco capas del renombrado:** variables `TSUKI_*`, archivos `tsuki_*`, símbolos y clases (`TsukiSettings`, `tsukigpu_*`), binarios (`tsuki-probe`), biblioteca de la GPU (`libtsukigpu.so`), `tsuki.ini`, la marca `tsuki:` en shadPS4 y esta documentación. Antes, la misma spec borró el upscaler temporal (FSR 3.1/4, DLSS y TAA, §12 de su spec); FSR 1 y RCAS siguen. Comprobado: el recorrido grabado y los fotogramas oráculo del arranque salen idénticos, y `build.sh --test` termina con `tools/check_rename.sh`. El usuario confirmó el título. El overlay de rendimiento ya mide en Linux CPU, RAM, GPU y VRAM (§9 de su spec). Windows sin probar. Hitos anteriores: Spec 1b y Spec 6 cerradas el 2026-10-28; Spec 5 el 2026-10-25; Spec 4 (4a ATRAC9 y 4b HEVAG) el 2026-10-21; Spec 1a y Spec 3 el 2026-10-19; primer fotograma el 2026-10-18; Spec 2 el 2026-10-17; el orden de las specs se revisó el 2026-10-14 tras un análisis adversarial. Quedan pendientes las revisiones adversariales de lo implementado en la Spec 4 (tarea 13 de su plan) y en la Spec 5 (tarea 8, paso 4), y 4 tests del launcher marcados como fallo esperado hasta la Spec 8. El detalle de cada hito está en su sección de la etapa 5 y en su spec; el relato fechado completo, en la historia de git de este archivo. |
 
 ---
 
@@ -82,7 +82,7 @@ la rama `gow3`).
 - Hooks de orbes, daño, cheats y barra de vida del enemigo: los `install_*` de `src/probe.c`,
   `src/*_hook.h`, los backends de orbes y actores de `gpu/shim/`, y sus llamadas desde el
   overlay. *(Spec 1a, ✅ 2026-10-19: con ellos se fue la pestaña "Game" del menú del juego.)* Las del
-  launcher se quitan al final (ver "Después de la Alpha").
+  launcher se quitan en la Spec 8 (antes, "Después de la Alpha").
 - La herramienta de mapa de fotogramas del juego anterior (`tools/`). *(Spec 1a, ✅ borrada.)*
 - El XML de parches del juego anterior (`patches/`), el perfil `GAMES` y `REFERENCE_SHA256` de
   `scripts/patches.py`, y `tools/make_signatures.py` si solo genera firmas del juego anterior. *(Spec 1a, ✅: el
@@ -95,13 +95,14 @@ la rama `gow3`).
 - Identidad del juego anterior: título y serial por defecto en `probe.c` y en `run.py`/`scripts/patches.py`.
   *(Spec 1a, ✅: además, cualquier juego que no sea CUSA47999 sale con código 30.)* El acceso de Steam,
   los textos del launcher y el empaquetado los cambió la Spec 7 (§11 de su spec); los README, el icono, la
-  fuente de títulos y la paleta del launcher se dejan para el final (ver "Después de la Alpha").
-- **Después de la Alpha** (decidido el 2026-10-19): la elección de parches de resolución y de frame rate usa todavía los nombres de los
+  fuente de títulos y la paleta del launcher van en la Spec 8: los README los reescribe ella, y la estética la cambia
+  el usuario antes de publicar.
+- **En la Spec 8** (decidido el 2026-10-19 para después de la Alpha; adelantado el 2026-10-30): la elección de parches de resolución y de frame rate usa todavía los nombres de los
   parches del juego anterior ("Resolution Patch", "Frame Rate Patch", "Bug Fix - Texture Corruption Fix"). Está
   en `scripts/patches.py`, `scripts/graphics_options.py`, `run.py`, el menú del juego y sus ajustes.
   Sin perfil de parches no hace nada, pero `run.py` sigue diciendo en cada arranque que no encontró el
   parche de frame rate. La Spec 1a no la cubría, y el launcher importa `EXCLUSIVE_PREFIX` de
-  `patches.py`, así que se borra junto con el launcher (ver "Después de la Alpha").
+  `patches.py`, así que se borra junto con el arreglo del launcher (Spec 8).
 - Heurísticas de GPU del juego anterior: `gbuffer_draw` y la constante de cámara de 864 bytes en
   `vk_rasterizer.cpp`; los hashes fijos de shaders del upscaler temporal; `TSUKI_READBACK_LINEAR=1` por defecto en
   `run.py`. *(Spec 1b, ✅ 2026-10-28)* El escalado a 1920×1080 **se conserva**: el proyecto trabaja de base a 1080p.
@@ -137,8 +138,10 @@ segundos los juzga el usuario jugando.
 **Se comprueban con log o test**
 
 - [ ] El log (`user/last_run.log`) no contiene `STOP:` ni `Fault:` en el recorrido.
-- [ ] El prólogo se recorre hasta `phasetitle_01_00` sin colgarse ni cerrarse. El recorrido se graba
+- [x] El prólogo se recorre hasta `phasetitle_01_00` sin colgarse ni cerrarse. El recorrido se graba
   una vez con `TSUKI_PAD_RECORD` y se repite con `TSUKI_PAD_REPLAY`, para poder repetirlo tras cada cambio.
+  *(2026-10-30, decisión del usuario (Spec 8 §2): se da por aprobado, porque lo ha jugado varias veces sin ver nada
+  mal. No se graba un recorrido nuevo para él. El título del capítulo 1 ya no se cuelga desde la Spec 5.)*
 - [ ] El juego arranca en inglés: el log de archivos abiertos muestra recursos `_en` y la fuente
   `ft_en`, y ninguno de otro idioma.
 - [ ] El save se graba y se carga tras reiniciar el juego (archivo de save presente y estado restaurado).
@@ -155,13 +158,17 @@ segundos los juzga el usuario jugando.
 - [ ] BGM, voces y efectos suenan sin chirridos ni cortes.
 - [ ] Se avanza el texto con mando, teclado y ratón.
 
+**Para publicarla** (añadido el 2026-10-30, Spec 8 §8): la Alpha se publica en un repositorio de GitHub nuevo con
+el nombre "Project Blue Moon". Hacen falta el AppImage de Linux y el `.zip` de Windows (build cruzado desde Linux con
+exit code 0, probado con Wine y después por el usuario en Windows real), un launcher que reconozca el dump, los
+README del proyecto y la fuente, la paleta y el icono cambiados por el usuario. La lista completa está en la spec.
+
 ### Fuera de la Alpha
 
 - Japonés, chino y coreano (si funcionan, mejor, pero no se prueban).
 - Upscalers, motion vectors, patches de resolución o FPS.
-- Launcher completo con identidad de Tsukihime.
 - Trofeos reales, funciones de PSN, capturas/grabación/streaming del sistema.
-- Windows y Steam Deck (solo si no salen gratis del build actual).
+- Steam Deck. *(Windows entró en la Alpha el 2026-10-30, Spec 8.)*
 - Rutas completas y finales (eso es la Beta).
 
 ---
@@ -181,7 +188,7 @@ motivos están en la sección "Hito".
 | 0 | Preparar el entorno (Linux) | Setup | — | — | ✅ Concluida |
 | 1 | Inventario de APIs faltantes | Diagnóstico | 0 | — | ✅ Concluida |
 | 2 | Kernel: event flags, tiempo, hilos (y lo mínimo de servicios para arrancar) | **Spec 2** | 1 | 3–5 días | ✅ Concluida (fases 2A y 2B; en libkernel solo quedan las 3 trampas decididas) |
-| 3 | Borrar hooks, patches, touchpad, tests e identidad del juego anterior | **Spec 1a** | 1 (en paralelo con la Spec 2) | 1–2 días (real: 1 día) | ✅ Concluida el 2026-10-19 (otro juego sale con código 30; 4 tests del launcher marcados como fallo esperado hasta su limpieza; la elección de parches por nombre del juego anterior queda para después de la Alpha) |
+| 3 | Borrar hooks, patches, touchpad, tests e identidad del juego anterior | **Spec 1a** | 1 (en paralelo con la Spec 2) | 1–2 días (real: 1 día) | ✅ Concluida el 2026-10-19 (otro juego sale con código 30; 4 tests del launcher marcados como fallo esperado hasta su limpieza; la elección de parches por nombre del juego anterior queda para después de la Alpha; adelantada a la Spec 8 el 2026-10-30) |
 | 4 | **Hito: primer fotograma** | Hito | Spec 2 | 1 día (real: ~1 día) | ✅ Concluido el 2026-10-18 (imagen correcta: el aviso de autoguardado y el vídeo del prólogo se ven bien; `unimplemented=0`; capturas PNG y `compare_captures.sh` con línea base en `out/baseline/`; se sigue el orden previsto) |
 | 5 | Borrar las heurísticas de GPU del juego anterior | **Spec 1b** | Spec 1a, hito | 1–2 días (antes 2–3; real: del 25 al 28 de octubre) | ✅ Concluida el 2026-10-28 (`gbuffer_draw`, la constante de 864 y los hashes del upscaler borrados; de la lectura lineal, solo su valor por defecto; el escalado a 1080p y el MSAA por vendor se quedan; capturas idénticas y recorrido de la Spec 6 igual a `out/baseline/6a/`) |
 | 6 | Servicios del sistema que faltan | **Spec 3** | Spec 2 | 2–3 días (real: 1 día, más las 15 adelantadas en la Spec 2) | ✅ Concluida el 2026-10-19 (23 de 23: 15 adelantadas en la Spec 2 y 8 en la Spec 3; `--check-imports` da 11, todos de las Specs 2 y 4) |
@@ -190,8 +197,9 @@ motivos están en la sección "Hito".
 | 8 | Vídeo (AvPlayer) | **Spec 5** | Specs 2 y 3 | 2–3 días (antes 2–4; real: 1 día de plan, el 24 de octubre, y el cierre el 25, más el estudio del cuelgue del 21) | ✅ Concluida el 2026-10-25 (**arreglado el cuelgue en `sceAvPlayerStop` del título del capítulo 1**, confirmado en el juego tres de tres veces y en el recorrido final; en el juego, el opening llega entero y sincronizado según el usuario, el prólogo a tiempo real, saltar el logo no cuelga y el fondo del menú de título ya no se acelera; los 134 vídeos se reproducen fuera del juego; queda la revisión adversarial, tarea 8 paso 4; sección Spec 5) |
 | 9 | 2D correcto, ratón y saves | **Spec 6** | Hito (empieza), Specs 3, 4 y 5 (cierra) | 1–3 semanas (real: del 25 al 28 de octubre) | ✅ Concluida el 2026-10-28 (ratón, saves, idioma y render 2D; línea base `out/baseline/6a/` aprobada por el usuario y repetible con `tools/route.sh`; la miniatura pixelada es del juego y se deja; la comprobación tras la Spec 1b pasa a la 1b, decisión del usuario) |
 | 10 | Renombrar el proyecto a `tsuki` | **Spec 7** | Specs 6 y 1b | 2–3 días | ✅ Cerrada el 2026-10-30 (fusionada en `tsuki/main`): recorrido y oráculo de arranque idénticos; el usuario confirmó el título; métricas del overlay en Linux hechas (§9 de su spec). Windows sin probar |
+| 11 | Alpha pública ("Project Blue Moon"): criterios, Windows, launcher, empaquetado y README | **Spec 8** | Spec 7 | sin estimar | ⬜ Aprobada el 2026-10-30, sin plan todavía |
 
-**Total: 8 specs (la 4 en dos partes) y 1 hito** (pueden crecer según lo que aparezca al ejecutar el juego).
+**Total: 9 specs (la 4 en dos partes) y 1 hito** (pueden crecer según lo que aparezca al ejecutar el juego).
 
 Leyenda de estado: ⬜ Pendiente · 🟨 En curso · ✅ Concluida · ⛔ Bloqueada
 
@@ -215,7 +223,8 @@ flowchart LR
     S5 --> S6
     S6 --> S7[Spec 7<br/>Renombrar a tsuki]
     S1B --> S7
-    S7 --> A((Alpha))
+    S7 --> S8[Spec 8<br/>Alpha pública]
+    S8 --> A((Alpha))
 ```
 
 ### Lo que ya se hizo
@@ -524,7 +533,7 @@ los tests y fuentes eliminados.
   antes del cambio (se comparan `out/first-run.log` antes y después: mismo punto de parada).
   *(2026-10-19: sin las líneas de hooks y con la misma parada. Siguen las dos líneas `Patches:` del
   cargador genérico, que la spec pide, y el aviso de `run.py` de que no encontró el parche de frame
-  rate, que va con la elección de parches por nombre y se quita después de la Alpha.)*
+  rate, que va con la elección de parches por nombre y se quita después de la Alpha; adelantado a la Spec 8 el 2026-10-30.)*
 - [x] Un juego que no sea CUSA47999 se rechaza con mensaje claro (test). *(2026-10-19:
   `STOP: unsupported title <id|unknown>: this build only runs CUSA47999`, código 30;
   `tests/test_probe.py`.)*
@@ -557,8 +566,8 @@ los tests y fuentes eliminados.
 - **Consecuencias en lo que no se tocó:**
   - El launcher ya no reconoce un dump, porque usaba el perfil del juego anterior.
   - El empaquetado copia `patches/` con `cp -r`, y esa carpeta ya no existe.
-  - Las dos cosas van con la limpieza de después de la Alpha.
-- **Después de la Alpha:** la elección de parches por nombre del juego anterior (decidido el 2026-10-19; ver la sección 2).
+  - Las dos cosas van con la limpieza de después de la Alpha. *(Adelantada a la Spec 8 el 2026-10-30.)*
+- **Después de la Alpha:** la elección de parches por nombre del juego anterior (decidido el 2026-10-19; ver la sección 2). *(Adelantada a la Spec 8 el 2026-10-30.)*
 - **Esfuerzo:** 1 día, el mínimo de lo previsto.
 
 ---
@@ -1111,6 +1120,65 @@ una función nueva, con su spec. Va antes del `git mv` (tarea 5.5 del plan).
 - [x] Nada del upscaler temporal ni del escalado de escena queda en el árbol, y el recorrido grabado sale igual.
   *(2026-10-30, tarea 5.5 del plan.)*
 
+### Spec 8 — Alpha pública ("Project Blue Moon")
+
+> Spec detallada: [docs/specs/2026-10-30-spec-8-alpha.md](../specs/2026-10-30-spec-8-alpha.md)
+
+**Problema:** todas las specs de emulación están cerradas, pero la Alpha todavía no se puede publicar:
+- quedan criterios de la sección 3 sin marcar;
+- Windows no se ha compilado desde la Spec 1a;
+- el launcher no reconoce el dump y el empaquetado copia una carpeta `patches/` que ya no existe;
+- los README describen el juego anterior.
+
+El usuario quiere publicarla en un repositorio de GitHub nuevo que todavía no existe. La release la hace él.
+
+**Decisiones del usuario (2026-10-30):**
+- el prólogo se da por aprobado;
+- Windows entra en la Alpha, con un build cruzado desde Linux que termine con exit code 0 y una prueba con Wine
+  antes de llevarlo a Windows real;
+- la release lleva el AppImage y el `.zip` de Windows;
+- el port se publica como **"Project Blue Moon"**, para no presentarse con la marca del juego;
+- `README.pt-BR.md` se borra o pasa al español (la spec lo pasa a `README.es.md`);
+- la fuente, la paleta y el icono no se cambian en la spec, pero que estén cambiados es un criterio para publicar;
+- `tsuki/main` es la rama principal y `main` queda como histórico.
+
+**Bloques**
+
+- **A. Windows:** llvm-mingw y un sysroot con los paquetes de MSYS2 CLANG64, todo en `out/cross/`, con
+  `build.sh --windows`. Con el Flatpak `org.winehq.Wine` 11.0 se prueban:
+  1. `tsuki-gpu-capabilities.exe`;
+  2. `--vulkan-only`;
+  3. `--check-imports`, que debe dar las mismas 3 trampas que en Linux;
+  4. el arranque hasta el menú de título. Un fallo propio de Wine en este paso no bloquea.
+
+  El `.zip` sale de `package.sh`: con PyInstaller bajo Wine o, si no sale, en el PC con Windows del usuario.
+- **B. Launcher y empaquetado:**
+  - el launcher reconoce CUSA47999 por su `param.sfo`;
+  - se va la elección de parches por nombre del juego anterior;
+  - pasan los 4 tests marcados como fallo esperado;
+  - se arreglan "Touchpad right" y el mensaje del código 30;
+  - el empaquetado deja de copiar `patches/`;
+  - el nombre que ve el jugador pasa a "Project Blue Moon" (launcher, `.exe`, accesos, `.desktop`, Steam y paquetes).
+    Los nombres internos `tsuki_*`/`TSUKI_*` no cambian.
+- **C. README y repositorio público:**
+  - `README.md` y `README.es.md`, sincronizados, y `README-Windows.txt`, todos sobre este proyecto;
+  - `check_rename.sh` deja de exceptuarlos;
+  - se adapta `.github/ISSUE_TEMPLATE/`;
+  - se repasa `git ls-files` para que no se publique nada del juego.
+- **D. Estética:** una tabla con la fuente, la paleta y el icono, y dónde se usa cada uno (spec §7).
+
+**Criterios de aceptación** (la lista completa está en la spec, §8)
+
+- [ ] Los criterios de la sección 3 marcados, cada uno con su evidencia; el usuario juzga los logos y el audio.
+- [ ] `bash build.sh --windows` termina con exit code 0. Bajo Wine, el `.exe` ve la GPU y `--check-imports` da las
+  3 trampas.
+- [ ] `bash build.sh --test` y `python3 -m unittest discover -s tests` en verde, sin `expectedFailure` en el launcher.
+- [ ] El launcher arranca el juego desde el código fuente y desde el AppImage. El AppImage y el `.zip` se generan.
+- [ ] El recorrido grabado y el oráculo del arranque salen iguales.
+- [ ] Los README describen este proyecto; `README.pt-BR.md` ya no existe.
+- [ ] **Antes de publicar (los cumple el usuario):** la estética cambiada, el repositorio creado, el `.zip` probado
+  en Windows real y la release subida.
+
 ---
 
 ## 6. Riesgos
@@ -1129,7 +1197,7 @@ una función nueva, con su spec. Va antes del `git mv` (tarea 5.5 del plan).
 | Defectos 2D (alfa, fundidos, texto) en el traductor | Medio | Línea base de capturas aprobadas por el usuario; captura antes y después de cada corrección |
 | Borrar heurísticas del renderizador (Spec 1b) rompe el dibujo sin que se sepa qué cambió | Medio; cerrado el 2026-10-28 | Se hace después del hito, una heurística por vez, con captura antes y después. **Cerrado:** Spec 1b terminada sin cambios en las capturas ni en el recorrido grabado |
 | Borrar por error código compartido con lo genérico | Medio | Borrar por pasos, compilar y pasar los tests tras cada uno; la historia queda en git y en la rama `gow3`. En la Spec 1a (2026-10-19) no hubo regresiones en tests, log ni capturas |
-| El launcher y el empaquetado se quedan rotos hasta su limpieza: tras la Spec 1a, el launcher no reconoce un dump (usaba el perfil de parches del juego anterior) y el empaquetado copia una carpeta `patches/` que ya no existe | Bajo (el launcher solo es de Windows/Tk, y en Linux se usa `run.py`) | Se arreglan juntos después de la Alpha; los 4 tests del launcher afectados están marcados como fallo esperado, y unittest avisa en cuanto vuelvan a pasar |
+| El launcher y el empaquetado se quedan rotos hasta su limpieza: tras la Spec 1a, el launcher no reconoce un dump (usaba el perfil de parches del juego anterior) y el empaquetado copia una carpeta `patches/` que ya no existe | Medio desde el 2026-10-30, porque la Alpha se publica con ellos (antes Bajo) | Se arreglan juntos en la Spec 8 (antes, después de la Alpha); los 4 tests del launcher afectados están marcados como fallo esperado, y unittest avisa en cuanto vuelvan a pasar |
 | El renombrado masivo rompe el build o una variable queda a medias (el juego ignora la opción sin avisar) | Medio | Va al final (Spec 7), con recorrido grabado y capturas como oráculo; renombrar por capas con `git mv`; sin alias; script de comprobación con excepciones explícitas |
 | Defecto de render RDNA2 (franjas oscuras) documentado en `docs/gow3/plans/2026-10-12-gpu-corruption-rdna2.md`; la máquina de pruebas es una Navi 23 | Bajo | Visto solo en Windows y en la ruta de MSAA del juego anterior. La Spec 1b no la borra: el parche de MSAA por vendor para Windows se queda (2026-10-25), así que el riesgo no cambia; `--vulkan-only` pasa en RADV. En el hito (2026-10-18) no apareció nada parecido |
 | El juego no elige inglés o mezcla recursos de otro idioma | Bajo | El runtime ya reporta inglés; verificar `_en` en el log de archivos abiertos |
@@ -1148,6 +1216,12 @@ una función nueva, con su spec. Va antes del `git mv` (tarea 5.5 del plan).
 | Aprobar las capturas de línea base (una por una) | Hito, Spec 1b, Spec 6 |
 | ~~Decidir qué hacer con la elección de parches de resolución y de frame rate por nombre del juego anterior (sección 2)~~ Hecho el 2026-10-19: se deja para después de la Alpha, con el launcher | Spec 1b |
 | Probar el recorrido en el juego e informar de lo que vio y oyó | Specs 4 a 6 |
+| Juzgar los logos y el audio para los criterios de la Alpha | Spec 8 |
+| Probar el launcher en Linux con el dump | Spec 8 |
+| Poner la fuente de títulos, la paleta y el icono nuevos (los archivos están listados en la spec, §7) | Antes de publicar la Alpha |
+| Crear el repositorio de GitHub y sustituir el marcador `https://github.com/OWNER/REPO` | Antes de publicar la Alpha |
+| Probar el `.zip` en Windows real (el launcher reconoce el dump; el juego llega al menú de título con música y guarda) | Antes de publicar la Alpha |
+| Subir la release (AppImage y `.zip` de Windows) | Publicación de la Alpha |
 
 ---
 
@@ -1156,23 +1230,15 @@ una función nueva, con su spec. Va antes del `git mv` (tarea 5.5 del plan).
 Ideas para versiones siguientes, sin compromiso:
 
 - **Beta:** todas las rutas (Arcueid y Ciel) hasta los finales y créditos.
-- **Launcher, empaquetado y documentación de usuario** (se hacen al final, por decisión del
-  2026-10-14): identidad de Tsukihime, acceso de Steam, README, `.github`, y quitar del launcher las
-  opciones de funciones ya borradas (orbes, cheats) y sus tests de Python. Tras la Spec 1a, además:
-  - Reconocer el dump sin `patches.game_profile`.
-  - Quitar las marcas `expectedFailure` de sus 4 tests en cuanto vuelvan a pasar.
-  - Dejar de mostrar `Backspace`/`back` como teclas por defecto de "Touchpad right".
-  - Dar un mensaje propio al código 30.
-  - Quitar el `cp -r patches` de `packaging/linux/build.sh` y de `packaging/windows/package.sh`.
-  - ~~Quitar la mención de la herramienta de mapa de fotogramas en `docs/upscaler.md`.~~ El documento pasó a `docs/gow3/`
-    (historia) el 2026-10-30.
-  - Quitar la elección de parches de resolución y de frame rate por nombre del juego anterior (sección 2), con
-    el aviso de `run.py` sobre el parche de frame rate. Está en `scripts/patches.py`
-    (`EXCLUSIVE_PREFIX`, que importa el launcher), `scripts/graphics_options.py`, `run.py`, el menú
-    del juego, sus ajustes y sus tests. Decidido el 2026-10-19.
 - Launcher con idioma, resolución de ventana y remapeo pensados para una novela visual.
 - Escalado limpio para 1440p/4K (FSR 1 o escalado entero) de fondos y texto.
-- Windows y Steam Deck.
+- Steam Deck.
+
+*2026-10-30: lo que esta sección tenía para el launcher, el empaquetado y la documentación de usuario pasó a la
+Spec 8. Eso incluye reconocer el dump sin `patches.game_profile`, los 4 `expectedFailure`, "Touchpad right", el
+mensaje del código 30, el `cp -r patches` del empaquetado, la elección de parches por nombre del juego anterior y los
+README. También Windows, que antes estaba aquí con Steam Deck. La identidad pasa a ser "Project Blue Moon", no la de
+Tsukihime.*
 
 ---
 
