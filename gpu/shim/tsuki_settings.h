@@ -22,7 +22,6 @@ struct Values {
     // Graphics (tsuki_graphics.h). Live: applied on the next frame.
     std::atomic<int> display_mode{0};
     std::atomic<bool> vsync{true};
-    std::atomic<int> fps_limit{0};
     std::atomic<bool> async_shaders{true};
     std::atomic<bool> fsr1{false};
     std::atomic<bool> rcas{true};
@@ -33,21 +32,12 @@ struct Values {
     /// Set by the presenter: the game's image and the window it is shown in, in pixels.
     std::atomic<int> image_width{0}, image_height{0}, window_width{0}, window_height{0};
     std::atomic<int> frames_queued{1};
-    // Startup: run.py turns them into environment variables; "Apply and restart".
-    std::atomic<bool> deferred_readback{true};
-    std::atomic<bool> stale_readback{true};
-    /// Set before an "Apply and restart"; cleared once the new launch shows the game. run.py
-    /// restores the previous startup options when a launch never cleared it.
-    std::atomic<bool> restart_unconfirmed{false};
-    bool startup_deferred_readback = true, startup_stale_readback = true;
 };
 
 Values& Get();
 
 /// Reads the file, then the environment overrides. Called once at start.
 void Load();
-/// A startup graphics option differs from the one this launch started with.
-bool GraphicsNeedRestart();
 /// Writes the file (menu changes).
 void Save();
 

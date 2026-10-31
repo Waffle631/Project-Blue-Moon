@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// tsuki: graphics options of the in-game menu (Insert / R3+L2), kept in tsuki.ini. The live ones
-// apply on the next frame; the startup ones (GPU readback modes) are read by run.py and
-// apply through "Apply and restart". The launcher reads and writes the same keys.
+// tsuki: graphics options of the in-game menu (Insert / R3+L2), kept in tsuki.ini. They apply on
+// the next frame. The launcher reads and writes the same keys.
 #pragma once
 
 #include <array>
@@ -15,12 +14,6 @@ inline constexpr std::array<std::string_view, DisplayModeCount> DisplayModeKeys 
 inline constexpr std::array<const char*, DisplayModeCount> DisplayModeNames = {
     "Windowed", "Borderless", "Fullscreen"};
 
-/// Present rate limits; 0 = unlimited.
-inline constexpr std::array<int, 5> FpsLimits = {30, 60, 120, 240, 0};
-
-/// The game's own frame rate: its engine steps 1/60 s per frame, so presenting faster speeds it up.
-inline constexpr int kEngineFps = 60;
-
 template <typename T, std::size_t N>
 constexpr int IndexOf(const std::array<T, N>& values, const T& value, int fallback) {
     for (std::size_t i = 0; i < N; ++i) {
@@ -32,11 +25,6 @@ constexpr int IndexOf(const std::array<T, N>& values, const T& value, int fallba
 inline int ParseDisplayMode(std::string_view text) {
     return IndexOf(DisplayModeKeys, text, Windowed);
 }
-/// A listed limit, else unlimited.
-inline int ParseFpsLimit(int value) {
-    return IndexOf(FpsLimits, value, -1) >= 0 ? value : 0;
-}
-
 /// Frames the GPU command thread may queue ahead of the GPU; 0 = unbounded.
 inline constexpr std::array<int, 3> FramesQueued = {1, 2, 0};
 inline int ParseFramesQueued(int value) {
@@ -56,16 +44,6 @@ inline bool FsrPassRuns(bool fsr1, bool rcas, int in_w, int in_h, int out_w, int
     const bool upscale = in_w < out_w && in_h < out_h;
     const bool same = in_w == out_w && in_h == out_h;
     return (fsr1 && upscale) || (rcas && same);
-}
-
-/// What the present limit really allows: the game's own rate caps it.
-inline int EffectiveFps(int limit) {
-    return limit == 0 || limit > kEngineFps ? kEngineFps : limit;
-}
-
-/// The present thread's frame limit: never above the game's own rate. 0 stays vblank paced.
-inline int PresentLimit(int limit) {
-    return limit == 0 ? 0 : EffectiveFps(limit);
 }
 
 } // namespace TsukiGraphics

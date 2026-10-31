@@ -34,7 +34,7 @@ missing() { local n; for n in ${1//,/ }; do compgen -G "$R/$name/frame_$(printf 
 
 rm -rf "$R/user" && mkdir -p "$R/user" && cp -a "$R/save/." "$R/user/" || { echo "error: no se pudo restaurar $R/user/" >&2; exit 2; }
 [[ -f $R/tsuki.ini ]] || printf '%s\n' '# tsuki settings of the recorded route (tools/route.sh): the defaults, except async_shaders' \
-    deferred_readback=1 stale_readback=1 async_shaders=0 > "$R/tsuki.ini"
+    async_shaders=0 > "$R/tsuki.ini"
 log=$R/$name.log; extra=()
 if [[ $name == record ]]; then
     extra=(TSUKI_PAD_RECORD="$R/pad.txt" TSUKI_SCREENSHOT_DIR="$R/record")

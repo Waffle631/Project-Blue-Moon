@@ -203,9 +203,9 @@ PS4 import with no implementation without starting the game; `--cpu-features`, `
    rewrites `mov rax, fs:[0]` to `gs:` (host libc owns FS). Only that exact byte pattern is patched.
 4. `isa_rewrite.py` — only on CPUs lacking MOVBE/BMI1/LZCNT: table of sites emulated by
    `src/isa_emulate.c` (runs inside guest code: `-mgeneral-regs-only`, no XMM).
-5. `content_profile.py`, `patches.py` (XML → `patches.bin`), graphics options from `tsuki.ini`.
-6. Starts `tsuki-probe` with those files. The in-game "Apply and restart" re-runs `run.py` via
-   `TSUKI_RESTART_COMMAND`.
+5. `content_profile.py`, `patches.py` (XML → `patches.bin`).
+6. Starts `tsuki-probe` with those files. The game reads `tsuki.ini` itself (`gpu/shim/tsuki_settings.cpp`);
+   nothing restarts it from the in-game menu (Spec 8 §5 took out "Apply and restart").
 
 `src/probe.c` (loader): maps the image below 1 TiB (GPU descriptors hold 40-bit addresses, so all
 guest-visible memory, stacks and host objects handed to the guest must stay low), resolves each
@@ -246,11 +246,12 @@ TEB TLS slot on Windows, patched by `patch_tcb_loads`).
 - `gpu/tsukigpu.h` — the C interface between loader/runtime and the GPU library.
 - Linux: `libtsukigpu.so` loaded via rpath `$ORIGIN/gpu`; Windows: static, linked into `tsuki-probe.exe`.
 - Many behaviours are toggled by `TSUKI_*` environment variables (diagnostics, readbacks,
-  multisampling); `run.py` and `scripts/graphics_options.py` derive them from the
-  launcher/`tsuki.ini`. There are no temporal upscalers or motion vectors (deleted, Spec 7 §12).
-  `run.py` turns on deferred and stale image readback by default (`TSUKI_DEFERRED_READBACK`,
-  `TSUKI_STALE_READBACK`, `scripts/graphics_options.py:14-15`), so CPU reads of GPU-written images use the
-  previous frame's copy.
+  multisampling); the launcher derives some of them from its settings. There are no temporal upscalers or
+  motion vectors (deleted, Spec 7 §12). `run.py` always turns on deferred and stale image readback
+  (`TSUKI_DEFERRED_READBACK`, `TSUKI_STALE_READBACK`; the environment can turn them off), so CPU reads of
+  GPU-written images use the previous frame's copy. Tsukihime makes no readbacks on the recorded route, so
+  Spec 8 §5 took their options out of the launcher and the in-game menu, with the frame rate limit (30 FPS
+  slowed the whole game down), the multisampling choice and the shader cache switches.
 
 ## Game-specific surface (the previous game's code, deleted; what any other title would need)
 

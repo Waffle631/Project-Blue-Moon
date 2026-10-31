@@ -51,12 +51,31 @@ class ControlMapTest(unittest.TestCase):
             self.assertNotIn(value, ('4K', '240', 'Skip Any Video With X Button'), name)
         self.assertNotIn('TSUKI_PATCHES', env)
 
-    def test_pipeline_binary_cache_switch(self):
-        settings = {**launcher.APP_DEFAULTS}
-        self.assertTrue(settings['pipeline_binary_cache'])
-        self.assertEqual(launcher.game_environment(settings)['TSUKI_PIPELINE_BINARIES'], '1')
-        settings['pipeline_binary_cache'] = False
-        self.assertEqual(launcher.game_environment(settings)['TSUKI_PIPELINE_BINARIES'], '0')
+    def test_no_performance_options_the_game_gets_nothing_from(self):
+        # Spec 8 §5 (task 6b, the recorded route): 0 GPU readbacks, the same frames without multisampling,
+        # 60 FPS whatever the limit above it (30 slowed the whole game down), ~20 cached pipelines in 0.1 s.
+        for key in ('readbacks', 'no_msaa', 'background_warmup', 'parallel_warmup', 'pipeline_binary_cache'):
+            self.assertNotIn(key, launcher.APP_DEFAULTS)
+        for key in ('fps_limit', 'deferred_readback', 'stale_readback'):
+            self.assertNotIn(key, launcher.INI_DEFAULTS)
+            self.assertNotIn(key, launcher.INI_FLAGS)
+        for name in ('FPS_LIMITS', 'READBACKS', 'NO_MSAA', 'NO_MSAA_HINT', 'no_msaa_options'):
+            self.assertFalse(hasattr(launcher, name), name)
+        from unittest import mock
+        old = {**launcher.APP_DEFAULTS, 'readbacks': '2', 'no_msaa': '1', 'background_warmup': False,
+               'parallel_warmup': False, 'pipeline_binary_cache': False}
+        names = ('TSUKI_READBACKS', 'TSUKI_NO_MSAA', 'TSUKI_BACKGROUND_WARMUP', 'TSUKI_PARALLEL_WARMUP',
+                 'TSUKI_PIPELINE_BINARIES')
+        with mock.patch.dict(os.environ):
+            for name in names:
+                os.environ.pop(name, None)
+            env = launcher.game_environment(old)
+        for name in names:
+            self.assertNotIn(name, env)
+        # Texts measured on the previous game.
+        source = (ROOT / 'launcher' / 'tsuki_launcher_win.py').read_text(encoding='utf-8')
+        for text in ('40 to 66 FPS', '20–30%', 'NVIDIA laptops', 'previous behavior', 'black lines'):
+            self.assertNotIn(text, source)
 
     def test_changed_buttons_in_table_order(self):
         controls = {'key': {'circle': ' Left Shift ', 'cross': 'Q', 'square': ''}, 'pad': {'cross': 'b'}}
@@ -132,34 +151,30 @@ class ControlMapTest(unittest.TestCase):
         env = launcher.game_environment(settings)
         self.assertEqual(env['TSUKI_KEY_MAP'], 'cross=Q')
         self.assertNotIn('TSUKI_PAD_MAP', env)
-        self.assertEqual(env['TSUKI_PARALLEL_WARMUP'], '1')
-        self.assertEqual(env['TSUKI_BACKGROUND_WARMUP'], '1')
         self.assertEqual(env['TSUKI_PERF_DIAG'], '0')
         self.assertNotIn('TSUKI_FRAME_CAPTURE_KEY', {k for k in env if k not in __import__('os').environ})
         self.assertEqual(launcher.game_environment({**settings, 'frame_capture_key': True})['TSUKI_FRAME_CAPTURE_KEY'], '1')
-        # Graphics options live in tsuki.ini (run.py and the in-game menu), not in the environment.
+        # Graphics options live in tsuki.ini (the in-game menu reads it), not in the environment; run.py
+        # always turns the readbacks on.
         for name in ('TSUKI_FULLSCREEN', 'TSUKI_PRESENT_MODE', 'TSUKI_FPS_LIMIT', 'TSUKI_ASYNC_SHADERS',
                      'TSUKI_DEFERRED_READBACK', 'TSUKI_STALE_READBACK', 'TSUKI_FSR1', 'TSUKI_RCAS'):
             self.assertNotIn(name, {k for k in env if k not in __import__('os').environ})
         old = launcher.game_environment({**settings, 'extra_env': 'TSUKI_DRAW_PIPE=0'})
         self.assertNotIn('TSUKI_DRAW_PIPE', old)  # the old free-text field is ignored
-        self.assertEqual(launcher.game_environment({**settings, 'parallel_warmup': False})['TSUKI_PARALLEL_WARMUP'], '0')
-        self.assertEqual(launcher.game_environment({**settings, 'background_warmup': False})['TSUKI_BACKGROUND_WARMUP'], '0')
 
     def test_settings_keys_kept(self):
         # The redesign hides some options (player name) but keeps every saved setting working.
         for key in ('game_dir', 'user_dir', 'mods_dir', 'patches_dir', 'language', 'player_name', 'hdr',
-                    'draw_pipe', 'readbacks', 'background_warmup', 'parallel_warmup', 'controls', 'pad_style'):
+                    'draw_pipe', 'stream_memory', 'gpu_id', 'controls', 'pad_style'):
             self.assertIn(key, launcher.APP_DEFAULTS)
         env = launcher.game_environment({**launcher.APP_DEFAULTS, 'player_name': ' Shiki '})
         self.assertEqual(env['TSUKI_USER_NAME'], 'Shiki')
-        for key in ('display_mode', 'fps_limit'):
+        for key in ('display_mode', 'frames_queued'):
             self.assertIn(key, launcher.INI_DEFAULTS)
 
     def test_graphics_defaults_match_the_game(self):
         d = launcher.INI_DEFAULTS
-        self.assertEqual((d['display_mode'], d['vsync'], d['fps_limit']), ('windowed', '1', '0'))
-        self.assertEqual([v for v, _t in launcher.FPS_LIMITS], ['30', '60', '120', '240', '0'])
+        self.assertEqual((d['display_mode'], d['vsync']), ('windowed', '1'))
         self.assertEqual(d['frames_queued'], '1')
         self.assertEqual([v for v, _t in launcher.FRAMES_QUEUED], ['1', '2', '0'])
         self.assertNotIn('TSUKI_FRAMES_AHEAD', launcher.game_environment({**launcher.APP_DEFAULTS, 'frames_ahead': '2'}))

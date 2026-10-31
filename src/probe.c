@@ -412,42 +412,6 @@ static void apply_patches(const char *path, Segment *segments, uint64_t ns, cons
     fclose(f);
     printf("Patches: %" PRIu64 " writes, %" PRIu64 " bytes applied, %" PRIu64 " pointers rebased\n",count,bytes,rebased);
 }
-/* Restarts the game through run.sh (the settings menu: a new render resolution is a patch
- * applied at start). Descriptors are closed first so the old GPU device and its memory are
- * released before the new process opens its own. */
-void runtime_restart(void) {
-    fflush(NULL);
-#ifdef _WIN32
-    /* run.py sets TSUKI_RESTART_COMMAND: the launch command line, started again (new patches). */
-    const char *command=getenv("TSUKI_RESTART_COMMAND");
-    puts("Runtime: restarting through run.py");
-    if (!command || !*command) { fputs("runtime_restart: TSUKI_RESTART_COMMAND is not set\n",stderr); _exit(1); }
-    char *line=_strdup(command);
-    /* Same output handles: a launcher reading the game's log keeps reading the new launch. */
-    STARTUPINFOA startup={.cb=sizeof(startup),.dwFlags=STARTF_USESTDHANDLES,
-                          .hStdInput=GetStdHandle(STD_INPUT_HANDLE),.hStdOutput=GetStdHandle(STD_OUTPUT_HANDLE),
-                          .hStdError=GetStdHandle(STD_ERROR_HANDLE)};
-    PROCESS_INFORMATION process;
-    if (!line || !CreateProcessA(NULL,line,NULL,NULL,TRUE,0,NULL,NULL,&startup,&process)) {
-        fprintf(stderr,"runtime_restart: CreateProcess failed (%lu)\n",GetLastError()); _exit(1);
-    }
-    CloseHandle(process.hThread); CloseHandle(process.hProcess);
-    /* The new launch waits for this process's GPU device to go away (run.py --after). */
-    TerminateProcess(GetCurrentProcess(),0);
-#else
-    const char *command = getenv("TSUKI_RESTART_COMMAND");
-    syscall(SYS_close_range, 3u, ~0u, 0u);
-    if (command && *command) {
-        puts("Runtime: restarting through TSUKI_RESTART_COMMAND");
-        execl("/bin/sh", "sh", "-c", command, (char *)NULL);
-    } else {
-        puts("Runtime: restarting through run.sh");
-        execlp("bash", "bash", "run.sh", (char *)NULL);
-    }
-    perror("runtime_restart: exec");
-    _exit(1);
-#endif
-}
 
 /* The guest code needs the PS4's instruction sets (#33, #66); TSUKI_CPU_CHECK=0 skips this. A
  * missing fatal set prints STOP and returns 0; the rewritable ones go to cpu_missing_sets, named

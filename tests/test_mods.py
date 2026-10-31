@@ -139,7 +139,7 @@ class ModTests(unittest.TestCase):
         """run.py with the game preparation scripts stubbed out (the fake game is not a SELF), and
         what its fake probe mounted."""
         port = self.root / 'port'
-        shutil.copytree(ROOT / 'scripts', port / 'scripts')
+        shutil.copytree(ROOT / 'scripts', port / 'scripts', dirs_exist_ok=True)  # again on a second run
         shutil.copy(ROOT / 'run.py', port / 'run.py')
         for name in ('prepare', 'link_libc', 'link_modules', 'content_profile'):
             (port / 'scripts' / f'{name}.py').write_text('')
@@ -147,13 +147,16 @@ class ModTests(unittest.TestCase):
         probe.write_text(f'#!{sys.executable}\nimport json,sys,os\nfrom pathlib import Path\n'
             'game=Path(sys.argv[sys.argv.index("--app0")+1])\n'
             'Path(os.environ["TSUKI_DATA_DIR"],"mounted.json").write_text(json.dumps({\n'
-            '"path":str(game),"content":(game/"dvdroot_ps4/data/a.wad").read_text()}))\n'
+            '"path":str(game),"content":(game/"dvdroot_ps4/data/a.wad").read_text(),\n'
+            '"env":{k:v for k,v in os.environ.items() if k.startswith("TSUKI_")}}))\n'
             'sys.exit(7)\n')
         probe.chmod(0o755)
         env = dict(os.environ, TSUKI_PROBE=str(probe),
             TSUKI_DATA_DIR=str(self.root), TSUKI_GAME_DIR=str(self.game),
             TSUKI_MODS_DIR=str(self.moddir), TSUKI_MODS_CONFIG=str(self.root/'mods.json'))
-        env.pop('TSUKI_MODS_ENABLED', None)
+        for name in ('TSUKI_MODS_ENABLED', 'TSUKI_DEFERRED_READBACK', 'TSUKI_STALE_READBACK', 'TSUKI_ASYNC_SHADERS',
+                     'TSUKI_RESTART_COMMAND', 'TSUKI_DERIVED'):
+            env.pop(name, None)
         result = subprocess.run([sys.executable, 'run.py'], cwd=port, env={**env, **extra}, capture_output=True,
                                 timeout=30)
         self.assertEqual(result.returncode, 7, result.stderr)
@@ -166,6 +169,19 @@ class ModTests(unittest.TestCase):
         self.assertEqual(mounted['content'], 'mod')
         self.assertFalse(Path(mounted['path']).exists())
         self.assertEqual((self.assets/'a.wad').read_bytes(), b'original')
+
+    @unittest.skipIf(os.name == 'nt', 'the fake probe is a shebang script')
+    def test_run_always_turns_the_readbacks_on(self):
+        # Spec 8 §5 (task 6b): there is no option for them any more, so an old tsuki.ini changes nothing; the
+        # environment still can. Nor is there an in-game restart for run.py to prepare.
+        (self.root / 'tsuki.ini').write_text('deferred_readback=0\nstale_readback=0\nrestart_unconfirmed=1\n',
+                                             encoding='utf-8')
+        env = self.run_port()['env']
+        self.assertEqual((env['TSUKI_DEFERRED_READBACK'], env['TSUKI_STALE_READBACK']), ('1', '1'))
+        for name in ('TSUKI_ASYNC_SHADERS', 'TSUKI_RESTART_COMMAND', 'TSUKI_DERIVED'):
+            self.assertNotIn(name, env)
+        self.assertFalse((self.root / 'out' / 'graphics_state.json').exists())
+        self.assertEqual(self.run_port(TSUKI_STALE_READBACK='0')['env']['TSUKI_STALE_READBACK'], '0')
 
     @unittest.skipIf(os.name == 'nt', 'the fake probe is a shebang script')
     def test_run_loads_no_mods_unless_asked(self):

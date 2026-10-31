@@ -19,9 +19,6 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-/* The settings menu of the GPU library restarts through probe.c, which tests do not link. */
-void runtime_restart(void) { abort(); }
-
 typedef int32_t (ABI *Library)(uint32_t);
 typedef int32_t (ABI *Create)(void *,uint32_t);
 typedef int32_t (ABI *Handle)(int32_t);

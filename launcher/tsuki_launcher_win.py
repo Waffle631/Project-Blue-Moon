@@ -111,26 +111,10 @@ def find_tool(name):
 
 def parse_gpu_list(text):
     """One tuple per line of `tsuki-gpu-capabilities --list`: index, name, type and, from the tools
-    that print them, the game's multisampling default on that driver ('off' or 'on') and '1' on
-    the GPU the game picks without TSUKI_GPU_ID. Other lines are skipped."""
+    that print them, more columns the launcher does not use (the multisampling default, the GPU the
+    game picks). Other lines are skipped."""
     rows = [line.split('\t') for line in text.splitlines()]
     return [tuple(row) for row in rows if len(row) >= 3 and row[0].isdigit()]
-
-
-def chosen_gpu(gpus, gpu_id):
-    """The row of parse_gpu_list the game will run on: the Graphics card setting when it is in the
-    list, else the GPU the tool marks as the game's pick; None when neither is known."""
-    chosen = [row for row in gpus if row[0] == str(gpu_id)]
-    return (chosen or [row for row in gpus if len(row) > 4 and row[4] == '1'] or [None])[0]
-
-
-def no_msaa_options(gpus, gpu_id):
-    """NO_MSAA with Automatic naming the chosen card and the game's decision for it."""
-    row = chosen_gpu(gpus, gpu_id)
-    if row is None or len(row) < 4 or row[3] not in ('off', 'on'):
-        return list(NO_MSAA)
-    label = _('Automatic ({}: off)' if row[3] == 'off' else 'Automatic ({}: on)').format(row[1])
-    return [('', (label,))] + NO_MSAA[1:]
 
 
 def list_gpus():
@@ -272,20 +256,17 @@ def heading_text(text, every_language=False):
 # Settings. tsuki.ini keys (the game reads them, the in-game menu edits them) and the
 # launcher's own settings.json (passed to run.py as environment variables).
 
-INI_FLAGS = {'show_fps', 'vsync', 'async_shaders', 'deferred_readback', 'stale_readback'}
-# The graphics keys are also in the in-game menu (Insert / R3+L2); run.py reads the startup ones.
-INI_DEFAULTS = {'show_fps': '1', 'display_mode': 'windowed', 'vsync': '1', 'fps_limit': '0',
-                'async_shaders': '1', 'deferred_readback': '1', 'stale_readback': '1', 'frames_queued': '1'}
+INI_FLAGS = {'show_fps', 'vsync', 'async_shaders'}
+# The graphics keys are also in the in-game menu (Insert / R3+L2).
+INI_DEFAULTS = {'show_fps': '1', 'display_mode': 'windowed', 'vsync': '1', 'async_shaders': '1', 'frames_queued': '1'}
 DISPLAY_MODES = [('windowed', ('Windowed',)), ('borderless', ('Borderless',)), ('fullscreen', ('Fullscreen',))]
-FPS_LIMITS = [('30', ('30',)), ('60', ('60',)), ('120', ('120',)), ('240', ('240',)), ('0', ('Unlimited',))]
 # The sidebar's pages, top to bottom, and the methods that refresh a page's lists when it is shown.
 PAGES = ('home', 'graphics', 'performance', 'game', 'advanced')
 PAGE_REFRESH = {'home': ('refresh_status',), 'game': ('refresh_lists',)}
 APP_DEFAULTS = {'ui_language': 'en', 'game_dir': os.environ.get('TSUKI_GAME_DIR', str(PORT_DIR.parent / 'CUSA47999') if WINDOWS else ''), 'update_dir': '',
                 'video_backend': 'auto', 'gamemode': False, 'mangohud': False, 'desktop_integration': True, 'user_dir': '',
                 'mods_dir': '', 'mods_enabled': False, 'patches_dir': '', 'language': '1',
-                'player_name': '', 'hdr': False, 'draw_pipe': '', 'readbacks': '', 'no_msaa': '', 'stream_memory': 'cached',
-                'gpu_id': '', 'background_warmup': True, 'parallel_warmup': True, 'pipeline_binary_cache': True,
+                'player_name': '', 'hdr': False, 'draw_pipe': '', 'stream_memory': 'cached', 'gpu_id': '',
                 'perf_diag': False, 'frame_capture_key': False, 'frame_stats': False, 'gpu_profile': False,
                 'vk_validation': False, 'close_on_play': False,
                 'controls': {}, 'pad_style': 'playstation'}
@@ -352,18 +333,9 @@ LANGUAGES = [('1', ('English', 'Английский')), ('0', ('Japanese', 'Я�
              ('11', ('Simplified Chinese',)), ('10', ('Traditional Chinese',))]
 DRAW_PIPE = [('', ('Auto (8+ threads)', 'Авто (8+ потоков)')), ('1', ('On', 'Включён')),
              ('0', ('Off (more stable)', 'Выключен (стабильнее)'))]
-READBACKS = [('', ('Relaxed (default)', 'Relaxed (по умолчанию)')), ('0', ('Off', 'Выключены')),
-             ('2', ('Precise',))]
-# TSUKI_NO_MSAA: '' leaves the game's own default, off on AMD's and Intel's Windows drivers
-# (video_core/amdgpu/tsuki_msaa_default.h); no_msaa_options names the chosen card in Automatic.
-NO_MSAA = [('', ('Automatic',)), ('1', ('Off (fixes black lines)',)), ('0', ('On',))]
-NO_MSAA_HINT = ("The game's 2-sample depth buffer, read as a texture by its lighting. AMD's and Intel's Windows "
-                'drivers read it wrong and the lighting shows black lines, so Automatic turns multisampling off '
-                'on those cards (Radeon, Arc) and keeps it on elsewhere (NVIDIA). Off and On force the choice on '
-                'any card.')
 STREAM_MEMORY = [('cached', ('System RAM (cached, default)',)),
                  ('host', ('System RAM (uncached)',)),
-                 ('device', ('GPU memory (previous behavior)',))]
+                 ('device', ('GPU memory',))]
 FRAMES_QUEUED = [('1', ('1 (lowest latency)',)), ('2', ('2',)), ('0', ('Unlimited',))]
 UI_LANGUAGES = tsuki_lang.LANGUAGE_NAMES
 
@@ -698,9 +670,8 @@ def game_environment(s):
         env['TSUKI_USER_NAME'] = str(s['player_name']).strip()
     if s['hdr']:
         env['TSUKI_HDR'] = '1'
-    for key, name in (('draw_pipe', 'TSUKI_DRAW_PIPE'), ('readbacks', 'TSUKI_READBACKS'), ('no_msaa', 'TSUKI_NO_MSAA')):
-        if s.get(key):
-            env[name] = s[key]
+    if s.get('draw_pipe'):
+        env['TSUKI_DRAW_PIPE'] = s['draw_pipe']
     # The saved UI choice wins over inherited diagnostic overrides, including when reverting.
     stream_memory = s.get('stream_memory', APP_DEFAULTS['stream_memory'])
     env['TSUKI_STREAM_MEMORY'] = stream_memory if stream_memory in ('cached', 'host', 'device') else 'cached'
@@ -708,9 +679,6 @@ def game_environment(s):
     env.pop('TSUKI_GPU_ID', None)
     if gpu_id.isdigit():
         env['TSUKI_GPU_ID'] = gpu_id
-    env['TSUKI_BACKGROUND_WARMUP'] = '1' if s.get('background_warmup', True) else '0'
-    env['TSUKI_PARALLEL_WARMUP'] = '1' if s.get('parallel_warmup', True) else '0'
-    env['TSUKI_PIPELINE_BINARIES'] = '1' if s.get('pipeline_binary_cache', True) else '0'
     env['TSUKI_PERF_DIAG'] = '1' if s.get('perf_diag', False) else '0'
     for key, name in (('frame_stats', 'TSUKI_FRAME_STATS'), ('gpu_profile', 'TSUKI_GPU_PROFILE'),
                       ('vk_validation', 'TSUKI_VK_VALIDATION'), ('frame_capture_key', 'TSUKI_FRAME_CAPTURE_KEY')):
@@ -1078,7 +1046,7 @@ class Launcher:
         ttk.Label(quick, text=heading_text(_('Quick settings', 'Основное').upper()), style='Section.TLabel').grid(
             row=0, column=0, columnspan=4, sticky='w')
         tk.Frame(quick, bg=LINE, height=1).grid(row=1, column=0, columnspan=4, sticky='we', pady=(2, 6))
-        items = ((_('Display mode'), 'display_mode', DISPLAY_MODES), (_('Frame rate limit'), 'fps_limit', FPS_LIMITS))
+        items = ((_('Display mode'), 'display_mode', DISPLAY_MODES),)
         for index, (title, key, options) in enumerate(items):
             r, c = 2 + index // 2, (index % 2) * 2
             ttk.Label(quick, text=title).grid(row=r, column=c, sticky='w', pady=6, padx=(0, 12))
@@ -1150,22 +1118,12 @@ class Launcher:
     def build_performance(self):
         f = self.scrolled_page('performance', _('Performance'), _('Frame rate and speed options.'))
         self.section(f, _('Frame rate', 'Частота кадров'), top=4)
-        self.row(f, _('Frame rate limit'), self.choice(f, 'fps_limit', 'ini', FPS_LIMITS),
-                 _("The game's own rate, 60 FPS, is the highest it can go."))
         self.row(f, _('Frames queued'), self.choice(f, 'frames_queued', 'ini', FRAMES_QUEUED),
                  _('1 is the lowest input latency; more can raise FPS when the graphics card is the limit.'))
         self.section(f, _('Shaders'))
-        self.check(f, 'pipeline_binary_cache', 'app', _('Use pipeline binary cache (A/B test)'),
-                   _('Reuse saved Vulkan pipelines. Disable to compare FPS with normal compilation. '
-                     'Takes effect on the next launch; saved caches are preserved.'))
-        self.check(f, 'background_warmup', 'app', _('Load shader cache in the background'),
-                   _('The game opens at once and the saved shaders load while you play; a small note in the '
-                     'corner shows the progress. Switch it off to wait on the loading screen instead.'))
         self.check(f, 'async_shaders', 'ini', _('Compile new shaders in the background'),
                    _('Fewer stutters in new areas: the game keeps running while new shaders compile. An object '
                      'or effect may appear a moment later. Switch it off if something stays missing.'))
-        self.check(f, 'parallel_warmup', 'app', _('Fast shader cache loading (parallel)'),
-                   _('Loading screen only: builds the cached pipelines on several CPU threads.'))
         self.section(f, _('GPU data'))
         gpus = list_gpus()
         cards = [('', ('Automatic',))] + [(row[0], (row[1],)) for row in gpus]
@@ -1173,27 +1131,11 @@ class Launcher:
                  _('The GPU the game runs on. Choose your dedicated card if the game uses the integrated one.'),
                  restart=True)
         self.row(f, _('Stream buffer memory'), self.choice(f, 'stream_memory', 'app', STREAM_MEMORY),
-                 _('System RAM can improve FPS on NVIDIA laptops. Choose GPU memory to restore the previous '
-                   'behavior. Applies on the next game launch.'), restart=True)
-        self.check(f, 'stale_readback', 'ini', _('Game reads GPU data without waiting (big FPS gain)'),
-                   _('About 40 to 66 FPS in a heavy scene. Needs deferred GPU readbacks. Switch it off if lighting '
-                     'or objects look wrong.'), restart=True)
-        self.check(f, 'deferred_readback', 'ini', _('Deferred GPU readbacks'),
-                   _('Fewer waits for the GPU. Switch it off if textures or shadows look wrong.'), restart=True)
+                 _('Where each draw copies its small buffers for the graphics card. GPU memory is what '
+                   'shadPS4 uses. Applies on the next game launch.'), restart=True)
         self.row(f, _('Two-stage GPU pipeline', 'Двухстадийный конвейер GPU'), self.choice(f, 'draw_pipe', 'app', DRAW_PIPE),
-                 _('20–30% faster; switch it off if the game is unstable.', 'Быстрее на 20–30%; при нестабильности выключите.'))
-        self.row(f, _('GPU readbacks', 'Чтение данных GPU'), self.choice(f, 'readbacks', 'app', READBACKS),
-                 _('How exactly data the GPU writes is copied back for the game.',
-                   'Насколько точно данные, записанные GPU, возвращаются игре.'))
-        card = self.var('gpu_id', 'app')
-        box = self.choice(f, 'no_msaa', 'app', no_msaa_options(gpus, card.get()), width=46)
-        self.row(f, _('Game multisampling'), box, _(NO_MSAA_HINT), restart=True)
-
-        def relabel(*_args):  # Automatic names the card the game will run on
-            index = max(box.current(), 0)
-            box['values'] = [_(*text) for _value, text in no_msaa_options(gpus, card.get())]
-            box.current(index)
-        card.trace_add('write', relabel)
+                 _('Prepares each draw on one CPU thread and records it on another. Switch it off if the game '
+                   'is unstable.'))
 
     def build_game(self):
         f = self.scrolled_page('game', _('Game', 'Игра'), _('Your game dump, saves and the game patches.'))
@@ -1985,8 +1927,7 @@ class Launcher:
 
 
 class GameJob:
-    """A Windows job holding run.py and everything it starts: tsuki-probe.exe and the launches made
-    by the in-game restart (no longer descendants of the first process)."""
+    """A Windows job holding run.py and everything it starts (tsuki-probe.exe), ended together."""
 
     def __init__(self, process):
         if not WINDOWS:

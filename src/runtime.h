@@ -13,8 +13,6 @@ typedef tsuki_jmp_buf sigjmp_buf;
 #endif
 /* Recovery point for speculative guest memory reads on this thread (probe.c fault handler). */
 extern __thread sigjmp_buf *runtime_fault_recover;
-/* Restarts the game (in-game settings menu, render resolution change). */
-void runtime_restart(void);
 #define ABI __attribute__((sysv_abi))
 typedef void (ABI *GuestCallback)(void);
 void runtime_start(uint64_t capabilities);

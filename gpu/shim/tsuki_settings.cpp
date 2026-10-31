@@ -61,8 +61,6 @@ void Set(Values& v, const std::string& key, const std::string& value) {
         v.display_mode = TsukiGraphics::ParseDisplayMode(value);
     } else if (key == "vsync") {
         v.vsync = i != 0;
-    } else if (key == "fps_limit") {
-        v.fps_limit = TsukiGraphics::ParseFpsLimit(i);
     } else if (key == "async_shaders") {
         v.async_shaders = i != 0;
     } else if (key == "fsr1") {
@@ -73,12 +71,6 @@ void Set(Values& v, const std::string& key, const std::string& value) {
         v.rcas_strength = TsukiGraphics::ParseRcasStrength(value.empty() ? -1 : i);
     } else if (key == "frames_queued") {
         v.frames_queued = TsukiGraphics::ParseFramesQueued(value.empty() ? -1 : i);
-    } else if (key == "deferred_readback") {
-        v.deferred_readback = i != 0;
-    } else if (key == "stale_readback") {
-        v.stale_readback = i != 0;
-    } else if (key == "restart_unconfirmed") {
-        v.restart_unconfirmed = i != 0;
     }
 }
 
@@ -107,23 +99,14 @@ void Load() {
     }
     // Environment overrides (scripts, A/B tests).
     const std::pair<const char*, const char*> env_keys[] = {
-        {"TSUKI_ASYNC_SHADERS", "async_shaders"},      {"TSUKI_DEFERRED_READBACK", "deferred_readback"},
-        {"TSUKI_STALE_READBACK", "stale_readback"},     {"TSUKI_FSR1", "fsr1"},
-        {"TSUKI_RCAS", "rcas"},                        {"TSUKI_FRAMES_AHEAD", "frames_queued"},
+        {"TSUKI_ASYNC_SHADERS", "async_shaders"}, {"TSUKI_FSR1", "fsr1"},
+        {"TSUKI_RCAS", "rcas"},                   {"TSUKI_FRAMES_AHEAD", "frames_queued"},
     };
     for (const auto& [env, key] : env_keys) {
         if (const char* value = std::getenv(env); value && value[0]) {
             Set(v, key, value);
         }
     }
-    v.startup_deferred_readback = v.deferred_readback;
-    v.startup_stale_readback = v.stale_readback;
-}
-
-bool GraphicsNeedRestart() {
-    const auto& v = Get();
-    return v.deferred_readback != v.startup_deferred_readback ||
-           v.stale_readback != v.startup_stale_readback;
 }
 
 void Save() {
@@ -141,15 +124,11 @@ void Save() {
                  v.overlay_scale.load(), v.overlay_corner.load(), v.overlay_opacity.load(),
                  v.overlay_layout.load(), v.menu_tab.load());
     std::fprintf(file,
-                 "display_mode=%s\nvsync=%d\nfps_limit=%d\nasync_shaders=%d\n"
-                 "fsr1=%d\nrcas=%d\nrcas_strength=%d\nframes_queued=%d\n"
-                 "deferred_readback=%d\nstale_readback=%d\n"
-                 "restart_unconfirmed=%d\n",
+                 "display_mode=%s\nvsync=%d\nasync_shaders=%d\n"
+                 "fsr1=%d\nrcas=%d\nrcas_strength=%d\nframes_queued=%d\n",
                  TsukiGraphics::DisplayModeKeys[std::clamp(v.display_mode.load(), 0, 2)].data(),
-                 int(v.vsync.load()), v.fps_limit.load(), int(v.async_shaders.load()),
-                 int(v.fsr1.load()), int(v.rcas.load()), v.rcas_strength.load(), v.frames_queued.load(),
-                 int(v.deferred_readback.load()), int(v.stale_readback.load()),
-                 int(v.restart_unconfirmed.load()));
+                 int(v.vsync.load()), int(v.async_shaders.load()),
+                 int(v.fsr1.load()), int(v.rcas.load()), v.rcas_strength.load(), v.frames_queued.load());
     std::fclose(file);
 }
 

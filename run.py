@@ -4,16 +4,12 @@
 
 Environment variables (TSUKI_GAME_DIR, TSUKI_DATA_DIR, TSUKI_PATCHES_DIR, TSUKI_MODS_*,
 TSUKI_USER_DIR, ...). Extra arguments go to tsuki-probe.
-The in-game "Apply and restart" runs this script again through TSUKI_RESTART_COMMAND;
-`--after PID` waits for the previous game process to end first (its GPU device and memory).
 """
 import os
 from pathlib import Path
-import shlex
 import shutil
 import subprocess
 import sys
-import time
 
 WINDOWS = sys.platform == 'win32'
 EXE_SUFFIX = '.exe' if WINDOWS else ''
@@ -26,26 +22,6 @@ PORT = Path(__file__).resolve().parent
 def fail(message):
     print(message, file=sys.stderr)
     sys.exit(1)
-
-
-def wait_for(pid):
-    if not WINDOWS:
-        deadline = time.monotonic() + 30
-        while time.monotonic() < deadline:
-            try:
-                os.kill(pid, 0)
-            except ProcessLookupError:
-                return
-            except PermissionError:
-                pass
-            time.sleep(0.1)
-        return
-    kernel32 = ctypes.windll.kernel32
-    SYNCHRONIZE = 0x00100000
-    handle = kernel32.OpenProcess(SYNCHRONIZE, False, pid)
-    if handle:
-        kernel32.WaitForSingleObject(handle, 30000)
-        kernel32.CloseHandle(handle)
 
 
 def no_console():
@@ -116,9 +92,6 @@ def find_executable(name):
 
 def main():
     args = sys.argv[1:]
-    if len(args) >= 2 and args[0] == '--after':
-        wait_for(int(args[1]))
-        args = args[2:]
     # As run.sh: relative paths (TSUKI_GAME_DIR, TSUKI_DATA_DIR) are from the port.
     os.chdir(PORT)
     env = os.environ
@@ -126,17 +99,11 @@ def main():
     out = data / 'out'
     out.mkdir(parents=True, exist_ok=True)
     env.setdefault('TSUKI_CONFIG', str(data / 'tsuki.ini'))
-    # Values this script derived on the previous start ("Apply and restart" inherits them) are
-    # derived again from the new options.
-    for key in env.pop('TSUKI_DERIVED', '').split(','):
-        env.pop(key, None)
-    derived = []
+    # CPU reads of images the GPU wrote use the previous frame's copy instead of waiting (texture_cache.h).
+    # Tsukihime makes none on the recorded route (Spec 8 §5), so there is no option for them.
+    env.setdefault('TSUKI_DEFERRED_READBACK', '1')
+    env.setdefault('TSUKI_STALE_READBACK', '1')
     sys.path.insert(0, str(PORT / 'scripts'))
-    import graphics_options
-    graphics, reverted = graphics_options.prepare(env['TSUKI_CONFIG'], out / 'graphics_state.json')
-    if reverted:
-        print('Graphics: the last restart never reached the game; previous options restored', flush=True)
-    env.update(graphics_options.environment(graphics))
 
     probe = Path(env['TSUKI_PROBE']) if env.get('TSUKI_PROBE') else find_executable('tsuki-probe' + EXE_SUFFIX)
     if not probe or not probe.is_file():
@@ -205,12 +172,8 @@ def main():
         run_script('patches.py', '--out', out, '--game-dir', game,
                    '--patches-dir', env.get('TSUKI_PATCHES_DIR', data / 'patches'),
                    '--patches-config', env.get('TSUKI_PATCHES_CONFIG', data / 'patches.json'))
-        if 'TSUKI_VBLANK_HZ' not in env:
-            env['TSUKI_VBLANK_HZ'] = '60'
-            derived.append('TSUKI_VBLANK_HZ')
-        env['TSUKI_DERIVED'] = ','.join(derived)
+        env.setdefault('TSUKI_VBLANK_HZ', '60')
 
-        # The in-game restart starts this script again once this process is gone.
         # GPU caches (shaders, pipelines) beside the saves; read before main(), so set here.
         user_dir = Path(env.get('TSUKI_USER_DIR', data / 'user')).resolve()
         user_dir.mkdir(parents=True, exist_ok=True)
@@ -221,12 +184,6 @@ def main():
                 print(f'Saves backed up to {made}', flush=True)
         except OSError as error:
             print(f'Save backup failed, starting anyway: {error}', flush=True)
-        this = ['--run'] if getattr(sys, 'frozen', False) else [str(Path(__file__).resolve())]
-        # Windows: the probe starts the new launch and ends, so it waits for this process. Linux:
-        # the probe replaces itself with the new launch while this process still waits for it.
-        after = ['--after', str(os.getpid())] if WINDOWS else []
-        restart = [sys.executable, *this, *after, *args]
-        env['TSUKI_RESTART_COMMAND'] = subprocess.list2cmdline(restart) if WINDOWS else shlex.join(restart)
         command = [*launch_prefix(env), str(probe), str(out / 'boot-linked.bin'), '--content-profile', str(out / 'content.bin'),
                    '--patches', str(out / 'patches.bin'), '--app0', str(game),
                    '--user', str(user_dir),

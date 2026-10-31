@@ -91,15 +91,15 @@ class SaveButtonTest(LauncherOverTemporaryFiles):
     def test_save_preserves_external_changes_and_refreshes_the_controls(self):
         self.app.save()
         path = self.tmp / 'tsuki.ini'
-        path.write_text(path.read_text(encoding='utf-8').replace('fps_limit=0', 'fps_limit=60') +
+        path.write_text(path.read_text(encoding='utf-8').replace('frames_queued=1', 'frames_queued=2') +
                         'external_runtime_key=keep\n', encoding='utf-8')
         self.app.var('vsync', 'ini').set(False)
         self.app.save()
         values, _lines = launcher.load_ini()
-        self.assertEqual(values['fps_limit'], '60')
+        self.assertEqual(values['frames_queued'], '2')
         self.assertEqual(values['external_runtime_key'], 'keep')
         self.assertEqual(values['vsync'], '0')
-        self.assertEqual(self.app.vars['fps_limit'].get(), '60')
+        self.assertEqual(self.app.vars['frames_queued'].get(), '2')
         self.assertEqual(self.save_state(), 'disabled')
 
     def test_failed_replace_keeps_files_and_changes_pending(self):

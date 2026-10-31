@@ -16,8 +16,6 @@
 #endif
 #include "common/assert.h"
 #include "tsuki_toggles.h"
-#include "tsuki_settings.h"
-#include "tsuki_graphics.h"
 #include "video_core/renderer_vulkan/vk_frame_capture.h"
 #include "common/debug.h"
 #include "common/thread.h"
@@ -656,17 +654,10 @@ void VideoOutDriver::PresentThread(std::stop_token token) {
 
     // tsuki: frame limit (see EmulatorSettings::GetFrameLimit). A request waits in the queue
     // until its slot; slots advance by one period (no drift) but never lag behind by more.
-    // tsuki: the in-game menu changes the limit live (TsukiSettings::fps_limit); TSUKI_FPS_LIMIT
-    // and the uncapped presets keep their fixed limit.
-    const bool fixed_limit = std::getenv("TSUKI_FPS_LIMIT") || EmulatorSettings.GetVblankFrequency() == 480;
-    const auto current_limit = [&] {
-        const auto& s = TsukiSettings::Get();
-        return fixed_limit ? EmulatorSettings.GetFrameLimit()
-                           : u32(TsukiGraphics::PresentLimit(s.fps_limit));
-    };
-    u32 frame_limit = current_limit();
-    auto frame_period = frame_limit ? std::chrono::nanoseconds(1000000000 / frame_limit)
-                                    : std::chrono::nanoseconds(0);
+    // By default there is none: the 60 Hz vblank paces the game, which steps 1/60 s per frame.
+    const u32 frame_limit = EmulatorSettings.GetFrameLimit();
+    const auto frame_period = frame_limit ? std::chrono::nanoseconds(1000000000 / frame_limit)
+                                          : std::chrono::nanoseconds(0);
     auto next_flip = std::chrono::steady_clock::now();
     std::printf("VideoOut: vblank %u Hz, frame limit %u FPS\n",
                 EmulatorSettings.GetVblankFrequency(), frame_limit);
@@ -683,16 +674,9 @@ void VideoOutDriver::PresentThread(std::stop_token token) {
 
     // tsuki: with a frame limit (uncapped presets) a queued flip is presented as soon as it
     // arrives and its slot allows, between vblanks, instead of on the next vblank tick.
-    bool immediate_flips = frame_limit != 0;
+    const bool immediate_flips = frame_limit != 0;
 
     while (!token.stop_requested()) {
-        if (const u32 limit = current_limit(); limit != frame_limit) {
-            frame_limit = limit;
-            frame_period = limit ? std::chrono::nanoseconds(1000000000 / limit) : std::chrono::nanoseconds(0);
-            immediate_flips = limit != 0;
-            next_flip = std::chrono::steady_clock::now();
-            std::printf("VideoOut: frame limit %u FPS\n", limit);
-        }
         timer.Start();
         const auto tick_deadline = std::chrono::steady_clock::now() + vblank_period;
 

@@ -18,8 +18,6 @@
 #include "tsuki_graphics.h"
 #include "tsuki_perf_stats.h"
 #include "tsuki_screenshot.h"
-
-extern "C" void runtime_restart(void); // src/probe.c: starts run.py again, ends this process
 #include "common/elf_info.h"
 #include "imgui.h"
 #include "imgui_internal.h" // RegisterUserTexture (save pictures)
@@ -308,30 +306,12 @@ void ImageTab() {
 void PerformanceTab() {
     namespace G = TsukiGraphics;
     auto& s = TsukiSettings::Get();
-    ImGui::SeparatorText("Live");
-    if (BeginRows("##live")) {
-        static const char* const fps_labels[] = {"30", "60", "120", "240", "Unlimited"};
-        ChoiceRow("Frame rate limit", s.fps_limit, fps_labels, G::FpsLimits.data(), int(G::FpsLimits.size()),
-                  "Caps the frame rate. The game's own rate, 60 FPS, is the highest it can go.");
-        const int effective = G::EffectiveFps(s.fps_limit);
-        if (s.fps_limit == 0 || effective < s.fps_limit) {
-            char text[48];
-            std::snprintf(text, sizeof(text), "%d FPS (the game's own rate)", effective);
-            InfoRow("Effective limit", text);
-        }
+    if (BeginRows("##performance")) {
         static const char* const queued_labels[] = {"1 (lowest latency)", "2", "Unlimited"};
         ChoiceRow("Frames queued", s.frames_queued, queued_labels, G::FramesQueued.data(),
                   int(G::FramesQueued.size()), "More frames queued: steadier FPS, slower response to input.");
         CheckRow("Compile new shaders in the background", s.async_shaders,
                  "Fewer stutters in new areas; an object or effect may appear a moment later.");
-        ImGui::EndTable();
-    }
-    ImGui::SeparatorText("Applied on restart");
-    if (BeginRows("##restart")) {
-        CheckRow("Game reads GPU data without waiting", s.stale_readback,
-                 "Big FPS gain. Switch it off if lighting or objects look wrong.");
-        CheckRow("Deferred GPU readbacks", s.deferred_readback,
-                 "Fewer waits for the GPU. Switch it off if textures or shadows look wrong.");
         ImGui::EndTable();
     }
 }
@@ -396,12 +376,6 @@ void OverlayTab() {
     }
 }
 
-// Startup options changed since this launch (applied by "Apply and restart").
-int RestartChanges() {
-    const auto& s = TsukiSettings::Get();
-    return (s.deferred_readback != s.startup_deferred_readback) + (s.stale_readback != s.startup_stale_readback);
-}
-
 void Menu() {
     auto& s = TsukiSettings::Get();
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
@@ -433,7 +407,8 @@ void Menu() {
             requested_tab = (s.menu_tab + step + TabCount) % TabCount;
         }
     }
-    const float footer = ImGui::GetFrameHeightWithSpacing() * 2.0f + ImGui::GetTextLineHeightWithSpacing() * 2.0f;
+    // Below the tabs: the help text (up to two lines) and the Close button.
+    const float footer = ImGui::GetFrameHeightWithSpacing() + ImGui::GetTextLineHeightWithSpacing() * 2.0f;
     if (ImGui::BeginTabBar("##tabs")) {
         static const char* const tabs[TabCount] = {"Image", "Performance", "Overlay"};
         for (int tab = 0; tab < TabCount; ++tab) {
@@ -467,22 +442,6 @@ void Menu() {
     ImGui::PushTextWrapPos(0.0f);
     ImGui::TextDisabled("%s", footer_help ? footer_help : "L1 / R1 or Q / E: switch tabs. Settings are saved in tsuki.ini.");
     ImGui::PopTextWrapPos();
-    if (const int changes = RestartChanges()) {
-        ImGui::TextColored(ImVec4(0.85f, 0.72f, 0.45f, 1.0f), "%d change%s need%s a restart (unsaved progress is lost).",
-                           changes, changes == 1 ? "" : "s", changes == 1 ? "s" : "");
-        ImGui::SameLine();
-        ImGui::BeginDisabled(!std::getenv("TSUKI_RESTART_COMMAND"));
-        if (ImGui::Button("Apply and restart")) {
-            // The new launch confirms the options once the game shows; run.py restores the
-            // previous ones if it never does (restart_unconfirmed).
-            s.restart_unconfirmed = true;
-            TsukiSettings::Save();
-            runtime_restart();
-        }
-        ImGui::EndDisabled();
-    } else {
-        ImGui::NewLine();
-    }
     const float close_width = ImGui::CalcTextSize("Close").x + ImGui::GetStyle().FramePadding.x * 2;
     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - close_width);
     if (ImGui::Button("Close")) {
@@ -927,19 +886,6 @@ bool HandleEvent(const SDL_Event& event) {
     }
 }
 
-// After "Apply and restart", the new options are kept once the game has shown about ten
-// seconds of frames after loading (run.py restores the previous ones otherwise).
-void ConfirmRestart() {
-    static u32 frames = 0;
-    auto& s = TsukiSettings::Get();
-    if (!s.restart_unconfirmed || loading || ++frames < 600) {
-        return;
-    }
-    s.restart_unconfirmed = false;
-    TsukiSettings::Save();
-    std::puts("Settings: graphics options confirmed after restart");
-}
-
 void SetBackgroundLoading(u32 done, u32 total) {
     background_done = done;
     background_total = total;
@@ -993,7 +939,6 @@ void Render(vk::CommandBuffer cmdbuf, vk::ImageView view, vk::Extent2D extent) {
     if (ms > 0.0f && ms < 1000.0f) {
         frame_ms_avg = frame_ms_avg == 0.0f ? ms : frame_ms_avg * 0.95f + ms * 0.05f;
     }
-    ConfirmRestart();
     if (!Visible()) {
         return;
     }

@@ -23,6 +23,12 @@ template <class T>
 concept HasEngineRate = requires(T t) { t.render_resolution; } || requires(T t) { t.engine_fps; } ||
                         requires(T t) { t.applied_engine_fps; } || requires(T t) { t.startup_engine_fps; };
 static_assert(!HasEngineRate<TsukiSettings::Values>);
+// Spec 8 §5 (task 6b): nor the options Tsukihime gets nothing from (the frame rate limit, which only slowed
+// the game down, and the GPU readback modes) and the "Apply and restart" that existed for the readbacks.
+template <class T>
+concept HasUnusedOption = requires(T t) { t.fps_limit; } || requires(T t) { t.deferred_readback; } ||
+                          requires(T t) { t.stale_readback; } || requires(T t) { t.restart_unconfirmed; };
+static_assert(!HasUnusedOption<TsukiSettings::Values>);
 
 static std::string Read(const char* path) {
     std::ifstream in(path);
@@ -33,58 +39,41 @@ static std::string Read(const char* path) {
 
 int main() {
     assert(G::ParseDisplayMode("borderless") == G::Borderless && G::ParseDisplayMode("bogus") == G::Windowed);
-    assert(G::ParseFpsLimit(240) == 240 && G::ParseFpsLimit(75) == 0);
     assert(G::ParseFramesQueued(2) == 2 && G::ParseFramesQueued(0) == 0 && G::ParseFramesQueued(5) == 1);
     assert(G::ParseRcasStrength(100) == 100 && G::ParseRcasStrength(101) == 75 && G::ParseRcasStrength(-1) == 75);
     assert(G::RcasAttenuation(100) == 0.0f && G::RcasAttenuation(0) == 2.0f && G::RcasAttenuation(75) == 0.5f);
     assert(G::FsrPassRuns(true, false, 1280, 720, 2560, 1440) && !G::FsrPassRuns(false, false, 1280, 720, 2560, 1440));
     assert(G::FsrPassRuns(false, true, 1920, 1080, 1920, 1080) && !G::FsrPassRuns(true, false, 1920, 1080, 1920, 1080));
     assert(!G::FsrPassRuns(true, true, 2560, 1440, 1920, 1080));  // larger image: regular scaling
-    assert(G::kEngineFps == 60);
-    assert(G::EffectiveFps(0) == 60 && G::EffectiveFps(120) == 60 && G::EffectiveFps(30) == 30);
-    // The engine steps 1/60 s per frame: presenting faster speeds the game up.
-    assert(G::PresentLimit(120) == 60 && G::PresentLimit(240) == 60 && G::PresentLimit(60) == 60);
-    assert(G::PresentLimit(0) == 0 && G::PresentLimit(30) == 30);  // 0: paced by vblank
 
     const char* path = "graphics-settings-test.ini";
     {
         std::ofstream out(path);
-        out << "display_mode=borderless\nvsync=0\nfps_limit=240\nasync_shaders=0\n"
-               "deferred_readback=0\nstale_readback=1\n"
+        out << "display_mode=borderless\nvsync=0\nasync_shaders=0\n"
                "fsr1=1\nrcas=0\nrcas_strength=40\nframes_queued=2\n";
     }
     _putenv_s("TSUKI_CONFIG", path);
     _putenv_s("TSUKI_ASYNC_SHADERS", "");
     auto& v = TsukiSettings::Get();
     TsukiSettings::Load();
-    assert(v.display_mode == G::Borderless && !v.vsync && v.fps_limit == 240 && !v.async_shaders);
-    assert(!v.deferred_readback && v.stale_readback);
+    assert(v.display_mode == G::Borderless && !v.vsync && !v.async_shaders);
     assert(v.fsr1 && !v.rcas && v.rcas_strength == 40 && v.frames_queued == 2);
-    assert(!TsukiSettings::GraphicsNeedRestart());
-    v.stale_readback = false;
-    assert(TsukiSettings::GraphicsNeedRestart());
-    v.fps_limit = 60;  // live: no restart because of it
-    v.stale_readback = true;
-    assert(!TsukiSettings::GraphicsNeedRestart());
 
     TsukiSettings::Save();
     const std::string saved = Read(path);
-    for (const char* line : {"display_mode=borderless\n", "vsync=0\n", "fps_limit=60\n", "async_shaders=0\n",
-                             "deferred_readback=0\n",
-                             "stale_readback=1\n", "fsr1=1\n", "rcas=0\n", "rcas_strength=40\n",
-                             "frames_queued=2\n"}) {
+    for (const char* line : {"display_mode=borderless\n", "vsync=0\n", "async_shaders=0\n", "fsr1=1\n",
+                             "rcas=0\n", "rcas_strength=40\n", "frames_queued=2\n"}) {
         assert(saved.find(line) != std::string::npos);
     }
 
     {
         std::ofstream out(path);
-        out << "display_mode=huge\nfps_limit=7\n"
-               "rcas_strength=250\nframes_queued=9\n";
+        out << "display_mode=huge\nrcas_strength=250\nframes_queued=9\n";
     }
     _putenv_s("TSUKI_ASYNC_SHADERS", "1");  // the environment still wins at start
     v.async_shaders = false;
     TsukiSettings::Load();
-    assert(v.display_mode == G::Windowed && v.fps_limit == 0);
+    assert(v.display_mode == G::Windowed);
     assert(v.rcas_strength == 75 && v.frames_queued == 1);
     assert(v.async_shaders);
     {
@@ -121,18 +110,23 @@ int main() {
     assert(temporal.find("fsr1=1\n") != std::string::npos && temporal.find("rcas=0\n") != std::string::npos);
     assert(temporal.find("rcas_strength=40\n") != std::string::npos);
     {
-        // Spec 8 §5: the render resolution and the engine frame rate were patches of the previous game. An old
-        // tsuki.ini with them (and run.py's old TSUKI_ENGINE_FPS) changes nothing, and Save() drops them.
+        // Spec 8 §5: the render resolution and the engine frame rate were patches of the previous game, and
+        // task 6b took out the frame rate limit, the readback modes and their restart. An old tsuki.ini with
+        // them (and run.py's old TSUKI_ENGINE_FPS) changes nothing, and Save() drops them.
         std::ofstream out(path);
-        out << "render_resolution=4K\nengine_fps=240\nstale_readback=0\n";
+        out << "render_resolution=4K\nengine_fps=240\nfps_limit=30\ndeferred_readback=0\nstale_readback=0\n"
+               "restart_unconfirmed=1\nvsync=0\n";
     }
     _putenv_s("TSUKI_ENGINE_FPS", "240");
+    v.vsync = true;
     TsukiSettings::Load();
-    assert(!v.stale_readback && !TsukiSettings::GraphicsNeedRestart() && G::PresentLimit(240) == 60);
+    assert(!v.vsync);
     _putenv_s("TSUKI_ENGINE_FPS", "");
     TsukiSettings::Save();
     const std::string engine = Read(path);
-    assert(engine.find("render_resolution") == std::string::npos && engine.find("engine_fps") == std::string::npos);
+    for (const char* key : {"render_resolution", "engine_fps", "fps_limit", "readback", "restart_"}) {
+        assert(engine.find(key) == std::string::npos);
+    }
     // A fresh Values has the overlay's default items: FPS and frametime, not the old upscaler bit.
     const TsukiSettings::Values fresh;
     assert(fresh.overlay_items == 3u);
