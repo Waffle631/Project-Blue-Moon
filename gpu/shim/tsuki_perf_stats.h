@@ -1,14 +1,18 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // tsuki: numbers for the performance overlay (tsuki_overlay.cpp). A thread started once samples
-// CPU, RAM, GPU use (Windows counters) and VRAM (VK_EXT_memory_budget) twice a second;
-// a value that cannot be measured stays negative and shows as "n/a".
+// CPU, RAM, GPU use (Windows counters; on Linux /proc and the DRM fdinfo) and VRAM
+// (VK_EXT_memory_budget) twice a second; a value that cannot be measured stays negative and shows as "n/a".
 
 #pragma once
 
 #include <algorithm>
+#include <charconv>
 #include <cstdint>
 #include <cstdio>
+#include <optional>
 #include <string>
+#include <string_view>
+#include <vector>
 
 namespace Vulkan {
 class Instance;
@@ -42,6 +46,93 @@ inline float CpuPercent(uint64_t process_delta, uint64_t wall_delta, unsigned co
         return -1.0f;
     }
     return std::clamp(float(double(process_delta) * 100.0 / (double(wall_delta) * cores)), 0.0f, 100.0f);
+}
+
+/// The leading number of `text` after any spaces or tabs.
+inline std::optional<uint64_t> LeadingNumber(std::string_view text) {
+    const size_t start = text.find_first_not_of(" \t");
+    if (start == std::string_view::npos) {
+        return std::nullopt;
+    }
+    uint64_t value = 0;
+    const auto [end, error] = std::from_chars(text.data() + start, text.data() + text.size(), value);
+    if (error != std::errc{}) {
+        return std::nullopt;
+    }
+    return value;
+}
+
+/// Linux: the resident pages of /proc/self/statm, its second column.
+inline std::optional<uint64_t> ParseStatmResidentPages(std::string_view statm) {
+    const size_t space = statm.find(' ');
+    if (space == std::string_view::npos) {
+        return std::nullopt;
+    }
+    return LeadingNumber(statm.substr(space));
+}
+
+/// Linux: one DRM client of this process, from /proc/self/fdinfo/<fd> of a /dev/dri descriptor
+/// (the kernel's drm-usage-stats keys; amdgpu writes drm-engine-gfx only once the client used it).
+struct DrmClient {
+    std::string pdev;
+    uint64_t client_id = 0, gfx_ns = 0, vram_resident_kib = 0;
+};
+
+/// nullopt without drm-client-id or drm-engine-gfx: another driver, an older kernel, or a client that
+/// never drew (RADV also opens the integrated GPU).
+inline std::optional<DrmClient> ParseDrmFdinfo(std::string_view fdinfo) {
+    DrmClient client;
+    bool id = false, gfx = false;
+    while (!fdinfo.empty()) {
+        const size_t newline = fdinfo.find('\n');
+        const std::string_view line = fdinfo.substr(0, newline);
+        fdinfo = newline == std::string_view::npos ? std::string_view{} : fdinfo.substr(newline + 1);
+        const size_t colon = line.find(':');
+        if (colon == std::string_view::npos) {
+            continue;
+        }
+        const std::string_view key = line.substr(0, colon), value = line.substr(colon + 1);
+        if (key == "drm-pdev") {
+            const size_t start = value.find_first_not_of(" \t");
+            client.pdev = start == std::string_view::npos ? "" : std::string(value.substr(start));
+        } else if (key == "drm-client-id" || key == "drm-engine-gfx" || key == "drm-resident-vram") {
+            const auto number = LeadingNumber(value);
+            if (!number) {
+                continue;
+            }
+            if (key == "drm-client-id") {
+                client.client_id = *number;
+                id = true;
+            } else if (key == "drm-engine-gfx") {
+                client.gfx_ns = *number;
+                gfx = true;
+            } else {
+                client.vram_resident_kib = *number;
+            }
+        }
+    }
+    if (!id || !gfx) {
+        return std::nullopt;
+    }
+    return client;
+}
+
+/// Graphics-engine time of the clients, each counted once: a dup'd descriptor shows the same client.
+/// nullopt without clients, so the overlay shows "n/a".
+inline std::optional<uint64_t> SumGfxNs(const std::vector<DrmClient>& clients) {
+    if (clients.empty()) {
+        return std::nullopt;
+    }
+    uint64_t total = 0;
+    for (size_t i = 0; i < clients.size(); ++i) {
+        const auto same = [&](const DrmClient& c) {
+            return c.client_id == clients[i].client_id && c.pdev == clients[i].pdev;
+        };
+        if (std::none_of(clients.begin(), clients.begin() + i, same)) {
+            total += clients[i].gfx_ns;
+        }
+    }
+    return total;
 }
 
 /// The overlay text for the items in `mask`: one line each, or one line when `row`.

@@ -50,6 +50,28 @@ int main() {
     unknown.ram_used_gb = 2.0;
     assert(P::Format(unknown, P::Ram, true) == "RAM 2.0 GB");
 
+    // §9: the resident pages of /proc/self/statm are its second column.
+    assert(P::ParseStatmResidentPages("123456 7890 321 1 0 4000 0\n") == 7890u);
+    assert(!P::ParseStatmResidentPages("123456\n") && !P::ParseStatmResidentPages(""));
+
+    // §9: an amdgpu fdinfo (kernel 7.2, keys trimmed); a dup of the same client counts once.
+    const auto fdinfo = [](const char* id, const char* gfx) {
+        return std::string("pos:\t0\nflags:\t02100002\ndrm-driver:\tamdgpu\ndrm-client-id:\t") + id +
+               "\ndrm-pdev:\t0000:03:00.0\npasid:\t64\ndrm-memory-gtt: \t8208 KiB\n"
+               "drm-resident-vram:\t69844 KiB\n" + gfx + "drm-engine-compute:\t544923 ns\n";
+    };
+    const auto seven = P::ParseDrmFdinfo(fdinfo("7", "drm-engine-gfx:\t1000000 ns\n"));
+    const auto nine = P::ParseDrmFdinfo(fdinfo("9", "drm-engine-gfx:\t2000000 ns\n"));
+    assert(seven && seven->pdev == "0000:03:00.0" && seven->client_id == 7 && seven->gfx_ns == 1000000 &&
+           seven->vram_resident_kib == 69844);
+    assert(nine && nine->client_id == 9);
+    assert(P::SumGfxNs({*seven, *nine}) == 3000000u && P::SumGfxNs({*seven, *nine, *seven}) == 3000000u);
+    assert(!P::SumGfxNs({}));
+
+    // §9: no drm-engine-gfx (another driver, an old kernel, or a client that never drew) leaves no client,
+    // so no sum: gpu_percent stays negative and shows as "GPU n/a" (the `unknown` sample above).
+    assert(!P::ParseDrmFdinfo(fdinfo("7", "")) && !P::ParseDrmFdinfo("drm-engine-gfx:\t5 ns\n"));
+
     const char* path = "perf-overlay-test.ini";
     {
         std::ofstream out(path);
