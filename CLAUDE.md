@@ -153,7 +153,8 @@ with before/after captures; the rename to `tsuki` is Spec 7, done last).
 - Build environment: everything is built and tested inside the Fedora 44 distrobox `ps4dev`
   (the host is immutable; no `rpm-ostree`). Claude Code runs in the VS Code Flatpak, which cannot
   see `distrobox`, so run commands as
-  `flatpak-spawn --host distrobox enter ps4dev -- sh -c 'cd /var/home/wafflepc/Documentos/ps4_port && bash build.sh'`.
+  `flatpak-spawn --host distrobox enter ps4dev -- sh -c 'cd <repo> && bash build.sh'`, where `<repo>` is the
+  repository's absolute path (the working directory; `$HOME` is shared, so it is the same inside the container).
   `/tmp` of the Flatpak sandbox is not visible inside the container: write logs under `out/`.
   Container setup, dependencies (RPM Fusion full ffmpeg; the system Vulkan-Headers 1.4.341 are enough since 2026-10-30)
   and command reference: `docs/ENTORNO.md`.

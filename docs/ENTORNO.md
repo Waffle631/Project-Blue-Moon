@@ -5,9 +5,8 @@ Referencia de comandos para compilar, probar y depurar el port en la máquina de
 `ps4dev`, con los paquetes `-devel` instalados con `dnf`; el sistema del host no se toca
 (nada de `rpm-ostree`). Se eligió Fedora para que Mesa/RADV y glibc coincidan con el host.
 
-`$HOME` se comparte con el contenedor, así que el repo
-(`/var/home/wafflepc/Documentos/ps4_port`) y el dump (`Tsukihime/CUSA47999`) se ven en la misma
-ruta dentro y fuera. `/dev/dri` (GPU) y `/dev/input` (mandos) también están disponibles.
+`$HOME` se comparte con el contenedor, así que el repo (una carpeta bajo `$HOME`) y el dump
+(`Tsukihime/CUSA47999`) se ven en la misma ruta dentro y fuera. `/dev/dri` (GPU) y `/dev/input` (mandos) también están disponibles.
 
 ## 1. Contenedor
 
