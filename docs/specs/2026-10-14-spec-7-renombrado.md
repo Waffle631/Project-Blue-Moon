@@ -1,10 +1,10 @@
 # Spec 7 — Renombrar `gow3` a `tsuki`
 
-Fecha: 2026-10-14, ampliada el 2026-10-25 (§9), el 2026-10-28 (§10) y el 2026-10-30 (§11 y §12). Estado: **borrador para aprobación**; tareas 0 (rama
+Fecha: 2026-10-14, ampliada el 2026-10-25 (§9), el 2026-10-28 (§10) y el 2026-10-30 (§11 y §12). Estado: **cerrada el 2026-10-30** (rama `tsuki/spec-7` fusionada en `tsuki/main` con fast-forward; Windows sin probar, §8); tareas 0 (rama
 `tsuki/spec-7` y línea base, §4), 1 (`tools/check_rename.sh`, §6), 2 y 3 (§10 completa), 4 (inventario, prosa y
 §11), 5 (variables `TSUKI_*`, §4 paso 2), 5.5 (borrar el upscaler temporal y el escalado, §12), 6 (`git mv`, §4
 paso 3), 7 (símbolos y binarios, §4 paso 4), 8 (documentación, §4 paso 5) y 9 (enganche y oráculo final, §7) del
-plan hechas el 2026-10-30, y la tarea 10 (métricas del overlay en Linux, §9) el mismo día. Queda fusionar la rama. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 7".
+plan hechas el 2026-10-30, y la tarea 10 (métricas del overlay en Linux, §9) el mismo día. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 7".
 Depende de: Spec 6 (el recorrido grabado y las capturas son el oráculo del renombrado) y Spec 1b. El renombrado va
 al final. Antes de que la Spec 6 se cerrara sin la 1b (2026-10-28), esta dependencia llegaba a través de la 6.
 

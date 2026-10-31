@@ -116,7 +116,7 @@ with before/after captures; the rename to `tsuki` is Spec 7, done last).
   - Saves: the game keeps every slot in one 4 MiB `savedata000`. At boot it reads the whole file read-only.
     To save it truncates and rewrites the file, calls `SaveIcon`, then `UmountWithBackup`. It never calls
     `SetParam` or `DirNameSearch`. The runtime logs mount, param, icon and unmount.
-- Spec 7 (rename to `tsuki`) is done and checked (2026-10-30; branch `tsuki/spec-7`): `TSUKI_*` variables, `tsuki_*`
+- Spec 7 (rename to `tsuki`) is closed (2026-10-30; branch `tsuki/spec-7`, fast-forward merged into `tsuki/main`): `TSUKI_*` variables, `tsuki_*`
   files, `tsuki-probe`, `libtsukigpu.so`, `tsuki.ini`, the `tsuki:` mark. No old name is read and nothing is migrated:
   an `.ini` with the old name left in the root is ignored. `bash build.sh --test` ends with `tools/check_rename.sh`, which fails when
   an old name comes back (exceptions: `docs/gow3/`, `docs/specs/`, the player READMEs, the branch `gow3`; full list in
