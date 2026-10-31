@@ -48,35 +48,35 @@ Fuera de alcance: servicios de plataforma (Spec 3), audio (Spec 4), vídeo (Spec
 
 | NID | Nombre | Estado |
 |---|---|---|
-| `rNhWz+lvOMU` | `_sceKernelSetThreadDtors` | hecha (`src/runtime_thread.c`, `2531937`) |
-| `pB-yGZ2nQ9o` | `_sceKernelSetThreadAtexitCount` | hecha (se guarda y no se llama, `2531937`) |
-| `WhCc1w3EhSI` | `_sceKernelSetThreadAtexitReport` | hecha (se guarda y no se llama, `2531937`) |
-| `Tz4RNUCBbGI` | `_sceKernelRtldThreadAtexitIncrement` | **nombre nuevo**; hecha (`2531937`) |
-| `8OnWXlgQlvo` | `_sceKernelRtldThreadAtexitDecrement` | **nombre nuevo**; hecha (`2531937`) |
-| `BpFoboUJoZU` | `sceKernelCreateEventFlag` | hecha (`src/runtime_eventflag.c`, `93f6896`) |
-| `8mql9OcQnd4` | `sceKernelDeleteEventFlag` | hecha (`src/runtime_eventflag.c`, `93f6896`) |
-| `JTvBflhYazQ` | `sceKernelWaitEventFlag` | hecha (`src/runtime_eventflag.c`, `93f6896`) |
-| `IOnSvHzqu6A` | `sceKernelSetEventFlag` | hecha (`src/runtime_eventflag.c`, `93f6896`) |
-| `PZku4ZrXJqg` | `sceKernelCancelEventFlag` | hecha (`src/runtime_eventflag.c`, `93f6896`) |
-| `fgxnMeTNUtY` | `sceKernelGetProcessTimeCounter` | hecha: el código existía y faltaba la línea de `import_names.inc` (`60bc6aa`) |
-| `BNowx2l588E` | `sceKernelGetProcessTimeCounterFrequency` | hecha: solo faltaba la línea (`60bc6aa`) |
-| `-o5uEDpN+oY` | `sceKernelConvertUtcToLocaltime` | hecha (`src/runtime_kernel.c`, `7244263`) |
-| `0NTHN1NKONI` | `sceKernelConvertLocaltimeToUtc` | hecha (`src/runtime_kernel.c`, `7244263`) |
-| `WslcK1FQcGI` | `sceKernelIsNeoMode` | hecha: 0 (`dd95b87`) |
-| `py6L8jiVAN8` | `sceKernelGetSanitizerMallocReplaceExternal` | hecha: `NULL` (`dd95b87`) |
-| `bnZxYgAFeA0` | `sceKernelGetSanitizerNewReplaceExternal` | hecha: `NULL` (`dd95b87`) |
-| `jh+8XiK4LeE` | `sceKernelIsAddressSanitizerEnabled` | hecha: 0 (`dd95b87`) |
-| `-YTW+qXc3CQ` | `sceKernelInternalMemoryGetModuleSegmentInfo` | **trampa** con nombre (sección 9, `7244263`) |
-| `RpQJJVKTiFM` | `sceKernelGetModuleInfoForUnwind` | **trampa** con nombre (sección 9, `7244263`) |
-| `j2AIqSqJP0w` | `sceKernelGetdents` | hecha: `getdirentries` sin base (`src/runtime_file.c`, `7244263`) |
-| `0Cq8ipKr9n0` | `sceKernelUtimes` | hecha (`src/runtime_file.c`, `7244263`) |
-| `fgIsQ10xYVA` | `sceKernelChmod` | hecha (`src/runtime_file.c`, `7244263`) |
-| `qBDmpCyGssE` | `scePthreadCancel` | **trampa** con nombre (sección 9, `7244263`) |
-| `How7B8Oet6k` | `scePthreadGetname` | hecha (`src/runtime_thread.c`, `7244263`) |
-| `iGjsr1WAtI0` | `pthread_rwlock_rdlock` | hecha (`src/runtime_rwlock.c`, `7244263`) |
-| `sIlRvQqsN2Y` | `pthread_rwlock_wrlock` | hecha (`src/runtime_rwlock.c`, `7244263`) |
-| `EgmLo6EWgso` | `pthread_rwlock_unlock` | hecha (`src/runtime_rwlock.c`, `7244263`) |
-| `NhpspxdjEKU` | `_nanosleep` (**resuelto en el paso 5.7**) | hecha: reutiliza `posix_nanosleep` (`60bc6aa`) |
+| `rNhWz+lvOMU` | `_sceKernelSetThreadDtors` | hecha (`src/runtime_thread.c`, `5629318`) |
+| `pB-yGZ2nQ9o` | `_sceKernelSetThreadAtexitCount` | hecha (se guarda y no se llama, `5629318`) |
+| `WhCc1w3EhSI` | `_sceKernelSetThreadAtexitReport` | hecha (se guarda y no se llama, `5629318`) |
+| `Tz4RNUCBbGI` | `_sceKernelRtldThreadAtexitIncrement` | **nombre nuevo**; hecha (`5629318`) |
+| `8OnWXlgQlvo` | `_sceKernelRtldThreadAtexitDecrement` | **nombre nuevo**; hecha (`5629318`) |
+| `BpFoboUJoZU` | `sceKernelCreateEventFlag` | hecha (`src/runtime_eventflag.c`, `5b2e1bc`) |
+| `8mql9OcQnd4` | `sceKernelDeleteEventFlag` | hecha (`src/runtime_eventflag.c`, `5b2e1bc`) |
+| `JTvBflhYazQ` | `sceKernelWaitEventFlag` | hecha (`src/runtime_eventflag.c`, `5b2e1bc`) |
+| `IOnSvHzqu6A` | `sceKernelSetEventFlag` | hecha (`src/runtime_eventflag.c`, `5b2e1bc`) |
+| `PZku4ZrXJqg` | `sceKernelCancelEventFlag` | hecha (`src/runtime_eventflag.c`, `5b2e1bc`) |
+| `fgxnMeTNUtY` | `sceKernelGetProcessTimeCounter` | hecha: el código existía y faltaba la línea de `import_names.inc` (`b4bcb9d`) |
+| `BNowx2l588E` | `sceKernelGetProcessTimeCounterFrequency` | hecha: solo faltaba la línea (`b4bcb9d`) |
+| `-o5uEDpN+oY` | `sceKernelConvertUtcToLocaltime` | hecha (`src/runtime_kernel.c`, `ba65173`) |
+| `0NTHN1NKONI` | `sceKernelConvertLocaltimeToUtc` | hecha (`src/runtime_kernel.c`, `ba65173`) |
+| `WslcK1FQcGI` | `sceKernelIsNeoMode` | hecha: 0 (`b62ce69`) |
+| `py6L8jiVAN8` | `sceKernelGetSanitizerMallocReplaceExternal` | hecha: `NULL` (`b62ce69`) |
+| `bnZxYgAFeA0` | `sceKernelGetSanitizerNewReplaceExternal` | hecha: `NULL` (`b62ce69`) |
+| `jh+8XiK4LeE` | `sceKernelIsAddressSanitizerEnabled` | hecha: 0 (`b62ce69`) |
+| `-YTW+qXc3CQ` | `sceKernelInternalMemoryGetModuleSegmentInfo` | **trampa** con nombre (sección 9, `ba65173`) |
+| `RpQJJVKTiFM` | `sceKernelGetModuleInfoForUnwind` | **trampa** con nombre (sección 9, `ba65173`) |
+| `j2AIqSqJP0w` | `sceKernelGetdents` | hecha: `getdirentries` sin base (`src/runtime_file.c`, `ba65173`) |
+| `0Cq8ipKr9n0` | `sceKernelUtimes` | hecha (`src/runtime_file.c`, `ba65173`) |
+| `fgIsQ10xYVA` | `sceKernelChmod` | hecha (`src/runtime_file.c`, `ba65173`) |
+| `qBDmpCyGssE` | `scePthreadCancel` | **trampa** con nombre (sección 9, `ba65173`) |
+| `How7B8Oet6k` | `scePthreadGetname` | hecha (`src/runtime_thread.c`, `ba65173`) |
+| `iGjsr1WAtI0` | `pthread_rwlock_rdlock` | hecha (`src/runtime_rwlock.c`, `ba65173`) |
+| `sIlRvQqsN2Y` | `pthread_rwlock_wrlock` | hecha (`src/runtime_rwlock.c`, `ba65173`) |
+| `EgmLo6EWgso` | `pthread_rwlock_unlock` | hecha (`src/runtime_rwlock.c`, `ba65173`) |
+| `NhpspxdjEKU` | `_nanosleep` (**resuelto en el paso 5.7**) | hecha: reutiliza `posix_nanosleep` (`b4bcb9d`) |
 
 Total: 29, todos con nombre y con su línea en `import_names.inc`: 26 implementadas y 3 trampas.
 
@@ -225,7 +225,7 @@ Diagnóstico: `GOW3_TRACE_EVENTFLAG` imprime las esperas bloqueantes (igual que 
 |---|---|---|
 | `sceKernelIsNeoMode` | 0 | El runtime representa una PS4 base. Neo hace que algunos juegos pidan más resolución y memoria |
 | `sceKernelIsAddressSanitizerEnabled` | 0 | No hay sanitizer |
-| `sceKernelGetSanitizerMallocReplaceExternal` / `...NewReplaceExternal` **[V]** | `NULL` = "no hay reemplazo" (`dd95b87`) | Devuelven un puntero a una tabla de reemplazos de ASan (libc `+0x27d2e` y `+0x99ba4`). Con `NULL`, libc mantiene su asignador y sigue con `_sceKernelRtldSetApplicationHeapAPI` |
+| `sceKernelGetSanitizerMallocReplaceExternal` / `...NewReplaceExternal` **[V]** | `NULL` = "no hay reemplazo" (`b62ce69`) | Devuelven un puntero a una tabla de reemplazos de ASan (libc `+0x27d2e` y `+0x99ba4`). Con `NULL`, libc mantiene su asignador y sigue con `_sceKernelRtldSetApplicationHeapAPI` |
 | `sceKernelGetModuleInfoForUnwind` | trampa (`STOP:`) hasta que el juego la llame (decidido, sección 9) | Lo usa el desenrollado de excepciones de C++ (**[V]** único sitio: libc `+0xb8191`, `(addr, 1, &info)` con `info.size = 0x130`). Devolver datos falsos corrompería el desenrollado. Si el juego lanza excepciones, aparecerá como `STOP:` y se implementa con los datos reales de `probe.c` |
 | `sceKernelInternalMemoryGetModuleSegmentInfo` | igual: trampa hasta ver el sitio de llamada | **[V]** libc `+0x2c30e` y `+0x2c73f`, en un camino del montón que no se toma (ni en la init ni en los 6 min del prólogo). Si fallara, libc haría `int 0x44`, así que una respuesta inventada solo movería el fallo |
 
@@ -277,16 +277,16 @@ su `STOP:`, su sitio de llamada, la respuesta, un test y un commit (logs `out/ru
 
 | # | `STOP:` | Sitio de llamada **[V]** | Respuesta | Spec | Commit |
 |---|---|---|---|---|---|
-| 1 | `SsC-m-S9JTA` `sceSystemServiceParamGetString` | eboot `+0x129991`: `(6, obj+4, 0x41)` tras `ParamGetInt(1)`; ignora el resultado | `"PS4"` para el id 6 (nombre del sistema); `0x80A10003` para otro id o buffer corto | 3 (4.1) | `6e40c0e` |
-| 2 | `hHrGoGoNf+s` `sceSysmoduleLoadModuleInternalWithArg` | Fios2 `+0x394a5`: `(0xd7, 0, NULL, 0, &res)`; si falla después, `sceSysmoduleUnloadModule(0xd7)` | igual que `sceSysmoduleLoadModule`, `*res = 0`; ids de más de 16 bits → `STOP:` | 3 | `673559f` |
-| 3 | `VjhsmxpcezI` `sceAudiodecInitLibrary` | eboot `+0x10e20c`: `(1)` (ATRAC9); ignora el resultado | error provisional `0x807F0001` (fase A de la Spec 4) | **4** | `18ad4dc` |
-| 4 | `TywrFKCoLGY` `sceSaveDataInitialize3` | eboot `+0xed2eb`: `(NULL)` | ya existía; faltaba la línea de `import_names.inc` | 3 | `2a43953` |
-| 5 | `isruqthpYcw` `sceSharePlayInitialize` | eboot `+0xed32e`: `(NULL, 0x1800)`; ignora el resultado | "sin efecto": 0, una línea de log y un contador | 3 (4.1) | `1f701d3` |
-| 6 | `kvYEw2lBndk` `sceGameLiveStreamingInitialize` | eboot `+0xed338`: `(0x4000)`, justo después de Share Play; ignora el resultado | "sin efecto" | 3 (4.1) | `93a9b2b` |
-| 7 | `0z45PIH+SNI` `sceSaveDataMount2` | eboot `+0x121716`: `{usuario, dir, 0x60 bloques, modo 1 = solo lectura}`; con `0x809F0008` (sin partida) toma su camino de "partida nueva" | ya existía; faltaba la línea de `import_names.inc` | 3 | `7b14f96` |
-| 8 | `fJgP+wqifno` DiscMap, sin nombre | Fios2 `+0x3411a`: `(ruta, 0, n, &ubicación, &lba, &tamaño)`, la "LBA package location" del archivo; con un resultado ≠0 usa su camino de reserva | `sceDiscMap_7C980FFB0AA27E7A` (los bytes del NID, como su gemela `ioKMruft1ek`): `NO_BITMAP_INFO` (`0x81100004`) sin tocar las salidas | 3 (4.3) | `d80dea5` |
-| 9 | `tIYf0W5VTi8` `sceScreenShotDisable` | eboot `+0xee582`, dentro de la política de captura del juego (`+0xee550`), que llama a seis APIs seguidas e ignora todos los resultados | las seis "sin efecto" en una sola iteración | 3 (4.1) | `61ec55c` |
-| 10 | `VwadwBBBJ80` `sceSaveDataUmountWithBackup` | eboot `+0x1214e2`, sobre la partida `savedata000` que el juego acaba de crear; ignora el resultado | desmonta como `sceSaveDataUmount` y no guarda copia; una línea de log | 3 (4.4) | `991fc5d` |
+| 1 | `SsC-m-S9JTA` `sceSystemServiceParamGetString` | eboot `+0x129991`: `(6, obj+4, 0x41)` tras `ParamGetInt(1)`; ignora el resultado | `"PS4"` para el id 6 (nombre del sistema); `0x80A10003` para otro id o buffer corto | 3 (4.1) | `3ae18f1` |
+| 2 | `hHrGoGoNf+s` `sceSysmoduleLoadModuleInternalWithArg` | Fios2 `+0x394a5`: `(0xd7, 0, NULL, 0, &res)`; si falla después, `sceSysmoduleUnloadModule(0xd7)` | igual que `sceSysmoduleLoadModule`, `*res = 0`; ids de más de 16 bits → `STOP:` | 3 | `e35f526` |
+| 3 | `VjhsmxpcezI` `sceAudiodecInitLibrary` | eboot `+0x10e20c`: `(1)` (ATRAC9); ignora el resultado | error provisional `0x807F0001` (fase A de la Spec 4) | **4** | `2bad2eb` |
+| 4 | `TywrFKCoLGY` `sceSaveDataInitialize3` | eboot `+0xed2eb`: `(NULL)` | ya existía; faltaba la línea de `import_names.inc` | 3 | `cb2a811` |
+| 5 | `isruqthpYcw` `sceSharePlayInitialize` | eboot `+0xed32e`: `(NULL, 0x1800)`; ignora el resultado | "sin efecto": 0, una línea de log y un contador | 3 (4.1) | `0a6a19f` |
+| 6 | `kvYEw2lBndk` `sceGameLiveStreamingInitialize` | eboot `+0xed338`: `(0x4000)`, justo después de Share Play; ignora el resultado | "sin efecto" | 3 (4.1) | `84835cc` |
+| 7 | `0z45PIH+SNI` `sceSaveDataMount2` | eboot `+0x121716`: `{usuario, dir, 0x60 bloques, modo 1 = solo lectura}`; con `0x809F0008` (sin partida) toma su camino de "partida nueva" | ya existía; faltaba la línea de `import_names.inc` | 3 | `998827c` |
+| 8 | `fJgP+wqifno` DiscMap, sin nombre | Fios2 `+0x3411a`: `(ruta, 0, n, &ubicación, &lba, &tamaño)`, la "LBA package location" del archivo; con un resultado ≠0 usa su camino de reserva | `sceDiscMap_7C980FFB0AA27E7A` (los bytes del NID, como su gemela `ioKMruft1ek`): `NO_BITMAP_INFO` (`0x81100004`) sin tocar las salidas | 3 (4.3) | `24b9ebf` |
+| 9 | `tIYf0W5VTi8` `sceScreenShotDisable` | eboot `+0xee582`, dentro de la política de captura del juego (`+0xee550`), que llama a seis APIs seguidas e ignora todos los resultados | las seis "sin efecto" en una sola iteración | 3 (4.1) | `8908852` |
+| 10 | `VwadwBBBJ80` `sceSaveDataUmountWithBackup` | eboot `+0x1214e2`, sobre la partida `savedata000` que el juego acaba de crear; ignora el resultado | desmonta como `sceSaveDataUmount` y no guarda copia; una línea de log | 3 (4.4) | `abdaf03` |
 
 **Punto de parada (iteración 10).** Después de la iteración 10 no aparece ningún `STOP:` en 60 s. El
 watchdog de `GOW3_TIMEOUT=60` corta el proceso con el juego vivo: no hay cuelgue. Con
@@ -368,7 +368,7 @@ Caller return offset: 0x113177; first argument: 0x1006eb2048
   tarea 7), la partida de `user/savedata/1/CUSA47999/` guardó progreso en la primera ejecución que pasó del prólogo (22:58:10), y desde entonces el arranque va directo al menú de título, sin el vídeo. Para ver el prólogo hay que restaurar la partida sin progreso
   (`out/savedata-sin-progreso/`).*
 
-### 4.2 Fase 2B: cierre (2026-10-17, commit `7244263`)
+### 4.2 Fase 2B: cierre (2026-10-17, commit `ba65173`)
 
 Quedaban 12 APIs sin nombre. Antes de escribir código se miraron sus sitios de llamada (pasos 5.4 a
 5.6; tabla de sitios en `out/callers-2b.txt`). Todas, salvo `scePthreadCancel`, las llama solo
@@ -435,7 +435,7 @@ nombrar el import de una ranura de GOT.
    solo si el hilo sigue vivo. No se llamó nunca en el prólogo, así que queda como trampa (sección 3.4).
 5. **Conversión de hora y sanitizer. ✅ (2026-10-17)** Mirar el sitio de llamada para fijar firma y
    valor devuelto. Nota:
-   - Sanitizer: adelantado en `dd95b87` (sección 3.5).
+   - Sanitizer: adelantado en `b62ce69` (sección 3.5).
    - Conversión de hora: solo la usan `localtime_r` (libc `+0x1777`), `localtime` (`+0xb8d8`),
      `mktime` (`+0xc104`…`+0xc15d`) y `strftime %z` (`+0x1fb73`). La firma, el registro de 16 bytes
      y el sentido de `westsec` están en la sección 3.3.
@@ -516,7 +516,7 @@ en MSYS2.
   `sceKernelInternalMemoryGetModuleSegmentInfo` y `sceKernelGetModuleInfoForUnwind`, ya con nombre.
   Los motivos están en las secciones 3.4 y 3.5, y la decisión en la 9).
 - [x] Cada respuesta explícita escribe una línea de log la primera vez que se llama (2026-10-17: las
-  cuatro del bloque E, desde `dd95b87`. `test_runtime.py` comprueba que cada línea sale una sola vez).
+  cuatro del bloque E, desde `b62ce69`. `test_runtime.py` comprueba que cada línea sale una sola vez).
 
 ## 9. Riesgos y preguntas abiertas
 

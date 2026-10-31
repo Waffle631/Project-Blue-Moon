@@ -21,12 +21,12 @@ la misma captura antes y después que Tsukihime no cambia (o que el cambio está
 
 | Heurística | Dónde | Qué hace | ¿Activa para Tsukihime? |
 |---|---|---|---|
-| `gbuffer_draw` | `vk_rasterizer.cpp:269-270` (se define), `:1336` (se pone a falso), `:1819`, `:2121`, `:2182`, `:2187` | Marca el draw de G-buffer (≥5 render targets con profundidad). Alimenta el vector de movimiento y la captura | **[V] Dormida**: depende de `camera_motion->Enabled()`, que está apagado por defecto ("Object motion: off" en `out/first-run.log`). **Borrada (Tarea 3, `ba39fdc`)** |
-| Constante de cámara de 864 bytes | `vk_rasterizer.cpp:2121`, `:2182` | Reconoce el buffer de constantes de cámara de GoW3 por su tamaño | **[V] Dormida**, la condición exige `gbuffer_draw`. **Borrada (Tarea 3, `ba39fdc`)** |
+| `gbuffer_draw` | `vk_rasterizer.cpp:269-270` (se define), `:1336` (se pone a falso), `:1819`, `:2121`, `:2182`, `:2187` | Marca el draw de G-buffer (≥5 render targets con profundidad). Alimenta el vector de movimiento y la captura | **[V] Dormida**: depende de `camera_motion->Enabled()`, que está apagado por defecto ("Object motion: off" en `out/first-run.log`). **Borrada (Tarea 3, `521508c`)** |
+| Constante de cámara de 864 bytes | `vk_rasterizer.cpp:2121`, `:2182` | Reconoce el buffer de constantes de cámara de GoW3 por su tamaño | **[V] Dormida**, la condición exige `gbuffer_draw`. **Borrada (Tarea 3, `521508c`)** |
 | Escalado de la escena a 1920×1080 | `vk_rasterizer.cpp:3044-3068` | "El viewport de la película de UI es 1920×1080 aunque la escena sea 960×540"; los pasos de media resolución mantienen el factor de la escena (`size/1920`, `size/1080`) | **Decidido: se conserva.** El proyecto trabaja de base a 1080p, así que esta lógica es la resolución base y no es específica de GoW3. No se borra; se documenta y, si hace falta, se renombra en la Spec 7 |
 | MSAA por vendor | `gpu/shadps4/video_core/amdgpu/gow3_msaa_default.h`, decisión en `vk_instance.cpp`, propiedades en `tools/gpu_capabilities.c` | En AMD y Intel propietario en Windows, crea las imágenes multimuestra con una muestra | **[V]** No incluye RADV (el driver de Linux): la 6650 XT de pruebas mantiene el multimuestreo del juego. **[D] Se queda (2026-10-25, §2.2):** es un parche de driver, no del juego |
 | `GOW3_READBACK_LINEAR=1` por defecto | `run.py:216` | Activa lectura lineal de imágenes para la CPU | **[H] Activa**; cambia rendimiento más que imagen. **[D] Solo se quita el valor por defecto (2026-10-25, §2.2):** la opción de shadPS4 que enciende se queda. **[V] Sin efecto (Tarea 4, §7):** con la opción encendida, Tsukihime no metió ninguna imagen en `download_images`. Valor por defecto quitado |
-| Hashes fijos de shaders en el upscaler temporal | `ui_composition.h:25-30` (`MovieShader`: 5 hashes de vertex shaders de la UI Scaleform), `vk_temporal_upscaler.h:197` (`trigger_hash = 0x9a9cf8a9`, el compute antes del cual se escala), `:215` (`ui_trigger_vs = 0x34e8a281`); usos en `vk_temporal_upscaler.cpp:361,1306,1321` y `tests/test_ui_composition.cpp:19-21` | Deciden en qué compute se escala la escena y qué draws son UI. Son de otro juego: entraron el 2026-09-26 (`0403703`, `ff221f7`), cuando el upscaler aún se llamaba `BB_UPSCALER`; no son shaders de Tsukihime | **[V] Dormidos** bajo `run.py`: fija `GOW3_UPSCALER=none` (`run.py:214-215`) y todas las llamadas al upscaler exigen `upscaler->Enabled()` (`vk_rasterizer.cpp:1012,1236,1353`). **[D] Se borran (2026-10-25)**: los valores por defecto pasan a «sin disparador»; `GOW3_UPSCALE_BEFORE_CS` y `GOW3_UI_TRIGGER_VS` siguen permitiendo fijarlos. **Borrados (Tarea 3b, `76b739f`)** |
+| Hashes fijos de shaders en el upscaler temporal | `ui_composition.h:25-30` (`MovieShader`: 5 hashes de vertex shaders de la UI Scaleform), `vk_temporal_upscaler.h:197` (`trigger_hash = 0x9a9cf8a9`, el compute antes del cual se escala), `:215` (`ui_trigger_vs = 0x34e8a281`); usos en `vk_temporal_upscaler.cpp:361,1306,1321` y `tests/test_ui_composition.cpp:19-21` | Deciden en qué compute se escala la escena y qué draws son UI. Son de otro juego: entraron el 2026-09-26 (`0403703`, `ff221f7`), cuando el upscaler aún se llamaba `BB_UPSCALER`; no son shaders de Tsukihime | **[V] Dormidos** bajo `run.py`: fija `GOW3_UPSCALER=none` (`run.py:214-215`) y todas las llamadas al upscaler exigen `upscaler->Enabled()` (`vk_rasterizer.cpp:1012,1236,1353`). **[D] Se borran (2026-10-25)**: los valores por defecto pasan a «sin disparador»; `GOW3_UPSCALE_BEFORE_CS` y `GOW3_UI_TRIGGER_VS` siguen permitiendo fijarlos. **Borrados (Tarea 3b, `4f6c868`)** |
 | Otros restos de GoW3 en el núcleo | `liverpool.cpp` (46 coincidencias `gow3`), `texture_cache.cpp`, `vk_pipeline_cache.cpp` (43), `videoout/driver.cpp` (65), `vk_frame_capture.cpp`, `camera_motion.comp`, `motion_history.h`, `vk_lighting_test.h`, `vk_temporal_upscaler.h` | Mezclan marcas `gow3:` (cambios nuestros sobre shadPS4, que **se conservan**) con comentarios o nombres de GoW3 | **[V] Clasificados (2026-10-25, §2.1)**: comentarios y lógica genérica. Hay dos excepciones: los hashes de la fila anterior y el clasificador de 864 bytes de `motion_history.h`, que se queda |
 
 Nota importante: las 2551 coincidencias de `gow3` no son todas código de GoW3. Casi todas son la
@@ -210,7 +210,7 @@ escenas (`despues-<n>.png`) y comparar con `tools/compare_captures.sh`.
 
 ### Tarea 0 — línea base de tests (2026-10-25)
 
-Rama `tsuki/spec-1b`, cortada de `tsuki/main` en `4567014` con el árbol limpio (solo el submódulo
+Rama `tsuki/spec-1b`, cortada de `tsuki/main` en `8a4b5d0` con el árbol limpio (solo el submódulo
 `fsr-vulkan` aparece modificado: son los parches que aplica `build.sh`). Logs en `out/spec1b-t0/` (sin
 versionar), generados por `out/spec1b-t0/run-baseline.sh` dentro del distrobox.
 
@@ -254,7 +254,7 @@ Sin cambios de código. La tabla está en §2.1 y la salida del grep en `out/spe
 
 ### Tarea 2 — línea base «antes» (2026-10-25)
 
-Mismo binario que en la Tarea 0: desde `4567014` la rama solo ha cambiado la spec. Se usó la partida del usuario, que
+Mismo binario que en la Tarea 0: desde `8a4b5d0` la rama solo ha cambiado la spec. Se usó la partida del usuario, que
 tiene progreso y arranca al menú del título; antes de empezar se copió a `out/savedata-usuario-1b/`. Fueron seis
 arranques de 40 s sin entrada, a pantalla completa (`GOW3_FULLSCREEN=1`, ventana sin bordes). Los lanzó
 `out/spec1b-t2/run-antes.sh`: tomas a–c, fotogramas 120, 300, 420 y 900. Después los lanzó `run-antes-2.sh`: tomas d–f,
@@ -335,10 +335,10 @@ pantalla completa, con la partida del usuario, que siguió intacta tras cada tom
 ### Tareas 3 y 3b: preparación (2026-10-28)
 
 Plan nuevo para lo que faltaba: `~/.claude/plans/quiero-que-hagas-un-iterative-gem.md`, que también recoge el criterio
-del recorrido de la Spec 6 (§5). Rama `tsuki/spec-1b-cierre`, desde `tsuki/main` en `06401c1`, que ya incluye la Spec 6.
+del recorrido de la Spec 6 (§5). Rama `tsuki/spec-1b-cierre`, desde `tsuki/main` en `42029cf`, que ya incluye la Spec 6.
 Scripts, logs y capturas en `out/spec1b-t3/` y `out/baseline/1b/`, sin versionar.
 
-- **Línea base de suites en `06401c1`** (`out/spec1b-t3/run-baseline.sh`, copia de la de la Tarea 0; `D=` elige la
+- **Línea base de suites en `42029cf`** (`out/spec1b-t3/run-baseline.sh`, copia de la de la Tarea 0; `D=` elige la
   carpeta; resultado en `out/spec1b-t3/base/`). Es la referencia de las tareas 3, 3b y 6.
   - `bash build.sh --test` sale con 0.
   - Python: 273 ejecutados, 35 omitidos y 4 fallos esperados, OK.
@@ -354,7 +354,7 @@ Scripts, logs y capturas en `out/spec1b-t3/` y `out/baseline/1b/`, sin versionar
   En cada toma la receta rehace un `GOW3_USER_DIR` propio, `out/spec1b-t3/user/`: copia `user/` sin `savedata` ni
   `savedata_backups` y pone ahí la partida fija. Después arranca 40 s a pantalla completa, sin ratón, con los fotogramas
   oráculo en `out/baseline/1b/<toma>/`. Las variables extra van detrás de las fijas y mandan sobre ellas.
-- **Control antes de tocar código:** dos tomas con el binario de `06401c1`, `control-a` y `control-b`
+- **Control antes de tocar código:** dos tomas con el binario de `42029cf`, `control-a` y `control-b`
   (`out/spec1b-t3/control-compare.txt`).
   - `compare-oracle.sh antes control-a`: **idénticos** el 120, el 300, el 420 y el 1320. `control-a` frente a
     `control-b`: también idénticos. La receta nueva reproduce la referencia, y `antes/` sigue siendo el oráculo.
@@ -372,7 +372,7 @@ Scripts, logs y capturas en `out/spec1b-t3/` y `out/baseline/1b/`, sin versionar
 Bajo `run.py` (`GOW3_UPSCALER=none`) las dos heurísticas están dormidas, así que sus capturas salen iguales por
 construcción. La prueba de que no hacían nada con Tsukihime es un contador temporal con las dos encendidas
 (`GOW3_EXPERIMENTAL_UPSCALER=1`, que activa a la vez `CameraMotion` y el upscaler temporal). Se midió una vez, para las
-tareas 3 y 3b, sobre `61e34a3`. El contador (prefijo `T1B:`, impreso cada 5 s) no se commiteó: se quitó con
+tareas 3 y 3b, sobre `a74a656`. El contador (prefijo `T1B:`, impreso cada 5 s) no se commiteó: se quitó con
 `git checkout --`, `git diff` quedó vacío y se recompiló el árbol limpio.
 
 | Contador | Arranque (40 s) | Recorrido de la Spec 6 |
@@ -438,7 +438,7 @@ Borrado en `vk_rasterizer.cpp` y `vk_rasterizer.h` (38 líneas, todas quitadas):
 
 ### Tarea 3b — sin los hashes fijos del upscaler temporal (2026-10-28)
 
-Commit `76b739f`. Se borraron los hashes de shaders de God of War III que el upscaler traía de serie:
+Commit `4f6c868`. Se borraron los hashes de shaders de God of War III que el upscaler traía de serie:
 
 - `trigger_hash = 0x9a9cf8a9` (el compute antes del que escalaba la escena) y `ui_trigger_vs = 0x34e8a281` (primera
   pasada de la interfaz), en `vk_temporal_upscaler.h`. Ahora valen 0;
@@ -472,7 +472,7 @@ disparador, la línea del arranque dice `Upscaler: FSR 3.1 available (…) on sc
 
 ### Tarea C — recorrido grabado de la Spec 6 (2026-10-28)
 
-Con el binario final (`76b739f`, tareas 3 y 3b) y sin variables extra, dentro del distrobox:
+Con el binario final (`4f6c868`, tareas 3 y 3b) y sin variables extra, dentro del distrobox:
 `bash tools/route.sh replay spec1b-despues` sale con 0 (`out/route/spec1b-despues.log`), sin `STOP:` ni `Fault:`, con
 `unimplemented=0`, `GPU: guest multisampling on` y el ratón apagado. Línea `GPU:` final:
 `submits=25950 draws=5279480 dispatches=0 flips=12974`. Bajo `run.py` el upscaler está apagado, así que no imprime su

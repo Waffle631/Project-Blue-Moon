@@ -1,7 +1,7 @@
 # Spec 1a — Eliminar hooks, patches, touchpad, tests e identidad de GoW3
 
 Fecha: 2026-10-14. Revisada el 2026-10-18 tras auditar el repo (la spec seguía sin implementar).
-Estado: **implementada** el 2026-10-19. Pasos 0, 1, 4, 2, 3 y 5, en ese orden (commits `9f86fc1`, `f90d6ac`, `ad33479`, `2e8474d`, `77b6319`), y el resto de la identidad en `15c6ad0`. Los resultados están debajo de cada paso y en la sección 6, que también lista lo que queda fuera. Desde el paso 2 fallan 4 tests del launcher (ver su resultado); están marcados como fallo esperado (`@unittest.expectedFailure`) hasta que se limpie el launcher. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 1a".
+Estado: **implementada** el 2026-10-19. Pasos 0, 1, 4, 2, 3 y 5, en ese orden (commits `f89e069`, `d2b8af3`, `d6556ac`, `f06bc0b`, `0663bf6`), y el resto de la identidad en `0275117`. Los resultados están debajo de cada paso y en la sección 6, que también lista lo que queda fuera. Desde el paso 2 fallan 4 tests del launcher (ver su resultado); están marcados como fallo esperado (`@unittest.expectedFailure`) hasta que se limpie el launcher. Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 1a".
 
 Marcas: **[V]** comprobado en el repo (comando indicado); **[D]** decisión que debe tomar el usuario.
 
@@ -127,7 +127,7 @@ secciones correspondientes; el resto no cambia. Se borran en este paso los seis 
 inspeccionan hooks (`test_actor_hook`, `test_cheat_hook`, `test_cheat_hooks`, `test_orb_multiplier`,
 `test_stat_multipliers`, `test_signatures`), pero **no** `tests/data/eboot_6e72_sites.json` (ver paso 4).
 
-**Resultado (2026-10-19, commit `9f86fc1`).**
+**Resultado (2026-10-19, commit `f89e069`).**
 
 - Borrados: las cinco funciones `install_*` de `probe.c` (con `install_jump`), sus `extern` y sus
   llamadas; `src/{actor,cheat,damage,orb}_hook.h`, `src/signature.h`, `gpu/shim/gow3_orbs.*`,
@@ -164,7 +164,7 @@ dice en el log (hoy ya responde "no patch profile for CUSA47999"). `tools/make_s
 si solo genera firmas del XML. `mods.py` y `game_update.py` no cambian. La carpeta `patches/` queda
 vacía (git no la conserva); el código no debe fallar si no existe.
 
-**Resultado (2026-10-19, commit `ad33479`).** Se hizo después del paso 4, que es su precondición (sin él,
+**Resultado (2026-10-19, commit `d6556ac`).** Se hizo después del paso 4, que es su precondición (sin él,
 `test_patches.py` fallaba al borrar el XML).
 
 - Borrados:
@@ -227,7 +227,7 @@ comprobación de que `touchpad_left` y `touchpad_right` del archivo de pad dan `
 afirmar que los tres nombres aceptan el mismo botón del host y que las únicas fuentes por defecto
 (`Tab` y el clic del touchpad real) dan `BTN_TOUCHPAD`, y que `Backspace` y `Back` ya no pulsan nada.
 
-**Resultado (2026-10-19, commit `2e8474d`).**
+**Resultado (2026-10-19, commit `f06bc0b`).**
 
 - Hecho como se describe arriba:
   - Fuera `CLICK_LEFT/RIGHT`, `play_click` y sus tiempos.
@@ -273,7 +273,7 @@ parches y mods sin un juego concreto; deja de leer el XML de GoW3 y el JSON de s
 sustituir `CUSA01623`/`CUSA01715` por IDs ficticios (`CUSA99991`, `CUSA99992`; son datos de prueba, no
 perfiles). Los `test_launcher_*.py` no se tocan. Listar en el cambio los tests borrados y reescritos.
 
-**Resultado (2026-10-19, commit `f90d6ac`).**
+**Resultado (2026-10-19, commit `d2b8af3`).**
 
 - `test_patches.py` usa un perfil sintético: `CUSA99990`, un XML mínimo en un directorio temporal y
   `GAMES` inyectado con `mock`.
@@ -312,7 +312,7 @@ soportado:
 pasa a ser `Tsukihime/CUSA47999` (o ninguna). `scripts/steam_shortcut.py` queda para el final junto con el
 launcher.
 
-**Resultado (2026-10-19, commits `77b6319` y `15c6ad0`).**
+**Resultado (2026-10-19, commits `0663bf6` y `0275117`).**
 
 - `probe.c`: `check_title` y una sola constante, `SUPPORTED_TITLE_ID`.
   - Con `--app0`, en cualquier modo, lee `TITLE_ID` de `sce_sys/param.sfo` antes de montar nada y de
@@ -333,7 +333,7 @@ launcher.
   - El cargador real con un `param.sfo` de CUSA01623 sale con 30 y
     `STOP: unsupported title CUSA01623: this build only runs CUSA47999`, sin abrir ventana ni crear
     `user/`.
-- Resto de la identidad (`15c6ad0`):
+- Resto de la identidad (`0275117`):
   - El título de la ventana (`gow3gpu.cpp`) y la cabecera del menú (`gow3_overlay.cpp`) ya no usan
     "God of War III" cuando falta el título.
   - El nombre de aplicación Vulkan de `vulkan_smoke.c` pasa a "gow3 native probe".

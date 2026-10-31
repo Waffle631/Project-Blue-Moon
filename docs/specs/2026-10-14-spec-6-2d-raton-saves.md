@@ -174,7 +174,7 @@ cada reproducción arranca con la misma partida, así que el recorrido debe fija
 
 El usuario no rechazó ninguna captura, así que solo entra la miniatura «algo pixelada» del menú de carga.
 
-- **El analizador de fotogramas ya lista samplers y mips** (commit `6a082f3`, test `frame-capture-test`). Cada pase
+- **El analizador de fotogramas ya lista samplers y mips** (commit `ea32be8`, test `frame-capture-test`). Cada pase
   dice cuántos mips tiene lo que muestrea, y cada sampler tal como lo pide el S# del guest junto a lo que recibe
   Vulkan. El disparo fue con `GOW3_CAPTURE_TRIGGER` durante una repetición: el archivo se crea al ver en el log la
   captura de un fotograma, sin F11.

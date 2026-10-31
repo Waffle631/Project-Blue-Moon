@@ -736,7 +736,7 @@ libera él (2.1).
 ### 2.7 Implementación (tarea 12, 2026-10-21)
 
 `src/runtime_audiodec_cpu.c` cumple el contrato de 2.6 con el decodificador de
-`third_party/vgmstream_hevag/`. Commit `cba20ba`.
+`third_party/vgmstream_hevag/`. Commit `a8c9f5c`.
 
 **La memoria de trabajo** es una cabecera de `0x10` bytes seguida de un `HevagState` (4 muestras
 `int32_t`, 16 bytes) por canal: 32 bytes en mono y 48 en estéreo. La cabecera guarda una marca

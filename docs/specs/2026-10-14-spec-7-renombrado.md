@@ -23,7 +23,7 @@ mecánico, no reduce riesgo técnico y mezclaría sus errores con los de las spe
 - **[V]** No hay nombres de variable construidos dinámicamente en C, C++, Python o shell
   (patrones `GOW3_%s`, `"GOW3_"+…`, `startswith('GOW3')`, `GOW3_$…`): sin resultados el
   2026-10-14. Se repite al empezar.
-- **[V]** Repetido el 2026-10-30 en `c75138c` (tarea 0): 2913 líneas en 308 archivos, 185 variables `GOW3_*`
+- **[V]** Repetido el 2026-10-30 en `d8117bf` (tarea 0): 2913 líneas en 308 archivos, 185 variables `GOW3_*`
   distintas y 38 archivos con `gow3` en el nombre (la Spec 1a borró `gpu/shim/gow3_{actors,orbs}.*` y
   `tools/gow3_frame_map.py`; después llegaron `gpu/shim/gow3_mouse.h` y `gow3_screenshot.*`). Los patrones dinámicos de arriba, ampliados a literales `"GOW3_"`/`'GOW3'` sueltos y a
   concatenación de macros, solo aparecen en esta spec y en el roadmap, como texto.
@@ -76,7 +76,7 @@ Antes de empezar: una captura de la línea base de las pruebas (`bash build.sh -
 log del recorrido grabado (`user/last_run.log`) y las capturas de píxeles (`out/baseline/`). Son el
 oráculo de que nada cambió.
 
-Línea base tomada el 2026-10-30 en `c75138c` (`out/baseline/7/`, sin versionar): `bash build.sh --test` verde
+Línea base tomada el 2026-10-30 en `d8117bf` (`out/baseline/7/`, sin versionar): `bash build.sh --test` verde
 (`tests-c.log`); Python, 273 tests, 35 omitidos y 4 fallos esperados (`tests-py.log`); `--check-imports`, las 3
 trampas de libkernel (`imports.log`); el recorrido grabado (`antes/`, `antes.log`) da idénticos los 6 fotogramas
 `exact`/`mask` frente a `out/baseline/6a/`, sin `STOP:` ni `Fault:`, con `Settings: out/route/gow3.ini`. Los 2
@@ -179,7 +179,7 @@ fotogramas `eye` (2700, 2890: el menú de carga sobre `titlebg1.mp4`) quedan a o
 - Memoria del proyecto: `hung-game-stack-dump`, `close-game-run-sigterm` y `tsukihime-boot-captures` pasan a
   `tsuki-probe`, `libtsukigpu.so`, `tsukigpu.cpp` y `TSUKI_*`; «GoW3» queda donde nombra al juego anterior.
 - Los README del jugador no se tocan (§11). `git grep FSR4_PROFILE\|FSR4_STATS` fuera de las excepciones: 0.
-  `bash build.sh` compila y `check_rename.sh` sale 0 sin salida. Commit `0aabf57`.
+  `bash build.sh` compila y `check_rename.sh` sale 0 sin salida. Commit `8b43f45`.
 
 ## 5. Requisitos
 
@@ -211,7 +211,7 @@ Hecho el 2026-10-30 (tarea 1 del plan): `tools/check_rename.sh [repo_dir]` y `te
 sobre un repositorio temporal). Sale 0 sin salida si no queda nada, 1 con cada resto (`ruta:línea:texto` y luego cada
 ruta con `gow3`), 2 si `repo_dir` no es un repositorio. Busca sin distinguir mayúsculas y solo en archivos versionados.
 En `CLAUDE.md` y el roadmap quita las frases permitidas del punto 4 antes de buscar otra vez, así que otro `gow3` en la
-misma línea sigue contando. Punto de partida en `65b6c13`: 2504 restos, 2467 líneas en 295 archivos y 37 rutas. Aún no
+misma línea sigue contando. Punto de partida en `58baf5f`: 2504 restos, 2467 líneas en 295 archivos y 37 rutas. Aún no
 se engancha a `build.sh --test`, porque quedaría en rojo hasta el final; se engancha en la tarea 9 del plan. «the `gow3`
 branch» (`CLAUDE.md:25`) no es una de las formas del punto 4: hay que escribirla como «branch `gow3`» en el paso 5.
 
@@ -316,7 +316,7 @@ Criterios de aceptación:
 - [ ] Windows: solo cambia que la VRAM pasa a código común. Queda pendiente de compilar en MSYS2 cuando se
   aborde Windows (como el resto del §8).
 
-**Hecho (tarea 10 del plan, 2026-10-30, commit `dfd4692`):**
+**Hecho (tarea 10 del plan, 2026-10-30, commit `1a5cc85`):**
 - `tsuki_perf_stats.h` tiene tres funciones puras: `ParseStatmResidentPages`, `ParseDrmFdinfo` (devuelve un
   `DrmClient` con `drm-pdev`, `drm-client-id`, `drm-engine-gfx` y `drm-resident-vram`) y `SumGfxNs`.
   - `SumGfxNs` no repite un cliente. Se distinguen por la pareja `drm-pdev` + `drm-client-id`, no solo por el id,
@@ -356,7 +356,7 @@ Criterios de aceptación:
 temporal **se queda**. Lo que se quita es todo lo que permite encenderlo, porque encendido ya no hace nada y una
 opción que no hace nada engaña a quien la toca.
 
-Hechos (**[V]** comprobados el 2026-10-28, en `c6f5fd4`):
+Hechos (**[V]** comprobados el 2026-10-28, en `b2846e6`):
 
 - La Spec 1b (tarea 3) borró `gbuffer_draw` y la lectura de la constante de 864 bytes, que eran las únicas entradas
   de `CameraMotion` (`OnGBufferPass`, `OnConstants`). Sin ellas `camera_motion.Ready()` nunca es verdadero y
@@ -531,7 +531,7 @@ tarea 3 borró. El resto del upscaler (FSR 3.1, FSR 4 v07, DLSS, TAA) se queda, 
 III se reemplaza o se quita, no solo los identificadores `gow3`. Esto cambia la decisión del 2026-10-14 (§3) para los
 textos del launcher y del empaquetado, salvo lo que el punto 6 deja para la Alpha.
 
-Hechos (**[V]** 2026-10-30, en `ef0c90c`, fuera de `docs/gow3/`, `docs/plans/`, `docs/specs/` y submódulos):
+Hechos (**[V]** 2026-10-30, en `27d7cd7`, fuera de `docs/gow3/`, `docs/plans/`, `docs/specs/` y submódulos):
 
 - 237 líneas en 40 archivos nombran el juego por su nombre, `GoW3` o sus seriales (`God of War`, `GoW3`,
   `CUSA01623`, `CUSA01715`, `Remastered`, `Kratos`). De ellas, 77 están en `README.md`, `README.pt-BR.md` y
@@ -581,10 +581,10 @@ Orden: la prosa, los comentarios y los textos de esta sección van en la tarea 4
 
 **Hecho (tarea 4 del plan, 2026-10-30):**
 
-- `check_rename.sh` (commit `5571780`): busca también el nombre y los seriales, con tres tests nuevos. Además acepta
+- `check_rename.sh` (commit `f2197b1`): busca también el nombre y los seriales, con tres tests nuevos. Además acepta
   la ruta `docs/gow3/` escrita como enlace relativo (`../gow3/`) en `CLAUDE.md` y el roadmap, que es la misma
   excepción del §6 punto 4.
-- Actualizador (commit `05e1692`): borrado con sus 12 textos en los 13 idiomas (`KEYS` y las 12 listas, 130 → 118,
+- Actualizador (commit `011a06e`): borrado con sus 12 textos en los 13 idiomas (`KEYS` y las 12 listas, 130 → 118,
   comprobado contra el archivo anterior) y un test que comprueba que no queda.
 - Identidad: `APP_NAME` del launcher es `Tsukihime`, y el título completo va en el `.desktop`, en el acceso de Steam
   y en el texto que pide el dump. `Tsukihime.exe` y `Play Tsukihime.exe` aparecen en `package.sh`, `play.c`, el
@@ -609,7 +609,7 @@ Orden: la prosa, los comentarios y los textos de esta sección van en la tarea 4
   nombres `gow3`). `build.sh --test` verde (12 PASS); Python 283 tests, 35 omitidos y los 4 fallos esperados.
 - `docs/upscaler.md`, `docs/DEPTH_ADAPTIVE_TAA.md` y `docs/motion_vectors.md` nombraban variables quitadas en la §10,
   que el `sed` convertiría en nombres `TSUKI_*` que nunca existieron. **[D]** 2026-10-30: el usuario los movió a
-  `docs/gow3/`, con `docs/plans/` (commit `c48d6c0`). Las referencias del código (siete comentarios) y del roadmap
+  `docs/gow3/`, con `docs/plans/` (commit `5c0faed`). Las referencias del código (siete comentarios) y del roadmap
   apuntan a la ruta nueva; `check_rename.sh` acepta `docs/gow3/` en todo el árbol (§6 punto 8, con test). Los
   README del jugador siguen enlazando `docs/upscaler.md`: se rehacen para la Alpha.
 
@@ -619,7 +619,7 @@ Criterios de aceptación:
 - [x] El launcher no tiene actualizador: ni `RELEASES_API`, ni `--install-update`, ni el ajuste `check_updates`;
   un test lo comprueba (`test_no_updater`).
 - [x] `README.md`, `README.pt-BR.md`, `packaging/windows/README-Windows.txt`, el icono y `launcher/gowfont.ttf` no
-  cambian de contenido en esta spec (`git diff ef0c90c` vacío para ellos al cerrar la tarea 4).
+  cambian de contenido en esta spec (`git diff 27d7cd7` vacío para ellos al cerrar la tarea 4).
 
 ## 12. Añadido: borrar el upscaler temporal y el escalado de escena
 
@@ -630,7 +630,7 @@ El usuario preguntó si sin ese código se podría escalar el juego a 2K o 4K (r
 decidió borrarlo también. Esto cambia dos decisiones anteriores: la del 2026-10-28 (§10, conservar el código del
 upscaler) y la de la Spec 1b (§2.2, conservar el escalado a 1920×1080).
 
-Hechos (**[V]** 2026-10-30, en `f58d344`):
+Hechos (**[V]** 2026-10-30, en `dd6246a`):
 
 1. `TemporalUpscaler` empieza con `enabled = Gow3Settings::TemporalUpscalerAvailable` (`vk_temporal_upscaler.cpp:176`),
    una constante `false` desde la §10. TAA es uno de sus modos (`UpscalerTaa`), así que tampoco corre.

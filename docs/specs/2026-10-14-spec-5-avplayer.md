@@ -111,7 +111,7 @@ espera, y que el juego continúe después.
     - `gdb` sitúa a `Stop` en el `join` del hilo de audio (`:317`) o del de vídeo (`:316`).
     - La espera solo se rompe si algo la interrumpe: el volcado del watchdog en el juego, el `attach`
       de `gdb` en el test.
-  - **[V] 2026-10-24: arreglado fuera del juego** (tarea 3, `1442f25`, §9).
+  - **[V] 2026-10-24: arreglado fuera del juego** (tarea 3, `b80f597`, §9).
     - Ahora un solo llamador saca el `std::thread` de `Kernel::Thread`, bajo un mutex, y lo une. Los
       demás esperan a que la función vuelva.
     - `kernel-thread-test` y los tres casos del arnés que se colgaban pasan.
@@ -130,7 +130,7 @@ espera, y que el juego continúe después.
   - `IsActive()` pasa a falso, pero `StateStop` solo llega después del `Stop` del juego: en
     `phasetitle`, 3 ms después.
   - Con audio (`tiny_av.mp4`), `StateStop` sí llega al final por sí solo.
-  - **Causa precisa y arreglo** (tarea 3, `3d33791`):
+  - **Causa precisa y arreglo** (tarea 3, `56601c9`):
     - el demultiplexor avisa a los decodificadores al llegar a EOF, pero su espera de paquetes solo
       miraba si había paquetes;
     - ahora también mira `m_is_eof`, y `StateStop` llega 7–12 ms después del último fotograma;
@@ -138,7 +138,7 @@ espera, y que el juego continúe después.
 - **[V] 2026-10-24: `Start` con la reproducción en curso aborta el proceso** ("Resource deadlock
   avoided", tarea 2). `AvPlayerState::Start` toma el mutex del origen en exclusiva y llama a `Stop`,
   que lo pide compartido (`avplayer_state.cpp:178-179, 282`). El juego no lo hace (tarea 1).
-  - *Arreglado en la tarea 3* (`aeaf4ee`): `Start` llama a `StopLocked`, que no toma el mutex.
+  - *Arreglado en la tarea 3* (`c1cd2a2`): `Start` llama a `StopLocked`, que no toma el mutex.
   - Ahora el segundo `Start` devuelve 0 y la reproducción vuelve a empezar desde 0.
 - **[V] 2026-10-24: `Stop` rebobinaba el lector antes de parar los hilos**
   (`m_up_data_streamer->Reset()`, `avplayer_source.cpp:313`). Era [H] en la tarea 2.
@@ -146,7 +146,7 @@ espera, y que el juego continúe después.
     del archivo como datos: `[h264] Invalid NAL unit size (-618261609 > 243)`, unas 20 líneas por
     cada `Stop` justo después de `Start`.
   - Si la cola estaba llena y el demultiplexor dormía, no salía ninguna.
-  - *Confirmado y arreglado en la tarea 3* (`e20fc9c`), con un oráculo nuevo del arnés: una queja del
+  - *Confirmado y arreglado en la tarea 3* (`3024854`), con un oráculo nuevo del arnés: una queja del
     decodificador H.264 hace fallar el caso.
     - Con el `Reset()`: 450 errores en `stop_right_after_start_and_twice` y 5 352 en
       `repeated_open_close`. Sin él, 0.
@@ -172,7 +172,7 @@ espera, y que el juego continúe después.
     12,7 millones en 2 s con `tiny_v20.mp4`, todos al callback del juego.
   - En el juego ya pasó: `out/run-audiodec-a1.log:1280` (2026-10-20) tiene el "duplicated MOOV Atom",
     unos 345 s después de abrirse el audio. Sin log `info` no se ve el giro.
-  - *Arreglado en la tarea 4* (`1ccd0f3`): sin el `avio_seek`, sale un aviso por vuelta.
+  - *Arreglado en la tarea 4* (`627a044`): sin el `avio_seek`, sale un aviso por vuelta.
   - **Quedaba para la tarea 7, paso 4:** en un vídeo sin audio, `CurrentTime()` se queda en la duración
     tras la primera vuelta. Las vueltas siguientes salen sin ritmo: 5 480 fotogramas en 2 s de
     `tiny_v20.mp4`, en vez de unos 60. *Visto y arreglado en la tarea 7 (siguiente punto).*
@@ -183,7 +183,7 @@ espera, y que el juego continúe después.
     (`avplayer_source.cpp`, `CurrentTime`). Los fotogramas de la segunda vuelta vuelven a marcar 0, así
     que todos vencían a la vez y salían en cuanto el juego los pedía. Con audio no pasa: ese reloj sigue
     al último bloque de audio, cuya marca también vuelve. Los cuatro `titlebg` son solo vídeo.
-  - *Arreglado* (`d8fd321`): una marca que retrocede empieza la vuelta siguiente, sus fotogramas vencen
+  - *Arreglado* (`b731005`): una marca que retrocede empieza la vuelta siguiente, sus fotogramas vencen
     una duración más tarde y `CurrentTime` descuenta las vueltas entregadas. Caso
     `loops_back_on_the_clock`: rojo con 7 472 fotogramas en 2,5 s, verde con 75.
   - En el juego, después del arreglo (`out/run-t7-loop-2.log`), la primera vuelta dura 120,0 s y las
@@ -247,7 +247,7 @@ espera, y que el juego continúe después.
   1920×1080 `yuv420p` a 30 o 29,97 fps fijos. 91 son solo vídeo y 43 llevan AAC LC estéreo a 48 kHz;
   en 37 de ellos el audio es la primera pista. 75 tienen fotogramas B (`has_b_frames` 1 o 2), que los
   fixtures no tenían.
-- **[V] 2026-10-24: con fotogramas B se perdían los últimos fotogramas** (arreglado, `a0b2c86`). El
+- **[V] 2026-10-24: con fotogramas B se perdían los últimos fotogramas** (arreglado, `cec50af`). El
   decodificador de vídeo salía en EOF sin el paquete nulo que lo vacía, y H.264 retiene tantos
   fotogramas como reordena. Les faltaba el último a los 64 vídeos de ≤ 10 s con `has_b_frames=1`, y
   también al prólogo de la tarea 1 (11 659 de 11 660).
@@ -329,7 +329,7 @@ por adjuntar). Nuevos: `tests/test_avplayer.cpp` (opcional).
 
 ## 9. Resultados
 
-### Tarea 1 — trazador y contrato del juego (2026-10-24, `c06b6a1`)
+### Tarea 1 — trazador y contrato del juego (2026-10-24, `f11b154`)
 
 - **Trazador `GOW3_TRACE_AVPLAYER=1`** (`avplayer_trace.h`, `avplayer.cpp`, `EmitEvent` en
   `avplayer_state.cpp`). Escribe en stderr una línea `AvTrace +<ms> t<tid>: …` por llamada exportada, con
@@ -373,7 +373,7 @@ por adjuntar). Nuevos: `tests/test_avplayer.cpp` (opcional).
   - Tarea 7, paso 2: la medición del prólogo ya está hecha y da el caso (a), la [H] es falsa.
   - Tarea 7, paso 4: el bucle sí se usa (`titlebg1.mp4`).
 
-### Tarea 2 — arnés de AvPlayer, en rojo (2026-10-24, `4d9dfb6`)
+### Tarea 2 — arnés de AvPlayer, en rojo (2026-10-24, `8b225a0`)
 
 - **Qué es.** `tests/test_avplayer.cpp`, destino `avplayer-test` (solo Linux):
   `ninja -C out/gpu avplayer-test && timeout 600 out/gpu/avplayer-test tests/data [caso …]`.
@@ -393,8 +393,8 @@ por adjuntar). Nuevos: `tests/test_avplayer.cpp` (opcional).
   - `tiny_v150.mp4`: réplica de `phasetitle_01_00_en.mp4` (solo vídeo, 150 fotogramas, 5,005 s);
   - `tiny_v20.mp4`: 20 fotogramas;
   - `tiny_av.mp4`: 2 s con AAC estéreo a 48 kHz.
-- **De paso:** `3648a99` añade el stub de `runtime_report` a `tests/test_gpu_runtime_stubs.cpp`. Sin
-  él, desde `80d5fb0` no enlazaba ningún test que use `libgow3gpu.so` con esos stubs.
+- **De paso:** `d222305` añade el stub de `runtime_report` a `tests/test_gpu_runtime_stubs.cpp`. Sin
+  él, desde `4dbaa22` no enlazaba ningún test que use `libgow3gpu.so` con esos stubs.
 - **En rojo sobre el código actual.** Logs sin versionar:
   - tres ejecuciones completas, con 5 o 6 de 10 casos en rojo cada vez; se conservan las dos últimas
     (`out/t2-red.log`, `out/t2-red-2.log`);
@@ -425,9 +425,9 @@ por adjuntar). Nuevos: `tests/test_avplayer.cpp` (opcional).
     La lectura que falla a mitad no cuelga, pero no avisa al juego: se decide en la tarea 3 si basta
     con el log.
 
-### Tarea 3 — carrera de `Kernel::Thread` y otras causas (2026-10-24, `1442f25`, `e20fc9c`, `3d33791`, `aeaf4ee`)
+### Tarea 3 — carrera de `Kernel::Thread` y otras causas (2026-10-24, `b80f597`, `3024854`, `56601c9`, `c1cd2a2`)
 
-- **`Kernel::Thread` nuevo** (`gpu/shim/core/libraries/kernel/threads.h`, `1442f25`). Sigue las cinco
+- **`Kernel::Thread` nuevo** (`gpu/shim/core/libraries/kernel/threads.h`, `b80f597`). Sigue las cinco
   reglas del plan:
   - estado compartido (`shared_ptr`) con mutex, `done`, `stop_source`, el `std::thread` y el id del
     hilo vivo, que se borra al volver la función porque los id se reutilizan;
@@ -452,12 +452,12 @@ por adjuntar). Nuevos: `tests/test_avplayer.cpp` (opcional).
   - el código viejo da `data race` en `Thread::Join` (salida 66);
   - el nuevo no da ninguno en 3 de 3 (`out/t3-tsan.log`).
 - **Otras causas, un commit por cada una.** Cada una tenía antes su caso del arnés en rojo:
-  1. `e20fc9c`: `Stop` ya no rebobina el lector bajo el demultiplexor (§2).
+  1. `3024854`: `Stop` ya no rebobina el lector bajo el demultiplexor (§2).
      - Es el [H] de la tarea 2, ahora confirmado.
      - Oráculo nuevo del arnés: una línea `[h264 @` hace fallar el caso, salvo en el de entrada rota.
-  2. `3d33791`: los decodificadores despiertan al llegar a EOF (§2). Con eso llega el `StateStop`
+  2. `56601c9`: los decodificadores despiertan al llegar a EOF (§2). Con eso llega el `StateStop`
      natural de un vídeo sin audio.
-  3. `aeaf4ee`: `Start` con la reproducción en curso ya no aborta (§2).
+  3. `c1cd2a2`: `Start` con la reproducción en curso ya no aborta (§2).
   4. La lectura que falla a mitad no cambia (decisión en §2).
 - **Verde** (`out/t3-final-*.log`, sin versionar):
   - `bash build.sh` y `bash build.sh --test`, con rc 0 y los 17 PASS/ok de la línea base;
@@ -484,7 +484,7 @@ por adjuntar). Nuevos: `tests/test_avplayer.cpp` (opcional).
     fixtures no tienen B-frames. El barrido debe comparar los fotogramas entregados con los del
     archivo.
 
-### Tarea 4 — `JumpToTime` real y bucle (2026-10-24, `77bd6aa`, `1ccd0f3`)
+### Tarea 4 — `JumpToTime` real y bucle (2026-10-24, `331111b`, `627a044`)
 
 - **Uso real** (paso 1, `docs/avplayer.md` §4). Son 20 llamadas en los 10 logs que lo tienen, del
   2026-10-17 al 2026-10-24:
@@ -494,7 +494,7 @@ por adjuntar). Nuevos: `tests/test_avplayer.cpp` (opcional).
   - `DisableStream`, `SetTrickSpeed` y `ChangeStream` no salen en ningún log y siguen como estaban.
 - **Decisión** (paso 2): implementarlo. El juego no puede recibir `ORBIS_OK` de algo que no se hizo.
   Un error explícito habría cambiado lo que ve el juego (hasta ahora 0) sin saber si mira el valor.
-- **Qué hace** (`77bd6aa`):
+- **Qué hace** (`331111b`):
   - `AvPlayerSource::JumpToTime` para los hilos como `Stop` y busca el fotograma clave anterior
     (`avformat_seek_file`). Vacía colas y códecs (`avcodec_flush_buffers`), devuelve a su reserva los
     búferes de los fotogramas en cola, pone el reloj en el destino y vuelve a arrancar los hilos.
@@ -521,7 +521,7 @@ por adjuntar). Nuevos: `tests/test_avplayer.cpp` (opcional).
   Los subcasos (b) y (c) de `jump_past_the_end_and_when_stopped` no llegaron a ejecutarse con el stub,
   porque (a) falló antes. (b) pasó de `tiny_v20` a `tiny_v150` después del rojo, porque con el bucle
   roto el clip corto ya había dado la vuelta antes de saltar. Después lo cubre `loops_back`.
-- **El bucle** (`1ccd0f3`, §2) salió con `jump_past_the_end_and_when_stopped`. Se arregla en un
+- **El bucle** (`627a044`, §2) salió con `jump_past_the_end_and_when_stopped`. Se arregla en un
   commit propio porque congelaba el fondo del menú de título y bloqueaba probar el salto en un bucle.
   El ritmo de las vueltas siguientes queda para la tarea 7.
 - **Verde** (`out/t4-final-*.log`):
@@ -536,7 +536,7 @@ por adjuntar). Nuevos: `tests/test_avplayer.cpp` (opcional).
     120 s en el menú de título, con la traza.
 
 
-### Tarea 5 — barrido de los 134 vídeos (2026-10-24, `bd61943`, `a0b2c86`)
+### Tarea 5 — barrido de los 134 vídeos (2026-10-24, `9256bb6`, `cec50af`)
 
 - **Qué hay** (paso 1, `tools/probe_movies.sh` → `out/movies-probe.csv`; detalle en `docs/avplayer.md`
   §6). Valores distintos de los fixtures:
@@ -547,7 +547,7 @@ por adjuntar). Nuevos: `tests/test_avplayer.cpp` (opcional).
   - 75 tienen fotogramas B: `has_b_frames` 1 en 71 y 2 en 4.
 
   Lo que no hay: fps variable, audio que no sea AAC LC estéreo a 48 kHz, ni subtítulos u otras pistas.
-- **Modo barrido** (paso 2, `bd61943`): `avplayer-test --movie-dir <dir> [--seconds N] [file.mp4 …]`, un
+- **Modo barrido** (paso 2, `9256bb6`): `avplayer-test --movie-dir <dir> [--seconds N] [file.mp4 …]`, un
   hijo por vídeo, una línea `OK|FAIL <archivo> v= a= ms= [end=] late=` y un resumen final. Además de lo
   que pedía el plan (un fotograma y un bloque si hay audio), comprueba marcas que no retroceden, `Stop` = 0
   con el vídeo en marcha, `Stop`/`Close` < 2 s y, si el vídeo acaba en la ventana, su último fotograma.
@@ -560,7 +560,7 @@ por adjuntar). Nuevos: `tests/test_avplayer.cpp` (opcional).
 
   Ningún `FAIL` en la pasada de 3 s del plan: con 3 s ningún vídeo llega a su final. La segunda pasada
   no estaba en el plan y es la que encontró el defecto.
-- **Arreglo** (`a0b2c86`, §2): con EOF y la cola vacía, el decodificador de vídeo recibe el paquete nulo y
+- **Arreglo** (`cec50af`, §2): con EOF y la cola vacía, el decodificador de vídeo recibe el paquete nulo y
   entrega lo que retiene. Caso fijo `plays_to_end_with_b_frames` con `tests/data/tiny_b150.mp4`
   (`has_b_frames=2`): **rojo** 148 de 150 fotogramas (3 de 3), **verde** 150 de 150 (3 de 3).
 - **Deuda anotada, sin rojo:**
@@ -646,7 +646,7 @@ por adjuntar). Nuevos: `tests/test_avplayer.cpp` (opcional).
 - **Para la tarea 7:** la ruta llega al capítulo 1 en ~30 s desde el menú, pero en ella no sale el
   opening `op1_arc_en.mp4`.
 
-### Tarea 7 — opening, prólogo, salto y bucle en el juego (2026-10-24, `d8fd321`)
+### Tarea 7 — opening, prólogo, salto y bucle en el juego (2026-10-24, `b731005`)
 
 - **Dónde está el opening** (paso 1). La traza solo muestra que lo pide la historia, sin ningún menú
   delante. Para saber dónde, descomprimí los guiones (`image/allscr.mrg`: entradas MZX con los
@@ -717,7 +717,7 @@ por adjuntar). Nuevos: `tests/test_avplayer.cpp` (opcional).
   fotograma 0 y no saltaba: lo que cambió es `CurrentTime`, que ahora vuelve a 0 con la vuelta, en
   vez de quedarse en 120 000. El aviso no rompe nada: en las dos ejecuciones el juego sigue en el menú,
   sin `STOP:` ni `Fault:`.
-- **Arreglo** (`d8fd321`, causa en §2), con TDD:
+- **Arreglo** (`b731005`, causa en §2), con TDD:
   - caso nuevo `loops_back_on_the_clock` (`tiny_v20`, 2,5 s): **rojo** con 7 472 fotogramas, 373 vueltas,
     un fotograma 246 s adelantado y `CurrentTime` 667 a los 1 500 ms; **verde** (3 de 3) con 75
     fotogramas, 3 vueltas, ninguno adelantado y `CurrentTime` 165, cuando se esperaba ~166;
@@ -746,7 +746,7 @@ por adjuntar). Nuevos: `tests/test_avplayer.cpp` (opcional).
   - `bash build.sh --test`: rc 0, con las mismas 17 líneas `PASS`/`ok`;
   - `kernel-thread-test`: 4 de 4, tres veces; `avplayer-test`: 16 de 16, tres veces;
   - Python: 267 ejecutados, OK (35 omitidos, 4 fallos esperados).
-- **Barridos fuera del juego**, repetidos porque `d8fd321` cambió `GetVideoData` en todos los vídeos sin
+- **Barridos fuera del juego**, repetidos porque `b731005` cambió `GetVideoData` en todos los vídeos sin
   audio:
   - `--seconds 3`, los 134 (`out/t8-sweep-3s.log`): 134 OK.
   - `--seconds 12`, los 117 que llegan al final (`out/t8-sweep-end.log`): 117 OK. Fotogramas y bloques de

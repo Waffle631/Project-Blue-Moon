@@ -211,7 +211,7 @@ cada fotograma de las vueltas siguientes salía en cuanto se pedía: 5 480 fotog
 - En el juego (`out/run-t7-loop-1.log`, 11 min en el menú de título sin entrada), cada vuelta de
   `titlebg1.mp4` (120 s, solo vídeo, como los cuatro `titlebg`) duraba 36,3 s desde la segunda, con sus
   3 600 fotogramas y `CurrentTime` en 120 000. El fondo iba 3,3 veces más rápido.
-- *Arreglado* (`d8fd321`): en un vídeo sin audio, una marca que retrocede empieza la vuelta siguiente.
+- *Arreglado* (`b731005`): en un vídeo sin audio, una marca que retrocede empieza la vuelta siguiente.
   Sus fotogramas vencen una duración más tarde, y `CurrentTime()` descuenta las vueltas ya entregadas,
   así que da el tiempo dentro de la vuelta. `Stop` y `JumpToTime` lo reinician. Caso
   `loops_back_on_the_clock`: 7 472 fotogramas en 2,5 s antes y 75 después.

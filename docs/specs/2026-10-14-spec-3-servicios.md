@@ -1,7 +1,7 @@
 # Spec 3 — Servicios del sistema que faltan
 
 Fecha: 2026-10-14. Estado: **cerrada** el 2026-10-19. El plan de implementación tenía 7 tareas, y
-están todas hechas (`f4a5d0a`, `4e09b95`, `45ba36b`, `82c7d78`, `2ced05c`, `5fcc578` y el cierre). Los
+están todas hechas (`0f32588`, `401caef`, `e5d817b`, `9fbcec8`, `1d4a37d`, `84774c6` y el cierre). Los
 resultados están en la sección 6, y los criterios, en la 8.
 Roadmap: `docs/tsuki/ROADMAP.md`, sección "Spec 3".
 
@@ -28,20 +28,20 @@ offline no tiene (PSN, capturas, Share Play, streaming).
   `import_names.inc` y faltan 8: `sceMsgDialogGetResult`, que ya tiene código, y las 7 que siguen como
   "falta" en la tabla. `--check-imports` da 19 faltantes: esas 8, 8 de Audiodec (Spec 4) y las 3 trampas
   de libkernel de la Spec 2.
-- **[V]** (2026-10-19, `4e09b95`) Ya están las 23 líneas. `--check-imports` da 18:
+- **[V]** (2026-10-19, `401caef`) Ya están las 23 líneas. `--check-imports` da 18:
   `sceMsgDialogGetResult` ya resuelve. Las otras 7 siguen en la lista, pero ahora con su nombre en vez de
   "name not resolved".
-- **[V]** (2026-10-19, `45ba36b`) `sceSharePlayTerminate`, `sceGameLiveStreamingTerminate` y
+- **[V]** (2026-10-19, `e5d817b`) `sceSharePlayTerminate`, `sceGameLiveStreamingTerminate` y
   `sceSystemServiceReenableMusicPlayer` ya son "sin efecto". `--check-imports` da 15: 8 de Audiodec, las 3
   trampas de kernel y 4 de esta spec (`GetUserColor`, `Check`/`RestoreBackupData` y
   `sceSysmoduleGetModuleInfoForUnwind`). Sitios de llamada: los dos Terminate están en la ruta de cierre
   del juego (eboot `+0xed3f7`) y `ReenableMusicPlayer` solo en un envoltorio al que nada llama (ver 4.1).
-- **[V]** (2026-10-19, `82c7d78`) `sceUserServiceGetUserColor` ya resuelve. `--check-imports` da 14. De esta
+- **[V]** (2026-10-19, `9fbcec8`) `sceUserServiceGetUserColor` ya resuelve. `--check-imports` da 14. De esta
   spec quedan `sceSaveDataCheckBackupData`, `sceSaveDataRestoreBackupData` y
   `sceSysmoduleGetModuleInfoForUnwind`.
-- **[V]** (2026-10-19, `2ced05c`) `sceSaveDataCheckBackupData` y `sceSaveDataRestoreBackupData` ya
+- **[V]** (2026-10-19, `1d4a37d`) `sceSaveDataCheckBackupData` y `sceSaveDataRestoreBackupData` ya
   resuelven. `--check-imports` da 12. De esta spec solo queda `sceSysmoduleGetModuleInfoForUnwind`.
-- **[V]** (2026-10-19, `5fcc578`) `sceSysmoduleGetModuleInfoForUnwind` ya resuelve. `--check-imports` da
+- **[V]** (2026-10-19, `84774c6`) `sceSysmoduleGetModuleInfoForUnwind` ya resuelve. `--check-imports` da
   11: los 8 de Audiodec (Spec 4) y las 3 trampas de libkernel (Spec 2). Ya no queda ninguna de las 23.
 - **[V]** `sceSysmoduleLoadModule`, `...IsLoaded` y `...UnloadModule` ya existen en
   `src/runtime_content.c:81-83` (`module_load`, `module_loaded`, `module_unload`).
@@ -59,28 +59,28 @@ offline no tiene (PSN, capturas, Share Play, streaming).
 
 | NID | Nombre | Biblioteca | Estado | Comportamiento |
 |---|---|---|---|---|
-| `TywrFKCoLGY` | `sceSaveDataInitialize3` | SaveData | **hecha** (`2a43953`) | solo `import_names.inc`; el juego la llama con `NULL` (eboot `+0xed2eb`) |
-| `0z45PIH+SNI` | `sceSaveDataMount2` | SaveData | **hecha** (`7b14f96`) | solo `import_names.inc`; eboot `+0x121716`, modo 1 (solo lectura); sin partida, `NOT_FOUND` |
-| `VwadwBBBJ80` | `sceSaveDataUmountWithBackup` | SaveData | **hecha** (`991fc5d`) | igual que `sceSaveDataUmount` (`save_umount`); no crea copia (ver 4.4) |
-| `RQOqDbk3bSU` | `sceSaveDataCheckBackupData` | SaveData | **hecha** (`2ced05c`) | `NOT_FOUND` (0x809F0008): no hay copia de seguridad; eboot `+0x121895`, solo tras una carga rota (ver 4.4) |
-| `lU9YRFsgwSU` | `sceSaveDataRestoreBackupData` | SaveData | **hecha** (`2ced05c`) | `NOT_FOUND`; eboot `+0x121bb2`, `+0x1224fd` y `+0x1257b8` |
-| `2xxUtuC-RzE` | `sceScreenShotEnable` | ScreenShot | **hecha** (`61ec55c`) | 0, sin efecto (política de captura, 4.1) |
-| `tIYf0W5VTi8` | `sceScreenShotDisable` | ScreenShot | **hecha** (`61ec55c`) | 0, sin efecto (política de captura, 4.1) |
-| `73WQ4Jj0nJI` | `sceScreenShotSetOverlayImageWithOrigin` | ScreenShot | **hecha** (`61ec55c`) | 0, sin efecto; `("/app0/image/corp.png", 0, 0, 3)` |
-| `isruqthpYcw` | `sceSharePlayInitialize` | SharePlay | **hecha** (`1f701d3`) | 0, sin efecto; `(NULL, 0x1800)` en eboot `+0xed32e`, resultado ignorado |
-| `UaLjloJinow` | `sceSharePlayTerminate` | SharePlay | **hecha** (`45ba36b`) | 0, sin efecto; ruta de cierre, eboot `+0xed406`, resultado ignorado |
-| `co2NCj--pnc` | `sceSharePlaySetProhibition` | SharePlay | **hecha** (`61ec55c`) | 0, sin efecto; `(0)` o `(2)` |
-| `kvYEw2lBndk` | `sceGameLiveStreamingInitialize` | GameLiveStreaming | **hecha** (`93a9b2b`) | 0, sin efecto; `(0x4000)` en eboot `+0xed338`, resultado ignorado |
-| `9yK6Fk8mKOQ` | `sceGameLiveStreamingTerminate` | GameLiveStreaming | **hecha** (`45ba36b`) | 0, sin efecto; ruta de cierre, eboot `+0xed40b`, resultado ignorado |
-| `dWM80AX39o4` | `sceGameLiveStreamingEnableLiveStreaming` | GameLiveStreaming | **hecha** (`61ec55c`) | 0, sin efecto: es un setter `(bool)`, no una consulta (**[V]**, 4.1) |
-| `Fc8qxlKINYQ` | `sceVideoRecordingSetInfo` | VideoRecording | **hecha** (`61ec55c`) | 0, sin efecto; `(0xd, &prohibido, 4)` |
-| `hHrGoGoNf+s` | `sceSysmoduleLoadModuleInternalWithArg` | Sysmodule | **hecha** (`673559f`) | como `module_load`; los argumentos se registran (**[V]**, ver 4.3) |
-| `4fU5yvOkVG4` | `sceSysmoduleGetModuleInfoForUnwind` | Sysmodule | **hecha** (`5fcc578`) | error explícito `0x805a1000`; la llama `libc.prx` (`+0xb852c`), no el eboot (ver 4.2) |
-| `SsC-m-S9JTA` | `sceSystemServiceParamGetString` | SystemService | **hecha** (`6e40c0e`) | ver 4.1 |
-| `9kPCz7Or+1Y` | `sceSystemServiceReenableMusicPlayer` | SystemService | **hecha** (`45ba36b`) | 0, sin efecto; solo la usa un envoltorio al que nada llama (4.1) |
-| `lUoqwTQu4Go` | `sceUserServiceGetUserColor` | UserService | **hecha** (`82c7d78`) | azul (0) para el usuario 1; solo la usa un getter al que nada llama (4.1) |
-| `Lr8ovHH9l6A` | `sceMsgDialogGetResult` | MsgDialog | **hecha** (`4e09b95`) | solo `import_names.inc`; ya probada en `tests/test_services.c:45-54` |
-| `fJgP+wqifno` | `sceDiscMap_7C980FFB0AA27E7A` (sin nombre real) | DiscMap | **hecha** (`d80dea5`) | `NO_BITMAP_INFO`, como su gemela (4.3) |
+| `TywrFKCoLGY` | `sceSaveDataInitialize3` | SaveData | **hecha** (`cb2a811`) | solo `import_names.inc`; el juego la llama con `NULL` (eboot `+0xed2eb`) |
+| `0z45PIH+SNI` | `sceSaveDataMount2` | SaveData | **hecha** (`998827c`) | solo `import_names.inc`; eboot `+0x121716`, modo 1 (solo lectura); sin partida, `NOT_FOUND` |
+| `VwadwBBBJ80` | `sceSaveDataUmountWithBackup` | SaveData | **hecha** (`abdaf03`) | igual que `sceSaveDataUmount` (`save_umount`); no crea copia (ver 4.4) |
+| `RQOqDbk3bSU` | `sceSaveDataCheckBackupData` | SaveData | **hecha** (`1d4a37d`) | `NOT_FOUND` (0x809F0008): no hay copia de seguridad; eboot `+0x121895`, solo tras una carga rota (ver 4.4) |
+| `lU9YRFsgwSU` | `sceSaveDataRestoreBackupData` | SaveData | **hecha** (`1d4a37d`) | `NOT_FOUND`; eboot `+0x121bb2`, `+0x1224fd` y `+0x1257b8` |
+| `2xxUtuC-RzE` | `sceScreenShotEnable` | ScreenShot | **hecha** (`8908852`) | 0, sin efecto (política de captura, 4.1) |
+| `tIYf0W5VTi8` | `sceScreenShotDisable` | ScreenShot | **hecha** (`8908852`) | 0, sin efecto (política de captura, 4.1) |
+| `73WQ4Jj0nJI` | `sceScreenShotSetOverlayImageWithOrigin` | ScreenShot | **hecha** (`8908852`) | 0, sin efecto; `("/app0/image/corp.png", 0, 0, 3)` |
+| `isruqthpYcw` | `sceSharePlayInitialize` | SharePlay | **hecha** (`0a6a19f`) | 0, sin efecto; `(NULL, 0x1800)` en eboot `+0xed32e`, resultado ignorado |
+| `UaLjloJinow` | `sceSharePlayTerminate` | SharePlay | **hecha** (`e5d817b`) | 0, sin efecto; ruta de cierre, eboot `+0xed406`, resultado ignorado |
+| `co2NCj--pnc` | `sceSharePlaySetProhibition` | SharePlay | **hecha** (`8908852`) | 0, sin efecto; `(0)` o `(2)` |
+| `kvYEw2lBndk` | `sceGameLiveStreamingInitialize` | GameLiveStreaming | **hecha** (`84835cc`) | 0, sin efecto; `(0x4000)` en eboot `+0xed338`, resultado ignorado |
+| `9yK6Fk8mKOQ` | `sceGameLiveStreamingTerminate` | GameLiveStreaming | **hecha** (`e5d817b`) | 0, sin efecto; ruta de cierre, eboot `+0xed40b`, resultado ignorado |
+| `dWM80AX39o4` | `sceGameLiveStreamingEnableLiveStreaming` | GameLiveStreaming | **hecha** (`8908852`) | 0, sin efecto: es un setter `(bool)`, no una consulta (**[V]**, 4.1) |
+| `Fc8qxlKINYQ` | `sceVideoRecordingSetInfo` | VideoRecording | **hecha** (`8908852`) | 0, sin efecto; `(0xd, &prohibido, 4)` |
+| `hHrGoGoNf+s` | `sceSysmoduleLoadModuleInternalWithArg` | Sysmodule | **hecha** (`e35f526`) | como `module_load`; los argumentos se registran (**[V]**, ver 4.3) |
+| `4fU5yvOkVG4` | `sceSysmoduleGetModuleInfoForUnwind` | Sysmodule | **hecha** (`84774c6`) | error explícito `0x805a1000`; la llama `libc.prx` (`+0xb852c`), no el eboot (ver 4.2) |
+| `SsC-m-S9JTA` | `sceSystemServiceParamGetString` | SystemService | **hecha** (`3ae18f1`) | ver 4.1 |
+| `9kPCz7Or+1Y` | `sceSystemServiceReenableMusicPlayer` | SystemService | **hecha** (`e5d817b`) | 0, sin efecto; solo la usa un envoltorio al que nada llama (4.1) |
+| `lUoqwTQu4Go` | `sceUserServiceGetUserColor` | UserService | **hecha** (`9fbcec8`) | azul (0) para el usuario 1; solo la usa un getter al que nada llama (4.1) |
+| `Lr8ovHH9l6A` | `sceMsgDialogGetResult` | MsgDialog | **hecha** (`401caef`) | solo `import_names.inc`; ya probada en `tests/test_services.c:45-54` |
+| `fJgP+wqifno` | `sceDiscMap_7C980FFB0AA27E7A` (sin nombre real) | DiscMap | **hecha** (`24b9ebf`) | `NO_BITMAP_INFO`, como su gemela (4.3) |
 | `NWtTN10cJzE` | `sceLibcHeapGetTraceInfo` | LibcInternalExt | hecha | ver 4.3 |
 
 Por ser APIs que el juego solo llama si ocurre algo concreto, se trabaja con el mismo criterio que la
@@ -111,7 +111,7 @@ verdad.
   primera llamada; `runtime_services_report()` saca los contadores en `runtime_report`. Añadir otra
   API "sin efecto" es una entrada en el `enum`, su nombre y su función. Hay ocho (2026-10-17, hasta la
   iteración 9 de la fase 2A): `sceSharePlayInitialize`, `sceGameLiveStreamingInitialize` y las seis
-  de la política de captura. Desde el 2026-10-19 (`45ba36b`) hay once: se suman
+  de la política de captura. Desde el 2026-10-19 (`e5d817b`) hay once: se suman
   `sceSharePlayTerminate`, `sceGameLiveStreamingTerminate` y `sceSystemServiceReenableMusicPlayer`.
 - **Ruta de cierre del juego [V]** (eboot `+0xed3f7`, 2026-10-19): llama, en este orden, a
   `sceSaveDataTerminate`, `sceSaveDataDialogTerminate`, `scePlayGoTerminate`, `sceSharePlayTerminate` y
@@ -129,7 +129,7 @@ verdad.
   `sceVideoRecordingSetInfo(0xd, &prohibido, 4)`. Ignora todos los resultados.
   `EnableLiveStreaming` es un setter, no una consulta: la **[H]** de la tabla queda resuelta como
   "sin efecto".
-- `sceUserServiceGetUserColor(user, *color)` **[V]** (2026-10-19, `82c7d78`): color fijo del usuario 1,
+- `sceUserServiceGetUserColor(user, *color)` **[V]** (2026-10-19, `9fbcec8`): color fijo del usuario 1,
   azul (`USER_COLOR_BLUE` = 0, el del primer usuario de una consola nueva). Solo para el usuario que el
   runtime ya reporta (`user_initial`). Cualquier otro id, o un puntero nulo, devuelve
   `USER_INVALID_ARGUMENT` (0x80960005) y no escribe nada.
@@ -245,7 +245,7 @@ Como el test compila `src/runtime_services.c` por separado, las nuevas líneas d
 comprueban con un test de tabla: cada nombre de la sección 3 está en `import_names.inc` y su NID
 coincide con `nid()` (script de comprobación en `tests/test_import_names.py`, nuevo).
 
-**Resultado (2026-10-19, commit `f4a5d0a`).** `tests/test_import_names.py` tiene la lista de las 23
+**Resultado (2026-10-19, commit `0f32588`).** `tests/test_import_names.py` tiene la lista de las 23
 `(nombre, biblioteca, NID)` de la sección 3 y dos tests:
 
 - `test_nid_matches_name`: el NID de cada nombre coincide con `nid()`. La excepción es
@@ -262,7 +262,7 @@ coincide con `nid()` (script de comprobación en `tests/test_import_names.py`, n
   esos 8 fallos. Fuera del contenedor, los tests que ejecutan binarios de `out/` fallan porque no
   encuentran `libavcodec.so.62`.
 
-**Resultado (2026-10-19, commit `4e09b95`).** Se añaden las 8 líneas que faltaban en `import_names.inc`,
+**Resultado (2026-10-19, commit `401caef`).** Se añaden las 8 líneas que faltaban en `import_names.inc`,
 cada una junto a una hermana de su biblioteca:
 
 - `test_import_names.py` pasa los dos tests con las 23.
@@ -274,7 +274,7 @@ cada una junto a una hermana de su biblioteca:
 El punto 6 de arriba (`GetResult` tras `Open`) ya estaba cubierto por `tests/test_services.c:45-54`, con
 el diálogo terminado, en curso y con `NULL`.
 
-**Resultado (2026-10-19, commit `45ba36b`).** `sceSharePlayTerminate`, `sceGameLiveStreamingTerminate` y
+**Resultado (2026-10-19, commit `e5d817b`).** `sceSharePlayTerminate`, `sceGameLiveStreamingTerminate` y
 `sceSystemServiceReenableMusicPlayer` son tres entradas más de `no_effect`. `tests/test_services.c` prueba
 el punto 1 con ellas:
 
@@ -288,7 +288,7 @@ el punto 1 con ellas:
   esperados).
 - `--check-imports` da 15 (ver sección 2).
 
-**Resultado (2026-10-19, commit `82c7d78`).** `tests/test_services.c` prueba el punto 5 con
+**Resultado (2026-10-19, commit `9fbcec8`).** `tests/test_services.c` prueba el punto 5 con
 `sceUserServiceGetUserColor`:
 
 - Con el usuario 1 devuelve 0 y escribe azul. La variable de salida vale `0x7f` antes de la llamada, para
@@ -300,7 +300,7 @@ el punto 1 con ellas:
   esperados).
 - `--check-imports` da 14 (ver sección 2).
 
-**Resultado (2026-10-19, commit `2ced05c`).** `sceSaveDataCheckBackupData` y
+**Resultado (2026-10-19, commit `1d4a37d`).** `sceSaveDataCheckBackupData` y
 `sceSaveDataRestoreBackupData` se prueban en `tests/test_runtime.c` (`savedata_backup_queries`), no en
 `tests/test_services.c`, porque `runtime_savedata.c` no se compila en `services-test`. El punto 2 habla
 de un `OrbisSaveDataMountPoint`, pero las dos reciben su propia estructura (ver 4.4); el test usa los
@@ -316,7 +316,7 @@ de un `OrbisSaveDataMountPoint`, pero las dos reciben su propia estructura (ver 
 - Suite Python en `ps4dev`: 257 tests, 35 omitidos y 4 fallos esperados, el resto OK.
 - `--check-imports` da 12 (ver sección 2).
 
-**Resultado (2026-10-19, commit `5fcc578`).** `sceSysmoduleGetModuleInfoForUnwind` se prueba en
+**Resultado (2026-10-19, commit `84774c6`).** `sceSysmoduleGetModuleInfoForUnwind` se prueba en
 `tests/test_content.c` (`unwind_unavailable`), porque Sysmodule vive en `runtime_content.c`:
 
 - Con flags 1 (lo que pasa `libc.prx`) y con flags 0 devuelve `0x805a1000`, y los `0x130` bytes de la
@@ -358,13 +358,13 @@ de un `OrbisSaveDataMountPoint`, pero las dos reciben su propia estructura (ver 
 
 ## 8. Criterios de aceptación
 
-- [x] `--check-imports` no lista ninguna de las 23 (2026-10-19, `5fcc578`: da 11, los 8 de Audiodec de la
+- [x] `--check-imports` no lista ninguna de las 23 (2026-10-19, `84774c6`: da 11, los 8 de Audiodec de la
   Spec 4 y las 3 trampas de libkernel de la Spec 2).
 - [x] `out/services-test` cubre las APIs nuevas y pasa (2026-10-19: cubre las tres "sin efecto",
-  `45ba36b`, y `GetUserColor`, `82c7d78`. Las APIs de otros archivos se prueban donde se compila su
-  código: las de copia de seguridad en `out/runtime-test`, `2ced05c`, y `GetModuleInfoForUnwind` en
-  `out/content-test`, `5fcc578`).
-- [x] `tests/test_import_names.py` confirma NID y nombre de cada una (2026-10-19, `4e09b95`: pasan los
+  `e5d817b`, y `GetUserColor`, `9fbcec8`. Las APIs de otros archivos se prueban donde se compila su
+  código: las de copia de seguridad en `out/runtime-test`, `1d4a37d`, y `GetModuleInfoForUnwind` en
+  `out/content-test`, `84774c6`).
+- [x] `tests/test_import_names.py` confirma NID y nombre de cada una (2026-10-19, `401caef`: pasan los
   23 NID y los 23 nombres).
 - [x] En un arranque real, cada API "sin efecto" que se llame deja su línea de log (2026-10-17: se
   cumple para las ocho llamadas hasta ahora, `out/run-2a-10b.log`; 2026-10-19: las mismas ocho, en

@@ -234,14 +234,14 @@ flowchart LR
 | — | Dump CUSA47999 v01.00 extraído (ShadPS4Plus `pkg_extractor`) en `Tsukihime/CUSA47999/`, ignorado en `.gitignore`. | — |
 | — | `prepare.py` y `link_modules.py` procesan el eboot sin errores: 104 enlaces nativos a `libc`/`Fios2`, 359 imports para el runtime, 0 parches `fs→gs`. | — |
 | 1 | Inventario estático (sección de la etapa 1): ~61 APIs sin implementación, 57 con nombre. | — |
-| 2 | Spec 2 (kernel) cerrada: 26 de las 29 APIs de libkernel implementadas y 3 trampas con nombre; en la fase 2A se adelantaron 15 APIs de la Spec 3 y una provisional de la 4. | `2531937`…`7244263` |
-| 3 | Spec 1a cerrada. Fuera del árbol: los hooks del juego anterior y sus backends, la pestaña "Game" del menú, el XML y el perfil de parches, el touchpad en dos mitades, los tests del juego anterior y los textos de identidad. El cargador solo arranca CUSA47999 (código 30 para cualquier otro). Los 4 tests del launcher que rompe quedan como fallo esperado. | `9f86fc1`…`4832164` |
-| 4 | Hito de primer fotograma cerrado: línea `GPU:` al final del log, capturas PNG del fotograma presentado (`TSUKI_SCREENSHOT_AT`, F12), `tools/compare_captures.sh`, línea base en `out/baseline/` y decisión: seguir el orden previsto. | `8c40e39`…`5acfafe` y `0e6bf51` (cierre) |
-| 5 | Spec 1b cerrada. Fuera del árbol: `gbuffer_draw` y la constante de cámara de 864 bytes, los hashes fijos de shaders del upscaler temporal (sustituidos por `UiComposition::Trigger`, que solo dispara con un hash configurado) y el valor por defecto de `TSUKI_READBACK_LINEAR` en `run.py`. Un contador temporal con las heurísticas encendidas dio 0 coincidencias, y las capturas del arranque y del recorrido de la Spec 6 salen idénticas tras los borrados. | `fe33d5e`…`13cba4c`, `61e34a3`…`0570722` y el cierre (`Docs(Spec1b): cierre de la Spec 1b`) |
-| 6 | Spec 3 cerrada: las 23 APIs de plataforma con comportamiento explícito y probado. `tests/test_import_names.py` fija NID y nombre de cada una, y no se finge ninguna conexión a PSN ni a la red. | `f4a5d0a`…`5fcc578` |
-| 7a | Spec 4a cerrada. `libSceAudiodec` decodifica ATRAC9 sobre LibAtrac9: música, voces y efectos `vse`, con el uso de la biblioteca documentado en `docs/audiodec.md`. Hay tests bit-exactos con los cinco clips de referencia, un fixture con los bloques de control reales y la reproducción de los flujos que vuelca una partida. `libSceAudiodecCpu` (HEVAG) responde con un error explícito hasta la Spec 4b. | `07800f5`…`6d82110` y el cierre (`docs(spec4): cierre de la parte 4a`) |
-| 7b | Spec 4b cerrada. `libSceAudiodecCpu` decodifica los efectos HEVAG de `vag.mrg` con `decode_hevag` de vgmstream, adaptado en `third_party/vgmstream_hevag/` con su aviso ISC. El estado vive en la memoria de trabajo del guest, la voz acaba por la bandera 7 y el contrato está en `docs/audiodec.md` 2.6–2.7. Hay tests con las 19 entradas de `vag.mrg` frente a `vgmstream-cli` y con las rutinas del juego emuladas. | `e6d01e7`…`cd056d8` y el cierre (`docs(spec4): cierre de la parte 4b`) |
-| 8 | Spec 5 cerrada. El AvPlayer de shadPS4 reproduce los vídeos del juego. Son ocho arreglos, cada uno con su caso rojo en `avplayer-test` o `kernel-thread-test`: la carrera de `Kernel::Thread` que colgaba `Stop` en el título del capítulo 1, el `StateStop` sin audio, `Start` con la reproducción en curso, `Stop` que rebobinaba el lector, `JumpToTime` real, el bucle, los últimos fotogramas con fotogramas B y el ritmo del bucle sin audio. El trazador `TSUKI_TRACE_AVPLAYER` dio el contrato del juego (`docs/avplayer.md`), y el arnés tiene un modo barrido para los 134 vídeos. | `c06b6a1`…`1ab2a94` y el cierre (`docs(spec5): cierre`) |
+| 2 | Spec 2 (kernel) cerrada: 26 de las 29 APIs de libkernel implementadas y 3 trampas con nombre; en la fase 2A se adelantaron 15 APIs de la Spec 3 y una provisional de la 4. | `5629318`…`ba65173` |
+| 3 | Spec 1a cerrada. Fuera del árbol: los hooks del juego anterior y sus backends, la pestaña "Game" del menú, el XML y el perfil de parches, el touchpad en dos mitades, los tests del juego anterior y los textos de identidad. El cargador solo arranca CUSA47999 (código 30 para cualquier otro). Los 4 tests del launcher que rompe quedan como fallo esperado. | `f89e069`…`37d7344` |
+| 4 | Hito de primer fotograma cerrado: línea `GPU:` al final del log, capturas PNG del fotograma presentado (`TSUKI_SCREENSHOT_AT`, F12), `tools/compare_captures.sh`, línea base en `out/baseline/` y decisión: seguir el orden previsto. | `fbdd75c`…`0424e76` y `c6cf5d4` (cierre) |
+| 5 | Spec 1b cerrada. Fuera del árbol: `gbuffer_draw` y la constante de cámara de 864 bytes, los hashes fijos de shaders del upscaler temporal (sustituidos por `UiComposition::Trigger`, que solo dispara con un hash configurado) y el valor por defecto de `TSUKI_READBACK_LINEAR` en `run.py`. Un contador temporal con las heurísticas encendidas dio 0 coincidencias, y las capturas del arranque y del recorrido de la Spec 6 salen idénticas tras los borrados. | `59a77aa`…`92284fe`, `a74a656`…`1baba9c` y el cierre (`Docs(Spec1b): cierre de la Spec 1b`) |
+| 6 | Spec 3 cerrada: las 23 APIs de plataforma con comportamiento explícito y probado. `tests/test_import_names.py` fija NID y nombre de cada una, y no se finge ninguna conexión a PSN ni a la red. | `0f32588`…`84774c6` |
+| 7a | Spec 4a cerrada. `libSceAudiodec` decodifica ATRAC9 sobre LibAtrac9: música, voces y efectos `vse`, con el uso de la biblioteca documentado en `docs/audiodec.md`. Hay tests bit-exactos con los cinco clips de referencia, un fixture con los bloques de control reales y la reproducción de los flujos que vuelca una partida. `libSceAudiodecCpu` (HEVAG) responde con un error explícito hasta la Spec 4b. | `a7cdcdd`…`d2c224b` y el cierre (`docs(spec4): cierre de la parte 4a`) |
+| 7b | Spec 4b cerrada. `libSceAudiodecCpu` decodifica los efectos HEVAG de `vag.mrg` con `decode_hevag` de vgmstream, adaptado en `third_party/vgmstream_hevag/` con su aviso ISC. El estado vive en la memoria de trabajo del guest, la voz acaba por la bandera 7 y el contrato está en `docs/audiodec.md` 2.6–2.7. Hay tests con las 19 entradas de `vag.mrg` frente a `vgmstream-cli` y con las rutinas del juego emuladas. | `a9ccdbb`…`573d304` y el cierre (`docs(spec4): cierre de la parte 4b`) |
+| 8 | Spec 5 cerrada. El AvPlayer de shadPS4 reproduce los vídeos del juego. Son ocho arreglos, cada uno con su caso rojo en `avplayer-test` o `kernel-thread-test`: la carrera de `Kernel::Thread` que colgaba `Stop` en el título del capítulo 1, el `StateStop` sin audio, `Start` con la reproducción en curso, `Stop` que rebobinaba el lector, `JumpToTime` real, el bucle, los últimos fotogramas con fotogramas B y el ritmo del bucle sin audio. El trazador `TSUKI_TRACE_AVPLAYER` dio el contrato del juego (`docs/avplayer.md`), y el arnés tiene un modo barrido para los 134 vídeos. | `f11b154`…`d9d6fe9` y el cierre (`docs(spec5): cierre`) |
 
 ### Flujo de cada spec
 
@@ -451,7 +451,7 @@ de lo que viene después cuesta esos 6 min 29 s. Registro en la sección 4.1 de 
 entonces el arranque va directo al menú de título, sin el vídeo, y ya no cuesta esos 6 min 29 s. Para
 volver a ver el prólogo hay que restaurar la partida sin progreso (`out/savedata-sin-progreso/`).*
 
-**Fase 2B (2026-10-17, `7244263`): spec cerrada.** Se miró el sitio de llamada de las 12 que faltaban
+**Fase 2B (2026-10-17, `ba65173`): spec cerrada.** Se miró el sitio de llamada de las 12 que faltaban
 antes de escribir código. Todas menos `scePthreadCancel` las llama solo `libc.prx`:
 
 - `pthread_rwlock_*` POSIX: el lock de su tabla de módulos.
@@ -769,7 +769,7 @@ esa línea de log.
 - [x] Las APIs nuevas tienen test: `services-test` (las tres "sin efecto" y `GetUserColor`), `runtime-test`
   (copias de seguridad) y `content-test` (`GetModuleInfoForUnwind`), cada una donde se compila su código.
 
-**Resultado (2026-10-19).** Spec cerrada en 7 tareas (`f4a5d0a`…`5fcc578`). El detalle de cada API, con su
+**Resultado (2026-10-19).** Spec cerrada en 7 tareas (`0f32588`…`84774c6`). El detalle de cada API, con su
 sitio de llamada, está en la spec.
 
 ---
