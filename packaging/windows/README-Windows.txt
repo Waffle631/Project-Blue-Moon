@@ -51,7 +51,7 @@ Data
 Problems
 - Black screen at start: Advanced -> Clear shader cache, then start again.
 - The game does not open or stops: look at the Log section on Advanced, and send
-  user\last_run.log with your report: https://github.com/OWNER/REPO/issues
+  user\last_run.log with your report: https://github.com/Waffle631/Project-Blue-Moon/issues
 - RTSS/Afterburner and ReShade must target bin\tsuki-probe.exe (the game), not the launcher.
   Select Vulkan in the ReShade installer.
 

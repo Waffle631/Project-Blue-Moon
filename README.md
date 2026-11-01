@@ -49,7 +49,7 @@ languages, but nobody has played them with this port. Routes past chapter 1 have
 
 ## Download and play
 
-Download the package for your system from the [Releases page](https://github.com/OWNER/REPO/releases).
+Download the package for your system from the [Releases page](https://github.com/Waffle631/Project-Blue-Moon/releases).
 
 ### Windows
 
@@ -96,7 +96,7 @@ After the first save, the game starts at the title menu.
 
 - Black screen at start: **Advanced → Clear shader cache**, then start again.
 - The game does not open, or stops: look at the **Log** section on **Advanced**, and attach `last_run.log` to
-  your report on the [Issues page](https://github.com/OWNER/REPO/issues).
+  your report on the [Issues page](https://github.com/Waffle631/Project-Blue-Moon/issues).
 
 ## While playing
 
@@ -134,7 +134,7 @@ Defaults; change them on the launcher's **Game → Controls**.
 The main branch is `tsuki/main`. Clone with the submodules:
 
 ```bash
-git clone --recursive https://github.com/OWNER/REPO
+git clone --recursive https://github.com/Waffle631/Project-Blue-Moon
 ```
 
 ### Linux

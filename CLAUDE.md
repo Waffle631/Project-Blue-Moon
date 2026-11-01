@@ -143,7 +143,7 @@ with before/after captures; the rename to `tsuki` is Spec 7, done last).
     off by default: `scripts/mods.py` only mounts the previous game's `dvdroot_ps4/` layout (roadmap §8).
   - The READMEs are rewritten for this project (`README.md`, `README.es.md` in Spanish and
     `packaging/windows/README-Windows.txt`). Their repository links use the one placeholder
-    `https://github.com/OWNER/REPO`, also in `.github/ISSUE_TEMPLATE/`, which the user replaces when the repository
+    `https://github.com/Waffle631/Project-Blue-Moon`, also in `.github/ISSUE_TEMPLATE/`, which the user replaces when the repository
     exists.
   - The title font (`launcher/gowfont.ttf`), the launcher palette and the icon are not changed by the spec. It only
     lists their files and how to regenerate the `.ico` and the AppImage icon (§7); having them changed by the user is

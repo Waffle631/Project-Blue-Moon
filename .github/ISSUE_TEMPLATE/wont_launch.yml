@@ -8,7 +8,7 @@ body:
         Most launch failures come from an incomplete or misplaced game dump (missing `param.sfo`,
         another game or version, wrong folder selected). The port runs TSUKIHIME -A piece of blue
         glass moon- CUSA47999, version 01.00 only. Check the README's setup section before filing:
-        https://github.com/OWNER/REPO#download-and-play
+        https://github.com/Waffle631/Project-Blue-Moon#download-and-play
 
   - type: input
     id: version

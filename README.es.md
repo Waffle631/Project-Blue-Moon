@@ -52,7 +52,7 @@ comprobado.
 
 ## Descargar y jugar
 
-Descarga el paquete de tu sistema desde la [página de Releases](https://github.com/OWNER/REPO/releases).
+Descarga el paquete de tu sistema desde la [página de Releases](https://github.com/Waffle631/Project-Blue-Moon/releases).
 
 ### Windows
 
@@ -101,7 +101,7 @@ Después del primer guardado, el juego arranca en el menú de título.
 
 - Pantalla negra al empezar: **Advanced → Clear shader cache** y vuelve a empezar.
 - El juego no abre o se para: mira la sección **Log** de **Advanced** y adjunta `last_run.log` a tu informe en la
-  [página de Issues](https://github.com/OWNER/REPO/issues).
+  [página de Issues](https://github.com/Waffle631/Project-Blue-Moon/issues).
 
 ## Mientras juegas
 
@@ -140,7 +140,7 @@ Valores por defecto; se cambian en **Game → Controls** del launcher.
 La rama principal es `tsuki/main`. Clona con los submódulos:
 
 ```bash
-git clone --recursive https://github.com/OWNER/REPO
+git clone --recursive https://github.com/Waffle631/Project-Blue-Moon
 ```
 
 ### Linux

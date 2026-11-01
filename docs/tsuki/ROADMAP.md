@@ -1249,7 +1249,7 @@ la spec, tarea por tarea.
 | ~~Probar el launcher en Linux con el dump, desde el código fuente y desde el AppImage~~ Hecho el 2026-10-31 | Spec 8 (tarea 15 de su plan) |
 | Confirmar la fusión de `tsuki/spec-8` en `tsuki/main` | Cierre de la Spec 8 |
 | Poner la fuente de títulos, la paleta y el icono nuevos (los archivos están listados en la spec, §7). Hechos el acento azul y el icono el 2026-10-31; falta la fuente | Antes de publicar la Alpha |
-| Crear el repositorio de GitHub y sustituir el marcador `https://github.com/OWNER/REPO` | Antes de publicar la Alpha |
+| Crear el repositorio de GitHub y sustituir el marcador `https://github.com/Waffle631/Project-Blue-Moon` | Antes de publicar la Alpha |
 | Probar el `.zip` en Windows real (el launcher reconoce el dump; el juego llega al menú de título con música y guarda) | Antes de publicar la Alpha |
 | Subir la release (AppImage y `.zip` de Windows) | Publicación de la Alpha |
 
