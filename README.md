@@ -32,9 +32,8 @@ languages, but nobody has played them with this port. Routes past chapter 1 have
 **Platforms**
 - **Linux:** tested on Bazzite 44 (Fedora-based), KDE Plasma 6 on Wayland, AMD Radeon RX 6650 XT (RADV),
   Ryzen 5 7600.
-- **Windows 10 and 11:** built from the same sources. So far it has been tested under Wine 11 on Linux, where the
-  launcher recognises the game and the game reaches the title menu; it has **not been tested on a real Windows PC
-  yet**. If you try it, please open an issue with your `last_run.log` (see below).
+- **Windows 10 and 11:** built from the same sources and tested on Windows. If something fails on your PC,
+  please open an issue with your `last_run.log` (see below).
 
 ## Requirements
 

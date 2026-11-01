@@ -34,9 +34,8 @@ comprobado.
 **Plataformas**
 - **Linux:** probado en Bazzite 44 (basado en Fedora), KDE Plasma 6 en Wayland, AMD Radeon RX 6650 XT (RADV),
   Ryzen 5 7600.
-- **Windows 10 y 11:** se compila con el mismo código. Por ahora se ha probado con Wine 11 en Linux, donde el
-  launcher reconoce el juego y el juego llega al menú de título; **todavía no se ha probado en un PC con Windows
-  de verdad**. Si lo pruebas, abre un issue con tu `last_run.log` (ver abajo).
+- **Windows 10 y 11:** se compila con el mismo código y se ha probado en Windows. Si algo falla en tu PC,
+  abre un issue con tu `last_run.log` (ver abajo).
 
 ## Requisitos
 

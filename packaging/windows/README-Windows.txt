@@ -2,8 +2,8 @@ Project Blue Moon for Windows
 =============================
 
 A native PC port of TSUKIHIME -A piece of blue glass moon- (PS4). This is an Alpha: the game is
-playable up to the title of chapter 1, in English. It has been tested under Wine on Linux, not yet
-on a real Windows PC: if something fails, please report it (see Problems).
+playable up to the title of chapter 1, in English. It has been tested on Windows: if something
+fails on your PC, please report it (see Problems).
 
 No game files are included. You need your own dump of TSUKIHIME -A piece of blue glass moon-:
 CUSA47999, version 01.00, decrypted, as a folder that contains eboot.bin, sce_module and sce_sys.
