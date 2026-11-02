@@ -5,8 +5,8 @@
 # CUSA01715). Exceptions: docs/gow3/, docs/plans/ and docs/specs/ (history with the names of their time), the
 # submodules, pgo/, this script and its test, lines marked "rename-check: ok" (a test that checks an old variable no
 # longer works has to name it; the README credit to the previous game's port), "gow3 contributors" on a
-# copyright line, the path docs/gow3/ anywhere, and in CLAUDE.md and docs/tsuki/ROADMAP.md the branch `gow3` and the
-# relative path ../gow3/.
+# copyright line, the path docs/gow3/ anywhere, and in CLAUDE.md, docs/tsuki/ROADMAP.md and docs/tsuki/ESTADO.md the
+# branch `gow3` and the relative path ../gow3/.
 # Exit 0 with no output when nothing is left, 1 when something is, 2 on an error.
 set -u
 (($# <= 1)) || { echo "uso: $0 [repo_dir]" >&2; exit 2; }
@@ -21,7 +21,7 @@ found=$({
         awk -v old="$old" '{
             path = $0; sub(/:.*/, "", path); rest = $0; sub(/^[^:]*:[^:]*:/, "", rest); rest = tolower(rest)
             gsub(/docs\/gow3\//, "", rest)
-            if (path == "CLAUDE.md" || path == "docs/tsuki/ROADMAP.md")
+            if (path == "CLAUDE.md" || path == "docs/tsuki/ROADMAP.md" || path == "docs/tsuki/ESTADO.md")
                 gsub(/rama `gow3`|branch `gow3`|branch gow3|\.\.\/gow3\//, "", rest)
             if (rest ~ /copyright/) gsub(/gow3 contributors/, "", rest)
             if (rest ~ old) print }'

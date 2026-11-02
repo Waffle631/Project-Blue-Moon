@@ -8,7 +8,7 @@ SCRIPT=ROOT/'tools/check_rename.sh'
 
 # Spec 7 §6 (docs/specs/2026-10-14-spec-7-renombrado.md): check_rename.sh fails on any old name left in the tracked
 # tree, in a file's contents or in its path, except in the history folders, the submodules, pgo/, the branch
-# mention in CLAUDE.md and the roadmap, and lines marked "rename-check: ok". Since §11 it also fails on the previous
+# mention in CLAUDE.md, the roadmap and ESTADO.md, and lines marked "rename-check: ok". Since §11 it also fails on the previous
 # game's name and serials, except in "gow3 contributors" credits; since Spec 8 §6 the player READMEs are checked too.
 class CheckRenameTests(unittest.TestCase):
     def setUp(self):
@@ -53,9 +53,9 @@ class CheckRenameTests(unittest.TestCase):
         r=self.check()
         self.assertEqual((r.returncode,r.stdout),(0,''),r.stderr)
 
-    def test_branch_mention_only_in_claude_and_roadmap(self):
+    def test_branch_mention_only_in_claude_roadmap_and_estado(self):
         line='History stays in the rama `gow3`, branch gow3 and branch `gow3`; see [docs/gow3/ROADMAP.md](../gow3/ROADMAP.md).\n'
-        self.write('CLAUDE.md',line); self.write('docs/tsuki/ROADMAP.md',line)
+        self.write('CLAUDE.md',line); self.write('docs/tsuki/ROADMAP.md',line); self.write('docs/tsuki/ESTADO.md',line)
         r=self.check()
         self.assertEqual((r.returncode,r.stdout),(0,''),r.stderr)
         self.write('docs/a.md',line)
@@ -76,7 +76,7 @@ class CheckRenameTests(unittest.TestCase):
         r=self.check()
         self.assertEqual(r.returncode,1,r.stderr)
         self.assertIn('gpu/b.h:1:',r.stdout)
-        self.write('docs/c.md','See [it](../gow3/ROADMAP.md).\n') # the relative form only in CLAUDE.md and the roadmap
+        self.write('docs/c.md','See [it](../gow3/ROADMAP.md).\n') # the relative form only in CLAUDE.md, the roadmap and ESTADO.md
         r=self.check()
         self.assertIn('docs/c.md:1:',r.stdout)
 
