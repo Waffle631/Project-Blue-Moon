@@ -206,8 +206,9 @@ motivos están en la sección "Hito".
 | 9 | 2D correcto, ratón y saves | **Spec 6** | Hito (empieza), Specs 3, 4 y 5 (cierra) | 1–3 semanas (real: del 25 al 28 de octubre) | ✅ Concluida el 2026-10-28 (ratón, saves, idioma y render 2D; línea base `out/baseline/6a/` aprobada por el usuario y repetible con `tools/route.sh`; la miniatura pixelada es del juego y se deja; la comprobación tras la Spec 1b pasa a la 1b, decisión del usuario) |
 | 10 | Renombrar el proyecto a `tsuki` | **Spec 7** | Specs 6 y 1b | 2–3 días | ✅ Cerrada el 2026-10-30 (fusionada en `tsuki/main`): recorrido y oráculo de arranque idénticos; el usuario confirmó el título; métricas del overlay en Linux hechas (§9 de su spec). Windows sin probar |
 | 11 | Alpha pública ("Project Blue Moon"): criterios, Windows, launcher, empaquetado y README | **Spec 8** | Spec 7 | sin estimar (real: 2 días, el 30 y el 31 de octubre) | ✅ Cierre técnico el 2026-10-31 en `tsuki/spec-8`: build cruzado de Windows con exit 0 y menú de título bajo Wine, launcher que reconoce CUSA47999, AppImage y `.zip`, README, y recorrido y oráculo idénticos. El usuario probó el launcher en Linux y juzgó los logos y el audio. Falta lo de antes de publicar: la fuente, el repositorio, Windows real y la release |
+| 12 | Texto y guiones: herramienta de extracción y mod de texto (primera spec de la Beta) | **Spec 9** | Spec 8 | sin estimar | ⬜ Borrador del 2026-11-02, sin aprobar ([spec](../specs/2026-11-02-spec-9-texto-y-guiones.md)) |
 
-**Total: 9 specs (la 4 en dos partes) y 1 hito** (pueden crecer según lo que aparezca al ejecutar el juego).
+**Total: 10 specs (la 4 en dos partes) y 1 hito** (pueden crecer según lo que aparezca al ejecutar el juego).
 
 Leyenda de estado: ⬜ Pendiente · 🟨 En curso · ✅ Concluida · ⛔ Bloqueada
 
@@ -1208,6 +1209,25 @@ la spec, tarea por tarea.
 - **Publicada el 2026-11-02.** El repositorio es https://github.com/Waffle631/Project-Blue-Moon, el `.zip` se probó en
   Windows real y la release (AppImage y `.zip`) está subida. La fuente de títulos no se cambió.
 
+### Spec 9 — Texto y guiones (borrador de la Beta)
+
+> Spec detallada: [docs/specs/2026-11-02-spec-9-texto-y-guiones.md](../specs/2026-11-02-spec-9-texto-y-guiones.md)
+
+**Problema:** el usuario quiere preparar una traducción futura. El texto del juego está separado de los guiones
+(`script_text.mrg` con 43 971 líneas por idioma, citadas desde los 550 guiones de `allscr.mrg` por número), pero no hay
+una herramienta que lo extraiga ni una forma de reemplazarlo: `scripts/mods.py` solo monta la estructura `dvdroot_ps4/`
+del juego anterior.
+
+**Solución (propuesta):**
+- una herramienta versionada que extrae texto, guiones e índice a `out/`;
+- un mod de texto que lleva solo líneas propias (`text/en.tsv`) y que, en cada arranque, reconstruye `script_text.mrg`
+  desde el dump del usuario, sin distribuir texto del juego;
+- un experimento previo (tarea 1) que mide los tres riesgos: ajuste de líneas largas, glifos de la fuente `ft_en.mrg` y
+  si el juego verifica el archivo.
+
+**Estado (2026-11-02):** borrador, sin aprobar y sin ninguna tarea empezada. Fuera de alcance: traducir, imágenes con
+texto, menús del `eboot`, subtítulos de vídeo y ampliar la fuente.
+
 ---
 
 ## 6. Riesgos
@@ -1263,7 +1283,8 @@ Ideas para versiones siguientes, sin compromiso:
 - **Beta:** todas las rutas (Arcueid y Ciel) hasta los finales y créditos.
 - Launcher con resolución de ventana y remapeo pensados para una novela visual. *(El idioma del juego ya lo elige el
   launcher desde la Spec 8.)*
-- Mods de Tsukihime. `scripts/mods.py` solo monta mods con `dvdroot_ps4/`, que es la estructura del juego anterior,
+- Mods de Tsukihime. *(Empezado como borrador: la Spec 9 cubre el mod de texto sobre `script_text.mrg`. El reemplazo de
+  entradas dentro de los demás `.mrg` sigue sin spec.)* `scripts/mods.py` solo monta mods con `dvdroot_ps4/`, que es la estructura del juego anterior,
   y Tsukihime tiene sus datos en `image/` y `data/`. El launcher trae los mods desactivados (decisión del usuario,
   Spec 8, 2026-10-31) y los README no los anuncian. Adaptarlo es trabajo nuevo: hay que decidir qué estructura acepta
   y si un mod puede reemplazar entradas dentro de los `.mrg`.
