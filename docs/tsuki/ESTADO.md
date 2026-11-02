@@ -111,6 +111,8 @@ with before/after captures; the rename to `tsuki` is Spec 7, done last).
   full list in the script; since Spec 8 the player READMEs are checked too). The user confirmed the title in the window and the Insert menu. The
   performance overlay now measures CPU, RAM, GPU and VRAM on Linux too (spec §9): `/proc/self/statm`, process CPU time,
   and `drm-engine-gfx` from the fdinfo of the process's `/dev/dri` descriptors (`tsuki_perf_stats.h`).
+- **The Alpha is published (2026-11-02):** repository https://github.com/Waffle631/Project-Blue-Moon (the URL the READMEs already used),
+  `.zip` tested by the user on real Windows, release with the AppImage and the `.zip` uploaded. The title font was not changed.
 - Spec 8 (public Alpha, approved 2026-10-30) is technically closed (2026-10-31, branch `tsuki/spec-8`; spec
   `docs/specs/2026-10-30-spec-8-alpha.md`, task by task). The recorded route and the boot oracle still match
   (`run-oracle.sh` takes need `TSUKI_CONFIG=out/t9-defaults.ini`: the root `tsuki.ini` holds the user's own settings,
